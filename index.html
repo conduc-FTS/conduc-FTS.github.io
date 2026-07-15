@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#3A3A3A">
+<link rel="manifest" href="manifest_dashboard.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-dashboard-192.png">
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw_dashboard.js").catch(() => {});
+}
+</script>
+<title>FTS Dashboard</title>
+<link rel="stylesheet" href="css/dashboard.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+<div class="app-shell active" id="appShell">
+
+  <!-- Barre du haut : logo, chantier actif, utilisateur -->
+  <header class="app-topbar">
+    <div class="app-topbar-brand">
+      <span class="logo-badge">FTS</span>
+      <div class="brand-titles">
+        <h1>FTS Dashboard</h1>
+        <p>Fondations et Travaux Spéciaux</p>
+      </div>
+    </div>
+    <div class="app-topbar-right">
+      <div class="chantier-badge" id="chantierBadge" hidden>
+        <div class="code" id="chantierBadgeCode">—</div>
+        <div class="nom" id="chantierBadgeNom">—</div>
+      </div>
+      <div class="user-avatar-block">
+        <div class="user-avatar" id="userAvatar">?</div>
+        <div>
+          <div class="name" id="userName">Non connecté</div>
+          <div class="role" id="userRole">—</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Vue ACCUEIL -->
+  <main class="app-view active" id="view-accueil">
+    <div class="app-body">
+      <div class="app-col-left">
+        <div class="activite-title" style="margin-top:0">Applications</div>
+        <div class="app-tiles-grid">
+          <a class="app-tile accent-blue" href="rapport/">
+            <div class="tile-icon icon-blue">📋</div>
+            <h3>Rapport Journalier</h3>
+            <p>Saisie pieux, matériel, personnel du jour</p>
+            <span class="tile-chevron">›</span>
+          </a>
+          <a class="app-tile accent-pink" href="accueil-interimaire/">
+            <div class="tile-icon icon-pink">🦺</div>
+            <h3>Accueil Intérimaire</h3>
+            <p>QCM sécurité &amp; fiche d'accueil</p>
+            <span class="tile-chevron">›</span>
+          </a>
+          <a class="app-tile accent-green" href="accueil-securite/">
+            <div class="tile-icon icon-green">🛡️</div>
+            <h3>Accueil Sécurité</h3>
+            <p>15 points de sécurité chantier</p>
+            <span class="tile-chevron">›</span>
+          </a>
+          <a class="app-tile accent-yellow" href="materiel/">
+            <div class="tile-icon icon-yellow">🔧</div>
+            <h3>Fiche Matériel</h3>
+            <p>Pannes, entretien &amp; envoi mail</p>
+            <span class="tile-chevron">›</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="app-col-right">
+        <div class="date-banner">
+          <div class="date-box">
+            <div class="mois" id="dateBoxMois">—</div>
+            <div class="jour" id="dateBoxJour">—</div>
+          </div>
+          <div>
+            <div class="date-main" id="dateMain">—</div>
+            <div class="date-sub" id="dateSub">—</div>
+          </div>
+        </div>
+
+        <div class="activite-title">Activité récente</div>
+        <div id="activiteList">
+          <div class="activite-empty">Sélectionne un chantier pour voir son activité.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Vue CHANTIERS -->
+  <main class="app-view" id="view-chantiers">
+    <div class="app-body" style="flex-direction:column;max-width:700px">
+      <div class="panel" id="panel-chantier-actif">
+        <h2 class="panel-title">Chantier actif</h2>
+        <p class="panel-sub">Choisis le chantier sur lequel tu travailles aujourd'hui.</p>
+        <div class="chantier-actif-row">
+          <select id="chantierActifSelect" class="chantier-select">
+            <option value="">— Sélectionner un chantier —</option>
+          </select>
+          <button type="button" class="btn-secondary" id="refreshChantiersBtn">↻ Actualiser</button>
+        </div>
+        <p class="form-status" id="chantierActifStatus"></p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Vue RÉGLAGES -->
+  <main class="app-view" id="view-reglages">
+    <div class="app-body" style="flex-direction:column;max-width:600px">
+      <div class="panel">
+        <h2 class="panel-title">Compte Google</h2>
+        <p class="panel-sub" id="adminAccountInfo">Non connecté</p>
+        <button class="btn-secondary" id="signInBtn">Se connecter</button>
+        <button class="btn-secondary" id="signOutBtn" hidden>Se déconnecter</button>
+      </div>
+      <div class="panel">
+        <h2 class="panel-title">À propos</h2>
+        <p class="panel-sub">FTS Dashboard — Fondations et Travaux Spéciaux.<br>Une seule appli pour l'ouverture de chantier, les rapports, les accueils et la fiche matériel.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Barre de navigation basse -->
+  <nav class="app-tabbar">
+    <button class="app-tab active" id="tabAccueil" data-view="view-accueil">
+      <span class="tab-icon">🏠</span>ACCUEIL
+    </button>
+    <button class="app-tab" id="tabChantiers" data-view="view-chantiers">
+      <span class="tab-icon">📁</span>CHANTIERS
+    </button>
+    <button class="app-tab" id="tabReglages" data-view="view-reglages">
+      <span class="tab-icon">⚙️</span>RÉGLAGES
+    </button>
+  </nav>
+
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/drive.js"></script>
+<script src="js/notifications.js"></script>
+<script src="js/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "name": "FTS Dashboard Chantier",
+  "short_name": "FTS Dashboard",
+  "description": "Dashboard unifié FTS : ouverture de chantier et accès aux applications terrain",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F5F6F8",
+  "theme_color": "#3A3A3A",
+  "icons": [
+    {
+      "src": "icon-dashboard-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-dashboard-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#3A3A3A">
+<link rel="manifest" href="/manifest_dashboard.json">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-dashboard-192.png">
+<script>
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashboard.js").catch(() => {}); }
+</script>
+<title>Rapport Journalier – FTS</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --jaune: #FDCA01;
+    --gris-fonce: #2E2E2E;
+    --gris-moyen: #5A5A5A;
+    --gris-clair: #E8E8E8;
+    --blanc: #FFFFFF;
+    --bordure: #CCCCCC;
+    --rouge: #C0392B;
+    --vert: #27AE60;
+    --bleu-fts: #1A3A5C;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #F2F2F2;
+    color: var(--gris-fonce);
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .app-header {
+    background: var(--gris-fonce);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .app-header .logo-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+  }
+  .logo-img { height: 38px; width: auto; display: block; }
+  .logo-fts span { color: var(--jaune); }
+  .app-title {
+    font-size: 13px;
+    color: #AAA;
+    font-weight: 400;
+    line-height: 1.2;
+  }
+  .btn-valider {
+    background: var(--jaune);
+    color: var(--gris-fonce);
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    transition: opacity 0.2s;
+  }
+  .btn-valider:active { opacity: 0.8; }
+
+  /* SECTIONS */
+  .section {
+    background: var(--blanc);
+    margin: 12px;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  .section-title {
+    background: var(--gris-fonce);
+    color: var(--blanc);
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title .dot {
+    width: 8px; height: 8px;
+    background: var(--jaune);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* FORM FIELDS */
+  .fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+  .field-row {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--gris-clair);
+  }
+  .field-row.full { grid-column: 1 / -1; }
+  .field-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--gris-moyen);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 4px;
+  }
+  input[type="text"], input[type="date"], input[type="number"], select, textarea {
+    width: 100%;
+    border: none;
+    border-bottom: 2px solid var(--gris-clair);
+    padding: 6px 2px;
+    font-size: 15px;
+    color: var(--gris-fonce);
+    background: transparent;
+    outline: none;
+    border-radius: 0;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-bottom-color: var(--jaune);
+  }
+  input[type="date"] { font-size: 14px; }
+
+  /* TABLE PIEUX */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; min-width: 680px; }
+  thead th {
+    background: var(--gris-fonce);
+    color: var(--blanc);
+    padding: 7px 5px;
+    font-size: 10px;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 0.5px;
+    border: 1px solid #444;
+  }
+  thead th.jaune { background: var(--jaune); color: var(--gris-fonce); }
+  tbody tr { border-bottom: 1px solid var(--gris-clair); }
+  tbody tr:nth-child(even) { background: #FAFAFA; }
+  tbody td {
+    padding: 2px 3px;
+    border-right: 1px solid var(--gris-clair);
+    vertical-align: middle;
+  }
+  tbody td input[type="text"], tbody td input[type="number"] {
+    padding: 6px 4px;
+    font-size: 13px;
+    text-align: center;
+    border-bottom: 1px solid transparent;
+  }
+  tbody td input:focus { border-bottom-color: var(--jaune); }
+  tbody td select {
+    font-size: 12px;
+    padding: 5px 2px;
+  }
+  .td-check {
+    text-align: center;
+    cursor: pointer;
+    padding: 0 !important;
+  }
+  .check-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 36px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .check-cell input[type="checkbox"] { display: none; }
+  .check-icon {
+    width: 28px; height: 28px;
+    border: 2px solid var(--bordure);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    font-size: 18px;
+    color: transparent;
+    background: var(--blanc);
+  }
+  .check-cell input:checked + .check-icon {
+    background: var(--gris-fonce);
+    border-color: var(--gris-fonce);
+    color: var(--blanc);
+  }
+
+  /* PERSONNEL */
+  .personnel-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .personnel-row {
+    display: grid;
+    grid-template-columns: 1fr 56px 52px 52px 52px;
+    align-items: center;
+    padding: 8px 14px;
+    gap: 6px;
+    border-bottom: 1px solid var(--gris-clair);
+  }
+  .personnel-header {
+    background: #F5F5F5;
+    padding: 6px 14px;
+  }
+  .personnel-header .ph-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--gris-moyen);
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    text-align: center;
+  }
+  .personnel-header .ph-nom { text-align: left; }
+  .pers-check {
+    display: flex; align-items: center; justify-content: center;
+    height: 40px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  .pers-check input[type="checkbox"] { display: none; }
+  .pers-check-box {
+    width: 32px; height: 32px;
+    border: 2px solid var(--bordure);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    color: transparent;
+    background: var(--blanc);
+    transition: all 0.15s;
+  }
+  .pers-check input:checked + .pers-check-box {
+    background: var(--gris-fonce);
+    border-color: var(--gris-fonce);
+    color: var(--blanc);
+  }
+  .pers-col-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #999;
+    text-transform: uppercase;
+    text-align: center;
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  /* SIGNATURE */
+  .sig-zone {
+    padding: 14px;
+  }
+  .sig-canvas-wrap {
+    border: 2px solid var(--gris-clair);
+    border-radius: 6px;
+    background: var(--blanc);
+    position: relative;
+    touch-action: none;
+  }
+  #sigCanvas {
+    display: block;
+    width: 100%;
+    height: 160px;
+    cursor: crosshair;
+    touch-action: none;
+  }
+  .sig-hint {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #CCC;
+    font-size: 13px;
+    pointer-events: none;
+    text-align: center;
+    transition: opacity 0.3s;
+  }
+  .sig-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+  .btn-clear-sig {
+    background: none;
+    border: 1px solid var(--bordure);
+    color: var(--gris-moyen);
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  /* OBSERVATIONS */
+  .obs-wrap { padding: 14px; }
+  .obs-wrap textarea {
+    border: 1px solid var(--gris-clair);
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 14px;
+    min-height: 100px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  /* TOAST */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--gris-fonce);
+    color: var(--blanc);
+    padding: 12px 22px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 9999;
+    white-space: nowrap;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.success { background: var(--vert); }
+  #toast.error { background: var(--rouge); }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 500;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--blanc);
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 340px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  }
+  .modal h3 { font-size: 17px; margin-bottom: 12px; }
+  .modal p { color: var(--gris-moyen); font-size: 13px; line-height: 1.5; margin-bottom: 18px; }
+  .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-cancel { background: none; border: 1px solid var(--bordure); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .btn-confirm { background: var(--jaune); border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 700; }
+
+  /* GOOGLE DRIVE CONFIG */
+  .drive-status {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    border-bottom: 1px solid var(--gris-clair);
+  }
+  .drive-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #CCC; flex-shrink: 0;
+  }
+  .drive-dot.connected { background: var(--vert); }
+  .drive-dot.error { background: var(--rouge); }
+  .btn-drive-connect {
+    background: #4285F4; color: #FFF; border: none;
+    padding: 7px 14px; border-radius: 5px; font-size: 12px;
+    font-weight: 600; cursor: pointer; margin-left: auto;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-drive-connect:disabled { opacity: 0.5; }
+
+  /* NOM CHEF */
+  .chef-row {
+    padding: 10px 14px;
+    border-top: 1px solid var(--gris-clair);
+  }
+
+  /* PLACEHOLDER CONFIG DRIVE */
+  .config-banner {
+    background: #FFF8E1;
+    border: 1px solid #FFE082;
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin: 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #5D4037;
+  }
+  .config-banner strong { display: block; margin-bottom: 4px; font-size: 13px; }
+  .config-banner code {
+    background: rgba(0,0,0,0.07);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="app-header">
+  <div class="logo-bar">
+    <img id="headerLogo" class="logo-img" alt="FTS">
+    <div class="app-title">Fondations & Travaux Spéciaux<br><strong style="color:#fff">Rapport Journalier</strong></div>
+  </div>
+  <button class="btn-valider" onclick="validerRapport()">
+    <span>✓</span> Enregistrer
+  </button>
+</header>
+
+<!-- CONFIG BANNER (affiché jusqu'à ce que le CLIENT_ID soit renseigné) -->
+<div class="config-banner" id="configBanner">
+  <strong>⚙️ Configuration Google Drive requise</strong>
+  Pour activer l'enregistrement automatique sur Google Drive, remplacez <code>VOTRE_CLIENT_ID</code>
+  dans le code source de cette page par votre identifiant OAuth Google (voir guide de mise en place).
+  En attendant, le PDF sera téléchargé localement sur la tablette.
+</div>
+
+<!-- SECTION 1 : IDENTIFIANT -->
+<div class="chantier-actif-banner" id="chantierBanner" style="margin:12px;padding:10px 14px;border-radius:8px;background:#EAF6EE;border:1px solid #27AE60;font-size:13px;color:#1D6E3E;">Chargement du chantier actif...</div>
+
+<div class="section">
+  <div class="section-title"><span class="dot"></span>Identification du rapport</div>
+  <div class="fields-grid">
+    <div class="field-row">
+      <div class="field-label">Date</div>
+      <input type="date" id="date" required>
+    </div>
+    <div class="field-row">
+      <div class="field-label">N° Dossier</div>
+      <input type="text" id="dossier" placeholder="ex : 23 FTS 781" style="text-transform:uppercase">
+    </div>
+    <div class="field-row full">
+      <div class="field-label">Chantier</div>
+      <input type="text" id="chantier" placeholder="VILLE / CHANTIER" style="text-transform:uppercase">
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 2 : TABLEAU PIEUX -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>Micropieux réalisés</div>
+  <div class="table-scroll">
+    <table id="tablePieux">
+      <thead>
+        <tr>
+          <th rowspan="2" style="min-width:50px">N° PIEU</th>
+          <th colspan="2" class="jaune">FORAGE</th>
+          <th colspan="2">TUBE</th>
+          <th rowspan="2" style="min-width:52px">BARRE</th>
+          <th colspan="3" class="jaune">MATÉRIEL</th>
+        </tr>
+        <tr>
+          <th>Longueur</th>
+          <th>Ø forage</th>
+          <th>Ø tube principale</th>
+          <th>GAINAGE</th>
+          <th style="min-width:180px">Désignation</th>
+          <th style="min-width:100px">Statut</th>
+          <th style="min-width:80px">FTS / LOC</th>
+        </tr>
+      </thead>
+      <tbody id="tbodyPieux"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- SECTION 3 : PERSONNEL -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>Personnel sur chantier</div>
+  <div class="personnel-grid">
+    <div class="personnel-row personnel-header">
+      <div class="ph-label ph-nom">Nom & Prénom</div>
+      <div class="ph-label">Heures</div>
+      <div class="ph-label">GD</div>
+      <div class="ph-label">FTS</div>
+      <div class="ph-label">Intérim</div>
+    </div>
+    <div id="personnelRows"></div>
+  </div>
+</div>
+
+<!-- SECTION 4 : OBSERVATIONS + SIGNATURE côte à côte sur grand écran -->
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:0; margin:12px; background:#fff; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.08); overflow:hidden;">
+  <div style="border-right:1px solid var(--gris-clair);">
+    <div class="section-title" style="border-radius:0"><span class="dot"></span>Signature chef de chantier</div>
+    <div class="sig-zone">
+      <div class="sig-canvas-wrap">
+        <canvas id="sigCanvas"></canvas>
+        <div class="sig-hint" id="sigHint">✍️ Signez ici au doigt ou au stylet</div>
+      </div>
+      <div class="sig-actions">
+        <button class="btn-clear-sig" onclick="clearSig()">Effacer</button>
+      </div>
+      <div class="chef-row" style="padding:6px 0 0 0">
+        <div class="field-label">Nom du chef de chantier</div>
+        <input type="text" id="nomChef" placeholder="Prénom NOM">
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="section-title" style="border-radius:0"><span class="dot"></span>Observations générales</div>
+    <div class="obs-wrap">
+      <textarea id="observations" placeholder="Remarques, incidents, conditions de chantier..."></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- STATUT CONNEXION (partagée avec le dashboard) -->
+<div class="section" style="margin-bottom:80px">
+  <div class="drive-status">
+    <div class="drive-dot" id="driveDot"></div>
+    <span id="driveLabel">Connexion : vérification...</span>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- MODAL CONFIRMATION -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>📄 Enregistrer le rapport ?</h3>
+    <p id="modalMsg">Le rapport sera généré en PDF et enregistré sur Google Drive.</p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="btn-confirm" onclick="confirmerEnvoi()">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth.js"></script>
+<script src="/js/drive.js"></script>
+<script>
+const DRIVE_FOLDER_NAME = 'Rapports Journaliers FTS';
+
+// ─── Données métier ────────────────────────────────────────────
+const DROPDOWN = {
+  1: ['FUTURO n°1','FUTURO n°2','FUTURO ELEC','T41 n°1','T41 n°2','T46','MC6','MC8','MC15','DCH','EGT','MACHINE LOC'],
+  2: ['MIXO n°1','MIXO n°2','MA12','TCHNIWELL','AUTONOME'],
+  3: ['GROUPE 40KVA','GROUPE 60KVA','GROUPE 80KVA','GROUPE 100 KVA'],
+  4: ['PH15'],
+  5: ['COMPRESSEUR 7000l','COMPRESSEUR 10000l','COMPRESSEUR 15000l','COMPRESSEUR 20000l','COMPRESSEUR 25000l'],
+  6: ['BUGGY','TELSCO 6m','TELESCO 7m','TELESCO 9m','TELESCO 10m','TELESCO 12m','TELESCO 17m','TELSCO 21m','GYROSCOPIQUE 17m','GYROSCOPIQUE 21m','PELLE 20t Volet Variable'],
+  7: ['PELLE 2.7t','PELLE 3.5t','PELLE 5t','PELLE 8t','PELLE 14t'],
+  8: ["MFT 4\"","MFT 5\"","MFT 6\"","MFT 8\"","MFT 12\"",'TARRIERE'],
+};
+const N_PIEUX = 26;
+const N_PERS  = 4;
+
+// driveToken n'est plus une variable locale : elle est dérivée de l'auth partagée FTSAuth
+function driveTokenGetter() { return window.FTSAuth ? FTSAuth.getToken() : null; }
+Object.defineProperty(window, 'driveToken', { get: driveTokenGetter });
+let sigDrawing = false;
+let sigHasContent = false;
+let sigSavedDataUrl = null;   // ← image sauvegardée après chaque trait
+const sigCtx = document.getElementById('sigCanvas').getContext('2d');
+
+// ─── Init ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Date du jour par défaut
+  document.getElementById('date').valueAsDate = new Date();
+  document.getElementById('headerLogo').src = '/assets/logo-fts.png';
+
+  // Forcer MAJUSCULES sur dossier et chantier (CSS ne suffit pas pour la valeur réelle)
+  ['dossier','chantier'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', () => {
+      const pos = el.selectionStart;
+      el.value = el.value.toUpperCase();
+      el.setSelectionRange(pos, pos);
+    });
+  });
+
+  // Tableau pieux
+  const tbody = document.getElementById('tbodyPieux');
+  for (let i = 1; i <= N_PIEUX; i++) {
+    const dropHtml = DROPDOWN[i]
+      ? `<select id="mat_${i}"><option value=""></option>${DROPDOWN[i].map(v=>`<option value="${v}">${v}</option>`).join('')}</select>`
+      : `<input type="text" id="mat_${i}">`;
+    tbody.innerHTML += `
+      <tr>
+        <td><input type="text" id="pieu_${i}" style="text-align:center"></td>
+        <td><input type="number" id="lg_${i}" step="0.01" style="text-align:center"></td>
+        <td><input type="number" id="df_${i}" step="0.01" style="text-align:center"></td>
+        <td><input type="number" id="tp_${i}" step="0.01" style="text-align:center"></td>
+        <td><input type="number" id="gn_${i}" step="0.01" style="text-align:center"></td>
+        <td class="td-check"><label class="check-cell"><input type="checkbox" id="barre_${i}"><span class="check-icon">✓</span></label></td>
+        <td>${dropHtml}</td>
+        <td>
+          <select id="statut_${i}" style="font-size:11px;font-weight:700;border:1.5px solid #DDD;border-radius:4px;padding:4px 2px;width:100%;background:#fff;">
+            <option value="">—</option>
+            <option value="TRAVAIL">✓ TRAVAIL</option>
+            <option value="PANNE">✗ PANNE</option>
+            <option value="ARRET">● ARRÊT</option>
+            <option value="TRANSPORT">→ TRANSPORT</option>
+          </select>
+        </td>
+        <td>
+          <select id="fts_loc_${i}" style="font-size:11px;font-weight:700;border:1.5px solid #DDD;border-radius:4px;padding:4px 2px;width:100%;background:#fff;">
+            <option value="">—</option>
+            <option value="FTS">FTS</option>
+            <option value="LOC">LOC</option>
+          </select>
+        </td>
+      </tr>`;
+  }
+
+  // Personnel
+  const pRows = document.getElementById('personnelRows');
+  for (let i = 1; i <= N_PERS; i++) {
+    pRows.innerHTML += `
+      <div class="personnel-row">
+        <input type="text" id="nom_${i}" placeholder="Prénom NOM">
+        <input type="number" id="heure_${i}" step="0.5" min="0" max="24" style="text-align:center" placeholder="7.5">
+        <label class="pers-check"><input type="checkbox" id="gd_${i}"><span class="pers-check-box">✓</span></label>
+        <label class="pers-check"><input type="checkbox" id="fts_p_${i}"><span class="pers-check-box">✓</span></label>
+        <label class="pers-check"><input type="checkbox" id="int_${i}"><span class="pers-check-box">✓</span></label>
+      </div>`;
+  }
+
+  initSignature();
+  initAuthPartagee();
+  appliquerChantierActif();
+  chargerLogo();
+});
+
+let LOGO_B64 = null;
+async function chargerLogo() {
+  try {
+    const res = await fetch('/assets/logo-fts.png');
+    const blob = await res.blob();
+    LOGO_B64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    document.getElementById('headerLogo').src = LOGO_B64;
+  } catch (e) {
+    console.warn('Logo non chargé :', e);
+  }
+}
+
+// ─── Auth partagée (dashboard) ──────────────────────────────────
+let chantierActif = null;
+
+function initAuthPartagee() {
+  if (!window.FTSAuth) return;
+  FTSAuth.init();
+  FTSAuth.onAuthChange(majStatutConnexion);
+  majStatutConnexion(FTSAuth.isSignedIn());
+}
+
+function majStatutConnexion(signedIn) {
+  const dot = document.getElementById('driveDot');
+  const label = document.getElementById('driveLabel');
+  if (signedIn) {
+    dot.className = 'drive-dot connected';
+    label.textContent = '✓ Connecté (via le dashboard)';
+  } else {
+    dot.className = 'drive-dot';
+    label.textContent = 'Non connecté — connecte-toi depuis le dashboard';
+  }
+}
+
+function appliquerChantierActif() {
+  try {
+    const raw = localStorage.getItem('fts_chantier_actif');
+    chantierActif = raw ? JSON.parse(raw) : null;
+  } catch (e) { chantierActif = null; }
+
+  const banner = document.getElementById('chantierBanner');
+  if (chantierActif) {
+    banner.textContent = `Chantier actif : ${chantierActif.name}`;
+    document.getElementById('chantier').value = chantierActif.name;
+    const spaceIdx = chantierActif.name.search(/\s/);
+    const code = spaceIdx > 0 ? chantierActif.name.slice(0, spaceIdx) : chantierActif.name;
+    document.getElementById('dossier').value = code;
+  } else {
+    banner.style.background = '#FDECEA';
+    banner.style.borderColor = '#C0392B';
+    banner.style.color = '#8E2E22';
+    banner.innerHTML = 'Aucun chantier actif. <a href="/index.html">Retourner au dashboard pour en choisir un</a>.';
+  }
+}
+
+// ─── Signature pad ─────────────────────────────────────────────
+function initSignature() {
+  const canvas = document.getElementById('sigCanvas');
+  const hint   = document.getElementById('sigHint');
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr  = window.devicePixelRatio || 1;
+    const newW = Math.floor(rect.width  * dpr);
+    const newH = Math.floor(rect.height * dpr);
+    if (canvas.width === newW && canvas.height === newH) return; // pas de vrai changement, on ne touche pas
+    canvas.width  = newW;
+    canvas.height = newH;
+    sigCtx.scale(dpr, dpr);
+    sigCtx.strokeStyle = '#1A1A1A';
+    sigCtx.lineWidth   = 2.2;
+    sigCtx.lineCap     = 'round';
+    sigCtx.lineJoin    = 'round';
+    // restaurer la signature sauvegardée si elle existait
+    if (sigSavedDataUrl) {
+      const img = new Image();
+      img.onload = () => sigCtx.drawImage(img, 0, 0, rect.width, rect.height);
+      img.src = sigSavedDataUrl;
+    }
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const src  = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+  }
+
+  function saveSig() {
+    // sauvegarder immédiatement après chaque trait (fond blanc + signature)
+    const flat = document.createElement('canvas');
+    flat.width  = canvas.width;
+    flat.height = canvas.height;
+    const ctx2 = flat.getContext('2d');
+    ctx2.fillStyle = '#FFFFFF';
+    ctx2.fillRect(0, 0, flat.width, flat.height);
+    ctx2.drawImage(canvas, 0, 0);
+    sigSavedDataUrl = flat.toDataURL('image/jpeg', 0.95);
+  }
+
+  function start(e) {
+    e.preventDefault();
+    sigDrawing = true;
+    const p = getPos(e);
+    sigCtx.beginPath();
+    sigCtx.moveTo(p.x, p.y);
+    hint.style.opacity = '0';
+  }
+  function move(e) {
+    e.preventDefault();
+    if (!sigDrawing) return;
+    const p = getPos(e);
+    sigCtx.lineTo(p.x, p.y);
+    sigCtx.stroke();
+    sigHasContent = true;
+  }
+  function stop(e) {
+    e.preventDefault();
+    sigDrawing = false;
+    if (sigHasContent) saveSig(); // ← sauvegarde immédiate après chaque trait
+  }
+
+  canvas.addEventListener('mousedown',  start);
+  canvas.addEventListener('mousemove',  move);
+  canvas.addEventListener('mouseup',    stop);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove',  move,  { passive: false });
+  canvas.addEventListener('touchend',   stop,  { passive: false });
+}
+
+function clearSig() {
+  const canvas = document.getElementById('sigCanvas');
+  sigCtx.clearRect(0, 0, canvas.width, canvas.height);
+  sigHasContent  = false;
+  sigSavedDataUrl = null;
+  document.getElementById('sigHint').style.opacity = '1';
+}
+
+// ─── Google Drive ──────────────────────────────────────────────
+// Récupérer le token si on revient d'une auth Google (hash dans l'URL)
+// Restaurer le token au chargement si disponible
+// ─── Validation & génération PDF ──────────────────────────────
+function validerRapport() {
+  const date    = document.getElementById('date').value;
+  const chantier = document.getElementById('chantier').value.trim();
+  if (!date)     { showToast('⚠️ Veuillez renseigner la date', 'error'); return; }
+  if (!chantier) { showToast('⚠️ Veuillez renseigner le chantier', 'error'); return; }
+  const dest = driveToken ? 'Google Drive de l\'entreprise' : 'téléchargement local (Drive non connecté)';
+  document.getElementById('modalMsg').textContent = `Le rapport du ${formatDate(date)} – ${chantier} sera enregistré en PDF vers : ${dest}.`;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+
+async function confirmerEnvoi() {
+  closeModal();
+  showToast('⏳ Génération du PDF...', '');
+  try {
+    const pdfBlob = await genererPDF();
+    const date    = document.getElementById('date').value;
+    const dossier = document.getElementById('dossier').value.trim().toUpperCase();
+    const fileName = `${date}_Rapport journalier_${dossier}.pdf`;
+
+    if (driveToken) {
+      await uploadToDrive(pdfBlob, fileName);
+    } else {
+      downloadLocal(pdfBlob, fileName);
+    }
+  } catch(err) {
+    console.error(err);
+    showToast('❌ Erreur : ' + err.message, 'error');
+  }
+}
+
+// ─── Génération PDF (jsPDF) ────────────────────────────────────
+async function genererPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const W = 297, H = 210;
+  const M = 6;
+  let y = M;
+
+  // ── Palette FTS ───────────────────────────────────────────────
+  const C_ANTH  = [58, 58, 58];       // gris anthracite (headers)
+  const C_JAUNE = [245, 168, 0];      // jaune FTS
+  const C_GRIS  = [230, 230, 230];    // gris clair (fond sous-en-têtes)
+  const C_GRIS2 = [245, 245, 245];    // gris très clair (lignes paires)
+  const C_BORD  = [195, 195, 195];    // bordures
+  const C_TXT   = [40, 40, 40];       // texte principal
+  const C_WHITE = [255, 255, 255];
+
+  // ── Titre ─────────────────────────────────────────────────────
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(13);
+  doc.setTextColor(...C_ANTH);
+  doc.text('RAPPORT JOURNALIER DE CHANTIER', W/2, y+5, { align:'center' });
+  y += 9;
+
+  // ── En-tête logo + infos ──────────────────────────────────────
+  const HDR_H = 18;
+  // Cadre logo avec fond blanc
+  doc.setFillColor(...C_WHITE);
+  doc.setDrawColor(...C_BORD);
+  doc.rect(M, y, 58, HDR_H, 'FD');
+  // Vrai logo FTS
+  doc.addImage(LOGO_B64, 'JPEG', M + 2, y + 1.5, 54, HDR_H - 3);
+
+  // Infos DATE/DOSSIER/CHANTIER
+  const infoX = M + 59;
+  const infoW = W - M - infoX - M;
+  const labelW = 27;
+  const infos = [
+    ['DATE',     document.getElementById('date').value ? formatDate(document.getElementById('date').value) : ''],
+    ['DOSSIER',  document.getElementById('dossier').value],
+    ['CHANTIER', document.getElementById('chantier').value],
+  ];
+  const rh = HDR_H / 3;
+  infos.forEach(([lbl, val], i) => {
+    const ry = y + i * rh;
+    // fond jaune sur les labels
+    doc.setFillColor(...C_JAUNE);
+    doc.rect(infoX, ry, labelW, rh, 'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...C_ANTH);
+    doc.text(lbl, infoX + 2, ry + rh / 2 + 1.5);
+    // fond blanc pour la valeur
+    doc.setFillColor(...C_WHITE);
+    doc.setDrawColor(...C_BORD);
+    doc.rect(infoX + labelW, ry, infoW - labelW, rh, 'FD');
+    doc.setFont('helvetica','normal'); doc.setTextColor(...C_TXT);
+    doc.text(val, infoX + labelW + 2, ry + rh / 2 + 1.5);
+  });
+  y += HDR_H + 1;
+
+  // Colonnes tableau — total = W - 2*M = 285mm
+  // N°pieu | Longueur | Øforage | Øtube | Gainage | Barre | Désignation (large) | FTS | LOC
+  const cols = [14, 18, 20, 22, 18, 14, 143, 18, 18];
+  // vérification : 14+18+20+22+18+14+143+18+18 = 285 ✓
+  const colX = [M];
+  cols.forEach(w => colX.push(colX[colX.length-1] + w));
+  const totalW = cols.reduce((a,b)=>a+b,0);
+  const ROW_H = 5.0;  // réduit de 5.5 → 5.0 pour laisser ~27mm en zone basse
+  const HDR2 = 11;
+
+  // ── En-tête tableau ────────────────────────────────────────────
+  // Ligne 1 : fond anthracite, texte blanc — groupes de colonnes
+  doc.setFillColor(...C_ANTH);
+  doc.rect(colX[0], y, totalW, HDR2 / 2, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_WHITE);
+  [[0,1,'N° PIEU'],[1,3,'FORAGE'],[3,5,'TUBE'],[5,6,'BARRE'],[6,9,'MATÉRIEL']].forEach(([a,b,lbl]) => {
+    doc.text(lbl, (colX[a]+colX[b])/2, y + HDR2/4 + 1.2, {align:'center'});
+  });
+
+  // Ligne 2 : fond jaune pour FORAGE et MATÉRIEL, fond gris pour le reste
+  const subs = ['','Longueur','Ø forage','Ø tube princ.','GAINAGE','','Désignation','FTS','LOC'];
+  const jauneCols = new Set([1,2,6,7,8]); // FORAGE + MATÉRIEL
+  subs.forEach((s, i) => {
+    if (i === 0 || i === 5) return;
+    doc.setFillColor(...(jauneCols.has(i) ? C_JAUNE : C_GRIS));
+    doc.setDrawColor(...C_BORD);
+    doc.rect(colX[i], y + HDR2/2, cols[i], HDR2/2, 'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(6);
+    doc.setTextColor(...C_ANTH);
+    doc.text(s, colX[i] + cols[i]/2, y + HDR2 - 1.5, {align:'center'});
+  });
+
+  // Cellules fusionnées N° PIEU et BARRE (pleine hauteur, fond anthracite)
+  doc.setFillColor(...C_ANTH);
+  doc.setDrawColor(...C_BORD);
+  doc.rect(colX[0], y, cols[0], HDR2, 'FD');
+  doc.rect(colX[5], y, cols[5], HDR2, 'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_WHITE);
+  doc.text('N° PIEU', colX[0]+cols[0]/2, y+HDR2/2+1.5, {align:'center'});
+  doc.text('BARRE',   colX[5]+cols[5]/2, y+HDR2/2+1.5, {align:'center'});
+
+  // Séparateurs verticaux dans la ligne 1
+  doc.setDrawColor(...C_BORD);
+  doc.line(colX[1], y, colX[1], y+HDR2/2);
+  doc.line(colX[3], y, colX[3], y+HDR2/2);
+  doc.line(colX[5], y, colX[5], y+HDR2/2);
+  doc.line(colX[6], y, colX[6], y+HDR2/2);
+  doc.line(colX[9], y, colX[9], y+HDR2/2);
+  y += HDR2;
+
+  // ── Lignes pieux ───────────────────────────────────────────────
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
+  const N_MATERIEL = 16;
+  for (let i = 1; i <= N_PIEUX; i++) {
+    const ry = y + (i-1)*ROW_H;
+    // alternance gris très clair / blanc
+    if (i % 2 === 0) { doc.setFillColor(...C_GRIS2); doc.rect(colX[0], ry, totalW, ROW_H, 'F'); }
+    doc.setDrawColor(...C_BORD);
+    doc.line(colX[0], ry+ROW_H, colX[9], ry+ROW_H);
+    colX.forEach(x => doc.line(x, ry, x, ry+ROW_H));
+
+    const vals = [
+      document.getElementById(`pieu_${i}`)?.value || '',
+      document.getElementById(`lg_${i}`)?.value   || '',
+      document.getElementById(`df_${i}`)?.value   || '',
+      document.getElementById(`tp_${i}`)?.value   || '',
+      document.getElementById(`gn_${i}`)?.value   || '',
+    ];
+    vals.forEach((v,ci) => {
+      if (v) { doc.setTextColor(...C_TXT); doc.text(v, colX[ci]+cols[ci]/2, ry+ROW_H/2+1.5, {align:'center'}); }
+    });
+
+    // Barre ✓ vectoriel
+    if (document.getElementById(`barre_${i}`)?.checked) {
+      drawCoche(doc, colX[5], ry, cols[5], ROW_H, C_JAUNE);
+    }
+
+    if (i <= N_MATERIEL) {
+      const mat = document.getElementById(`mat_${i}`)?.value || '';
+      if (mat) { doc.setTextColor(...C_TXT); doc.text(mat, colX[6]+2, ry+ROW_H/2+1.5); }
+      ['fts','loc'].forEach((k,ci) => {
+        if (document.getElementById(`${k}_${i}`)?.checked) {
+          drawCoche(doc, colX[7+ci], ry, cols[7+ci], ROW_H, C_JAUNE);
+        }
+      });
+    }
+    doc.setTextColor(...C_TXT);
+  }
+
+  // ── PERSONNEL ──────────────────────────────────────────────────
+  const P_START = y + 16 * ROW_H;
+  const PW = colX[9] - colX[6];
+  // sous-colonnes : NOM large, HEURES, GD, FTS, Intérim — toutes proportionnelles à PW
+  const narrowW2 = 18; // fixe (même largeur que FTS/LOC matériel)
+  const hrW = 18;
+  const nomW2 = PW - hrW - 3 * narrowW2;
+  const pcols = [
+    colX[6],
+    colX[6] + nomW2,
+    colX[6] + nomW2 + hrW,
+    colX[6] + nomW2 + hrW + narrowW2,
+    colX[6] + nomW2 + hrW + 2 * narrowW2,
+    colX[9]
+  ];
+
+  doc.setFillColor(...C_ANTH);
+  doc.rect(pcols[0], P_START, PW, 5.5, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...C_WHITE);
+  doc.text('PERSONNEL', (pcols[0]+pcols[5])/2, P_START+3.5, {align:'center'});
+
+  // sous-en-têtes fond jaune
+  doc.setFillColor(...C_JAUNE);
+  pcols.slice(0,-1).forEach((x,i) => doc.rect(x, P_START+5.5, pcols[i+1]-x, 4.5, 'FD'));
+  doc.setFont('helvetica','bold'); doc.setFontSize(6); doc.setTextColor(...C_ANTH);
+  ['NOM','HEURES','GD','FTS','Intérim'].forEach((lbl,i) => {
+    doc.text(lbl, (pcols[i]+pcols[i+1])/2, P_START+5.5+4.5/2+1.2, {align:'center'});
+  });
+
+  const entryH = ROW_H * 2;
+  for (let k = 1; k <= N_PERS; k++) {
+    const ey = P_START + 5.5 + 4.5 + (k-1)*entryH;
+    if (k % 2 === 0) { doc.setFillColor(...C_GRIS2); pcols.slice(0,-1).forEach((x,i) => doc.rect(x, ey, pcols[i+1]-x, entryH, 'F')); }
+    pcols.slice(0,-1).forEach((x,i) => {
+      doc.setDrawColor(...C_BORD);
+      doc.rect(x, ey, pcols[i+1]-x, entryH, 'S');
+    });
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...C_TXT);
+    const nom = document.getElementById(`nom_${k}`)?.value || '';
+    const hr  = document.getElementById(`heure_${k}`)?.value || '';
+    if (nom) doc.text(nom, pcols[0]+2, ey+entryH/2+1.5);
+    if (hr)  doc.text(hr, (pcols[1]+pcols[2])/2, ey+entryH/2+1.5, {align:'center'});
+    ['gd','fts_p','int'].forEach((id,ci) => {
+      if (document.getElementById(`${id}_${k}`)?.checked) {
+        const cx0 = pcols[2+ci], cx1 = pcols[3+ci];
+        drawCoche(doc, cx0, ey, cx1-cx0, entryH, C_JAUNE);
+      }
+    });
+  }
+
+  y = y + N_PIEUX * ROW_H + 1.5;
+
+  // ZONE BASSE : signature (gauche, 4 cols) + observations (droite, reste)
+  const BOTTOM_H = H - M - y;
+  // left = 4 premières colonnes, right = colonnes 4 à 9
+  const LEFT_W  = colX[4] - colX[0];   // ~74mm
+  const RIGHT_W = colX[9] - colX[4] - 0.5; // ~211mm
+  const obsX    = colX[4] + 0.5;
+  const LABEL_H = 5.5;
+  const NOM_H   = 8;
+  const SIG_H   = BOTTOM_H - LABEL_H - NOM_H;
+
+  // --- Signature ---
+  doc.setFillColor(...C_ANTH);
+  doc.rect(M, y, LEFT_W, LABEL_H, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_WHITE);
+  doc.text('SIGNATURE', M + 3, y + 3.8);
+
+  doc.setDrawColor(...C_BORD);
+  doc.rect(M, y + LABEL_H, LEFT_W, SIG_H, 'S');
+
+  if (sigHasContent && sigSavedDataUrl) {
+    // utiliser l'image sauvegardée après le dernier trait (insensible aux resize ultérieurs)
+    doc.addImage(sigSavedDataUrl, 'JPEG', M+2, y+LABEL_H+1, LEFT_W-4, SIG_H-2);
+  }
+
+  // Nom chef fond jaune
+  doc.setFillColor(...C_JAUNE);
+  doc.setDrawColor(...C_BORD);
+  doc.rect(M, y + LABEL_H + SIG_H, LEFT_W, NOM_H, 'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_ANTH);
+  doc.text('NOM DU CHEF :', M+2, y+LABEL_H+SIG_H+NOM_H/2+1.2);
+  doc.setFont('helvetica','normal');
+  const nomChef = document.getElementById('nomChef').value || '';
+  if (nomChef) doc.text(nomChef, M+32, y+LABEL_H+SIG_H+NOM_H/2+1.2);
+
+  // --- Suivi matériel du jour ---
+  const suiviMat = getSuiviMateriel();
+  if (suiviMat.length > 0) {
+    if (y > H - 40) { doc.addPage(); y = M; }
+    const matW = W - 2*M;
+    const colW = [matW*0.45, matW*0.35, matW*0.20];
+    const colX = [M, M+colW[0], M+colW[0]+colW[1]];
+    const rowH = 7;
+
+    // En-tête section
+    doc.setFillColor(...C_ANTH); doc.rect(M, y, matW, rowH, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_WHITE);
+    doc.text('SUIVI MATÉRIEL DU JOUR', M+3, y+4.5); y += rowH;
+
+    // En-têtes colonnes
+    doc.setFillColor(...C_JAUNE);
+    doc.rect(colX[0], y, colW[0], rowH, 'F');
+    doc.rect(colX[1], y, colW[1], rowH, 'F');
+    doc.rect(colX[2], y, colW[2], rowH, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_ANTH);
+    doc.text('DÉSIGNATION', colX[0]+2, y+4.2);
+    doc.text('STATUT', colX[1]+2, y+4.2);
+    doc.text('APPARTIENT À', colX[2]+2, y+4.2);
+    y += rowH;
+
+    // Lignes matériel
+    suiviMat.forEach((m, idx) => {
+      if (y > H - 15) { doc.addPage(); y = M; }
+      const bg = idx%2===0 ? [255,255,255] : [248,248,248];
+      doc.setFillColor(...bg); doc.setStrokeColor(...C_BORD);
+      colX.forEach((cx, ci) => doc.rect(cx, y, colW[ci], rowH, 'FD'));
+
+      // Nom machine
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...C_ANTH);
+      doc.text(m.nom.toUpperCase(), colX[0]+2, y+4.5);
+
+      // Statut avec couleur
+      const statutColors = {
+        TRAVAIL:   [39,174,96],
+        PANNE:     [192,57,43],
+        ARRET:     [136,136,136],
+        TRANSPORT: [58,134,255],
+      };
+      const sc = statutColors[m.statut] || C_ANTH;
+      if (m.statut) {
+        doc.setFillColor(...sc);
+        doc.roundedRect(colX[1]+2, y+1.5, colW[1]-4, rowH-3, 1.5, 1.5, 'F');
+        doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(255,255,255);
+        doc.text(m.statut, colX[1]+colW[1]/2, y+4.5, {align:'center'});
+      }
+
+      // FTS / LOC
+      const typColor = m.type==='LOC' ? [...C_JAUNE] : [...C_ANTH];
+      doc.setFillColor(...typColor);
+      doc.roundedRect(colX[2]+4, y+1.5, colW[2]-8, rowH-3, 1.5, 1.5, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(7);
+      doc.setTextColor(...(m.type==='LOC' ? C_ANTH : [255,255,255]));
+      doc.text(m.type, colX[2]+colW[2]/2, y+4.5, {align:'center'});
+
+      y += rowH;
+    });
+    y += 4;
+  }
+
+  // --- Observations ---
+  doc.setFillColor(...C_ANTH);
+  doc.rect(obsX, y, RIGHT_W, LABEL_H, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_WHITE);
+  doc.text('OBSERVATIONS GÉNÉRALES', obsX + 3, y + 3.8);
+
+  doc.setDrawColor(...C_BORD);
+  doc.rect(obsX, y + LABEL_H, RIGHT_W, BOTTOM_H - LABEL_H, 'S');
+
+  const obs = document.getElementById('observations').value || '';
+  if (obs) {
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...C_TXT);
+    const lines = doc.splitTextToSize(obs, RIGHT_W - 4);
+    doc.text(lines, obsX + 2, y + LABEL_H + 4.5);
+  }
+
+  return doc.output('blob');
+}
+
+// ─── Dessine une coche ✓ en lignes vectorielles dans un rectangle (x,y,w,h) ──
+function drawCoche(doc, x, y, w, h, color) {
+  const s   = Math.min(w, h) * 0.72;   // taille carrée basée sur la plus petite dim
+  const ox  = x + (w - s) / 2;
+  const oy  = y + (h - s) / 2;
+  const lw  = Math.max(0.7, s * 0.14);
+  // points : bas-gauche → bas-milieu → haut-droite
+  const x1 = ox + 0.12 * s, y1 = oy + 0.55 * s;
+  const x2 = ox + 0.40 * s, y2 = oy + 0.82 * s;
+  const x3 = ox + 0.88 * s, y3 = oy + 0.18 * s;
+  doc.setDrawColor(...color);
+  doc.setLineWidth(lw);
+  doc.setLineCap('round');
+  doc.setLineJoin('round');
+  doc.line(x1, y1, x2, y2);
+  doc.line(x2, y2, x3, y3);
+  // remettre les valeurs par défaut
+  doc.setLineWidth(0.1);
+  doc.setLineCap('butt');
+  doc.setLineJoin('miter');
+}
+
+// ─── Suivi matériel du jour ────────────────────────────────────
+const MACHINES_LIST = [
+  'FUTURO n°1','FUTURO n°2','FUTURO ELEC','T41 n°1','T41 n°2','T46',
+  'MC6','MC8','MC15','DCH','EGT','MIXO n°1','MIXO n°2','MA12',
+  'CENTRALE TECNIVELL','CENTRALE AUTONOME','GROUPE 40KVA','GROUPE 60KVA',
+  'GROUPE 80KVA','COMPRESSEUR','BUGGY','TÉLESCO','MACHINE LOC'
+];
+let suivi_mat_count = 0;
+
+function ajouterSuiviMat(nom='', statut='', type='FTS') {
+  suivi_mat_count++;
+  const id = suivi_mat_count;
+  const optionsHTML = MACHINES_LIST.map(m => `<option value="${m}" ${m===nom?'selected':''}>${m}</option>`).join('');
+  const div = document.createElement('div');
+  div.className = 'suivi-row';
+  div.id = 'suivi_row_' + id;
+  div.innerHTML = `
+    <select id="suivi_nom_${id}">
+      <option value="">— Choisir —</option>
+      ${optionsHTML}
+    </select>
+    <div class="statut-btns">
+      <button class="statut-btn travail ${statut==='TRAVAIL'?'active':''}" onclick="setSuiviStatut(${id},'TRAVAIL')">✓ TRAVAIL</button>
+      <button class="statut-btn panne ${statut==='PANNE'?'active':''}" onclick="setSuiviStatut(${id},'PANNE')">✗ PANNE</button>
+      <button class="statut-btn arret ${statut==='ARRET'?'active':''}" onclick="setSuiviStatut(${id},'ARRET')">● ARRÊT</button>
+      <button class="statut-btn transport ${statut==='TRANSPORT'?'active':''}" onclick="setSuiviStatut(${id},'TRANSPORT')">→ TRANS.</button>
+    </div>
+    <div class="fts-loc-toggle">
+      <button class="fts-loc-btn ${type!=='LOC'?'active-fts':''}" id="btn_fts_${id}" onclick="setSuiviType(${id},'FTS')">FTS</button>
+      <button class="fts-loc-btn ${type==='LOC'?'active-loc':''}" id="btn_loc_${id}" onclick="setSuiviType(${id},'LOC')">LOC</button>
+    </div>
+    <input type="hidden" id="suivi_statut_${id}" value="${statut}">
+    <input type="hidden" id="suivi_type_${id}" value="${type}">
+    <button class="btn-del-mat" onclick="supprimerSuiviMat(${id})">✕</button>`;
+  document.getElementById('suivi_mat_rows').appendChild(div);
+}
+
+function setSuiviStatut(id, val) {
+  document.getElementById('suivi_statut_' + id).value = val;
+  const btns = document.querySelectorAll(`#suivi_row_${id} .statut-btn`);
+  btns.forEach(b => b.classList.remove('active'));
+  const map = {TRAVAIL:'travail', PANNE:'panne', ARRET:'arret', TRANSPORT:'transport'};
+  document.querySelector(`#suivi_row_${id} .statut-btn.${map[val]}`).classList.add('active');
+}
+
+function setSuiviType(id, val) {
+  document.getElementById('suivi_type_' + id).value = val;
+  document.getElementById('btn_fts_' + id).className = 'fts-loc-btn' + (val==='FTS'?' active-fts':'');
+  document.getElementById('btn_loc_' + id).className = 'fts-loc-btn' + (val==='LOC'?' active-loc':'');
+}
+
+function supprimerSuiviMat(id) {
+  const el = document.getElementById('suivi_row_' + id);
+  if (el) el.remove();
+}
+
+function getSuiviMateriel() {
+  const rows = document.querySelectorAll('#suivi_mat_rows .suivi-row');
+  return Array.from(rows).map(row => {
+    const id = row.id.replace('suivi_row_','');
+    return {
+      nom:    document.getElementById('suivi_nom_'+id)?.value || '',
+      statut: document.getElementById('suivi_statut_'+id)?.value || '',
+      type:   document.getElementById('suivi_type_'+id)?.value || 'FTS',
+    };
+  }).filter(m => m.nom);
+}
+
+window.ajouterSuiviMat   = ajouterSuiviMat;
+window.setSuiviStatut     = setSuiviStatut;
+window.setSuiviType       = setSuiviType;
+window.supprimerSuiviMat  = supprimerSuiviMat;
+async function uploadToDrive(blob, fileName) {
+  showToast('⏳ Envoi sur Google Drive...', '');
+
+  if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
+    throw new Error('Non connecté — connecte-toi depuis le dashboard.');
+  }
+  if (!chantierActif) {
+    throw new Error('Aucun chantier actif sélectionné depuis le dashboard.');
+  }
+
+  // Le module partagé FTSDrive gère la recherche tolérante aux espaces
+  // et retrouve/creé le sous-dossier RAPPORT JOURNALIER du chantier.
+  const { id: rapportsFolderId } = await FTSDrive.getDossierModuleChantier(
+    chantierActif.name,
+    'RAPPORT JOURNALIER'
+  );
+
+  await FTSDrive.uploadFile(blob, fileName, 'application/pdf', rapportsFolderId);
+  showToast('✅ Rapport enregistré sur Drive !', 'success');
+}
+
+function downloadLocal(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('📥 PDF téléchargé localement', 'success');
+}
+
+// ─── Utilitaires ───────────────────────────────────────────────
+function formatDate(d) {
+  if (!d) return '';
+  const [y,m,j] = d.split('-');
+  return `${j}/${m}/${y}`;
+}
+
+let toastTimer;
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = '', type === 'error' ? 4000 : 3000);
+}
+</script>
+</body>
+</html>

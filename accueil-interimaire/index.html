@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#3A3A3A">
+<link rel="manifest" href="/manifest_dashboard.json">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-dashboard-192.png">
+<script>
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashboard.js").catch(() => {}); }
+</script>
+<title>Accueil Intérimaire – FTS</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{--jaune:#FDCA01;--anth:#3A3A3A;--gris:#E8E8E8;--bord:#CCCCCC;--blanc:#FFFFFF;--vert:#27AE60;--rouge:#C0392B;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Segoe UI",Arial,sans-serif;background:#F2F2F2;color:#2E2E2E;font-size:14px;}
+.app-header{background:var(--anth);padding:12px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3);}
+.logo-bar{display:flex;align-items:center;gap:10px;flex:1;}
+.logo-img{height:38px;width:auto;display:block;}
+.logo-fts span{color:var(--jaune);}
+.app-title{font-size:12px;color:#AAA;line-height:1.2;}
+.btn-valider{background:var(--jaune);color:var(--anth);border:none;padding:10px 18px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;}
+.section{background:#fff;margin:12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;}
+.section-title{background:var(--anth);color:#fff;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+.section-title .dot{width:8px;height:8px;background:var(--jaune);border-radius:50%;flex-shrink:0;}
+.fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.field-row{padding:10px 14px;border-bottom:1px solid var(--gris);}
+.field-row.full{grid-column:1/-1;}
+.field-label{font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
+input[type=text],input[type=date],select{width:100%;border:none;border-bottom:2px solid var(--gris);padding:6px 2px;font-size:15px;color:#2E2E2E;background:transparent;outline:none;-webkit-appearance:none;}
+input:focus,select:focus{border-bottom-color:var(--jaune);}
+/* Cases à cocher */
+.check-group{padding:10px 14px;}
+.check-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F5F5F5;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;}
+.check-item:last-child{border-bottom:none;}
+.check-item input[type=checkbox]{display:none;}
+.check-box{width:26px;height:26px;border:2px solid var(--bord);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;color:transparent;background:#fff;flex-shrink:0;transition:all .15s;}
+.check-item input:checked+.check-box{background:var(--anth);border-color:var(--anth);color:#fff;}
+.check-label{font-size:13px;line-height:1.4;flex:1;}
+/* QCM */
+.qcm-question{padding:12px 14px;border-bottom:1px solid var(--gris);}
+.qcm-question:last-child{border-bottom:none;}
+.qcm-q{font-size:13px;font-weight:700;color:var(--anth);margin-bottom:8px;padding:8px 10px;background:#F8F8F8;border-left:3px solid var(--jaune);border-radius:0 4px 4px 0;}
+/* Formations renforcées */
+.formation-toggle{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;border-bottom:1px solid var(--gris);-webkit-tap-highlight-color:transparent;}
+.formation-toggle .ft-label{font-size:13px;font-weight:700;color:var(--anth);}
+.toggle-switch{width:44px;height:24px;background:#ccc;border-radius:12px;position:relative;transition:background .2s;flex-shrink:0;}
+.toggle-switch.on{background:var(--jaune);}
+.toggle-knob{width:20px;height:20px;background:#fff;border-radius:50%;position:absolute;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3);}
+.toggle-switch.on .toggle-knob{transform:translateX(20px);}
+.formation-content{display:none;background:#FAFAFA;border-bottom:1px solid var(--gris);}
+.formation-content.open{display:block;}
+.formation-subtitle{font-size:11px;font-weight:700;color:var(--jaune);text-transform:uppercase;letter-spacing:.8px;padding:8px 14px 4px;}
+/* Signatures */
+.sig-zone{padding:14px;}
+.sig-canvas-wrap{border:2px solid var(--gris);border-radius:6px;background:#fff;position:relative;touch-action:none;}
+canvas{display:block;width:100%;height:130px;cursor:crosshair;touch-action:none;}
+.sig-hint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#CCC;font-size:12px;pointer-events:none;text-align:center;}
+.sig-actions{display:flex;justify-content:flex-end;margin-top:6px;}
+.btn-clear{background:none;border:1px solid var(--bord);color:#666;padding:5px 12px;border-radius:4px;font-size:12px;cursor:pointer;}
+/* Drive */
+.drive-status{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:12px;flex-wrap:wrap;gap:6px;}
+.drive-dot{width:8px;height:8px;border-radius:50%;background:#CCC;flex-shrink:0;}
+.drive-dot.connected{background:var(--vert);}
+.drive-dot.error{background:var(--rouge);}
+.btn-drive{background:#4285F4;color:#fff;border:none;padding:7px 14px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;margin-left:auto;}
+.btn-secondary{background:#888;color:#fff;border:none;padding:7px 14px;border-radius:5px;font-size:11px;cursor:pointer;}
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:#fff;border-radius:12px;padding:24px;max-width:340px;width:90%;}
+.modal h3{font-size:17px;margin-bottom:12px;}
+.modal p{color:#666;font-size:13px;line-height:1.5;margin-bottom:18px;}
+.modal-btns{display:flex;gap:10px;justify-content:flex-end;}
+.btn-cancel{background:none;border:1px solid var(--bord);padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;}
+.btn-confirm{background:var(--jaune);border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:700;}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--anth);color:#fff;padding:12px 22px;border-radius:8px;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.25);transition:transform .35s cubic-bezier(.34,1.56,.64,1);z-index:9999;white-space:nowrap;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+#toast.success{background:var(--vert);}
+#toast.error{background:var(--rouge);}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="logo-bar">
+    <img id="headerLogo" class="logo-img" alt="FTS">
+    <div class="app-title">Fondations & Travaux Spéciaux<br><strong style="color:#fff">Accueil Intérimaire</strong></div>
+  </div>
+  <button class="btn-valider" onclick="valider()">✓ Enregistrer</button>
+</header>
+
+<div class="chantier-actif-banner" id="chantierBanner" style="margin:12px;padding:10px 14px;border-radius:8px;background:#EAF6EE;border:1px solid #27AE60;font-size:13px;color:#1D6E3E;">Chargement du chantier actif...</div>
+
+<!-- SECTION 1 : CHANTIER + IDENTITÉ -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>Identification</div>
+  <div class="fields-grid">
+    <div class="field-row">
+      <div class="field-label">N° Dossier</div>
+      <input type="text" id="dossier" placeholder="25FTS914" style="text-transform:uppercase">
+    </div>
+    <div class="field-row">
+      <div class="field-label">Date</div>
+      <input type="date" id="date">
+    </div>
+    <div class="field-row">
+      <div class="field-label">Nom de l'intérimaire</div>
+      <input type="text" id="nom" placeholder="NOM" style="text-transform:uppercase">
+    </div>
+    <div class="field-row">
+      <div class="field-label">Prénom</div>
+      <input type="text" id="prenom" placeholder="Prénom" style="text-transform:uppercase">
+    </div>
+    <div class="field-row full">
+      <div class="field-label">Nom de l'ETT (agence intérim)</div>
+      <input type="text" id="ett" placeholder="Nom de l'agence" style="text-transform:uppercase">
+    </div>
+    <div class="field-row full">
+      <div class="field-label">Fonction / Poste</div>
+      <input type="text" id="fonction" placeholder="Ex : Opérateur forage" style="text-transform:uppercase">
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 2 : TYPE DE FORMATION -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>Type de formation sécurité</div>
+  <div class="check-group">
+    <label class="check-item"><input type="checkbox" id="form1j"><span class="check-box">✓</span><span class="check-label">1er Jour</span></label>
+    <label class="check-item"><input type="checkbox" id="form1m"><span class="check-box">✓</span><span class="check-label">Plus d'1 mois d'absence</span></label>
+    <label class="check-item"><input type="checkbox" id="formAnnuel"><span class="check-box">✓</span><span class="check-label">Annuel</span></label>
+  </div>
+</div>
+
+<!-- SECTION 3 : CERTIFICATIONS -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>Certifications & habilitations</div>
+  <div class="check-group">
+    <label class="check-item"><input type="checkbox" id="cR482"><span class="check-box">✓</span><span class="check-label">CACES R482 – Engins de chantier</span></label>
+    <label class="check-item"><input type="checkbox" id="cR486"><span class="check-box">✓</span><span class="check-label">CACES R486 – Plateformes élévatrices</span></label>
+    <label class="check-item"><input type="checkbox" id="cElec"><span class="check-box">✓</span><span class="check-label">Habilitation électrique BS (mise à la terre)</span></label>
+    <label class="check-item"><input type="checkbox" id="cHauteur"><span class="check-box">✓</span><span class="check-label">Travaux en hauteur</span></label>
+    <label class="check-item"><input type="checkbox" id="cSST"><span class="check-box">✓</span><span class="check-label">Sauveteur Secouriste du Travail (SST)</span></label>
+  </div>
+</div>
+
+<!-- SECTION 4 : QCM OBLIGATOIRE -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>QCM Obligatoire</div>
+
+  <div class="qcm-question">
+    <div class="qcm-q">1 — Quels sont les EPI minimum obligatoires ?</div>
+    <div class="check-group" style="padding:0 0 0 14px">
+      <label class="check-item"><input type="checkbox" id="q1a"><span class="check-box">✓</span><span class="check-label">Bottes de sécurité</span></label>
+      <label class="check-item"><input type="checkbox" id="q1b"><span class="check-box">✓</span><span class="check-label">Tenue de travail et vêtements couvrants</span></label>
+      <label class="check-item"><input type="checkbox" id="q1c"><span class="check-box">✓</span><span class="check-label">Gants</span></label>
+      <label class="check-item"><input type="checkbox" id="q1d"><span class="check-box">✓</span><span class="check-label">Vêtements haute visibilité</span></label>
+      <label class="check-item"><input type="checkbox" id="q1e"><span class="check-box">✓</span><span class="check-label">Protections auditives</span></label>
+      <label class="check-item"><input type="checkbox" id="q1f"><span class="check-box">✓</span><span class="check-label">Casque</span></label>
+      <label class="check-item"><input type="checkbox" id="q1g"><span class="check-box">✓</span><span class="check-label">Lunettes</span></label>
+    </div>
+  </div>
+
+  <div class="qcm-question">
+    <div class="qcm-q">2 — Un accident grave a lieu sur le chantier :</div>
+    <div class="check-group" style="padding:0 0 0 14px">
+      <label class="check-item"><input type="checkbox" id="q2a"><span class="check-box">✓</span><span class="check-label">Je déplace le blessé jusqu'au fourgon</span></label>
+      <label class="check-item"><input type="checkbox" id="q2b"><span class="check-box">✓</span><span class="check-label">Je l'emmène aux urgences</span></label>
+      <label class="check-item"><input type="checkbox" id="q2c"><span class="check-box">✓</span><span class="check-label">Je préviens les riverains</span></label>
+      <label class="check-item"><input type="checkbox" id="q2d"><span class="check-box">✓</span><span class="check-label">J'alerte le chef de chantier et le secouriste</span></label>
+    </div>
+  </div>
+
+  <div class="qcm-question">
+    <div class="qcm-q">3 — Ai-je le droit de déplacer un engin sans autorisation de conduite ?</div>
+    <div class="check-group" style="padding:0 0 0 14px">
+      <label class="check-item"><input type="checkbox" id="q3a"><span class="check-box">✓</span><span class="check-label">Non</span></label>
+      <label class="check-item"><input type="checkbox" id="q3b"><span class="check-box">✓</span><span class="check-label">Oui si c'est juste pour le déplacer</span></label>
+      <label class="check-item"><input type="checkbox" id="q3c"><span class="check-box">✓</span><span class="check-label">Oui si j'ai les CACES appropriés</span></label>
+    </div>
+  </div>
+
+  <div class="qcm-question">
+    <div class="qcm-q">4 — Le bruit sur un chantier peut entraîner :</div>
+    <div class="check-group" style="padding:0 0 0 14px">
+      <label class="check-item"><input type="checkbox" id="q4a"><span class="check-box">✓</span><span class="check-label">Améliorer la concentration</span></label>
+      <label class="check-item"><input type="checkbox" id="q4b"><span class="check-box">✓</span><span class="check-label">Perte d'audition et augmentation du risque d'accident</span></label>
+      <label class="check-item"><input type="checkbox" id="q4c"><span class="check-box">✓</span><span class="check-label">Aucun risque réel</span></label>
+    </div>
+  </div>
+
+  <div class="qcm-question">
+    <div class="qcm-q">5 — Pour éviter les chutes de plain-pied :</div>
+    <div class="check-group" style="padding:0 0 0 14px">
+      <label class="check-item"><input type="checkbox" id="q5a"><span class="check-box">✓</span><span class="check-label">Je garde les zones de circulation propres et dégagées</span></label>
+      <label class="check-item"><input type="checkbox" id="q5b"><span class="check-box">✓</span><span class="check-label">Je laisse traîner mes outils</span></label>
+      <label class="check-item"><input type="checkbox" id="q5c"><span class="check-box">✓</span><span class="check-label">Je balise et signale les obstacles</span></label>
+      <label class="check-item"><input type="checkbox" id="q5d"><span class="check-box">✓</span><span class="check-label">J'emprunte les cheminements piétons prévus</span></label>
+    </div>
+  </div>
+
+  <div class="qcm-question">
+    <div class="qcm-q">6 — Cocher les affirmations exactes :</div>
+    <div class="check-group" style="padding:0 0 0 14px">
+      <label class="check-item"><input type="checkbox" id="q6a"><span class="check-box">✓</span><span class="check-label">Sur chantier, je roule godet / fourches baissé(es)</span></label>
+      <label class="check-item"><input type="checkbox" id="q6b"><span class="check-box">✓</span><span class="check-label">Lors d'une manœuvre, je veille aux angles morts</span></label>
+      <label class="check-item"><input type="checkbox" id="q6c"><span class="check-box">✓</span><span class="check-label">Pour l'accès à l'engin, j'utilise trois points d'appui</span></label>
+      <label class="check-item"><input type="checkbox" id="q6d"><span class="check-box">✓</span><span class="check-label">J'attache la ceinture de sécurité dès que je monte dans un engin</span></label>
+      <label class="check-item"><input type="checkbox" id="q6e"><span class="check-box">✓</span><span class="check-label">Je conduis avec la porte de l'engin ouverte</span></label>
+      <label class="check-item"><input type="checkbox" id="q6f"><span class="check-box">✓</span><span class="check-label">Dans la cabine de l'engin, je peux téléphoner</span></label>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 5 : QCM FORMATIONS RENFORCÉES -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>QCM Formations renforcées (si concerné)</div>
+
+  <!-- FORAGE -->
+  <div class="formation-toggle" onclick="toggleFormation('forage')">
+    <span class="ft-label">🔩 Forage</span>
+    <div class="toggle-switch" id="tog_forage"><div class="toggle-knob"></div></div>
+  </div>
+  <div class="formation-content" id="fc_forage">
+    <div class="formation-subtitle">Forage — Cocher les affirmations exactes</div>
+    <div class="check-group">
+      <label class="check-item"><input type="checkbox" id="f1a"><span class="check-box">✓</span><span class="check-label">Je n'attends pas l'arrêt complet des pièces en mouvement pour intervenir sur la machine</span></label>
+      <label class="check-item"><input type="checkbox" id="f1b"><span class="check-box">✓</span><span class="check-label">Je m'assure de la stabilité de la machine</span></label>
+      <label class="check-item"><input type="checkbox" id="f1c"><span class="check-box">✓</span><span class="check-label">Les vêtements flottants sont interdits</span></label>
+      <label class="check-item"><input type="checkbox" id="f1d"><span class="check-box">✓</span><span class="check-label">Je reste visible du conducteur</span></label>
+    </div>
+    <div class="formation-subtitle">Pourquoi est-il interdit de s'approcher d'un train de tige en rotation ?</div>
+    <div class="check-group">
+      <label class="check-item"><input type="checkbox" id="f1e"><span class="check-box">✓</span><span class="check-label">À cause du bruit généré</span></label>
+      <label class="check-item"><input type="checkbox" id="f1f"><span class="check-box">✓</span><span class="check-label">À cause du risque de happement ou d'entraînement</span></label>
+      <label class="check-item"><input type="checkbox" id="f1g"><span class="check-box">✓</span><span class="check-label">À cause du risque de projection d'eau ou de coulis</span></label>
+    </div>
+    <div class="formation-subtitle">Machine de pieux — Cocher les affirmations exactes</div>
+    <div class="check-group">
+      <label class="check-item"><input type="checkbox" id="f1h"><span class="check-box">✓</span><span class="check-label">Le risque d'écrasement existe lors de la mise en place des cages armatures</span></label>
+      <label class="check-item"><input type="checkbox" id="f1i"><span class="check-box">✓</span><span class="check-label">La tarière en rotation présente un risque de happement</span></label>
+      <label class="check-item"><input type="checkbox" id="f1j"><span class="check-box">✓</span><span class="check-label">Il est possible d'enlever manuellement des résidus sur la tarière pendant une rotation lente</span></label>
+    </div>
+  </div>
+
+  <!-- SOUDURE -->
+  <div class="formation-toggle" onclick="toggleFormation('soudure')">
+    <span class="ft-label">🔥 Soudure</span>
+    <div class="toggle-switch" id="tog_soudure"><div class="toggle-knob"></div></div>
+  </div>
+  <div class="formation-content" id="fc_soudure">
+    <div class="formation-subtitle">Soudure — Cocher les affirmations exactes</div>
+    <div class="check-group">
+      <label class="check-item"><input type="checkbox" id="s1a"><span class="check-box">✓</span><span class="check-label">Je positionne un extincteur à proximité de ma zone de travail</span></label>
+      <label class="check-item"><input type="checkbox" id="s1b"><span class="check-box">✓</span><span class="check-label">Je porte un écran facial spécial soudure</span></label>
+      <label class="check-item"><input type="checkbox" id="s1c"><span class="check-box">✓</span><span class="check-label">Les bouteilles sont couchées au sol</span></label>
+      <label class="check-item"><input type="checkbox" id="s1d"><span class="check-box">✓</span><span class="check-label">Il doit y avoir une protection autour des robinets</span></label>
+      <label class="check-item"><input type="checkbox" id="s1e"><span class="check-box">✓</span><span class="check-label">Je porte des vêtements propres</span></label>
+      <label class="check-item"><input type="checkbox" id="s1f"><span class="check-box">✓</span><span class="check-label">J'éloigne le personnel et isole ma zone de travail</span></label>
+    </div>
+  </div>
+
+  <!-- CHALUMEAU -->
+  <div class="formation-toggle" onclick="toggleFormation('chalumeau')">
+    <span class="ft-label">🔧 Chalumeau</span>
+    <div class="toggle-switch" id="tog_chalumeau"><div class="toggle-knob"></div></div>
+  </div>
+  <div class="formation-content" id="fc_chalumeau">
+    <div class="formation-subtitle">Chalumeau — Cocher les affirmations exactes</div>
+    <div class="check-group">
+      <label class="check-item"><input type="checkbox" id="c1a"><span class="check-box">✓</span><span class="check-label">Je positionne un extincteur à proximité de ma zone de travail</span></label>
+      <label class="check-item"><input type="checkbox" id="c1b"><span class="check-box">✓</span><span class="check-label">Je porte des lunettes de sécurité teintées</span></label>
+      <label class="check-item"><input type="checkbox" id="c1c"><span class="check-box">✓</span><span class="check-label">Les bouteilles sont couchées au sol</span></label>
+      <label class="check-item"><input type="checkbox" id="c1d"><span class="check-box">✓</span><span class="check-label">Il doit y avoir une protection autour des robinets</span></label>
+      <label class="check-item"><input type="checkbox" id="c1e"><span class="check-box">✓</span><span class="check-label">Je porte des vêtements propres</span></label>
+    </div>
+  </div>
+
+  <!-- TRAVAUX EN HAUTEUR -->
+  <div class="formation-toggle" onclick="toggleFormation('hauteur')">
+    <span class="ft-label">⬆️ Travaux en hauteur</span>
+    <div class="toggle-switch" id="tog_hauteur"><div class="toggle-knob"></div></div>
+  </div>
+  <div class="formation-content" id="fc_hauteur">
+    <div class="formation-subtitle">Je peux travailler avec un harnais en hauteur :</div>
+    <div class="check-group">
+      <label class="check-item"><input type="checkbox" id="h1a"><span class="check-box">✓</span><span class="check-label">Si j'ai suivi une formation Tvx en hauteur et au port des EPI</span></label>
+      <label class="check-item"><input type="checkbox" id="h1b"><span class="check-box">✓</span><span class="check-label">En toutes circonstances</span></label>
+      <label class="check-item"><input type="checkbox" id="h1c"><span class="check-box">✓</span><span class="check-label">Avec un harnais contrôlé il y a moins d'un an</span></label>
+    </div>
+  </div>
+
+  <!-- BÉTON / CIMENT -->
+  <div class="formation-toggle" onclick="toggleFormation('beton')">
+    <span class="ft-label">🧱 Béton / Ciment</span>
+    <div class="toggle-switch" id="tog_beton"><div class="toggle-knob"></div></div>
+  </div>
+  <div class="formation-content" id="fc_beton">
+    <div class="formation-subtitle">Béton / Ciment — Cocher les affirmations exactes</div>
+    <div class="check-group">
+      <label class="check-item"><input type="checkbox" id="b1a"><span class="check-box">✓</span><span class="check-label">Le béton et le ciment peuvent provoquer une irritation de la peau</span></label>
+      <label class="check-item"><input type="checkbox" id="b1b"><span class="check-box">✓</span><span class="check-label">Le béton et le ciment peuvent provoquer une irritation des voies respiratoires</span></label>
+      <label class="check-item"><input type="checkbox" id="b1c"><span class="check-box">✓</span><span class="check-label">En présence de ces produits, je porte un masque FFP3 et des gants étanches</span></label>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 6 : L'INTÉRIMAIRE RECONNAÎT -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>L'intérimaire reconnaît avoir reçu une formation sur :</div>
+  <div class="check-group">
+    <label class="check-item"><input type="checkbox" id="r1a"><span class="check-box">✓</span><span class="check-label">Les tâches à réaliser sur la base de la fiche de poste</span></label>
+    <label class="check-item"><input type="checkbox" id="r1b"><span class="check-box">✓</span><span class="check-label">Les matériels à utiliser</span></label>
+    <label class="check-item"><input type="checkbox" id="r1c"><span class="check-box">✓</span><span class="check-label">Les matériaux à utiliser</span></label>
+    <label class="check-item"><input type="checkbox" id="r1d"><span class="check-box">✓</span><span class="check-label">Les risques particuliers du poste</span></label>
+    <label class="check-item"><input type="checkbox" id="r1e"><span class="check-box">✓</span><span class="check-label">Travaux à proximité des foreuses</span></label>
+    <label class="check-item"><input type="checkbox" id="r1f"><span class="check-box">✓</span><span class="check-label">Soudure</span></label>
+    <label class="check-item"><input type="checkbox" id="r1g"><span class="check-box">✓</span><span class="check-label">Chalumeau</span></label>
+    <label class="check-item"><input type="checkbox" id="r1h"><span class="check-box">✓</span><span class="check-label">Travaux en hauteur</span></label>
+    <label class="check-item"><input type="checkbox" id="r1i"><span class="check-box">✓</span><span class="check-label">Travaux avec ciment</span></label>
+  </div>
+  <div class="section-title" style="background:#555;font-size:10px;">Avoir été informé des règles de prévention suivantes :</div>
+  <div class="check-group">
+    <label class="check-item"><input type="checkbox" id="r2a"><span class="check-box">✓</span><span class="check-label">Moyens de protection collective</span></label>
+    <label class="check-item"><input type="checkbox" id="r2b"><span class="check-box">✓</span><span class="check-label">Port de toutes les protections individuelles</span></label>
+    <label class="check-item"><input type="checkbox" id="r2c"><span class="check-box">✓</span><span class="check-label">Respect des règles/consignes de circulation présentées</span></label>
+    <label class="check-item"><input type="checkbox" id="r2d"><span class="check-box">✓</span><span class="check-label">Respect des consignes données sur le poste de travail</span></label>
+    <label class="check-item"><input type="checkbox" id="r2e"><span class="check-box">✓</span><span class="check-label">Respect des consignes en cas d'accident (affichage)</span></label>
+  </div>
+</div>
+
+<!-- SECTION 7 : SIGNATURES -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px;margin-bottom:80px;">
+  <div class="section" style="margin:0">
+    <div class="section-title" style="font-size:10px"><span class="dot"></span>Signature Entreprise (Chef de chantier)</div>
+    <div class="sig-zone">
+      <div class="field-label" style="margin-bottom:4px">Nom du chef</div>
+      <input type="text" id="nomChef" placeholder="Prénom NOM" style="margin-bottom:10px">
+      <div class="sig-canvas-wrap">
+        <canvas id="sigChef"></canvas>
+        <div class="sig-hint" id="hintChef">✍️ Signez ici</div>
+      </div>
+      <div class="sig-actions"><button class="btn-clear" onclick="clearSig('chef')">Effacer</button></div>
+    </div>
+  </div>
+  <div class="section" style="margin:0">
+    <div class="section-title" style="font-size:10px"><span class="dot"></span>Signature Intérimaire</div>
+    <div class="sig-zone">
+      <div class="field-label" style="margin-bottom:14px">Signature de l'intérimaire</div>
+      <div class="sig-canvas-wrap">
+        <canvas id="sigInter"></canvas>
+        <div class="sig-hint" id="hintInter">✍️ Signez ici</div>
+      </div>
+      <div class="sig-actions"><button class="btn-clear" onclick="clearSig('inter')">Effacer</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUT CONNEXION (partagée avec le dashboard) -->
+<div class="section" style="margin-bottom:80px">
+  <div class="drive-status">
+    <div class="drive-dot" id="driveDot"></div>
+    <span id="driveLabel">Connexion : vérification...</span>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>📋 Enregistrer la fiche ?</h3>
+    <p id="modalMsg"></p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="btn-confirm" onclick="confirmerEnvoi()">Confirmer</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="/js/auth.js"></script>
+<script src="/js/drive.js"></script>
+<script>
+// driveToken dérive de l'auth partagée FTSAuth
+function driveTokenGetter() { return window.FTSAuth ? FTSAuth.getToken() : null; }
+Object.defineProperty(window, 'driveToken', { get: driveTokenGetter });
+let sigChefHas = false, sigInterHas = false;
+let sigChefUrl = null, sigInterUrl = null;
+const ctxChef = document.getElementById('sigChef').getContext('2d');
+const ctxInter = document.getElementById('sigInter').getContext('2d');
+
+// ─── Init ─────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('date').valueAsDate = new Date();
+  document.getElementById('headerLogo').src = '/assets/logo-fts.png';
+  ['nom','prenom','dossier','ett','fonction'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', () => {
+      const pos = el.selectionStart;
+      el.value = el.value.toUpperCase();
+      el.setSelectionRange(pos, pos);
+    });
+  });
+  initSig('chef', ctxChef, 'sigChef', 'hintChef');
+  initSig('inter', ctxInter, 'sigInter', 'hintInter');
+  initAuthPartagee();
+  appliquerChantierActif();
+  chargerLogoPourPdf();
+});
+
+let LOGO_B64 = null;
+async function chargerLogoPourPdf() {
+  try {
+    const res = await fetch('/assets/logo-fts.png');
+    const blob = await res.blob();
+    LOGO_B64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.warn('Logo non chargé :', e);
+  }
+}
+
+let chantierActif = null;
+
+function initAuthPartagee() {
+  if (!window.FTSAuth) return;
+  FTSAuth.init();
+  FTSAuth.onAuthChange(majStatutConnexion);
+  majStatutConnexion(FTSAuth.isSignedIn());
+}
+
+function majStatutConnexion(signedIn) {
+  const dot = document.getElementById('driveDot');
+  const label = document.getElementById('driveLabel');
+  if (signedIn) {
+    dot.className = 'drive-dot connected';
+    label.textContent = '✓ Connecté (via le dashboard)';
+  } else {
+    dot.className = 'drive-dot';
+    label.textContent = 'Non connecté — connecte-toi depuis le dashboard';
+  }
+}
+
+function appliquerChantierActif() {
+  try {
+    const raw = localStorage.getItem('fts_chantier_actif');
+    chantierActif = raw ? JSON.parse(raw) : null;
+  } catch (e) { chantierActif = null; }
+
+  const banner = document.getElementById('chantierBanner');
+  if (chantierActif) {
+    banner.textContent = `Chantier actif : ${chantierActif.name}`;
+    const spaceIdx = chantierActif.name.search(/\s/);
+    const code = spaceIdx > 0 ? chantierActif.name.slice(0, spaceIdx) : chantierActif.name;
+    document.getElementById('dossier').value = code;
+  } else {
+    banner.style.background = '#FDECEA';
+    banner.style.borderColor = '#C0392B';
+    banner.style.color = '#8E2E22';
+    banner.innerHTML = 'Aucun chantier actif. <a href="/index.html">Retourner au dashboard pour en choisir un</a>.';
+  }
+}
+
+// ─── Formations renforcées toggle ─────────────────────────────
+function toggleFormation(name) {
+  const tog = document.getElementById('tog_' + name);
+  const fc  = document.getElementById('fc_' + name);
+  const isOn = tog.classList.contains('on');
+  tog.classList.toggle('on', !isOn);
+  fc.classList.toggle('open', !isOn);
+}
+
+// ─── Signature ────────────────────────────────────────────────
+function initSig(name, ctx, canvasId, hintId) {
+  const canvas = document.getElementById(canvasId);
+  const hint   = document.getElementById(hintId);
+  let drawing  = false;
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr  = window.devicePixelRatio || 1;
+    const nw = Math.floor(rect.width * dpr), nh = Math.floor(rect.height * dpr);
+    if (canvas.width === nw && canvas.height === nh) return;
+    canvas.width = nw; canvas.height = nh;
+    ctx.scale(dpr, dpr);
+    ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (name === 'chef' && sigChefUrl) { const img=new Image(); img.onload=()=>ctx.drawImage(img,0,0,rect.width,rect.height); img.src=sigChefUrl; }
+    if (name === 'inter' && sigInterUrl) { const img=new Image(); img.onload=()=>ctx.drawImage(img,0,0,rect.width,rect.height); img.src=sigInterUrl; }
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const src  = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+  }
+  function saveSig() {
+    const flat = document.createElement('canvas');
+    flat.width = canvas.width; flat.height = canvas.height;
+    const fc = flat.getContext('2d');
+    fc.fillStyle = '#FFFFFF'; fc.fillRect(0,0,flat.width,flat.height);
+    fc.drawImage(canvas,0,0);
+    const url = flat.toDataURL('image/jpeg', 0.95);
+    if (name === 'chef') { sigChefUrl = url; sigChefHas = true; }
+    else                 { sigInterUrl = url; sigInterHas = true; }
+  }
+  canvas.addEventListener('mousedown', e => { e.preventDefault(); drawing=true; const p=getPos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); hint.style.opacity='0'; });
+  canvas.addEventListener('mousemove', e => { e.preventDefault(); if(!drawing) return; const p=getPos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); });
+  canvas.addEventListener('mouseup',   e => { e.preventDefault(); drawing=false; saveSig(); });
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; const p=getPos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); hint.style.opacity='0'; }, {passive:false});
+  canvas.addEventListener('touchmove',  e => { e.preventDefault(); if(!drawing) return; const p=getPos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); }, {passive:false});
+  canvas.addEventListener('touchend',   e => { e.preventDefault(); drawing=false; saveSig(); }, {passive:false});
+}
+
+function clearSig(name) {
+  if (name === 'chef') {
+    ctxChef.clearRect(0,0,document.getElementById('sigChef').width,document.getElementById('sigChef').height);
+    sigChefHas=false; sigChefUrl=null; document.getElementById('hintChef').style.opacity='1';
+  } else {
+    ctxInter.clearRect(0,0,document.getElementById('sigInter').width,document.getElementById('sigInter').height);
+    sigInterHas=false; sigInterUrl=null; document.getElementById('hintInter').style.opacity='1';
+  }
+}
+
+// ─── Validation ───────────────────────────────────────────────
+function valider() {
+  const nom = document.getElementById('nom').value.trim();
+  const prenom = document.getElementById('prenom').value.trim();
+  const date = document.getElementById('date').value;
+  if (!nom || !prenom) { showToast('⚠️ Veuillez renseigner le nom et prénom', 'error'); return; }
+  if (!date) { showToast('⚠️ Veuillez renseigner la date', 'error'); return; }
+  const dest = driveToken ? "Google Drive de l'entreprise" : 'téléchargement local';
+  document.getElementById('modalMsg').textContent = `Fiche accueil de ${prenom} ${nom} du ${formatDate(date)} — enregistrement vers : ${dest}.`;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+
+async function confirmerEnvoi() {
+  closeModal();
+  showToast('⏳ Génération du PDF...', '');
+  try {
+    const blob = await genererPDF();
+    const date = document.getElementById('date').value;
+    const nom  = document.getElementById('nom').value.trim().toUpperCase();
+    const prenom = document.getElementById('prenom').value.trim().toUpperCase();
+    const fileName = `${date}_ACCUEIL_INTERIMAIRE_${nom}-${prenom}.pdf`;
+    if (driveToken) await uploadToDrive(blob, fileName);
+    else downloadLocal(blob, fileName);
+  } catch(err) {
+    console.error(err);
+    showToast('❌ ' + err.message, 'error');
+  }
+}
+
+// ─── Génération PDF ───────────────────────────────────────────
+async function genererPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W=210, H=297, M=10;
+  const C_ANTH=[58,58,58], C_JAUNE=[245,168,0], C_GRIS=[232,232,232], C_BORD=[195,195,195];
+  const C_TXT=[40,40,40], C_WHITE=[255,255,255];
+  let y = M;
+
+  // Titre
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(...C_ANTH);
+  doc.text('FICHE ACCUEIL DES INTÉRIMAIRES', W/2, y+6, {align:'center'}); y+=12;
+
+  // En-tête logo + infos
+  doc.setFillColor(255,255,255); doc.setDrawColor(...C_BORD);
+  doc.rect(M, y, 42, 20, 'FD');
+  doc.addImage(LOGO_B64, 'JPEG', M+1, y+1, 40, 18);
+  const infoX=M+44, infoW=W-M-infoX-M, rh=20/4;
+  const date=document.getElementById('date').value;
+  const nom=document.getElementById('nom').value;
+  const prenom=document.getElementById('prenom').value;
+  const ett=document.getElementById('ett').value;
+  const fonction=document.getElementById('fonction').value;
+  [['DATE', formatDate(date)],['NOM', nom],['PRÉNOM', prenom],['ETT', ett]].forEach(([l,v],i)=>{
+    const ry=y+i*rh;
+    doc.setFillColor(...C_JAUNE); doc.rect(infoX,ry,28,rh,'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_ANTH);
+    doc.text(l, infoX+2, ry+rh/2+1.2);
+    doc.setFillColor(...C_WHITE); doc.setDrawColor(...C_BORD); doc.rect(infoX+28,ry,infoW-28,rh,'FD');
+    doc.setFont('helvetica','normal'); doc.text(v||'', infoX+30, ry+rh/2+1.2);
+  });
+  y+=22;
+
+  // Fonction + type formation
+  doc.setFillColor(...C_ANTH); doc.rect(M,y,W-2*M,6,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_WHITE);
+  doc.text('FONCTION : '+fonction.toUpperCase(), M+3, y+4);
+  y+=8;
+
+  // Type de formation
+  doc.setFillColor(...C_GRIS); doc.rect(M,y,W-2*M,6,'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_ANTH);
+  doc.text('TYPE DE FORMATION SÉCURITÉ', M+3, y+4);
+  y+=8;
+  const forTypes = [['1er Jour', 'form1j'],["> 1 mois d'absence",'form1m'],['Annuel','formAnnuel']];
+  forTypes.forEach(([label,id],i)=>{
+    const cx = M + i*(W-2*M)/3;
+    drawCheckPDF(doc, cx+2, y+1, 5, 5, document.getElementById(id).checked, C_ANTH, C_JAUNE);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...C_TXT);
+    doc.text(label, cx+9, y+5);
+  });
+  y+=10;
+
+  // Certifications
+  doc.setFillColor(...C_GRIS); doc.rect(M,y,W-2*M,6,'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_ANTH);
+  doc.text('CERTIFICATIONS & HABILITATIONS', M+3, y+4); y+=7;
+  const certs=[['CACES R482','cR482'],['CACES R486','cR486'],['Habilitation élec. BS','cElec'],['Travaux en hauteur','cHauteur'],['SST','cSST']];
+  const cW=(W-2*M)/certs.length;
+  certs.forEach(([l,id],i)=>{
+    drawCheckPDF(doc, M+i*cW+2, y+1, 4.5, 4.5, document.getElementById(id).checked, C_ANTH, C_JAUNE);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
+    const lines=doc.splitTextToSize(l, cW-8);
+    doc.text(lines, M+i*cW+8, y+3.5);
+  });
+  y+=12;
+
+  // QCM Obligatoire
+  y = drawSection(doc, y, M, W, 'QCM OBLIGATOIRE', C_ANTH, C_WHITE);
+  const qcm = [
+    {q:'1 — EPI minimum obligatoires', ids:['q1a','q1b','q1c','q1d','q1e','q1f','q1g'],
+     labels:['Bottes de sécurité','Tenue couvrants','Gants','Vêtements HV','Prot. auditives','Casque','Lunettes']},
+    {q:'2 — Accident grave sur le chantier', ids:['q2a','q2b','q2c','q2d'],
+     labels:['Je déplace le blessé au fourgon',"Je l'emmène aux urgences",'Je préviens les riverains',"J'alerte chef de chantier et secouriste"]},
+    {q:'3 — Déplacer un engin sans autorisation ?', ids:['q3a','q3b','q3c'],
+     labels:['Non','Oui si juste pour le déplacer',"Oui si j'ai les CACES appropriés"]},
+    {q:'4 — Le bruit sur chantier peut entraîner', ids:['q4a','q4b','q4c'],
+     labels:['Améliorer la concentration','Perte audition + risque accident','Aucun risque réel']},
+    {q:'5 — Pour éviter les chutes de plain-pied', ids:['q5a','q5b','q5c','q5d'],
+     labels:['Zones circulation propres','Je laisse traîner mes outils','Je balise les obstacles','J\'emprunte les cheminements piétons']},
+    {q:'6 — Affirmations exactes (conduite engins)', ids:['q6a','q6b','q6c','q6d','q6e','q6f'],
+     labels:['Roule godet/fourches baissé(es)','Veille aux angles morts','3 points d\'appui pour accéder à l\'engin','Ceinture dès la montée','Conduis porte ouverte','Téléphone dans la cabine']},
+  ];
+  qcm.forEach(q => {
+    if (y > H - 50) { doc.addPage(); y = M; }
+    doc.setFillColor(248,248,248); doc.rect(M, y, W-2*M, 6, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...C_ANTH);
+    doc.setDrawColor(...C_BORD); doc.rect(M, y, W-2*M, 6, 'S');
+    doc.rect(M, y, 3, 6, 'F'); // barre jaune gauche
+    doc.setFillColor(...C_JAUNE); doc.rect(M, y, 3, 6, 'F');
+    doc.setTextColor(...C_ANTH);
+    doc.text(q.q, M+6, y+4.2);
+    y+=7;
+    const cols = q.ids.length <= 4 ? 1 : 2;
+    const perCol = Math.ceil(q.ids.length/cols);
+    const colW = (W-2*M)/cols;
+    q.ids.forEach((id,i)=>{
+      const col = Math.floor(i/perCol);
+      const row = i%perCol;
+      const cx = M + col*colW;
+      const cy = y + row*5.5;
+      drawCheckPDF(doc, cx+2, cy+0.5, 4, 4, document.getElementById(id).checked, C_ANTH, C_JAUNE);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
+      const lines=doc.splitTextToSize(q.labels[i], colW-10);
+      doc.text(lines, cx+8, cy+3.5);
+    });
+    y += perCol*5.5 + 2;
+  });
+
+  // QCM Formations renforcées
+  const formations = [
+    {name:'forage', label:'FORAGE', tog:'tog_forage',
+     items:[
+       {sub:'Affirmations exactes — Forage', ids:['f1a','f1b','f1c','f1d'], labels:["Je n'attends pas l'arrêt complet des pièces en mouvement",'Je m\'assure de la stabilité de la machine','Les vêtements flottants sont interdits','Je reste visible du conducteur']},
+       {sub:'Train de tige en rotation — pourquoi interdit ?', ids:['f1e','f1f','f1g'], labels:['À cause du bruit',"Risque de happement/entraînement","Risque de projection eau/coulis"]},
+       {sub:'Machine de pieux — affirmations exactes', ids:['f1h','f1i','f1j'], labels:['Risque écrasement lors mise en place cages','Tarière en rotation : risque happement',"Possible enlever résidus tarière pendant rotation lente"]},
+     ]},
+    {name:'soudure', label:'SOUDURE', tog:'tog_soudure',
+     items:[{sub:'Affirmations exactes — Soudure', ids:['s1a','s1b','s1c','s1d','s1e','s1f'], labels:['Extincteur à proximité','Écran facial spécial soudure','Bouteilles couchées au sol','Protection autour des robinets','Vêtements propres','Éloigner personnel, isoler zone']}]},
+    {name:'chalumeau', label:'CHALUMEAU', tog:'tog_chalumeau',
+     items:[{sub:'Affirmations exactes — Chalumeau', ids:['c1a','c1b','c1c','c1d','c1e'], labels:['Extincteur à proximité','Lunettes de sécurité teintées','Bouteilles couchées au sol','Protection autour des robinets','Vêtements propres']}]},
+    {name:'hauteur', label:'TRAVAUX EN HAUTEUR', tog:'tog_hauteur',
+     items:[{sub:'Je peux travailler avec un harnais en hauteur', ids:['h1a','h1b','h1c'], labels:["Si formation Tvx hauteur + EPI",'En toutes circonstances',"Harnais contrôlé < 1 an"]}]},
+    {name:'beton', label:'BÉTON / CIMENT', tog:'tog_beton',
+     items:[{sub:'Affirmations exactes — Béton/Ciment', ids:['b1a','b1b','b1c'], labels:['Irritation de la peau possible','Irritation voies respiratoires possible','Porter masque FFP3 et gants étanches']}]},
+  ];
+
+  formations.forEach(f => {
+    if (!document.getElementById(f.tog).classList.contains('on')) return;
+    if (y > H-40) { doc.addPage(); y=M; }
+    y = drawSection(doc, y, M, W, 'QCM — '+f.label, [80,80,80], C_WHITE);
+    f.items.forEach(item => {
+      doc.setFillColor(...C_GRIS); doc.rect(M,y,(W-2*M),5,'FD');
+      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_ANTH);
+      doc.text(item.sub, M+3, y+3.5); y+=6;
+      item.ids.forEach((id,i)=>{
+        if(y>H-20){doc.addPage();y=M;}
+        drawCheckPDF(doc,M+3,y+0.5,4,4,document.getElementById(id).checked,C_ANTH,C_JAUNE);
+        doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
+        const lines=doc.splitTextToSize(item.labels[i],W-2*M-12);
+        doc.text(lines,M+9,y+3.5);
+        y+=lines.length*4.5+0.5;
+      });
+      y+=2;
+    });
+  });
+
+  // Reconnaît
+  if (y>H-60){doc.addPage();y=M;}
+  y=drawSection(doc,y,M,W,"L'INTÉRIMAIRE RECONNAÎT",C_ANTH,C_WHITE);
+  const recs=[
+    {label:"Formation sur :", ids:['r1a','r1b','r1c','r1d','r1e','r1f','r1g','r1h','r1i'],
+     labels:["Tâches à réaliser (fiche de poste)",'Matériels à utiliser','Matériaux à utiliser','Risques particuliers du poste','Travaux à proximité des foreuses','Soudure','Chalumeau','Travaux en hauteur','Travaux avec ciment']},
+    {label:"Règles de prévention :", ids:['r2a','r2b','r2c','r2d','r2e'],
+     labels:['Moyens de protection collective','Port de toutes les protections individuelles','Respect règles/consignes de circulation','Respect consignes sur le poste de travail','Respect consignes en cas d\'accident']},
+  ];
+  recs.forEach(r=>{
+    doc.setFillColor(...C_GRIS); doc.rect(M,y,W-2*M,5,'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_ANTH);
+    doc.text(r.label, M+3, y+3.5); y+=6;
+    r.ids.forEach((id,i)=>{
+      if(y>H-20){doc.addPage();y=M;}
+      drawCheckPDF(doc,M+3,y+0.5,4,4,document.getElementById(id).checked,C_ANTH,C_JAUNE);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
+      doc.text(r.labels[i],M+9,y+3.5); y+=5;
+    });
+    y+=2;
+  });
+
+  // Signatures
+  if(y>H-55){doc.addPage();y=M;}
+  const sigW=(W-2*M)/2-3;
+  ['ENTREPRISE — CHEF DE CHANTIER','INTÉRIMAIRE'].forEach((label,i)=>{
+    const sx=M+i*(sigW+6);
+    doc.setFillColor(...C_ANTH); doc.rect(sx,y,sigW,6,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_WHITE);
+    doc.text(label,sx+3,y+4);
+  });
+  y+=7;
+
+  // Nom chef sous son bloc
+  const nomChef=document.getElementById('nomChef').value||'';
+  doc.setFillColor(...C_JAUNE); doc.rect(M,y,sigW,6,'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_ANTH);
+  doc.text('NOM : '+nomChef, M+2, y+4);
+  doc.setFillColor(...C_GRIS); doc.rect(M+sigW+6,y,sigW,6,'FD');
+  doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  doc.text('Nom : '+document.getElementById('nom').value+' '+document.getElementById('prenom').value, M+sigW+8, y+4);
+  y+=7;
+
+  // Date
+  const dateStr=formatDate(document.getElementById('date').value)||'';
+  [M, M+sigW+6].forEach(sx=>{
+    doc.setFillColor(248,248,248); doc.setDrawColor(...C_BORD);
+    doc.rect(sx,y,sigW,5,'FD');
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
+    doc.text('Date : '+dateStr, sx+2, y+3.5);
+  });
+  y+=6;
+
+  // Zones de signature
+  const sigH=35;
+  [0,1].forEach(i=>{
+    const sx=M+i*(sigW+6);
+    doc.setDrawColor(...C_BORD); doc.rect(sx,y,sigW,sigH,'S');
+    const url = i===0 ? sigChefUrl : sigInterUrl;
+    if(url) doc.addImage(url,'JPEG',sx+1,y+1,sigW-2,sigH-2);
+  });
+
+  return doc.output('blob');
+}
+
+function drawSection(doc,y,M,W,title,bg,fg){
+  doc.setFillColor(...bg); doc.rect(M,y,W-2*M,7,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...fg);
+  doc.text(title,M+4,y+4.8);
+  return y+9;
+}
+
+function drawCheckPDF(doc,x,y,w,h,checked,bgColor,checkColor){
+  doc.setDrawColor(...bgColor); doc.setLineWidth(0.4);
+  doc.rect(x,y,w,h,'S');
+  if(checked){
+    doc.setDrawColor(...checkColor); doc.setLineWidth(0.9);
+    doc.setLineCap('round'); doc.setLineJoin('round');
+    doc.line(x+0.8,y+h*0.55, x+w*0.4,y+h*0.82);
+    doc.line(x+w*0.4,y+h*0.82, x+w-0.5,y+0.5);
+    doc.setLineWidth(0.4); doc.setLineCap('butt'); doc.setLineJoin('miter');
+  }
+}
+
+// ─── Exposer les fonctions dans le scope global (obligatoire pour les onclick HTML) ───
+window.toggleFormation = toggleFormation;
+window.clearSig = clearSig;
+window.valider = valider;
+window.closeModal = closeModal;
+window.confirmerEnvoi = confirmerEnvoi;
+window.connectDrive = connectDrive;
+window.disconnectDrive = disconnectDrive;
+
+async function uploadToDrive(blob, fileName) {
+  showToast('⏳ Envoi sur Google Drive...', '');
+
+  if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
+    throw new Error('Non connecté — connecte-toi depuis le dashboard.');
+  }
+
+  const date = document.getElementById('date').value;
+  const annee = date ? date.split('-')[0] : new Date().getFullYear().toString();
+
+  const folderId = await FTSDrive.getDossierAnneeAccueilInterimaire(annee);
+  await FTSDrive.uploadFile(blob, fileName, 'application/pdf', folderId);
+  showToast('✅ Fiche enregistrée sur Drive !', 'success');
+}
+
+function downloadLocal(blob,fileName){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=fileName;a.click();
+  URL.revokeObjectURL(url);
+  showToast('📥 PDF téléchargé localement','success');
+}
+function formatDate(d){if(!d)return '';const [y,m,j]=d.split('-');return j+'/'+m+'/'+y;}
+let toastTimer;
+function showToast(msg,type){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='show'+(type?' '+type:'');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.className='',type==='error'?4000:3000);
+}
+</script>
+</body>
+</html>

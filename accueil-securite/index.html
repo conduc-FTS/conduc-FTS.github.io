@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#3A3A3A">
+<link rel="manifest" href="/manifest_dashboard.json">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-dashboard-192.png">
+<script>
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashboard.js").catch(() => {}); }
+</script>
+<title>Accueil Sécurité – FTS</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{--jaune:#FDCA01;--anth:#3A3A3A;--gris:#E8E8E8;--bord:#CCCCCC;--blanc:#FFFFFF;--vert:#27AE60;--rouge:#C0392B;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Segoe UI",Arial,sans-serif;background:#F2F2F2;color:#2E2E2E;font-size:14px;}
+.app-header{background:var(--anth);padding:12px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3);}
+.logo-bar{display:flex;align-items:center;gap:10px;flex:1;}
+.logo-img{height:38px;width:auto;display:block;}
+.app-title{font-size:12px;color:#AAA;line-height:1.2;}
+.btn-valider{background:var(--jaune);color:var(--anth);border:none;padding:10px 18px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.section-card{background:#fff;margin:12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;}
+.card-title{background:var(--anth);color:#fff;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+.card-title .dot{width:8px;height:8px;background:var(--jaune);border-radius:50%;flex-shrink:0;}
+.fields-grid{display:grid;grid-template-columns:1fr 1fr;}
+.field-row{padding:10px 14px;border-bottom:1px solid var(--gris);}
+.field-row.full{grid-column:1/-1;}
+.field-label{font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
+input[type=text],input[type=date],textarea{width:100%;border:none;border-bottom:2px solid var(--gris);padding:6px 2px;font-size:15px;color:#2E2E2E;background:transparent;outline:none;-webkit-appearance:none;}
+input:focus,textarea:focus{border-bottom-color:var(--jaune);}
+/* Sections sécurité */
+.section-item{border-bottom:1px solid var(--gris);}
+.section-item:last-child{border-bottom:none;}
+.section-header{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;}
+.section-num{background:var(--jaune);color:var(--anth);font-size:13px;font-weight:900;min-width:28px;height:28px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.section-titre{font-size:13px;font-weight:700;color:var(--anth);flex:1;}
+.section-check-wrap{flex-shrink:0;}
+.check-item{display:flex;align-items:center;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;}
+.check-item input[type=checkbox]{display:none;}
+.check-box{width:32px;height:32px;border:2px solid var(--bord);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:transparent;background:#fff;transition:all .15s;}
+.check-item input:checked+.check-box{background:#fff;border-color:#1A1A1A;border-width:2.5px;color:#1A1A1A;}
+.section-arrow{color:#999;font-size:11px;flex-shrink:0;transition:transform .2s;}
+.section-arrow.open{transform:rotate(180deg);}
+.section-body{display:none;padding:0 14px 14px 52px;background:#FAFAFA;}
+.section-body.open{display:block;}
+.section-texte{font-size:12px;color:#555;line-height:1.6;margin-bottom:8px;}
+.preciser-wrap{margin-top:8px;}
+.preciser-label{font-size:10px;font-weight:700;color:var(--jaune);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
+.preciser-input{font-size:13px;border-bottom:2px solid var(--jaune) !important;}
+/* Signatures */
+.sig-row{display:grid;grid-template-columns:100px 1fr 120px 130px;gap:6px;padding:8px 14px;border-bottom:1px solid var(--gris);align-items:start;}
+.sig-row:last-child{border-bottom:none;}
+.sig-cell{display:flex;flex-direction:column;gap:3px;}
+.sig-nom{grid-column:span 1;}
+.sig-label{font-size:9px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.7px;}
+.sig-cell input[type=text],.sig-cell input[type=date]{font-size:11px;padding:3px 2px;}
+.sig-canvas-mini-wrap{position:relative;border:1px solid var(--bord);border-radius:4px;background:#fff;height:44px;touch-action:none;}
+.sig-canvas-mini{width:100%;height:44px;display:block;cursor:crosshair;touch-action:none;}
+.sig-hint-mini{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#CCC;font-size:16px;pointer-events:none;}
+.btn-clear-mini{background:none;border:1px solid var(--bord);color:#999;padding:2px 6px;border-radius:3px;font-size:10px;cursor:pointer;margin-top:2px;align-self:flex-end;}
+/* Compteur */
+.progress-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#F5F5F5;border-bottom:1px solid var(--gris);}
+.progress-track{flex:1;height:6px;background:#E0E0E0;border-radius:3px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--jaune);border-radius:3px;transition:width .3s;}
+.progress-text{font-size:11px;font-weight:700;color:var(--anth);white-space:nowrap;}
+/* Drive */
+.drive-status{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:12px;flex-wrap:wrap;}
+.drive-dot{width:8px;height:8px;border-radius:50%;background:#CCC;flex-shrink:0;}
+.drive-dot.connected{background:var(--vert);}
+.drive-dot.error{background:var(--rouge);}
+.btn-drive{background:#4285F4;color:#fff;border:none;padding:7px 14px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;margin-left:auto;}
+.btn-secondary{background:#888;color:#fff;border:none;padding:7px 14px;border-radius:5px;font-size:11px;cursor:pointer;}
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:#fff;border-radius:12px;padding:24px;max-width:340px;width:90%;}
+.modal h3{font-size:17px;margin-bottom:12px;}
+.modal p{color:#666;font-size:13px;line-height:1.5;margin-bottom:18px;}
+.modal-btns{display:flex;gap:10px;justify-content:flex-end;}
+.btn-cancel{background:none;border:1px solid var(--bord);padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;}
+.btn-confirm{background:var(--jaune);border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:700;}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--anth);color:#fff;padding:12px 22px;border-radius:8px;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.25);transition:transform .35s cubic-bezier(.34,1.56,.64,1);z-index:9999;white-space:nowrap;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+#toast.success{background:var(--vert);}
+#toast.error{background:var(--rouge);}
+</style>
+</head>
+<body>
+<header class="app-header">
+  <div class="logo-bar">
+    <img id="headerLogo" class="logo-img" alt="FTS">
+    <div class="app-title">Fondations & Travaux Spéciaux<br><strong style="color:#fff">Accueil Sécurité Chantier</strong></div>
+  </div>
+  <button class="btn-valider" onclick="valider()">✓ Enregistrer</button>
+</header>
+
+<div class="chantier-actif-banner" id="chantierBanner" style="margin:12px;padding:10px 14px;border-radius:8px;background:#EAF6EE;border:1px solid #27AE60;font-size:13px;color:#1D6E3E;">Chargement du chantier actif...</div>
+
+<!-- IDENTIFICATION -->
+<div class="section-card">
+  <div class="card-title"><span class="dot"></span>Identification</div>
+  <div class="fields-grid">
+    <div class="field-row">
+      <div class="field-label">N° Dossier</div>
+      <input type="text" id="dossier" placeholder="25FTS914" style="text-transform:uppercase">
+    </div>
+    <div class="field-row">
+      <div class="field-label">Date</div>
+      <input type="date" id="date">
+    </div>
+    <div class="field-row full">
+      <div class="field-label">Chantier</div>
+      <input type="text" id="chantier" placeholder="VILLE / CHANTIER" style="text-transform:uppercase">
+    </div>
+    <div class="field-row full">
+      <div class="field-label">Responsable du chantier</div>
+      <input type="text" id="responsable" placeholder="NOM PRÉNOM" style="text-transform:uppercase">
+    </div>
+  </div>
+</div>
+
+<!-- POINTS SÉCURITÉ -->
+<div class="section-card">
+  <div class="card-title"><span class="dot"></span>Risques et moyens de prévention — Cocher quand consigne donnée</div>
+  <div class="progress-bar">
+    <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div class="progress-text" id="progressText">0 / 15</div>
+  </div>
+  
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(1)">
+      <div class="section-num">01</div>
+      <div class="section-titre">Objectifs du chantier</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_1">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_1">▼</div>
+    </div>
+    <div class="section-body" id="body_1">
+      <p class="section-texte">Décrire les objectifs du chantier – Présentation du travail attendu et des consignes particulières. S'appuyer sur le dossier chantier (plans, …).</p>
+      
+    </div>
+  </div>
+
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(2)">
+      <div class="section-num">02</div>
+      <div class="section-titre">Circulation sur le chantier</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_2">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_2">▼</div>
+    </div>
+    <div class="section-body" id="body_2">
+      <p class="section-texte">Montrer : Base vie, Zone de travail, Zone de livraison, Zone de stockage des matériels, des matériaux. Indiquer les zones de circulation des engins. Décrire les procédures d'accès au chantier. Maintenir les zones de circulation dégagées. Utiliser les accès aménagés et circuler hors des zones de manutention et de charge. Ne pas être dans la zone de circulation d'un engin, sinon établir un contact visuel avec le conducteur.</p>
+      
+      <div class="preciser-wrap">
+        <div class="preciser-label">✏️ À préciser — Procédures d'accès au chantier :</div>
+        <input type="text" id="preciser_2" class="preciser-input" placeholder="..." style="text-transform:uppercase">
+      </div>
+    </div>
+  </div>
+
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(3)">
+      <div class="section-num">03</div>
+      <div class="section-titre">Protections collectives</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_3">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_3">▼</div>
+    </div>
+    <div class="section-body" id="body_3">
+      <p class="section-texte">Baliser, protéger toutes les ouvertures dans le sol. Mettre et maintenir les protections sur les aciers : Fiches, cages sans cerce, … Travaux en hauteur (Interventions sur Foreuses, …) – Utilisation d'une nacelle, d'une PIRL, …</p>
+      
+      <div class="preciser-wrap">
+        <div class="preciser-label">✏️ À préciser — Tranchées, regards ouverts, … :</div>
+        <input type="text" id="preciser_3" class="preciser-input" placeholder="..." style="text-transform:uppercase">
+      </div>
+    </div>
+  </div>
+
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(4)">
+      <div class="section-num">04</div>
+      <div class="section-titre">EPI – Équipements de Protection Individuelle</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_4">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_4">▼</div>
+    </div>
+    <div class="section-body" id="body_4">
+      <p class="section-texte">EPI OBLIGATOIRES EN TOUTES CIRCONSTANCES : Vêtement réfléchissant HV, tenue de travail, chaussures/bottes de sécurité, casque de sécurité. Travaux avec risque de projection : lunettes/visière. Travaux générant du bruit : casque/coquilles/bouchons. Travaux générant de la poussière : masque anti-poussière. Travaux manuels/produits : gants adaptés, vêtements couvrants. Travaux en hauteur : casque avec jugulaire, harnais et longe. Soudure : tablier, gants ignifugés, écran facial. Chalumeau : vêtements propres, gants ignifugés, lunettes teintées.</p>
+      
+    </div>
+  </div>
+
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(5)">
+      <div class="section-num">05</div>
+      <div class="section-titre">Réseaux</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_5">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_5">▼</div>
+    </div>
+    <div class="section-body" id="body_5">
+      <p class="section-texte">Respecter les distances de sécurité avec les lignes nues sous tension (< 50 000 V : 3 m / > 50 000 V : 5 m). Présenter les réseaux présents sur le chantier via les DICT et les plans des concessionnaires. En particulier les réseaux sensibles.</p>
+      
+    </div>
+  </div>
+
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(6)">
+      <div class="section-num">06</div>
+      <div class="section-titre">Engins, matériels et manutention</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_6">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_6">▼</div>
+    </div>
+    <div class="section-body" id="body_6">
+      <p class="section-texte">Vérifier les autorisations de conduite et les CACES du personnel conducteur d'engins. S'assurer du contrôle < 12 mois pour les accessoires de levage et < 6 mois pour les engins de levage. Vérifier l'état des accessoires de levage avant utilisation : sangles, chaînes… Respecter la charge maximale d'utilisation (CMU). S'assurer de la bonne mise en place des élingues anti-fouet. Mettre à la terre le groupe électrogène. Adopter une bonne position pour lever une charge : plier les genoux, conserver le dos droit.</p>
+      
+    </div>
+  </div>
+
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(7)">
+      <div class="section-num">07</div>
+      <div class="section-titre">Soudure et Chalumeau</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_7">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_7">▼</div>
+    </div>
+    <div class="section-body" id="body_7">
+      <p class="section-texte">Bouteilles sanglées, stockées verticalement avec protection autour des robinets. Préparer la zone de travail : éloigner les matériaux combustibles, positionner un extincteur à proximité. Vérifier le bon état des flexibles. Vêtements de travail propres.</p>
+      
+    </div>
+  </div>
+
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(8)">
+      <div class="section-num">08</div>
+      <div class="section-titre">Travaux en fouille</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_8">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_8">▼</div>
+    </div>
+    <div class="section-body" id="body_8">
+      <p class="section-texte">Présenter les moyens de prévention, d'accès et de circulation de la fiche d'évaluation du risque ensevelissement rédigée pour le chantier.</p>
+      
+    </div>
+  </div>
+
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(9)">
+      <div class="section-num">09</div>
+      <div class="section-titre">Conduite à tenir en cas d'accident</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_9">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_9">▼</div>
+    </div>
+    <div class="section-body" id="body_9">
+      <p class="section-texte">Préciser le personnel formé SST (Sauveteur Secouriste du Travail). Présenter la consigne « en cas d'accident » et l'afficher. Préciser la localisation de la trousse de secours. Préciser la localisation des extincteurs.</p>
+      
+    </div>
+  </div>
+
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(10)">
+      <div class="section-num">10</div>
+      <div class="section-titre">Ordre sur le chantier</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_10">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_10">▼</div>
+    </div>
+    <div class="section-body" id="body_10">
+      <p class="section-texte">Ranger et nettoyer les postes de travail et les zones de stockage. Trier les déchets.</p>
+      
+      <div class="preciser-wrap">
+        <div class="preciser-label">✏️ À préciser — Moyens mis à disposition :</div>
+        <input type="text" id="preciser_10" class="preciser-input" placeholder="..." style="text-transform:uppercase">
+      </div>
+    </div>
+  </div>
+
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(11)">
+      <div class="section-num">11</div>
+      <div class="section-titre">Hygiène</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_11">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_11">▼</div>
+    </div>
+    <div class="section-body" id="body_11">
+      <p class="section-texte">Se laver les mains avant les repas. Changer de vêtements en début et fin de poste. Maintenir les locaux propres.</p>
+      
+    </div>
+  </div>
+
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(12)">
+      <div class="section-num">12</div>
+      <div class="section-titre">Manutention manuelle</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_12">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_12">▼</div>
+    </div>
+    <div class="section-body" id="body_12">
+      <p class="section-texte">Adopter une bonne position pour lever, poser ou déplacer une charge : plier les genoux, garder le dos droit. Répartir le poids en portant à plusieurs si nécessaire.</p>
+      
+      <div class="preciser-wrap">
+        <div class="preciser-label">✏️ À préciser — Matériel de manutention disponible :</div>
+        <input type="text" id="preciser_12" class="preciser-input" placeholder="..." style="text-transform:uppercase">
+      </div>
+    </div>
+  </div>
+
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(13)">
+      <div class="section-num">13</div>
+      <div class="section-titre">Outillage portatif</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_13">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_13">▼</div>
+    </div>
+    <div class="section-body" id="body_13">
+      <p class="section-texte">Maintenir les machines à deux mains. Ne jamais enlever les protections des machines (carters, …). Vigilance avec l'inertie du disque après utilisation. Vérifier le type et l'état du disque.</p>
+      
+    </div>
+  </div>
+
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(14)">
+      <div class="section-num">14</div>
+      <div class="section-titre">Produits dangereux</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_14">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_14">▼</div>
+    </div>
+    <div class="section-body" id="body_14">
+      <p class="section-texte">Ciment : veiller à porter les EPI. Refermer les contenants/bidons après usage. Travailler à l'écart de toute source d'inflammation. Ne pas transvaser dans un autre contenant sans l'étiqueter.</p>
+      
+    </div>
+  </div>
+
+  <div class="section-item">
+    <div class="section-header" onclick="toggleSection(15)">
+      <div class="section-num">15</div>
+      <div class="section-titre">Autres risques particuliers / Consignes particulières</div>
+      <div class="section-check-wrap">
+        <label class="check-item" onclick="event.stopPropagation()">
+          <input type="checkbox" id="sec_15">
+          <span class="check-box">✓</span>
+        </label>
+      </div>
+      <div class="section-arrow" id="arrow_15">▼</div>
+    </div>
+    <div class="section-body" id="body_15">
+      
+      
+      <div class="preciser-wrap">
+        <div class="preciser-label">✏️ À préciser — Décrire les risques et consignes particuliers du chantier :</div>
+        <input type="text" id="preciser_15" class="preciser-input" placeholder="..." style="text-transform:uppercase">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SIGNATURES -->
+<div class="section-card" style="margin-bottom:80px">
+  <div class="card-title"><span class="dot"></span>Signatures — Je soussigné(e), reconnais avoir reçu et compris les consignes de sécurité</div>
+  
+    <div class="sig-row">
+      <div class="sig-cell">
+        <div class="sig-label">DATE</div>
+        <input type="date" id="sig_date_1">
+      </div>
+      <div class="sig-cell sig-nom">
+        <div class="sig-label">NOM & PRÉNOM</div>
+        <input type="text" id="sig_nom_1" placeholder="NOM PRÉNOM" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">ENTREPRISE</div>
+        <input type="text" id="sig_ent_1" placeholder="ENTREPRISE" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">SIGNATURE</div>
+        <div class="sig-canvas-mini-wrap">
+          <canvas id="sigCanvas_1" class="sig-canvas-mini" touch-action="none"></canvas>
+          <div class="sig-hint-mini" id="sigHint_1">✍️</div>
+        </div>
+        <button class="btn-clear-mini" onclick="clearSigRow(1)">✕</button>
+      </div>
+    </div>
+    <div class="sig-row">
+      <div class="sig-cell">
+        <div class="sig-label">DATE</div>
+        <input type="date" id="sig_date_2">
+      </div>
+      <div class="sig-cell sig-nom">
+        <div class="sig-label">NOM & PRÉNOM</div>
+        <input type="text" id="sig_nom_2" placeholder="NOM PRÉNOM" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">ENTREPRISE</div>
+        <input type="text" id="sig_ent_2" placeholder="ENTREPRISE" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">SIGNATURE</div>
+        <div class="sig-canvas-mini-wrap">
+          <canvas id="sigCanvas_2" class="sig-canvas-mini" touch-action="none"></canvas>
+          <div class="sig-hint-mini" id="sigHint_2">✍️</div>
+        </div>
+        <button class="btn-clear-mini" onclick="clearSigRow(2)">✕</button>
+      </div>
+    </div>
+    <div class="sig-row">
+      <div class="sig-cell">
+        <div class="sig-label">DATE</div>
+        <input type="date" id="sig_date_3">
+      </div>
+      <div class="sig-cell sig-nom">
+        <div class="sig-label">NOM & PRÉNOM</div>
+        <input type="text" id="sig_nom_3" placeholder="NOM PRÉNOM" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">ENTREPRISE</div>
+        <input type="text" id="sig_ent_3" placeholder="ENTREPRISE" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">SIGNATURE</div>
+        <div class="sig-canvas-mini-wrap">
+          <canvas id="sigCanvas_3" class="sig-canvas-mini" touch-action="none"></canvas>
+          <div class="sig-hint-mini" id="sigHint_3">✍️</div>
+        </div>
+        <button class="btn-clear-mini" onclick="clearSigRow(3)">✕</button>
+      </div>
+    </div>
+    <div class="sig-row">
+      <div class="sig-cell">
+        <div class="sig-label">DATE</div>
+        <input type="date" id="sig_date_4">
+      </div>
+      <div class="sig-cell sig-nom">
+        <div class="sig-label">NOM & PRÉNOM</div>
+        <input type="text" id="sig_nom_4" placeholder="NOM PRÉNOM" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">ENTREPRISE</div>
+        <input type="text" id="sig_ent_4" placeholder="ENTREPRISE" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">SIGNATURE</div>
+        <div class="sig-canvas-mini-wrap">
+          <canvas id="sigCanvas_4" class="sig-canvas-mini" touch-action="none"></canvas>
+          <div class="sig-hint-mini" id="sigHint_4">✍️</div>
+        </div>
+        <button class="btn-clear-mini" onclick="clearSigRow(4)">✕</button>
+      </div>
+    </div>
+    <div class="sig-row">
+      <div class="sig-cell">
+        <div class="sig-label">DATE</div>
+        <input type="date" id="sig_date_5">
+      </div>
+      <div class="sig-cell sig-nom">
+        <div class="sig-label">NOM & PRÉNOM</div>
+        <input type="text" id="sig_nom_5" placeholder="NOM PRÉNOM" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">ENTREPRISE</div>
+        <input type="text" id="sig_ent_5" placeholder="ENTREPRISE" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">SIGNATURE</div>
+        <div class="sig-canvas-mini-wrap">
+          <canvas id="sigCanvas_5" class="sig-canvas-mini" touch-action="none"></canvas>
+          <div class="sig-hint-mini" id="sigHint_5">✍️</div>
+        </div>
+        <button class="btn-clear-mini" onclick="clearSigRow(5)">✕</button>
+      </div>
+    </div>
+    <div class="sig-row">
+      <div class="sig-cell">
+        <div class="sig-label">DATE</div>
+        <input type="date" id="sig_date_6">
+      </div>
+      <div class="sig-cell sig-nom">
+        <div class="sig-label">NOM & PRÉNOM</div>
+        <input type="text" id="sig_nom_6" placeholder="NOM PRÉNOM" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">ENTREPRISE</div>
+        <input type="text" id="sig_ent_6" placeholder="ENTREPRISE" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">SIGNATURE</div>
+        <div class="sig-canvas-mini-wrap">
+          <canvas id="sigCanvas_6" class="sig-canvas-mini" touch-action="none"></canvas>
+          <div class="sig-hint-mini" id="sigHint_6">✍️</div>
+        </div>
+        <button class="btn-clear-mini" onclick="clearSigRow(6)">✕</button>
+      </div>
+    </div>
+    <div class="sig-row">
+      <div class="sig-cell">
+        <div class="sig-label">DATE</div>
+        <input type="date" id="sig_date_7">
+      </div>
+      <div class="sig-cell sig-nom">
+        <div class="sig-label">NOM & PRÉNOM</div>
+        <input type="text" id="sig_nom_7" placeholder="NOM PRÉNOM" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">ENTREPRISE</div>
+        <input type="text" id="sig_ent_7" placeholder="ENTREPRISE" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">SIGNATURE</div>
+        <div class="sig-canvas-mini-wrap">
+          <canvas id="sigCanvas_7" class="sig-canvas-mini" touch-action="none"></canvas>
+          <div class="sig-hint-mini" id="sigHint_7">✍️</div>
+        </div>
+        <button class="btn-clear-mini" onclick="clearSigRow(7)">✕</button>
+      </div>
+    </div>
+    <div class="sig-row">
+      <div class="sig-cell">
+        <div class="sig-label">DATE</div>
+        <input type="date" id="sig_date_8">
+      </div>
+      <div class="sig-cell sig-nom">
+        <div class="sig-label">NOM & PRÉNOM</div>
+        <input type="text" id="sig_nom_8" placeholder="NOM PRÉNOM" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">ENTREPRISE</div>
+        <input type="text" id="sig_ent_8" placeholder="ENTREPRISE" style="text-transform:uppercase">
+      </div>
+      <div class="sig-cell">
+        <div class="sig-label">SIGNATURE</div>
+        <div class="sig-canvas-mini-wrap">
+          <canvas id="sigCanvas_8" class="sig-canvas-mini" touch-action="none"></canvas>
+          <div class="sig-hint-mini" id="sigHint_8">✍️</div>
+        </div>
+        <button class="btn-clear-mini" onclick="clearSigRow(8)">✕</button>
+      </div>
+    </div>
+</div>
+
+<!-- STATUT CONNEXION (partagée avec le dashboard) -->
+<div class="section-card" style="margin-bottom:80px">
+  <div class="drive-status">
+    <div class="drive-dot" id="driveDot"></div>
+    <span id="driveLabel">Connexion : vérification...</span>
+  </div>
+</div>
+
+<!-- MODAL ERREUR 15/15 -->
+<div class="modal-overlay" id="modalErreur">
+  <div class="modal" style="border-top:5px solid #C0392B">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <span style="font-size:28px">⚠️</span>
+      <h3 style="color:#C0392B">Accueil sécurité incomplet</h3>
+    </div>
+    <p style="font-size:13px;color:#555;line-height:1.6;margin-bottom:14px">
+      Veuillez valider les <strong style="color:#C0392B;font-size:15px" id="erreurRestants">0</strong> points de sécurité restants avant d'enregistrer.<br><br>
+      Chaque consigne doit être donnée et vérifiée avant de pouvoir signer et enregistrer la fiche.
+    </p>
+    <div style="display:flex;align-items:center;gap:10px;background:#FFF5F5;padding:10px 14px;border-radius:6px;border:1px solid #FFCDD2;margin-bottom:18px">
+      <div style="flex:1;height:8px;background:#FFCDD2;border-radius:4px;overflow:hidden">
+        <div id="erreurFill" style="height:100%;background:#C0392B;border-radius:4px;width:0%;transition:width .3s"></div>
+      </div>
+      <span id="erreurProgress" style="font-size:12px;font-weight:700;color:#C0392B;white-space:nowrap">0 / 15</span>
+    </div>
+    <button onclick="document.getElementById('modalErreur').classList.remove('open')" style="background:#C0392B;color:#fff;border:none;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;width:100%">Compris, je continue</button>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMATION -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>📋 Enregistrer la fiche ?</h3>
+    <p id="modalMsg"></p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="btn-confirm" onclick="confirmerEnvoi()">Confirmer</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="/js/auth.js"></script>
+<script src="/js/drive.js"></script>
+<script>
+// driveToken dérive de l'auth partagée FTSAuth
+function driveTokenGetter() { return window.FTSAuth ? FTSAuth.getToken() : null; }
+Object.defineProperty(window, 'driveToken', { get: driveTokenGetter });
+
+// Signatures
+const sigStates = {};
+for (let i = 1; i <= 8; i++) {
+  sigStates[i] = { has: false, url: null, drawing: false };
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('headerLogo').src = '/assets/logo-fts.png';
+  document.getElementById('date').valueAsDate = new Date();
+
+  ['dossier','chantier','responsable'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', () => {
+      const pos = el.selectionStart;
+      el.value = el.value.toUpperCase();
+      el.setSelectionRange(pos, pos);
+    });
+  });
+
+  // Init checkboxes progress
+  document.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', updateProgress);
+  });
+
+  // Init signature pads
+  for (let i = 1; i <= 8; i++) initSigRow(i);
+
+  initAuthPartagee();
+  appliquerChantierActif();
+  chargerLogoPourPdf();
+});
+
+let LOGO_B64 = null;
+async function chargerLogoPourPdf() {
+  try {
+    const res = await fetch('/assets/logo-fts.png');
+    const blob = await res.blob();
+    LOGO_B64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.warn('Logo non chargé :', e);
+  }
+}
+
+let chantierActif = null;
+
+function initAuthPartagee() {
+  if (!window.FTSAuth) return;
+  FTSAuth.init();
+  FTSAuth.onAuthChange(majStatutConnexion);
+  majStatutConnexion(FTSAuth.isSignedIn());
+}
+
+function majStatutConnexion(signedIn) {
+  const dot = document.getElementById('driveDot');
+  const label = document.getElementById('driveLabel');
+  if (signedIn) {
+    dot.className = 'drive-dot connected';
+    label.textContent = '✓ Connecté (via le dashboard)';
+  } else {
+    dot.className = 'drive-dot';
+    label.textContent = 'Non connecté — connecte-toi depuis le dashboard';
+  }
+}
+
+function appliquerChantierActif() {
+  try {
+    const raw = localStorage.getItem('fts_chantier_actif');
+    chantierActif = raw ? JSON.parse(raw) : null;
+  } catch (e) { chantierActif = null; }
+
+  const banner = document.getElementById('chantierBanner');
+  if (chantierActif) {
+    banner.textContent = `Chantier actif : ${chantierActif.name}`;
+    document.getElementById('chantier').value = chantierActif.name;
+    const spaceIdx = chantierActif.name.search(/\s/);
+    const code = spaceIdx > 0 ? chantierActif.name.slice(0, spaceIdx) : chantierActif.name;
+    document.getElementById('dossier').value = code;
+  } else {
+    banner.style.background = '#FDECEA';
+    banner.style.borderColor = '#C0392B';
+    banner.style.color = '#8E2E22';
+    banner.innerHTML = 'Aucun chantier actif. <a href="/index.html">Retourner au dashboard pour en choisir un</a>.';
+  }
+}
+
+function toggleSection(n) {
+  const body = document.getElementById('body_' + n);
+  const arrow = document.getElementById('arrow_' + n);
+  body.classList.toggle('open');
+  arrow.classList.toggle('open');
+}
+
+function updateProgress() {
+  const total = 15;
+  let done = 0;
+  for (let i = 1; i <= total; i++) {
+    if (document.getElementById('sec_' + i)?.checked) done++;
+  }
+  const pct = (done / total * 100).toFixed(0);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = done + ' / ' + total;
+}
+
+function initSigRow(i) {
+  const canvas = document.getElementById('sigCanvas_' + i);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const hint = document.getElementById('sigHint_' + i);
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const nw = Math.floor(rect.width * dpr), nh = Math.floor(rect.height * dpr);
+    if (canvas.width === nw && canvas.height === nh) return;
+    canvas.width = nw; canvas.height = nh;
+    ctx.scale(dpr, dpr);
+    ctx.strokeStyle = '#1A1A1A'; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (sigStates[i].url) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      img.src = sigStates[i].url;
+    }
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const src = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+  }
+  function saveSig() {
+    const flat = document.createElement('canvas');
+    flat.width = canvas.width; flat.height = canvas.height;
+    const fc = flat.getContext('2d');
+    fc.fillStyle = '#FFFFFF'; fc.fillRect(0, 0, flat.width, flat.height);
+    fc.drawImage(canvas, 0, 0);
+    sigStates[i].url = flat.toDataURL('image/jpeg', 0.95);
+    sigStates[i].has = true;
+  }
+  canvas.addEventListener('mousedown', e => { e.preventDefault(); sigStates[i].drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); hint.style.opacity = '0'; });
+  canvas.addEventListener('mousemove', e => { e.preventDefault(); if (!sigStates[i].drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+  canvas.addEventListener('mouseup', e => { e.preventDefault(); sigStates[i].drawing = false; saveSig(); });
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); sigStates[i].drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); hint.style.opacity = '0'; }, {passive:false});
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!sigStates[i].drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }, {passive:false});
+  canvas.addEventListener('touchend', e => { e.preventDefault(); sigStates[i].drawing = false; saveSig(); }, {passive:false});
+}
+
+function clearSigRow(i) {
+  const canvas = document.getElementById('sigCanvas_' + i);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  sigStates[i].has = false; sigStates[i].url = null;
+  document.getElementById('sigHint_' + i).style.opacity = '1';
+}
+
+function valider() {
+  const date = document.getElementById('date').value;
+  const dossier = document.getElementById('dossier').value.trim();
+  if (!date) { showToast('⚠️ Veuillez renseigner la date', 'error'); return; }
+  if (!dossier) { showToast('⚠️ Veuillez renseigner le N° dossier', 'error'); return; }
+
+  // Vérifier les 15 points
+  let done = 0;
+  for (let i = 1; i <= 15; i++) {
+    if (document.getElementById('sec_' + i)?.checked) done++;
+  }
+  const restants = 15 - done;
+  if (restants > 0) {
+    document.getElementById('erreurRestants').textContent = restants;
+    document.getElementById('erreurFill').style.width = (done/15*100) + '%';
+    document.getElementById('erreurProgress').textContent = done + ' / 15';
+    document.getElementById('modalErreur').classList.add('open');
+    return;
+  }
+
+  const dest = driveToken ? "Google Drive de l'entreprise" : 'téléchargement local';
+  document.getElementById('modalMsg').textContent = `Accueil Sécurité du ${formatDate(date)} – ${dossier} — enregistrement vers : ${dest}.`;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+
+async function confirmerEnvoi() {
+  closeModal();
+  showToast('⏳ Génération du PDF...', '');
+  try {
+    const blob = await genererPDF();
+    const date = document.getElementById('date').value;
+    const dossier = document.getElementById('dossier').value.trim().toUpperCase().replace(/\s+/g, '');
+    const fileName = `${date}_ACCUEIL_SECURITE_${dossier}.pdf`;
+    if (driveToken) await uploadToDrive(blob, fileName);
+    else downloadLocal(blob, fileName);
+  } catch(err) {
+    console.error(err);
+    showToast('❌ ' + err.message, 'error');
+  }
+}
+
+async function genererPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W=210, H=297, M=10;
+  const C_ANTH=[58,58,58], C_JAUNE=[245,168,0], C_GRIS=[232,232,232], C_BORD=[195,195,195], C_TXT=[40,40,40], C_WHITE=[255,255,255];
+  let y = M;
+
+  // Titre
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(...C_ANTH);
+  doc.text('ACCUEIL SÉCURITÉ CHANTIER', W/2, y+6, {align:'center'}); y+=12;
+
+  // En-tête
+  doc.setFillColor(255,255,255); doc.setDrawColor(...C_BORD);
+  doc.rect(M, y, 42, 22, 'FD');
+  doc.addImage(LOGO_B64, 'JPEG', M+1, y+1, 40, 20);
+
+  const infoX=M+44, infoW=W-M-infoX-M, rh=22/4;
+  const infos = [
+    ['DATE', formatDate(document.getElementById('date').value)],
+    ['N° DOSSIER', document.getElementById('dossier').value],
+    ['CHANTIER', document.getElementById('chantier').value],
+    ['RESPONSABLE', document.getElementById('responsable').value],
+  ];
+  infos.forEach(([l,v],i) => {
+    const ry = y + i*rh;
+    doc.setFillColor(...C_JAUNE); doc.rect(infoX, ry, 30, rh, 'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_ANTH);
+    doc.text(l, infoX+2, ry+rh/2+1.2);
+    doc.setFillColor(...C_WHITE); doc.setDrawColor(...C_BORD); doc.rect(infoX+30, ry, infoW-30, rh, 'FD');
+    doc.setFont('helvetica','normal'); doc.text(v||'', infoX+32, ry+rh/2+1.2);
+  });
+  y += 24;
+
+  // Légende
+  doc.setFillColor(...C_GRIS); doc.rect(M, y, W-2*M, 6, 'FD');
+  doc.setFont('helvetica','italic'); doc.setFontSize(7); doc.setTextColor(...C_ANTH);
+  doc.text('Consigne donnée, vérification faite → case cochée', M+3, y+4); y+=8;
+
+  // Sections
+  const sectionsData = [
+    {num:1, titre:"Objectifs du chantier", texte:"Décrire les objectifs du chantier. Présentation du travail attendu et des consignes particulières. S'appuyer sur le dossier chantier (plans, …).", preciser:false},
+    {num:2, titre:"Circulation sur le chantier", texte:"Montrer : Base vie, Zone de travail, Zone de livraison, Zone de stockage. Indiquer les zones de circulation des engins. Décrire les procédures d'accès. Maintenir les zones dégagées. Ne pas être dans la zone de circulation d'un engin sans contact visuel.", preciser:true, labelP:"Procédures d'accès au chantier"},
+    {num:3, titre:"Protections collectives", texte:"Baliser, protéger toutes les ouvertures dans le sol. Mettre et maintenir les protections sur les aciers. Travaux en hauteur : nacelle, PIRL, …", preciser:true, labelP:"Tranchées, regards ouverts, …"},
+    {num:4, titre:"EPI – Équipements de Protection Individuelle", texte:"Obligatoires : Vêtement HV, tenue, chaussures/bottes, casque. Projection : lunettes/visière. Bruit : casque/coquilles/bouchons. Poussière : masque. Hauteur : harnais+longe. Soudure : tablier, gants ignifugés, écran. Chalumeau : vêtements propres, lunettes teintées.", preciser:false},
+    {num:5, titre:"Réseaux", texte:"Respecter les distances de sécurité (< 50 000 V : 3 m / > 50 000 V : 5 m). Présenter les réseaux via les DICT et plans des concessionnaires.", preciser:false},
+    {num:6, titre:"Engins, matériels et manutention", texte:"Vérifier CACES et autorisations de conduite. Contrôles périodiques : accessoires levage < 12 mois, engins levage < 6 mois. Respecter la CMU. Mise à la terre du groupe électrogène. Bonne position pour lever une charge.", preciser:false},
+    {num:7, titre:"Soudure et Chalumeau", texte:"Bouteilles sanglées, verticales, avec protection robinets. Éloigner matériaux combustibles, extincteur à proximité. Vérifier les flexibles. Vêtements propres.", preciser:false},
+    {num:8, titre:"Travaux en fouille", texte:"Présenter les moyens de prévention de la fiche d'évaluation du risque ensevelissement rédigée pour le chantier.", preciser:false},
+    {num:9, titre:"Conduite à tenir en cas d'accident", texte:"Préciser le personnel SST. Présenter et afficher la consigne 'en cas d'accident'. Localisation de la trousse de secours. Localisation des extincteurs.", preciser:false},
+    {num:10, titre:"Ordre sur le chantier", texte:"Ranger et nettoyer les postes de travail. Trier les déchets.", preciser:true, labelP:"Moyens mis à disposition"},
+    {num:11, titre:"Hygiène", texte:"Se laver les mains avant les repas. Changer de vêtements en début et fin de poste. Maintenir les locaux propres.", preciser:false},
+    {num:12, titre:"Manutention manuelle", texte:"Bonne position pour lever/poser/déplacer : plier les genoux, garder le dos droit. Répartir le poids en portant à plusieurs si nécessaire.", preciser:true, labelP:"Matériel de manutention disponible"},
+    {num:13, titre:"Outillage portatif", texte:"Maintenir les machines à deux mains. Ne jamais enlever les protections. Vigilance avec l'inertie du disque. Vérifier le type et l'état du disque.", preciser:false},
+    {num:14, titre:"Produits dangereux", texte:"Ciment : porter les EPI. Refermer les contenants après usage. Travailler à l'écart de toute source d'inflammation. Ne pas transvaser sans étiqueter.", preciser:false},
+    {num:15, titre:"Autres risques particuliers / Consignes particulières", texte:"", preciser:true, labelP:"Risques et consignes particuliers du chantier"},
+  ];
+
+  sectionsData.forEach(s => {
+    if (y > H - 30) { doc.addPage(); y = M; }
+    const checked = document.getElementById('sec_' + s.num)?.checked || false;
+    const precVal = s.preciser ? (document.getElementById('preciser_' + s.num)?.value || '') : '';
+
+    // Fond selon état
+    doc.setFillColor(...(checked ? [245,168,0] : [248,248,248]));
+    doc.rect(M, y, W-2*M, 7, 'F');
+    doc.setDrawColor(...C_BORD); doc.rect(M, y, W-2*M, 7, 'S');
+
+    // Numéro
+    doc.setFillColor(...(checked ? C_ANTH : C_ANTH));
+    doc.circle(M+4.5, y+3.5, 3.5, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_WHITE);
+    doc.text(String(s.num).padStart(2,'0'), M+4.5, y+4.5, {align:'center'});
+
+    // Titre
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...C_ANTH);
+    doc.text(s.titre, M+11, y+4.5);
+
+    // Coche
+    if (checked) {
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(0,100,0);
+      doc.text('✓', W-M-4, y+5, {align:'center'});
+    } else {
+      doc.setDrawColor(...C_BORD); doc.rect(W-M-7, y+1.5, 5, 4, 'S');
+    }
+    y += 8;
+
+    // Texte si présent
+    if (s.texte && y < H - 20) {
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(90,90,90);
+      const lines = doc.splitTextToSize(s.texte, W-2*M-8);
+      if (y + lines.length * 3.5 < H - 20) {
+        doc.text(lines, M+4, y+2.5);
+        y += lines.length * 3.5 + 2;
+      }
+    }
+
+    // À préciser
+    if (s.preciser && precVal) {
+      doc.setFillColor(255,252,230); doc.rect(M+2, y, W-2*M-4, 6, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_JAUNE);
+      doc.text('À PRÉCISER : ', M+4, y+4);
+      doc.setFont('helvetica','normal'); doc.setTextColor(...C_ANTH);
+      doc.text(precVal.toUpperCase(), M+26, y+4);
+      y += 7;
+    }
+    y += 1;
+  });
+
+  // Signatures
+  if (y > H - 80) { doc.addPage(); y = M; }
+  doc.setFillColor(...C_ANTH); doc.rect(M, y, W-2*M, 7, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...C_WHITE);
+  doc.text("SIGNATURES — Je reconnais avoir reçu et compris les consignes de sécurité", M+3, y+4.8);
+  y += 9;
+
+  // En-têtes colonnes signatures
+  const sigCols = [28, 52, 32, 78]; // widths
+  const sigX = [M, M+28, M+80, M+112];
+  const sigLabels = ['DATE','NOM & PRÉNOM','ENTREPRISE','SIGNATURE'];
+  doc.setFillColor(...C_GRIS); doc.rect(M, y, W-2*M, 6, 'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_ANTH);
+  sigLabels.forEach((l,i) => doc.text(l, sigX[i]+2, y+4));
+  y += 7;
+
+  const ROW_H = 16;
+  for (let i = 1; i <= 8; i++) {
+    if (y + ROW_H > H - M) { doc.addPage(); y = M; }
+    if (i % 2 === 0) { doc.setFillColor(248,248,248); doc.rect(M, y, W-2*M, ROW_H, 'F'); }
+    doc.setDrawColor(...C_BORD); doc.rect(M, y, W-2*M, ROW_H, 'S');
+    sigX.forEach((x,ci) => doc.line(x, y, x, y+ROW_H));
+
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...C_TXT);
+    const sigDate = document.getElementById('sig_date_' + i)?.value || '';
+    const sigNom = document.getElementById('sig_nom_' + i)?.value || '';
+    const sigEnt = document.getElementById('sig_ent_' + i)?.value || '';
+    if (sigDate) doc.text(formatDate(sigDate), M+2, y+ROW_H/2+1.5);
+    if (sigNom) doc.text(sigNom, M+30, y+ROW_H/2+1.5);
+    if (sigEnt) doc.text(sigEnt, M+82, y+ROW_H/2+1.5);
+    if (sigStates[i].url) doc.addImage(sigStates[i].url, 'JPEG', M+114, y+1, 74, ROW_H-2);
+    y += ROW_H;
+  }
+
+  return doc.output('blob');
+}
+
+// ─── Drive ────────────────────────────────────────────────────
+async function uploadToDrive(blob, fileName) {
+  showToast('⏳ Envoi sur Google Drive...', '');
+
+  if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
+    throw new Error('Non connecté — connecte-toi depuis le dashboard.');
+  }
+  if (!chantierActif) {
+    throw new Error('Aucun chantier actif sélectionné depuis le dashboard.');
+  }
+
+  // Le module partagé FTSDrive gère la recherche tolérante aux espaces
+  // et retrouve le sous-dossier SECURITE/ACCUEIL SECURITE du chantier.
+  const { id: accueilId } = await FTSDrive.getDossierModuleChantier(
+    chantierActif.name,
+    'ACCUEIL SECURITE'
+  );
+
+  await FTSDrive.uploadFile(blob, fileName, 'application/pdf', accueilId);
+  showToast('✅ Fiche enregistrée sur Drive !', 'success');
+}
+
+function downloadLocal(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fileName; a.click();
+  URL.revokeObjectURL(url);
+  showToast('📥 PDF téléchargé localement', 'success');
+}
+function formatDate(d) { if(!d) return ''; const [y,m,j]=d.split('-'); return j+'/'+m+'/'+y; }
+let toastTimer;
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show' + (type ? ' '+type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = '', type==='error' ? 4000 : 3000);
+}
+window.valider = valider;
+window.closeModal = closeModal;
+window.confirmerEnvoi = confirmerEnvoi;
+window.toggleSection = toggleSection;
+window.clearSigRow = clearSigRow;
+window.connectDrive = connectDrive;
+window.disconnectDrive = disconnectDrive;
+</script>
+</body>
+</html>

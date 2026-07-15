@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#3A3A3A">
+<link rel="manifest" href="/manifest_dashboard.json">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-dashboard-192.png">
+<script>
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashboard.js").catch(() => {}); }
+</script>
+<title>Fiche Matériel – FTS</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{--jaune:#FDCA01;--anth:#3A3A3A;--gris:#E8E8E8;--bord:#CCCCCC;--blanc:#FFFFFF;--vert:#27AE60;--rouge:#C0392B;--orange:#E67E22;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Segoe UI",Arial,sans-serif;background:#F2F2F2;color:#2E2E2E;font-size:14px;padding-bottom:80px;}
+.app-header{background:var(--anth);padding:12px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3);}
+.logo-bar{display:flex;align-items:center;gap:10px;flex:1;}
+.logo-img{height:38px;width:auto;display:block;}
+.app-title{font-size:12px;color:#AAA;line-height:1.2;}
+.btn-valider{background:var(--jaune);color:var(--anth);border:none;padding:10px 18px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.section{background:#fff;margin:12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;}
+.section-title{background:var(--anth);color:#fff;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+.section-title .dot{width:8px;height:8px;background:var(--jaune);border-radius:50%;flex-shrink:0;}
+.fields-grid{display:grid;grid-template-columns:1fr 1fr;}
+.field-row{padding:10px 14px;border-bottom:1px solid var(--gris);}
+.field-row.full{grid-column:1/-1;}
+.field-label{font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
+input[type=text],input[type=date],input[type=number],input[type=email],textarea,select{width:100%;border:none;border-bottom:2px solid var(--gris);padding:6px 2px;font-size:14px;color:#2E2E2E;background:transparent;outline:none;-webkit-appearance:none;}
+input:focus,textarea:focus,select:focus{border-bottom-color:var(--jaune);}
+
+/* Machine cards */
+.machine-card{border:1px solid var(--gris);border-radius:8px;margin:10px;overflow:hidden;}
+.machine-header{background:var(--anth);color:#fff;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;}
+.machine-num{background:var(--jaune);color:var(--anth);font-size:12px;font-weight:900;padding:2px 8px;border-radius:10px;}
+.btn-remove{background:none;border:1px solid rgba(255,255,255,.4);color:#fff;padding:3px 10px;border-radius:4px;font-size:12px;cursor:pointer;}
+.machine-body{padding:10px;}
+.machine-row{display:grid;grid-template-columns:1fr 80px;gap:8px;margin-bottom:8px;}
+.machine-row.full{grid-template-columns:1fr;}
+.m-label{font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.7px;margin-bottom:3px;}
+
+/* État radio */
+.etat-group{display:flex;gap:8px;flex-wrap:wrap;}
+.etat-btn{flex:1;padding:7px 4px;border:2px solid var(--gris);border-radius:6px;text-align:center;font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .15s;min-width:70px;}
+.etat-btn.bon{border-color:#27AE60;color:#27AE60;}
+.etat-btn.bon.selected{background:#27AE60;color:#fff;}
+.etat-btn.surveiller{border-color:var(--orange);color:var(--orange);}
+.etat-btn.surveiller.selected{background:var(--orange);color:#fff;}
+.etat-btn.panne{border-color:var(--rouge);color:var(--rouge);}
+.etat-btn.panne.selected{background:var(--rouge);color:#fff;}
+
+/* OUI/NON toggle */
+.oui-non-group{display:flex;gap:0;border:2px solid var(--gris);border-radius:6px;overflow:hidden;width:fit-content;}
+.oui-non-btn{padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;background:#fff;border:none;color:#999;transition:all .15s;}
+.oui-non-btn.oui.selected{background:#27AE60;color:#fff;}
+.oui-non-btn.non.selected{background:var(--rouge);color:#fff;}
+
+/* Entretien */
+.entretien-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F5F5F5;}
+.entretien-row:last-child{border-bottom:none;}
+.entretien-label{font-size:13px;color:var(--anth);}
+
+/* Signature */
+.sig-wrap{padding:14px;}
+.sig-canvas-wrap{border:2px solid var(--gris);border-radius:6px;background:#fff;position:relative;touch-action:none;}
+canvas.sig-canvas{display:block;width:100%;height:120px;cursor:crosshair;touch-action:none;}
+.sig-hint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#CCC;font-size:13px;pointer-events:none;text-align:center;}
+.btn-clear{background:none;border:1px solid var(--bord);color:#666;padding:5px 12px;border-radius:4px;font-size:12px;cursor:pointer;margin-top:6px;}
+
+/* Email */
+.email-status{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:12px;border-bottom:1px solid var(--gris);flex-wrap:wrap;}
+.email-dot{width:8px;height:8px;border-radius:50%;background:#CCC;flex-shrink:0;}
+.email-dot.connected{background:var(--vert);}
+.btn-gmail{background:#EA4335;color:#fff;border:none;padding:7px 14px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;margin-left:auto;display:flex;align-items:center;gap:6px;}
+.btn-secondary{background:#888;color:#fff;border:none;padding:7px 14px;border-radius:5px;font-size:11px;cursor:pointer;}
+.cc-row{padding:8px 14px;border-top:1px solid var(--gris);}
+
+/* Bouton ajouter machine */
+.btn-add-machine{display:flex;align-items:center;justify-content:center;gap:8px;width:calc(100% - 24px);margin:0 12px 12px;padding:12px;border:2px dashed var(--jaune);background:rgba(253,202,1,.08);color:var(--anth);font-size:14px;font-weight:700;border-radius:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:#fff;border-radius:12px;padding:24px;max-width:360px;width:90%;}
+.modal h3{font-size:17px;margin-bottom:12px;}
+.modal p{color:#666;font-size:13px;line-height:1.5;margin-bottom:18px;}
+.modal-btns{display:flex;gap:10px;justify-content:flex-end;}
+.btn-cancel{background:none;border:1px solid var(--bord);padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;}
+.btn-confirm{background:var(--jaune);color:var(--anth);border:none;padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:700;}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--anth);color:#fff;padding:12px 22px;border-radius:8px;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.25);transition:transform .35s cubic-bezier(.34,1.56,.64,1);z-index:9999;white-space:nowrap;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+#toast.success{background:var(--vert);}
+#toast.error{background:var(--rouge);}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="logo-bar">
+    <img id="headerLogo" class="logo-img" alt="FTS">
+    <div class="app-title">Fondations & Travaux Spéciaux<br><strong style="color:#fff">Fiche Matériel</strong></div>
+  </div>
+  <button class="btn-valider" onclick="valider()">✉️ Envoyer</button>
+</header>
+
+<div class="chantier-actif-banner" id="chantierBanner" style="margin:12px;padding:10px 14px;border-radius:8px;background:#EAF6EE;border:1px solid #27AE60;font-size:13px;color:#1D6E3E;">Chargement du chantier actif...</div>
+
+<!-- IDENTIFICATION -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>Identification</div>
+  <div class="fields-grid">
+    <div class="field-row">
+      <div class="field-label">N° Dossier</div>
+      <input type="text" id="dossier" placeholder="25FTS914" style="text-transform:uppercase">
+    </div>
+    <div class="field-row">
+      <div class="field-label">Date / Semaine</div>
+      <input type="date" id="date">
+    </div>
+    <div class="field-row full">
+      <div class="field-label">Nom du chantier</div>
+      <input type="text" id="chantier" placeholder="VILLE / CHANTIER" style="text-transform:uppercase">
+    </div>
+    <div class="field-row full">
+      <div class="field-label">Chef chantier / Équipe</div>
+      <input type="text" id="chef" placeholder="NOM PRÉNOM" style="text-transform:uppercase">
+    </div>
+  </div>
+</div>
+
+<!-- MACHINES (dynamique) -->
+<div id="machinesContainer"></div>
+
+<button class="btn-add-machine" onclick="ajouterMachine()">
+  + Ajouter une machine
+</button>
+
+<!-- DEMANDE D'ACHAT / REMPLACEMENT -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>Demande d'achat matériel / Remplacement</div>
+  <div class="field-row full" style="padding:12px 14px">
+    <textarea id="demandeAchat" rows="4" placeholder="Décrire les besoins en matériel, pièces à commander ou remplacements nécessaires..." style="border:1px solid var(--gris);border-radius:6px;padding:8px;font-size:13px;resize:vertical;border-bottom:1px solid var(--gris)"></textarea>
+  </div>
+</div>
+
+<!-- SIGNATURE -->
+<div class="section">
+  <div class="section-title"><span class="dot"></span>Nom et signature du chef de chantier</div>
+  <div class="sig-wrap">
+    <div class="sig-canvas-wrap">
+      <canvas id="sigCanvas" class="sig-canvas"></canvas>
+      <div class="sig-hint" id="sigHint">✍️ Signez ici au doigt ou au stylet</div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:6px">
+      <button class="btn-clear" onclick="clearSig()">Effacer</button>
+    </div>
+  </div>
+</div>
+
+<!-- EMAIL -->
+<div class="section" style="margin-bottom:20px">
+  <div class="section-title"><span class="dot"></span>Envoi par email</div>
+  <div class="email-status">
+    <div class="email-dot" id="emailDot"></div>
+    <span id="emailLabel">Connexion : vérification...</span>
+  </div>
+  <div class="cc-row">
+    <div class="field-label" style="margin-bottom:4px">Destinataires fixes</div>
+    <div style="font-size:12px;color:#888">m.delarche@fts-btp.fr &nbsp;|&nbsp; d.dias@fts-btp.fr</div>
+  </div>
+  <div class="cc-row">
+    <div class="field-label" style="margin-bottom:6px">Ajouter un destinataire (optionnel)</div>
+    <input type="email" id="emailCc" placeholder="autre@exemple.fr" style="font-size:13px">
+  </div>
+</div>
+
+<!-- MODAL CONFIRMATION -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" style="max-width:420px">
+    <h3>✉️ Confirmer l'envoi ?</h3>
+    <div style="background:#F8F8F8;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;line-height:1.6;">
+      <div style="margin-bottom:6px"><span style="font-weight:700;color:#666;text-transform:uppercase;font-size:10px;letter-spacing:.8px">Destinataires</span><br>
+        m.delarche@fts-btp.fr &nbsp;|&nbsp; d.dias@fts-btp.fr
+        <span id="ccDisplay" style="color:#888"></span>
+      </div>
+      <div style="border-top:1px solid #E0E0E0;padding-top:6px;margin-top:6px">
+        <span style="font-weight:700;color:#666;text-transform:uppercase;font-size:10px;letter-spacing:.8px">Objet</span><br>
+        <span id="subjectDisplay" style="font-weight:600;color:#2E2E2E"></span>
+      </div>
+      <div style="border-top:1px solid #E0E0E0;padding-top:6px;margin-top:6px">
+        <span style="font-weight:700;color:#666;text-transform:uppercase;font-size:10px;letter-spacing:.8px">Pièce jointe</span><br>
+        <span id="fileDisplay" style="color:#2E2E2E"></span>
+      </div>
+    </div>
+    <p id="modalMsg" style="font-size:12px;color:#888;margin-bottom:14px"></p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="btn-confirm" onclick="confirmerEnvoi()">✉️ Envoyer</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+
+const EMAIL_TO = ['m.delarche@fts-btp.fr', 'd.dias@fts-btp.fr'];
+
+let sigHas = false, sigUrl = null, sigDrawing = false;
+let machineCount = 0;
+const sigCtx = document.getElementById('sigCanvas').getContext('2d');
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('date').valueAsDate = new Date();
+  ['dossier','chantier','chef'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', () => {
+      const pos = el.selectionStart;
+      el.value = el.value.toUpperCase();
+      el.setSelectionRange(pos, pos);
+    });
+  });
+  initSig();
+  initAuthPartagee();
+  appliquerChantierActif();
+  chargerLogoPourPdf();
+  ajouterMachine(); // une machine par défaut
+});
+
+let LOGO_B64 = null;
+async function chargerLogoPourPdf() {
+  try {
+    const res = await fetch('/assets/logo-fts.png');
+    const blob = await res.blob();
+    LOGO_B64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    document.getElementById('headerLogo').src = LOGO_B64;
+  } catch (e) {
+    console.warn('Logo non chargé :', e);
+  }
+}
+
+let chantierActif = null;
+
+function initAuthPartagee() {
+  if (!window.FTSAuth) return;
+  FTSAuth.init();
+  FTSAuth.onAuthChange(majStatutConnexion);
+  majStatutConnexion(FTSAuth.isSignedIn());
+}
+
+function majStatutConnexion(signedIn) {
+  const dot = document.getElementById('emailDot');
+  const label = document.getElementById('emailLabel');
+  if (signedIn) {
+    dot.className = 'email-dot connected';
+    label.textContent = '✓ Connecté (via le dashboard)';
+  } else {
+    dot.className = 'email-dot';
+    label.textContent = 'Non connecté — connecte-toi depuis le dashboard';
+  }
+}
+
+function appliquerChantierActif() {
+  try {
+    const raw = localStorage.getItem('fts_chantier_actif');
+    chantierActif = raw ? JSON.parse(raw) : null;
+  } catch (e) { chantierActif = null; }
+
+  const banner = document.getElementById('chantierBanner');
+  if (chantierActif) {
+    banner.textContent = `Chantier actif : ${chantierActif.name}`;
+    document.getElementById('chantier').value = chantierActif.name;
+    const spaceIdx = chantierActif.name.search(/\s/);
+    const code = spaceIdx > 0 ? chantierActif.name.slice(0, spaceIdx) : chantierActif.name;
+    document.getElementById('dossier').value = code;
+  } else {
+    // Fiche Matériel n'exige pas de chantier actif (archivage par machine),
+    // donc on affiche juste une info, pas une erreur bloquante.
+    banner.style.background = '#F8F8F8';
+    banner.style.borderColor = '#CCCCCC';
+    banner.style.color = '#666';
+    banner.textContent = 'Aucun chantier actif sélectionné — tu peux quand même remplir cette fiche.';
+  }
+}
+
+// ─── Machines dynamiques ──────────────────────────────────────
+function ajouterMachine() {
+  machineCount++;
+  const id = machineCount;
+  const div = document.createElement('div');
+  div.className = 'machine-card';
+  div.id = 'machine_' + id;
+  div.innerHTML = `
+    <div class="machine-header">
+      <span class="machine-num">Machine ${id}</span>
+      <button class="btn-remove" onclick="supprimerMachine(${id})">✕ Supprimer</button>
+    </div>
+    <div class="machine-body">
+      <div class="machine-row">
+        <div>
+          <div class="m-label">Nom / Désignation de la machine</div>
+          <input type="text" id="mach_nom_${id}" placeholder="Ex : FUTURO n°1, MIXO n°2..." style="text-transform:uppercase">
+        </div>
+        <div>
+          <div class="m-label">Heures</div>
+          <input type="number" id="mach_h_${id}" placeholder="0" min="0" step="1" style="text-align:center">
+        </div>
+      </div>
+      <div style="margin-bottom:10px">
+        <div class="m-label" style="margin-bottom:6px">État général</div>
+        <div class="etat-group">
+          <div class="etat-btn bon" id="etat_bon_${id}" onclick="setEtat(${id},'bon')">✓ BON</div>
+          <div class="etat-btn surveiller" id="etat_surveiller_${id}" onclick="setEtat(${id},'surveiller')">⚠ À SURVEILLER</div>
+          <div class="etat-btn panne" id="etat_panne_${id}" onclick="setEtat(${id},'panne')">✗ EN PANNE</div>
+        </div>
+        <input type="hidden" id="mach_etat_${id}" value="">
+      </div>
+      <div class="machine-row full" style="margin-bottom:10px">
+        <div>
+          <div class="m-label">Dysfonctionnements / Pannes mécaniques / Commentaires</div>
+          <textarea id="mach_obs_${id}" rows="3" placeholder="Décrire les pannes, anomalies, observations..." style="border:1px solid var(--gris);border-radius:6px;padding:8px;font-size:13px;width:100%;resize:vertical;border-bottom:1px solid var(--gris)"></textarea>
+        </div>
+      </div>
+      <div style="background:#F8F8F8;border-radius:6px;padding:8px 12px">
+        <div class="m-label" style="margin-bottom:8px">Entretien</div>
+        <div class="entretien-row">
+          <span class="entretien-label">Nettoyage machine</span>
+          <div class="oui-non-group">
+            <button class="oui-non-btn oui" id="net_oui_${id}" onclick="setOuiNon('net',${id},'oui')">OUI</button>
+            <button class="oui-non-btn non" id="net_non_${id}" onclick="setOuiNon('net',${id},'non')">NON</button>
+          </div>
+        </div>
+        <div class="entretien-row">
+          <span class="entretien-label">Graissage</span>
+          <div class="oui-non-group">
+            <button class="oui-non-btn oui" id="grs_oui_${id}" onclick="setOuiNon('grs',${id},'oui')">OUI</button>
+            <button class="oui-non-btn non" id="grs_non_${id}" onclick="setOuiNon('grs',${id},'non')">NON</button>
+          </div>
+        </div>
+        <div class="entretien-row">
+          <span class="entretien-label">Décoffrant</span>
+          <div class="oui-non-group">
+            <button class="oui-non-btn oui" id="dec_oui_${id}" onclick="setOuiNon('dec',${id},'oui')">OUI</button>
+            <button class="oui-non-btn non" id="dec_non_${id}" onclick="setOuiNon('dec',${id},'non')">NON</button>
+          </div>
+        </div>
+        <input type="hidden" id="mach_net_${id}" value="">
+        <input type="hidden" id="mach_grs_${id}" value="">
+        <input type="hidden" id="mach_dec_${id}" value="">
+      </div>
+    </div>`;
+  document.getElementById('machinesContainer').appendChild(div);
+}
+
+function supprimerMachine(id) {
+  const el = document.getElementById('machine_' + id);
+  if (el) el.remove();
+}
+
+function setEtat(id, etat) {
+  ['bon','surveiller','panne'].forEach(e => {
+    document.getElementById('etat_' + e + '_' + id).classList.remove('selected');
+  });
+  document.getElementById('etat_' + etat + '_' + id).classList.add('selected');
+  document.getElementById('mach_etat_' + id).value = etat;
+}
+
+function setOuiNon(prefix, id, val) {
+  document.getElementById(prefix + '_oui_' + id).classList.remove('selected');
+  document.getElementById(prefix + '_non_' + id).classList.remove('selected');
+  document.getElementById(prefix + '_' + val + '_' + id).classList.add('selected');
+  document.getElementById('mach_' + prefix + '_' + id).value = val;
+}
+
+function getMachines() {
+  const machines = [];
+  document.querySelectorAll('.machine-card').forEach(card => {
+    const id = card.id.replace('machine_','');
+    machines.push({
+      nom:   document.getElementById('mach_nom_' + id)?.value || '',
+      h:     document.getElementById('mach_h_' + id)?.value   || '',
+      etat:  document.getElementById('mach_etat_' + id)?.value || '',
+      obs:   document.getElementById('mach_obs_' + id)?.value  || '',
+      net:   document.getElementById('mach_net_' + id)?.value  || '',
+      grs:   document.getElementById('mach_grs_' + id)?.value  || '',
+      dec:   document.getElementById('mach_dec_' + id)?.value  || '',
+    });
+  });
+  return machines;
+}
+
+function getNomFichier() {
+  const date  = document.getElementById('date').value;
+  const chef  = document.getElementById('chef').value.trim().toUpperCase().replace(/\s+/g,'-');
+  const machines = getMachines();
+  // Première machine avec dysfonctionnement (obs non vide ou état panne/surveiller)
+  const dysMachine = machines.find(m => m.obs.trim() || m.etat === 'panne' || m.etat === 'surveiller');
+  const machineName = (dysMachine?.nom || machines[0]?.nom || 'MATERIEL').replace(/\s+/g,'_').toUpperCase();
+  return `${date}_FICHE MATERIEL_${chef}_${machineName}.pdf`;
+}
+
+// ─── Signature ────────────────────────────────────────────────
+function initSig() {
+  const canvas = document.getElementById('sigCanvas');
+  const hint   = document.getElementById('sigHint');
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr  = window.devicePixelRatio || 1;
+    const nw = Math.floor(rect.width*dpr), nh = Math.floor(rect.height*dpr);
+    if (canvas.width===nw && canvas.height===nh) return;
+    canvas.width=nw; canvas.height=nh;
+    sigCtx.scale(dpr,dpr);
+    sigCtx.strokeStyle='#1A1A1A'; sigCtx.lineWidth=2.2; sigCtx.lineCap='round'; sigCtx.lineJoin='round';
+    if (sigUrl) { const img=new Image(); img.onload=()=>sigCtx.drawImage(img,0,0,rect.width,rect.height); img.src=sigUrl; }
+  }
+  resize();
+  window.addEventListener('resize',resize);
+  function getPos(e) { const r=canvas.getBoundingClientRect(),s=e.touches?e.touches[0]:e; return {x:s.clientX-r.left,y:s.clientY-r.top}; }
+  function saveSig() {
+    const flat=document.createElement('canvas'); flat.width=canvas.width; flat.height=canvas.height;
+    const fc=flat.getContext('2d'); fc.fillStyle='#FFFFFF'; fc.fillRect(0,0,flat.width,flat.height); fc.drawImage(canvas,0,0);
+    sigUrl=flat.toDataURL('image/jpeg',0.95); sigHas=true;
+  }
+  canvas.addEventListener('mousedown',  e=>{e.preventDefault();sigDrawing=true;const p=getPos(e);sigCtx.beginPath();sigCtx.moveTo(p.x,p.y);hint.style.opacity='0';});
+  canvas.addEventListener('mousemove',  e=>{e.preventDefault();if(!sigDrawing)return;const p=getPos(e);sigCtx.lineTo(p.x,p.y);sigCtx.stroke();});
+  canvas.addEventListener('mouseup',    e=>{e.preventDefault();sigDrawing=false;saveSig();});
+  canvas.addEventListener('touchstart', e=>{e.preventDefault();sigDrawing=true;const p=getPos(e);sigCtx.beginPath();sigCtx.moveTo(p.x,p.y);hint.style.opacity='0';},{passive:false});
+  canvas.addEventListener('touchmove',  e=>{e.preventDefault();if(!sigDrawing)return;const p=getPos(e);sigCtx.lineTo(p.x,p.y);sigCtx.stroke();},{passive:false});
+  canvas.addEventListener('touchend',   e=>{e.preventDefault();sigDrawing=false;saveSig();},{passive:false});
+}
+function clearSig() {
+  sigCtx.clearRect(0,0,document.getElementById('sigCanvas').width,document.getElementById('sigCanvas').height);
+  sigHas=false; sigUrl=null; document.getElementById('sigHint').style.opacity='1';
+}
+
+// ─── Validation ───────────────────────────────────────────────
+function valider() {
+  const date = document.getElementById('date').value;
+  const dossier = document.getElementById('dossier').value.trim();
+  const chef = document.getElementById('chef').value.trim();
+  const chantierVal = document.getElementById('chantier').value.trim();
+  if (!window.FTSAuth || !FTSAuth.isSignedIn()) { showToast('⚠️ Connecte-toi depuis le dashboard d\'abord', 'error'); return; }
+  if (!date)    { showToast('⚠️ Veuillez renseigner la date', 'error'); return; }
+  if (!dossier) { showToast('⚠️ Veuillez renseigner le N° dossier', 'error'); return; }
+  if (!chef)    { showToast('⚠️ Veuillez renseigner le chef de chantier', 'error'); return; }
+  const machines = getMachines();
+  if (machines.length === 0 || !machines[0].nom) { showToast('⚠️ Ajoutez au moins une machine', 'error'); return; }
+  const fileName = getNomFichier();
+  const cc = document.getElementById('emailCc').value.trim();
+  const subjectPreview = `[FTS] Fiche Matériel – ${dossier} – ${chantierVal || '...'} – ${formatDate(date)}`;
+  document.getElementById('subjectDisplay').textContent = subjectPreview;
+  document.getElementById('fileDisplay').textContent = fileName;
+  document.getElementById('ccDisplay').textContent = cc ? ' | ' + cc : '';
+  document.getElementById('modalMsg').textContent = 'Envoi par email + archivage automatique sur Drive';
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+
+async function confirmerEnvoi() {
+  closeModal();
+  showToast('⏳ Génération du PDF...', '');
+  try {
+    const blob = await genererPDF();
+    const fileName = getNomFichier();
+    const machineRef = await archiverSurDrive(blob, fileName);
+    await envoyerEmail(blob, fileName);
+    showToast(`✅ Envoyée et archivée dans FICHE MATERIEL / ${machineRef.toUpperCase()}`, 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('❌ ' + err.message, 'error');
+  }
+}
+
+// ─── Génération PDF ───────────────────────────────────────────
+async function genererPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const W=210, H=297, M=10;
+  const C_ANTH=[58,58,58], C_JAUNE=[253,202,1], C_GRIS=[232,232,232], C_BORD=[195,195,195], C_TXT=[40,40,40], C_WHITE=[255,255,255];
+  const C_VERT=[39,174,96], C_ROUGE=[192,57,43], C_ORANGE=[230,126,34];
+  let y = M;
+
+  // Titre
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(...C_ANTH);
+  doc.text('FICHE MATÉRIEL', W/2, y+6, {align:'center'}); y+=12;
+
+  // En-tête
+  doc.setFillColor(255,255,255); doc.setDrawColor(...C_BORD);
+  doc.rect(M, y, 42, 22, 'FD');
+  doc.addImage(LOGO_B64,'JPEG',M+1,y+1,40,20);
+  const infoX=M+44, infoW=W-M-infoX-M, rh=22/4;
+  [['DATE/SEMAINE',formatDate(document.getElementById('date').value)],
+   ['N° DOSSIER',document.getElementById('dossier').value],
+   ['CHANTIER',document.getElementById('chantier').value],
+   ['CHEF CHANTIER',document.getElementById('chef').value]
+  ].forEach(([l,v],i) => {
+    const ry=y+i*rh;
+    doc.setFillColor(...C_JAUNE); doc.rect(infoX,ry,32,rh,'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(6); doc.setTextColor(...C_ANTH);
+    doc.text(l,infoX+2,ry+rh/2+1.2);
+    doc.setFillColor(255,255,255); doc.setDrawColor(...C_BORD); doc.rect(infoX+32,ry,infoW-32,rh,'FD');
+    doc.setFont('helvetica','normal'); doc.text(v||'',infoX+34,ry+rh/2+1.2);
+  });
+  y+=24;
+
+  // Machines
+  const machines = getMachines();
+  machines.forEach((m,idx) => {
+    if (y > H-60) { doc.addPage(); y=M; }
+    const etatColor = m.etat==='bon' ? C_VERT : m.etat==='panne' ? C_ROUGE : m.etat==='surveiller' ? C_ORANGE : C_ANTH;
+    const etatLabel = m.etat==='bon' ? '✓ BON' : m.etat==='panne' ? '✗ EN PANNE' : m.etat==='surveiller' ? '⚠ À SURVEILLER' : '—';
+
+    // Header machine
+    doc.setFillColor(...C_ANTH); doc.rect(M,y,W-2*M,7,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...C_WHITE);
+    doc.text(`MACHINE ${idx+1} — ${m.nom.toUpperCase()}`,M+3,y+4.8);
+    // Badge état
+    if (m.etat) {
+      doc.setFillColor(...etatColor); doc.roundedRect(W-M-28,y+1,27,5,2,2,'F');
+      doc.setFontSize(7); doc.setTextColor(...C_WHITE);
+      doc.text(etatLabel,W-M-14.5,y+4.5,{align:'center'});
+    }
+    y+=8;
+
+    // Heures
+    doc.setFillColor(...C_GRIS); doc.rect(M,y,W-2*M,7,'FD');
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...C_ANTH);
+    doc.text(`Heures : ${m.h || '—'}`,M+3,y+4.8);
+    y+=8;
+
+    // Dysfonctionnements
+    if (m.obs) {
+      doc.setFillColor(255,250,235); doc.rect(M,y,W-2*M,5,'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(150,80,0);
+      doc.text('DYSFONCTIONNEMENTS / COMMENTAIRES :',M+2,y+3.5); y+=6;
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...C_TXT);
+      const lines = doc.splitTextToSize(m.obs, W-2*M-4);
+      doc.text(lines,M+2,y+3.5);
+      y += lines.length*4 + 2;
+    }
+
+    // Entretien
+    const entW = (W-2*M)/3;
+    [['Nettoyage',m.net],['Graissage',m.grs],['Décoffrant',m.dec]].forEach(([l,v],i)=>{
+      const ex=M+i*entW, ey=y;
+      doc.setFillColor(i%2===0?248:252,i%2===0?248:252,i%2===0?248:252);
+      doc.rect(ex,ey,entW,8,'FD');
+      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_ANTH);
+      doc.text(l,ex+3,ey+3.5);
+      if (v) {
+        const vc = v==='oui' ? C_VERT : C_ROUGE;
+        doc.setFillColor(...vc); doc.roundedRect(ex+entW-14,ey+1.5,13,5,2,2,'F');
+        doc.setTextColor(...C_WHITE); doc.setFontSize(7);
+        doc.text(v.toUpperCase(),ex+entW-7.5,ey+4.8,{align:'center'});
+      }
+    });
+    y+=10;
+    doc.setDrawColor(...C_BORD); doc.line(M,y,W-M,y); y+=4;
+  });
+
+  // Demande achat
+  const dem = document.getElementById('demandeAchat').value;
+  if (dem) {
+    if (y>H-40){doc.addPage();y=M;}
+    doc.setFillColor(...C_ANTH); doc.rect(M,y,W-2*M,7,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...C_WHITE);
+    doc.text("DEMANDE D'ACHAT MATÉRIEL / REMPLACEMENT",M+3,y+4.8); y+=8;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...C_TXT);
+    const dLines = doc.splitTextToSize(dem,W-2*M-4);
+    doc.text(dLines,M+2,y+4); y+=dLines.length*4+6;
+  }
+
+  // Signature
+  if (y>H-35){doc.addPage();y=M;}
+  const sigW=(W-2*M)/2;
+  doc.setFillColor(...C_JAUNE); doc.rect(M,y,sigW,7,'FD');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_ANTH);
+  doc.text('NOM DU CHEF DE CHANTIER',M+3,y+4.5);
+  doc.setFont('helvetica','normal');
+  doc.text(document.getElementById('chef').value||'',M+3,y+10.5);
+  doc.setFillColor(...C_ANTH); doc.rect(M+sigW,y,sigW,7,'F');
+  doc.setFont('helvetica','bold'); doc.setTextColor(...C_WHITE);
+  doc.text('SIGNATURE',M+sigW+3,y+4.5); y+=12;
+  doc.setDrawColor(...C_BORD); doc.rect(M,y,sigW*2,30,'S');
+  if (sigHas && sigUrl) doc.addImage(sigUrl,'JPEG',M+sigW,y,sigW,30);
+  y+=32;
+
+  return doc.output('blob');
+}
+
+// ─── Gmail ────────────────────────────────────────────────────
+async function envoyerEmail(blob, fileName) {
+  showToast('⏳ Envoi en cours...', '');
+
+  if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
+    throw new Error('Non connecté — connecte-toi depuis le dashboard.');
+  }
+
+  const to = [...EMAIL_TO];
+  const cc = document.getElementById('emailCc').value.trim();
+  if (cc) to.push(cc);
+  const date = document.getElementById('date').value;
+  const dossier = document.getElementById('dossier').value;
+  const chantier = document.getElementById('chantier').value;
+  const chef = document.getElementById('chef').value;
+  const machines = getMachines();
+  const pannes = machines.filter(m => m.etat === 'panne' || m.etat === 'surveiller');
+  const subject = `[FTS] Fiche Matériel – ${dossier} – ${chantier} – ${formatDate(date)}`;
+
+  // Résumé des machines pour le corps du mail
+  const lignesMachines = machines.map(m => {
+    const etatLabel = m.etat === 'bon' ? '✓ BON' : m.etat === 'panne' ? '⚠ EN PANNE' : m.etat === 'surveiller' ? '→ À SURVEILLER' : 'Non renseigné';
+    const entretien = [m.net === 'oui' ? 'Nettoyage ✓' : m.net === 'non' ? 'Nettoyage ✗' : '', m.grs === 'oui' ? 'Graissage ✓' : m.grs === 'non' ? 'Graissage ✗' : '', m.dec === 'oui' ? 'Décoffrant ✓' : m.dec === 'non' ? 'Décoffrant ✗' : ''].filter(Boolean).join(' | ');
+    let ligne = `  • ${m.nom.toUpperCase()} (${m.h ? m.h + 'h' : 'h non renseignées'}) — ${etatLabel}`;
+    if (m.obs) ligne += `\n    Obs. : ${m.obs}`;
+    if (entretien) ligne += `\n    Entretien : ${entretien}`;
+    return ligne;
+  }).join('\n');
+
+  const demandeAchat = document.getElementById('demandeAchat').value.trim();
+  const alertePannes = pannes.length > 0
+    ? `\n⚠️ ATTENTION — ${pannes.length} machine(s) en anomalie : ${pannes.map(m => m.nom).join(', ')}\n`
+    : '';
+
+  const body = `Mathieu, David,
+
+Vous trouverez ci-joint la fiche matériel pour le chantier ${chantier} (${dossier}), établie le ${formatDate(date)} par ${chef}.
+${alertePannes}
+─────────────────────────────────────
+RÉCAPITULATIF MACHINES (${machines.length} déclarée${machines.length > 1 ? 's' : ''})
+─────────────────────────────────────
+${lignesMachines}
+${demandeAchat ? '\n─────────────────────────────────────\nDEMANDE D\'ACHAT / REMPLACEMENT\n─────────────────────────────────────\n' + demandeAchat : ''}
+
+─────────────────────────────────────
+La fiche complète est disponible en pièce jointe (PDF). Elle est également archivée automatiquement sur Drive.
+
+Cordialement,
+
+${chef}
+Chef de chantier — FTS Fondations et Travaux Spéciaux`;
+
+  // Envoi via le module Gmail partagé (même connexion que Drive)
+  await FTSGmail.envoyerAvecPieceJointe({ to, subject, body, attachment: blob, fileName });
+
+  showToast('✅ Fiche envoyée par email !', 'success');
+}
+
+// ─── Archivage Drive (par machine, indépendant de l'envoi mail) ────
+async function archiverSurDrive(blob, fileName) {
+  if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
+    throw new Error('Non connecté — connecte-toi depuis le dashboard.');
+  }
+  const machines = getMachines();
+  const dys = machines.find(m => m.obs.trim() || m.etat === 'panne' || m.etat === 'surveiller');
+  const machineRef = dys?.nom || machines[0]?.nom || 'DIVERS';
+
+  const folderId = await FTSDrive.getDossierMachineFicheMateriel(machineRef);
+  await FTSDrive.uploadFile(blob, fileName, 'application/pdf', folderId);
+  return machineRef;
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const b64=reader.result.split(',')[1];
+      // Découper en lignes de 76 chars (RFC 2045)
+      const lines=b64.match(/.{1,76}/g)||[];
+      resolve(lines.join('\r\n'));
+    };
+    reader.onerror=reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function formatDate(d){if(!d)return '';const[y,m,j]=d.split('-');return j+'/'+m+'/'+y;}
+let toastTimer;
+function showToast(msg,type){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='show'+(type?' '+type:'');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.className='',type==='error'?4000:3000);
+}
+window.valider=valider;
+window.closeModal=closeModal;
+window.confirmerEnvoi=confirmerEnvoi;
+window.ajouterMachine=ajouterMachine;
+window.supprimerMachine=supprimerMachine;
+window.setEtat=setEtat;
+window.setOuiNon=setOuiNon;
+window.clearSig=clearSig;
+window.connectGmail=connectGmail;
+window.disconnectGmail=disconnectGmail;
+</script>
+</body>
+</html>

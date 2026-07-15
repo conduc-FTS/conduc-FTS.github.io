@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FTS — Ouverture de chantier (Conducteur)</title>
+<link rel="stylesheet" href="../css/dashboard.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-brand">
+    <span class="brand-mark">FTS</span>
+    <span class="brand-sub">Dashboard Conducteur</span>
+  </div>
+  <div class="topbar-actions">
+    <div class="user-chip" id="userChip">
+      <span class="user-dot" id="userDot"></span>
+      <span id="userLabel">Non connecté</span>
+    </div>
+  </div>
+</header>
+
+<main class="dashboard">
+
+  <section class="panel" id="panel-ouverture">
+    <h2 class="panel-title">Ouverture de chantier</h2>
+    <p class="panel-sub">Crée l'arborescence Drive du chantier avant de le partager avec le chef de chantier. Réservé aux conducteurs de travaux — cette page n'apparaît pas dans l'appli tablette du chef.</p>
+
+    <form class="chantier-form" id="chantierForm">
+      <div class="field">
+        <label for="numAffaire">N° affaire</label>
+        <input type="text" id="numAffaire" placeholder="ex : 25 FTS 381" required>
+      </div>
+      <div class="field">
+        <label for="nomChantier">Nom du chantier</label>
+        <input type="text" id="nomChantier" placeholder="ex : CAP8000 Auchan Lac" required>
+      </div>
+      <div class="field">
+        <label for="adresseChantier">Adresse / commune (optionnel)</label>
+        <input type="text" id="adresseChantier" placeholder="ex : Talence / Bordeaux">
+      </div>
+      <button type="submit" class="btn-primary">Créer le chantier</button>
+    </form>
+
+    <p class="form-status" id="chantierStatus"></p>
+  </section>
+
+  <section class="panel">
+    <h2 class="panel-title">Compte Google</h2>
+    <p class="panel-sub" id="adminAccountInfo">Non connecté</p>
+    <button class="btn-secondary" id="signInBtn">Se connecter</button>
+    <button class="btn-secondary" id="signOutBtn" hidden>Se déconnecter</button>
+  </section>
+
+  <p style="text-align:center;margin-top:8px">
+    <a href="../index.html" style="color:var(--text-sub);font-size:0.85rem">← Retour au dashboard applicatif</a>
+  </p>
+
+</main>
+
+<script src="../js/auth.js"></script>
+<script src="../js/drive.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.FTSAuth) {
+    FTSAuth.init();
+    FTSAuth.onAuthChange(updateUserBlock);
+    updateUserBlock(FTSAuth.isSignedIn());
+  }
+
+  async function updateUserBlock(signedIn) {
+    const dot = document.getElementById("userDot");
+    const label = document.getElementById("userLabel");
+    const signInBtn = document.getElementById("signInBtn");
+    const signOutBtn = document.getElementById("signOutBtn");
+    const accountInfo = document.getElementById("adminAccountInfo");
+
+    if (!signedIn) {
+      dot.classList.remove("online");
+      label.textContent = "Non connecté";
+      signInBtn.hidden = false;
+      signOutBtn.hidden = true;
+      accountInfo.textContent = "Non connecté";
+      return;
+    }
+    dot.classList.add("online");
+    signInBtn.hidden = true;
+    signOutBtn.hidden = false;
+    label.textContent = "Connecté";
+    accountInfo.textContent = "Connecté";
+    if (window.FTSAuth) {
+      const info = await FTSAuth.getUserInfo();
+      if (info) {
+        label.textContent = info.name || info.email || "Connecté";
+        accountInfo.textContent = `Connecté : ${info.email || info.name}`;
+      }
+    }
+  }
+
+  document.getElementById("signInBtn").addEventListener("click", () => window.FTSAuth && FTSAuth.signIn());
+  document.getElementById("signOutBtn").addEventListener("click", () => window.FTSAuth && FTSAuth.signOut());
+
+  const chantierForm = document.getElementById("chantierForm");
+  const chantierStatus = document.getElementById("chantierStatus");
+
+  chantierForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const numAffaire = document.getElementById("numAffaire").value.trim();
+    const nomChantier = document.getElementById("nomChantier").value.trim();
+    const adresseChantier = document.getElementById("adresseChantier").value.trim();
+    const submitBtn = chantierForm.querySelector(".btn-primary");
+
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
+      chantierStatus.textContent = "Connecte-toi d'abord pour créer l'arborescence Drive.";
+      return;
+    }
+    if (!window.FTSDrive) {
+      chantierStatus.textContent = "Erreur : module Drive non chargé.";
+      return;
+    }
+
+    submitBtn.disabled = true;
+    chantierStatus.textContent = "Création de l'arborescence Drive en cours...";
+
+    try {
+      const result = await FTSDrive.creerArborescenceChantier({ numAffaire, nom: nomChantier, adresse: adresseChantier });
+      const subfolderNames = Object.keys(result.subfolders).filter((k) => !k.includes("/"));
+      const statusPrefix = result.reused
+        ? `Dossier chantier "${result.chantierName}" déjà existant, sous-dossiers vérifiés`
+        : `Chantier "${result.chantierName}" créé sur Drive`;
+      chantierStatus.textContent = `${statusPrefix} (${subfolderNames.join(", ")}, + ACCUEIL SECURITE dans SECURITE). Il apparaîtra dans le sélecteur "Chantier actif" de l'appli.`;
+      chantierForm.reset();
+    } catch (err) {
+      console.error("Erreur création chantier :", err);
+      chantierStatus.textContent = `Erreur : ${err.message}`;
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+});
+</script>
+</body>
+</html>

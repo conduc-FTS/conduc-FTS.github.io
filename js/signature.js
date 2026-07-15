@@ -80,3 +80,8 @@ const FTSSignature = (() => {
 
   return { init, clear, getDataUrl, hasSignature };
 })();
+
+// Exposition explicite sur window : une déclaration top-level en const/let
+// ne crée PAS de propriété window.FTSSignature automatiquement (contrairement à var),
+// alors que tout le reste du code vérifie window.FTSSignature avant utilisation.
+window.FTSSignature = FTSSignature;

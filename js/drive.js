@@ -381,3 +381,8 @@ const FTSDrive = (() => {
     getActiviteRecenteChantier,
   };
 })();
+
+// Exposition explicite sur window : une déclaration top-level en const/let
+// ne crée PAS de propriété window.FTSDrive automatiquement (contrairement à var),
+// alors que tout le reste du code vérifie window.FTSDrive avant utilisation.
+window.FTSDrive = FTSDrive;

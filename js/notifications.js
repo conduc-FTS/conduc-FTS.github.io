@@ -60,3 +60,8 @@ const FTSNotifications = (() => {
 
   return { init, poll };
 })();
+
+// Exposition explicite sur window : une déclaration top-level en const/let
+// ne crée PAS de propriété window.FTSNotifications automatiquement (contrairement à var),
+// alors que tout le reste du code vérifie window.FTSNotifications avant utilisation.
+window.FTSNotifications = FTSNotifications;

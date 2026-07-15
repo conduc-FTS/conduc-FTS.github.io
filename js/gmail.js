@@ -78,3 +78,8 @@ const FTSGmail = (() => {
 
   return { envoyerAvecPieceJointe };
 })();
+
+// Exposition explicite sur window : une déclaration top-level en const/let
+// ne crée PAS de propriété window.FTSGmail automatiquement (contrairement à var),
+// alors que tout le reste du code vérifie window.FTSGmail avant utilisation.
+window.FTSGmail = FTSGmail;

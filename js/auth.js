@@ -111,8 +111,20 @@ const FTSAuth = (() => {
       accessToken = stored.access_token;
     }
 
+    // Le script Google (accounts.google.com/gsi/client) est chargé en
+    // async/defer : il peut ne pas encore être prêt au moment où init()
+    // est appelé au chargement de la page. On réessaie automatiquement
+    // toutes les 100ms pendant quelques secondes plutôt que d'abandonner,
+    // pour éviter que le bouton "Se connecter" ne reste silencieusement
+    // inopérant tant que la page n'est pas rechargée.
     if (typeof google === "undefined" || !google.accounts) {
-      console.warn("FTSAuth : Google Identity Services non chargé. Ajouter le script GSI dans le HTML.");
+      if (!window.__ftsAuthInitRetries) window.__ftsAuthInitRetries = 0;
+      if (window.__ftsAuthInitRetries < 100) { // ~10 secondes max
+        window.__ftsAuthInitRetries++;
+        setTimeout(init, 100);
+      } else {
+        console.warn("FTSAuth : Google Identity Services n'a pas pu être chargé après plusieurs tentatives.");
+      }
       return;
     }
 
@@ -152,3 +164,8 @@ const FTSAuth = (() => {
     onAuthChange,
   };
 })();
+
+// Exposition explicite sur window : une déclaration top-level en const/let
+// ne crée PAS de propriété window.FTSAuth automatiquement (contrairement à var),
+// alors que tout le reste du code vérifie window.FTSAuth avant utilisation.
+window.FTSAuth = FTSAuth;

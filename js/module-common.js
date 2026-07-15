@@ -58,3 +58,8 @@ const FTSCommon = (() => {
 
   return { getChantierActif, afficherBanniereChantier, showToast, formatDate, todayISO };
 })();
+
+// Exposition explicite sur window : une déclaration top-level en const/let
+// ne crée PAS de propriété window.FTSCommon automatiquement (contrairement à var),
+// alors que tout le reste du code vérifie window.FTSCommon avant utilisation.
+window.FTSCommon = FTSCommon;

@@ -624,12 +624,18 @@ document.addEventListener('DOMContentLoaded', () => {
   for (let i = 1; i <= N_PERS; i++) {
     pRows.innerHTML += `
       <div class="personnel-row">
-        <input type="text" id="nom_${i}" placeholder="Prénom NOM">
+        <input type="text" id="nom_${i}" placeholder="Prénom NOM" style="text-transform:uppercase">
         <input type="number" id="heure_${i}" step="0.5" min="0" max="24" style="text-align:center" placeholder="7.5">
         <label class="pers-check"><input type="checkbox" id="gd_${i}"><span class="pers-check-box">✓</span></label>
         <label class="pers-check"><input type="checkbox" id="fts_p_${i}"><span class="pers-check-box">✓</span></label>
         <label class="pers-check"><input type="checkbox" id="int_${i}"><span class="pers-check-box">✓</span></label>
       </div>`;
+    const nomInput = document.getElementById(`nom_${i}`);
+    nomInput.addEventListener('input', () => {
+      const pos = nomInput.selectionStart;
+      nomInput.value = nomInput.value.toUpperCase();
+      nomInput.setSelectionRange(pos, pos);
+    });
   }
 
   initSignature();
@@ -855,10 +861,16 @@ async function genererPDF() {
   const infoX = M + 59;
   const infoW = W - M - infoX - M;
   const labelW = 27;
+  const dossierVal = document.getElementById('dossier').value;
+  const chantierRaw = document.getElementById('chantier').value;
+  // Retirer le code chantier du début si le champ chantier le répète déjà
+  const chantierSansCode = dossierVal && chantierRaw.toUpperCase().startsWith(dossierVal.toUpperCase())
+    ? chantierRaw.slice(dossierVal.length).trim()
+    : chantierRaw;
   const infos = [
     ['DATE',     document.getElementById('date').value ? formatDate(document.getElementById('date').value) : ''],
-    ['DOSSIER',  document.getElementById('dossier').value],
-    ['CHANTIER', document.getElementById('chantier').value],
+    ['DOSSIER',  dossierVal],
+    ['CHANTIER', chantierSansCode],
   ];
   const rh = HDR_H / 3;
   infos.forEach(([lbl, val], i) => {
@@ -878,9 +890,9 @@ async function genererPDF() {
   y += HDR_H + 1;
 
   // Colonnes tableau — total = W - 2*M = 285mm
-  // N°pieu | Longueur | Øforage | Øtube | Gainage | Barre | Désignation (large) | FTS | LOC
-  const cols = [14, 18, 20, 22, 18, 14, 143, 18, 18];
-  // vérification : 14+18+20+22+18+14+143+18+18 = 285 ✓
+  // N°pieu | Longueur | Øforage | Øtube | Gainage | Barre | Désignation | Statut | FTS/LOC
+  const cols = [14, 18, 20, 22, 18, 14, 48, 70, 61];
+  // vérification : 14+18+20+22+18+14+48+70+61 = 285 ✓
   const colX = [M];
   cols.forEach(w => colX.push(colX[colX.length-1] + w));
   const totalW = cols.reduce((a,b)=>a+b,0);
@@ -896,9 +908,9 @@ async function genererPDF() {
     doc.text(lbl, (colX[a]+colX[b])/2, y + HDR2/4 + 1.2, {align:'center'});
   });
 
-  // Ligne 2 : fond jaune pour FORAGE et MATÉRIEL, fond gris pour le reste
-  const subs = ['','Longueur','Ø forage','Ø tube princ.','GAINAGE','','Désignation','FTS','LOC'];
-  const jauneCols = new Set([1,2,6,7,8]); // FORAGE + MATÉRIEL
+  // Ligne 2 : fond gris uniforme pour FORAGE/TUBE, jaune pour MATÉRIEL
+  const subs = ['','Longueur (m)','Ø forage','Ø tube princ.','GAINAGE','','Désignation','Statut','FTS/LOC'];
+  const jauneCols = new Set([6,7,8]); // MATÉRIEL uniquement (Longueur/Ø forage passent en gris comme Ø tube/gainage)
   subs.forEach((s, i) => {
     if (i === 0 || i === 5) return;
     doc.setFillColor(...(jauneCols.has(i) ? C_JAUNE : C_GRIS));
@@ -957,11 +969,24 @@ async function genererPDF() {
     if (i <= N_MATERIEL) {
       const mat = document.getElementById(`mat_${i}`)?.value || '';
       if (mat) { doc.setTextColor(...C_TXT); doc.text(mat, colX[6]+2, ry+ROW_H/2+1.5); }
-      ['fts','loc'].forEach((k,ci) => {
-        if (document.getElementById(`${k}_${i}`)?.checked) {
-          drawCoche(doc, colX[7+ci], ry, cols[7+ci], ROW_H, C_JAUNE);
-        }
-      });
+
+      // Statut (TRAVAIL / PANNE / ARRET / TRANSPORT), en couleur
+      const statut = document.getElementById(`statut_${i}`)?.value || '';
+      if (statut) {
+        const statutColorsPieu = { TRAVAIL:[39,174,96], PANNE:[192,57,43], ARRET:[136,136,136], TRANSPORT:[58,134,255] };
+        const sc = statutColorsPieu[statut] || C_ANTH;
+        doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...sc);
+        doc.text(statut, colX[7]+cols[7]/2, ry+ROW_H/2+1.5, {align:'center'});
+        doc.setFont('helvetica','normal');
+      }
+
+      // FTS / LOC
+      const ftsLoc = document.getElementById(`fts_loc_${i}`)?.value || '';
+      if (ftsLoc) {
+        doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_ANTH);
+        doc.text(ftsLoc, colX[8]+cols[8]/2, ry+ROW_H/2+1.5, {align:'center'});
+        doc.setFont('helvetica','normal');
+      }
     }
     doc.setTextColor(...C_TXT);
   }
@@ -991,7 +1016,7 @@ async function genererPDF() {
   doc.setFillColor(...C_JAUNE);
   pcols.slice(0,-1).forEach((x,i) => doc.rect(x, P_START+5.5, pcols[i+1]-x, 4.5, 'FD'));
   doc.setFont('helvetica','bold'); doc.setFontSize(6); doc.setTextColor(...C_ANTH);
-  ['NOM','HEURES','GD','FTS','Intérim'].forEach((lbl,i) => {
+  ['NOM ET PRENOM','HEURES','GD','FTS','Intérim'].forEach((lbl,i) => {
     doc.text(lbl, (pcols[i]+pcols[i+1])/2, P_START+5.5+4.5/2+1.2, {align:'center'});
   });
 
@@ -1004,14 +1029,14 @@ async function genererPDF() {
       doc.rect(x, ey, pcols[i+1]-x, entryH, 'S');
     });
     doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...C_TXT);
-    const nom = document.getElementById(`nom_${k}`)?.value || '';
+    const nom = (document.getElementById(`nom_${k}`)?.value || '').toUpperCase();
     const hr  = document.getElementById(`heure_${k}`)?.value || '';
     if (nom) doc.text(nom, pcols[0]+2, ey+entryH/2+1.5);
     if (hr)  doc.text(hr, (pcols[1]+pcols[2])/2, ey+entryH/2+1.5, {align:'center'});
     ['gd','fts_p','int'].forEach((id,ci) => {
       if (document.getElementById(`${id}_${k}`)?.checked) {
         const cx0 = pcols[2+ci], cx1 = pcols[3+ci];
-        drawCoche(doc, cx0, ey, cx1-cx0, entryH, C_JAUNE);
+        drawCoche(doc, cx0, ey, cx1-cx0, entryH, C_ANTH);
       }
     });
   }

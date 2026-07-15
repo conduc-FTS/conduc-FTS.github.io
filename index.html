@@ -22,13 +22,14 @@ if ("serviceWorker" in navigator) {
 
   <!-- Barre du haut : logo, chantier actif, utilisateur -->
   <header class="app-topbar">
-    <div class="app-topbar-brand">
-      <span class="logo-badge">FTS</span>
+    <a href="/index.html" class="app-topbar-brand" style="text-decoration:none;color:inherit;cursor:pointer" aria-label="Retour à l'accueil">
+      <img src="/assets/logo-fts.png" alt="FTS" class="logo-badge-img">
+
       <div class="brand-titles">
         <h1>FTS Dashboard</h1>
         <p>Fondations et Travaux Spéciaux</p>
       </div>
-    </div>
+    </a>
     <div class="app-topbar-right">
       <div class="chantier-badge" id="chantierBadge" hidden>
         <div class="code" id="chantierBadgeCode">—</div>

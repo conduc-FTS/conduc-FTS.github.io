@@ -11,7 +11,7 @@
 
 <header class="topbar">
   <div class="topbar-brand">
-    <span class="brand-mark">FTS</span>
+    <img src="../assets/logo-fts.png" alt="FTS" style="height:34px;width:auto;background:white;border-radius:6px;padding:4px 6px;display:block">
     <span class="brand-sub">Dashboard Conducteur</span>
   </div>
   <div class="topbar-actions">
@@ -64,6 +64,15 @@
 <script src="../js/drive.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+
+  ["numAffaire", "nomChantier", "adresseChantier"].forEach((id) => {
+    const el = document.getElementById(id);
+    el.addEventListener("input", () => {
+      const pos = el.selectionStart;
+      el.value = el.value.toUpperCase();
+      el.setSelectionRange(pos, pos);
+    });
+  });
   if (window.FTSAuth) {
     FTSAuth.init();
     FTSAuth.onAuthChange(updateUserBlock);

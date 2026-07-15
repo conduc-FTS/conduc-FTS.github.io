@@ -374,9 +374,9 @@ body {
   flex-wrap: wrap;
 }
 .app-topbar-brand { display: flex; align-items: center; gap: 12px; }
-.app-topbar-brand .logo-badge {
-  background: white; border-radius: 8px; padding: 6px 10px;
-  font-weight: 800; color: var(--anthracite); font-size: 1.1rem;
+.app-topbar-brand .logo-badge-img {
+  background: white; border-radius: 8px; padding: 5px 8px;
+  height: 34px; width: auto; display: block;
 }
 .app-topbar-brand .brand-titles h1 { font-size: 1.05rem; margin: 0; }
 .app-topbar-brand .brand-titles p { font-size: 0.78rem; color: #B8BAC0; margin: 0; }

@@ -420,10 +420,10 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 
 <!-- HEADER -->
 <header class="app-header">
-  <div class="logo-bar">
+  <a href="/index.html" class="logo-bar" style="text-decoration:none;color:inherit;cursor:pointer" aria-label="Retour au dashboard">
     <img id="headerLogo" class="logo-img" alt="FTS">
     <div class="app-title">Fondations & Travaux Spéciaux<br><strong style="color:#fff">Rapport Journalier</strong></div>
-  </div>
+  </a>
   <button class="btn-valider" onclick="validerRapport()">
     <span>✓</span> Enregistrer
   </button>

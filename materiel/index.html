@@ -99,10 +99,10 @@ canvas.sig-canvas{display:block;width:100%;height:120px;cursor:crosshair;touch-a
 <body>
 
 <header class="app-header">
-  <div class="logo-bar">
+  <a href="/index.html" class="logo-bar" style="text-decoration:none;color:inherit;cursor:pointer" aria-label="Retour au dashboard">
     <img id="headerLogo" class="logo-img" alt="FTS">
     <div class="app-title">Fondations & Travaux Spéciaux<br><strong style="color:#fff">Fiche Matériel</strong></div>
-  </div>
+  </a>
   <button class="btn-valider" onclick="valider()">✉️ Envoyer</button>
 </header>
 
@@ -205,6 +205,9 @@ canvas.sig-canvas{display:block;width:100%;height:120px;cursor:crosshair;touch-a
 
 <div id="toast"></div>
 
+<script src="/js/auth.js"></script>
+<script src="/js/drive.js"></script>
+<script src="/js/gmail.js"></script>
 <script>
 
 const EMAIL_TO = ['m.delarche@fts-btp.fr', 'd.dias@fts-btp.fr'];

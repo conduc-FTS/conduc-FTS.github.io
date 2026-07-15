@@ -934,8 +934,8 @@ async function genererPDF() {
 
     // Coche
     if (checked) {
-      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(0,100,0);
-      doc.text('✓', W-M-4, y+5, {align:'center'});
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,100,0);
+      doc.text('OK', W-M-4, y+4.8, {align:'center'});
     } else {
       doc.setDrawColor(...C_BORD); doc.rect(W-M-7, y+1.5, 5, 4, 'S');
     }

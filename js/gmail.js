@@ -25,6 +25,18 @@ const FTSGmail = (() => {
   }
 
   /**
+   * Encode un texte contenant des caractères accentués au format
+   * RFC 2047 (encoded-word), requis pour les en-têtes email (Subject,
+   * From, To...). Sans ça, les accents et tirets spéciaux s'affichent
+   * comme des caractères illisibles chez le destinataire, même si le
+   * corps du mail (encodé différemment) reste correct.
+   */
+  function encodeHeader(text) {
+    const b64 = btoa(unescape(encodeURIComponent(text)));
+    return `=?UTF-8?B?${b64}?=`;
+  }
+
+  /**
    * Envoie un mail avec une pièce jointe PDF.
    * @param {Object} opts
    * @param {string[]} opts.to
@@ -40,7 +52,7 @@ const FTSGmail = (() => {
     const mime = [
       `From: me`,
       `To: ${to.join(", ")}`,
-      `Subject: ${subject}`,
+      `Subject: ${encodeHeader(subject)}`,
       `MIME-Version: 1.0`,
       `Content-Type: multipart/mixed; boundary="${boundary}"`,
       ``,

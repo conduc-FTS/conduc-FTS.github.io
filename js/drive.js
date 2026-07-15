@@ -82,13 +82,21 @@ const FTSDrive = (() => {
    * "root" si parentId est null/undefined).
    */
   async function findFolderExact(name, parentId) {
-    const parentClause = parentId ? `'${parentId}' in parents` : `'root' in parents`;
+    // Pour un sous-dossier (parentId connu), on cherche précisément à cet
+    // endroit. Pour un dossier racine (parentId absent), on ne suppose PAS
+    // qu'il est à la racine du compte connecté : selon qui se connecte
+    // (le conducteur propriétaire, ou un chef à qui le dossier est
+    // seulement partagé), il peut apparaître ailleurs dans son Drive.
+    // On cherche donc par nom sur tout ce qui est accessible au compte
+    // (possédé ou partagé avec lui), sans restriction de parent.
+    const parentClause = parentId ? ` and '${parentId}' in parents` : "";
     const q = encodeURIComponent(
-      `name = '${escapeForQuery(name)}' and mimeType = 'application/vnd.google-apps.folder' and ${parentClause} and trashed = false`
+      `name = '${escapeForQuery(name)}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false${parentClause}`
     );
-    const res = await fetch(`${API_BASE}/files?q=${q}&fields=files(id,name)&spaces=drive`, {
-      headers: authHeader(),
-    });
+    const res = await fetch(
+      `${API_BASE}/files?q=${q}&fields=files(id,name)&spaces=drive&includeItemsFromAllDrives=true&supportsAllDrives=true`,
+      { headers: authHeader() }
+    );
     if (!res.ok) {
       throw new Error(`Erreur recherche dossier "${name}" : ${res.status}`);
     }
@@ -360,7 +368,7 @@ const FTSDrive = (() => {
       `(${parentsClause}) and mimeType != 'application/vnd.google-apps.folder' and trashed = false`
     );
     const res = await fetch(
-      `${API_BASE}/files?q=${qFiles}&fields=files(id,name,modifiedTime,parents)&orderBy=modifiedTime desc&pageSize=${limite || 5}&spaces=drive`,
+      `${API_BASE}/files?q=${qFiles}&fields=files(id,name,createdTime,parents)&orderBy=createdTime desc&pageSize=${limite || 5}&spaces=drive`,
       { headers: authHeader() }
     );
     if (!res.ok) return [];

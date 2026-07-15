@@ -208,7 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const couleurs = ["blue", "red", "green", "yellow"];
     activiteList.innerHTML = fichiers
       .map((f, i) => {
-        const date = new Date(f.modifiedTime);
+        const date = new Date(f.createdTime);
         return `
         <div class="activite-item">
           <span class="activite-dot ${couleurs[i % couleurs.length]}"></span>

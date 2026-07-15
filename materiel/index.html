@@ -458,7 +458,7 @@ function valider() {
   if (machines.length === 0 || !machines[0].nom) { showToast('⚠️ Ajoutez au moins une machine', 'error'); return; }
   const fileName = getNomFichier();
   const cc = document.getElementById('emailCc').value.trim();
-  const subjectPreview = `[FTS] Fiche Matériel – ${dossier} – ${chantierVal || '...'} – ${formatDate(date)}`;
+  const subjectPreview = `[FTS] Fiche Matériel – ${chantierVal || '...'} – ${formatDate(date)}`;
   document.getElementById('subjectDisplay').textContent = subjectPreview;
   document.getElementById('fileDisplay').textContent = fileName;
   document.getElementById('ccDisplay').textContent = cc ? ' | ' + cc : '';
@@ -519,7 +519,7 @@ async function genererPDF() {
   machines.forEach((m,idx) => {
     if (y > H-60) { doc.addPage(); y=M; }
     const etatColor = m.etat==='bon' ? C_VERT : m.etat==='panne' ? C_ROUGE : m.etat==='surveiller' ? C_ORANGE : C_ANTH;
-    const etatLabel = m.etat==='bon' ? '✓ BON' : m.etat==='panne' ? '✗ EN PANNE' : m.etat==='surveiller' ? '⚠ À SURVEILLER' : '—';
+    const etatLabel = m.etat==='bon' ? 'BON' : m.etat==='panne' ? 'EN PANNE' : m.etat==='surveiller' ? 'A SURVEILLER' : '—';
 
     // Header machine
     doc.setFillColor(...C_ANTH); doc.rect(M,y,W-2*M,7,'F');
@@ -587,14 +587,22 @@ async function genererPDF() {
   doc.setFillColor(...C_JAUNE); doc.rect(M,y,sigW,7,'FD');
   doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_ANTH);
   doc.text('NOM DU CHEF DE CHANTIER',M+3,y+4.5);
-  doc.setFont('helvetica','normal');
-  doc.text(document.getElementById('chef').value||'',M+3,y+10.5);
   doc.setFillColor(...C_ANTH); doc.rect(M+sigW,y,sigW,7,'F');
-  doc.setFont('helvetica','bold'); doc.setTextColor(...C_WHITE);
-  doc.text('SIGNATURE',M+sigW+3,y+4.5); y+=12;
-  doc.setDrawColor(...C_BORD); doc.rect(M,y,sigW*2,30,'S');
-  if (sigHas && sigUrl) doc.addImage(sigUrl,'JPEG',M+sigW,y,sigW,30);
-  y+=32;
+  doc.setTextColor(...C_WHITE);
+  doc.text('SIGNATURE',M+sigW+3,y+4.5);
+  y+=7;
+
+  // Deux boîtes distinctes (nom à gauche, signature à droite), même hauteur
+  const boxH = 30;
+  doc.setDrawColor(...C_BORD);
+  doc.rect(M,y,sigW,boxH,'S');
+  doc.rect(M+sigW,y,sigW,boxH,'S');
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...C_ANTH);
+  doc.text(document.getElementById('chef').value||'',M+3,y+7);
+
+  if (sigHas && sigUrl) doc.addImage(sigUrl,'JPEG',M+sigW+1,y+1,sigW-2,boxH-2);
+  y+=boxH+2;
 
   return doc.output('blob');
 }
@@ -616,7 +624,7 @@ async function envoyerEmail(blob, fileName) {
   const chef = document.getElementById('chef').value;
   const machines = getMachines();
   const pannes = machines.filter(m => m.etat === 'panne' || m.etat === 'surveiller');
-  const subject = `[FTS] Fiche Matériel – ${dossier} – ${chantier} – ${formatDate(date)}`;
+  const subject = `[FTS] Fiche Matériel – ${chantier} – ${formatDate(date)}`;
 
   // Résumé des machines pour le corps du mail
   const lignesMachines = machines.map(m => {
@@ -635,7 +643,7 @@ async function envoyerEmail(blob, fileName) {
 
   const body = `Mathieu, David,
 
-Vous trouverez ci-joint la fiche matériel pour le chantier ${chantier} (${dossier}), établie le ${formatDate(date)} par ${chef}.
+Vous trouverez ci-joint la fiche matériel pour le chantier ${chantier}, établie le ${formatDate(date)} par ${chef}.
 ${alertePannes}
 ─────────────────────────────────────
 RÉCAPITULATIF MACHINES (${machines.length} déclarée${machines.length > 1 ? 's' : ''})

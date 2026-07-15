@@ -14,7 +14,7 @@
  * toujours prendre la version la plus fraîche sans avoir à changer
  * ce numéro.
  */
-const CACHE_NAME = "fts-dashboard-v2";
+const CACHE_NAME = "fts-dashboard-v3";
 const ASSETS = [
   "/",
   "/index.html",
@@ -54,7 +54,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: "no-store" })
       .then((response) => {
         // Réseau disponible : on sert la réponse fraîche et on met
         // à jour le cache en arrière-plan pour le mode hors-ligne.

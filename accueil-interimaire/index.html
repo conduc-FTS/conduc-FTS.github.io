@@ -607,7 +607,7 @@ async function genererPDF() {
   const forTypes = [['1er Jour', 'form1j'],["> 1 mois d'absence",'form1m'],['Annuel','formAnnuel']];
   forTypes.forEach(([label,id],i)=>{
     const cx = M + i*(W-2*M)/3;
-    drawCheckPDF(doc, cx+2, y+1, 5, 5, document.getElementById(id).checked, C_ANTH, C_JAUNE);
+    drawCheckPDF(doc, cx+2, y+1, 5, 5, document.getElementById(id).checked, C_ANTH, C_ANTH);
     doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...C_TXT);
     doc.text(label, cx+9, y+5);
   });
@@ -620,7 +620,7 @@ async function genererPDF() {
   const certs=[['CACES R482','cR482'],['CACES R486','cR486'],['Habilitation élec. BS','cElec'],['Travaux en hauteur','cHauteur'],['SST','cSST']];
   const cW=(W-2*M)/certs.length;
   certs.forEach(([l,id],i)=>{
-    drawCheckPDF(doc, M+i*cW+2, y+1, 4.5, 4.5, document.getElementById(id).checked, C_ANTH, C_JAUNE);
+    drawCheckPDF(doc, M+i*cW+2, y+1, 4.5, 4.5, document.getElementById(id).checked, C_ANTH, C_ANTH);
     doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
     const lines=doc.splitTextToSize(l, cW-8);
     doc.text(lines, M+i*cW+8, y+3.5);
@@ -661,7 +661,7 @@ async function genererPDF() {
       const row = i%perCol;
       const cx = M + col*colW;
       const cy = y + row*5.5;
-      drawCheckPDF(doc, cx+2, cy+0.5, 4, 4, document.getElementById(id).checked, C_ANTH, C_JAUNE);
+      drawCheckPDF(doc, cx+2, cy+0.5, 4, 4, document.getElementById(id).checked, C_ANTH, C_ANTH);
       doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
       const lines=doc.splitTextToSize(q.labels[i], colW-10);
       doc.text(lines, cx+8, cy+3.5);
@@ -697,7 +697,7 @@ async function genererPDF() {
       doc.text(item.sub, M+3, y+3.5); y+=6;
       item.ids.forEach((id,i)=>{
         if(y>H-20){doc.addPage();y=M;}
-        drawCheckPDF(doc,M+3,y+0.5,4,4,document.getElementById(id).checked,C_ANTH,C_JAUNE);
+        drawCheckPDF(doc,M+3,y+0.5,4,4,document.getElementById(id).checked,C_ANTH,C_ANTH);
         doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
         const lines=doc.splitTextToSize(item.labels[i],W-2*M-12);
         doc.text(lines,M+9,y+3.5);
@@ -722,7 +722,7 @@ async function genererPDF() {
     doc.text(r.label, M+3, y+3.5); y+=6;
     r.ids.forEach((id,i)=>{
       if(y>H-20){doc.addPage();y=M;}
-      drawCheckPDF(doc,M+3,y+0.5,4,4,document.getElementById(id).checked,C_ANTH,C_JAUNE);
+      drawCheckPDF(doc,M+3,y+0.5,4,4,document.getElementById(id).checked,C_ANTH,C_ANTH);
       doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
       doc.text(r.labels[i],M+9,y+3.5); y+=5;
     });

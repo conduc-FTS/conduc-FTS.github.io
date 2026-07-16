@@ -500,9 +500,14 @@ async function genererPDF() {
   doc.rect(M, y, 42, 22, 'FD');
   doc.addImage(LOGO_B64,'JPEG',M+1,y+1,40,20);
   const infoX=M+44, infoW=W-M-infoX-M, rh=22/4;
+  const dossierVal = document.getElementById('dossier').value;
+  const chantierRaw = document.getElementById('chantier').value;
+  const chantierSansCode = dossierVal && chantierRaw.toUpperCase().startsWith(dossierVal.toUpperCase())
+    ? chantierRaw.slice(dossierVal.length).trim()
+    : chantierRaw;
   [['DATE/SEMAINE',formatDate(document.getElementById('date').value)],
-   ['N° DOSSIER',document.getElementById('dossier').value],
-   ['CHANTIER',document.getElementById('chantier').value],
+   ['N° DOSSIER',dossierVal],
+   ['CHANTIER',chantierSansCode],
    ['CHEF CHANTIER',document.getElementById('chef').value]
   ].forEach(([l,v],i) => {
     const ry=y+i*rh;
@@ -521,22 +526,18 @@ async function genererPDF() {
     const etatColor = m.etat==='bon' ? C_VERT : m.etat==='panne' ? C_ROUGE : m.etat==='surveiller' ? C_ORANGE : C_ANTH;
     const etatLabel = m.etat==='bon' ? 'BON' : m.etat==='panne' ? 'EN PANNE' : m.etat==='surveiller' ? 'A SURVEILLER' : '—';
 
-    // Header machine
+    // Header machine (nom + heures + statut, tout dans le même bandeau)
     doc.setFillColor(...C_ANTH); doc.rect(M,y,W-2*M,7,'F');
     doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...C_WHITE);
-    doc.text(`MACHINE ${idx+1} — ${m.nom.toUpperCase()}`,M+3,y+4.8);
+    doc.text(m.nom.toUpperCase(),M+3,y+4.8);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+    doc.text(`${m.h ? m.h + ' h' : '— h'}`,W/2,y+4.8,{align:'center'});
     // Badge état
     if (m.etat) {
       doc.setFillColor(...etatColor); doc.roundedRect(W-M-28,y+1,27,5,2,2,'F');
-      doc.setFontSize(7); doc.setTextColor(...C_WHITE);
+      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_WHITE);
       doc.text(etatLabel,W-M-14.5,y+4.5,{align:'center'});
     }
-    y+=8;
-
-    // Heures
-    doc.setFillColor(...C_GRIS); doc.rect(M,y,W-2*M,7,'FD');
-    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...C_ANTH);
-    doc.text(`Heures : ${m.h || '—'}`,M+3,y+4.8);
     y+=8;
 
     // Dysfonctionnements
@@ -550,20 +551,15 @@ async function genererPDF() {
       y += lines.length*4 + 2;
     }
 
-    // Entretien
+    // Entretien — discret : simple ligne de texte, pas de bandeau coloré
     const entW = (W-2*M)/3;
+    doc.setDrawColor(...C_BORD); doc.rect(M,y,W-2*M,6,'S');
     [['Nettoyage',m.net],['Graissage',m.grs],['Décoffrant',m.dec]].forEach(([l,v],i)=>{
-      const ex=M+i*entW, ey=y;
-      doc.setFillColor(i%2===0?248:252,i%2===0?248:252,i%2===0?248:252);
-      doc.rect(ex,ey,entW,8,'FD');
-      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_ANTH);
-      doc.text(l,ex+3,ey+3.5);
-      if (v) {
-        const vc = v==='oui' ? C_VERT : C_ROUGE;
-        doc.setFillColor(...vc); doc.roundedRect(ex+entW-14,ey+1.5,13,5,2,2,'F');
-        doc.setTextColor(...C_WHITE); doc.setFontSize(7);
-        doc.text(v.toUpperCase(),ex+entW-7.5,ey+4.8,{align:'center'});
-      }
+      const ex=M+i*entW;
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_ANTH);
+      const valTxt = v === 'oui' ? 'Oui' : v === 'non' ? 'Non' : '—';
+      doc.text(`${l} : ${valTxt}`,ex+3,y+4);
+      if (i>0) doc.line(ex,y,ex,y+6);
     });
     y+=10;
     doc.setDrawColor(...C_BORD); doc.line(M,y,W-M,y); y+=4;

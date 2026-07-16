@@ -573,6 +573,7 @@ const DROPDOWN = {
   8: ["MFT 4\"","MFT 5\"","MFT 6\"","MFT 8\"","MFT 12\"",'TARRIERE'],
 };
 const N_PIEUX = 26;
+const N_MATERIEL = 16;
 const N_PERS  = 4;
 
 // driveToken n'est plus une variable locale : elle est dérivée de l'auth partagée FTSAuth
@@ -1341,6 +1342,23 @@ async function uploadToDrive(blob, fileName) {
 
   await FTSDrive.uploadFile(blob, fileName, 'application/pdf', rapportsFolderId);
 
+  // Archivage en double dans le suivi administratif personnel du chef
+  // (ADMINISTRATIF / {chef} / RAPPORT JOURNALIER / RJ {année}). Une erreur
+  // ici n'empêche pas le rapport d'être considéré comme enregistré,
+  // puisque la copie dans le dossier chantier a déjà réussi.
+  try {
+    const nomChef = document.getElementById('nomChef').value.trim();
+    if (nomChef) {
+      const annee = document.getElementById('date').value
+        ? document.getElementById('date').value.split('-')[0]
+        : new Date().getFullYear();
+      const dossierChefId = await FTSDrive.getDossierRapportChef(nomChef, annee);
+      await FTSDrive.uploadFile(blob, fileName, 'application/pdf', dossierChefId);
+    }
+  } catch (e) {
+    console.warn('Archivage administratif (dossier du chef) non effectué :', e);
+  }
+
   // Alimenter le suivi chantier (calendrier matériel + cadence de production),
   // dans un classeur séparé du dossier du chantier. Une erreur ici n'empêche
   // pas le rapport d'être considéré comme enregistré (le PDF est prioritaire).
@@ -1365,12 +1383,18 @@ async function enregistrerSuiviChantier() {
 
   const dateAffichage = formatDate(document.getElementById('date').value);
 
-  // Machines du jour, depuis le bloc "Suivi matériel du jour"
-  const machines = getSuiviMateriel().map((m) => ({
-    nom: m.nom,
-    statut: m.statut,
-    ftsLoc: m.type,
-  }));
+  // Machines du jour, depuis les colonnes Désignation/Statut/FTS-LOC
+  // du tableau des pieux (une entrée par ligne de pieu renseignée).
+  const machines = [];
+  for (let i = 1; i <= N_MATERIEL; i++) {
+    const nom = document.getElementById(`mat_${i}`)?.value?.trim();
+    if (!nom) continue;
+    machines.push({
+      nom,
+      statut: document.getElementById(`statut_${i}`)?.value || '',
+      ftsLoc: document.getElementById(`fts_loc_${i}`)?.value || '',
+    });
+  }
 
   // Production du jour : pieux ayant une longueur de forage renseignée
   let nbPieux = 0;

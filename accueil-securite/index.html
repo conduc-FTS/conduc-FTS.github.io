@@ -57,8 +57,8 @@ input:focus,textarea:focus{border-bottom-color:var(--jaune);}
 .sig-nom{grid-column:span 1;}
 .sig-label{font-size:9px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.7px;}
 .sig-cell input[type=text],.sig-cell input[type=date]{font-size:11px;padding:3px 2px;}
-.sig-canvas-mini-wrap{position:relative;border:1px solid var(--bord);border-radius:4px;background:#fff;height:44px;touch-action:none;}
-.sig-canvas-mini{width:100%;height:44px;display:block;cursor:crosshair;touch-action:none;}
+.sig-canvas-mini-wrap{position:relative;border:1px solid var(--bord);border-radius:4px;background:#fff;height:70px;touch-action:none;}
+.sig-canvas-mini{width:100%;height:70px;display:block;cursor:crosshair;touch-action:none;}
 .sig-hint-mini{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#CCC;font-size:16px;pointer-events:none;}
 .btn-clear-mini{background:none;border:1px solid var(--bord);color:#999;padding:2px 6px;border-radius:3px;font-size:10px;cursor:pointer;margin-top:2px;align-self:flex-end;}
 /* Compteur */
@@ -671,6 +671,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  for (let i = 1; i <= 8; i++) {
+    ['sig_nom_' + i, 'sig_ent_' + i].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', () => {
+        const pos = el.selectionStart;
+        el.value = el.value.toUpperCase();
+        el.setSelectionRange(pos, pos);
+      });
+    });
+  }
+
   // Init checkboxes progress
   document.querySelectorAll('input[type=checkbox]').forEach(cb => {
     cb.addEventListener('change', updateProgress);
@@ -872,10 +884,15 @@ async function genererPDF() {
   doc.addImage(LOGO_B64, 'JPEG', M+1, y+1, 40, 20);
 
   const infoX=M+44, infoW=W-M-infoX-M, rh=22/4;
+  const dossierVal = document.getElementById('dossier').value;
+  const chantierRaw = document.getElementById('chantier').value;
+  const chantierSansCode = dossierVal && chantierRaw.toUpperCase().startsWith(dossierVal.toUpperCase())
+    ? chantierRaw.slice(dossierVal.length).trim()
+    : chantierRaw;
   const infos = [
     ['DATE', formatDate(document.getElementById('date').value)],
-    ['N° DOSSIER', document.getElementById('dossier').value],
-    ['CHANTIER', document.getElementById('chantier').value],
+    ['N° DOSSIER', dossierVal],
+    ['CHANTIER', chantierSansCode],
     ['RESPONSABLE', document.getElementById('responsable').value],
   ];
   infos.forEach(([l,v],i) => {

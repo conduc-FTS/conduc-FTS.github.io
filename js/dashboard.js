@@ -19,6 +19,13 @@ document.addEventListener("DOMContentLoaded", () => {
       document.querySelectorAll(".app-view").forEach((v) => v.classList.remove("active"));
       tab.classList.add("active");
       document.getElementById(tab.dataset.view).classList.add("active");
+
+      // Toujours reprendre une liste à jour en arrivant sur CHANTIERS,
+      // plutôt que d'obliger à cliquer "Actualiser" à la main.
+      if (tab.dataset.view === "view-chantiers" && window.FTSAuth && FTSAuth.isSignedIn()) {
+        chargerChantiers();
+        chargerDocumentsChantier();
+      }
     });
   });
 
@@ -262,7 +269,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Documents du chantier (visualisation Drive intégrée) ---
   const ICONES_DOSSIER = {
     "PLAN": "📐", "NDC": "📄", "SECURITE": "🦺", "RAPPORT JOURNALIER": "📋",
-    "DICT": "📑", "SONDAGE": "🧭", "SECURITE / ACCUEIL SECURITE": "🛡️",
+    "DICT": "📑", "SONDAGE": "🪨", "SECURITE / ACCUEIL SECURITE": "🛡️",
   };
 
   async function chargerDocumentsChantier() {
@@ -278,6 +285,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     panel.hidden = false;
+    document.getElementById("docsChantierNom").textContent = actif.name;
     filesEl.innerHTML = "";
     breadcrumb.innerHTML = "";
     foldersEl.innerHTML = '<div class="docs-empty">Chargement des dossiers...</div>';

@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#3A3A3A">
+<link rel="manifest" href="../manifest_conducteur.json">
+<link rel="icon" type="image/png" sizes="192x192" href="../icon-dashboard-192.png">
+<script>
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashboard.js").catch(() => {}); }
+</script>
 <title>FTS — Ouverture de chantier (Conducteur)</title>
 <link rel="stylesheet" href="../css/dashboard.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -25,13 +31,13 @@
 <body>
 
 <header class="topbar">
-  <a href="../index.html" class="topbar-brand" style="text-decoration:none;color:inherit;cursor:pointer" aria-label="Retour au tableau de bord">
+  <div class="topbar-brand">
     <img src="../assets/logo-fts.png" alt="FTS" style="height:34px;width:auto;background:white;border-radius:6px;padding:4px 6px;display:block">
     <div style="line-height:1.2">
       <div style="font-weight:800;font-size:1.05rem;color:#fff">TABLEAU DE BORD</div>
       <div class="brand-sub">Fondations et Travaux Spéciaux</div>
     </div>
-  </a>
+  </div>
   <div class="topbar-actions">
     <div class="user-chip" id="userChip">
       <span class="user-dot" id="userDot"></span>

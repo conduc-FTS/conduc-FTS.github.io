@@ -1,0 +1,25 @@
+{
+  "name": "Dashboard Conducteur FTS",
+  "short_name": "Dashboard Conducteur",
+  "description": "Ouverture de chantier, suivi et vérification des doublons de pieux — pour les conducteurs de travaux",
+  "start_url": "/nouveau-chantier/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F5F6F8",
+  "theme_color": "#3A3A3A",
+  "icons": [
+    {
+      "src": "/icon-dashboard-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-dashboard-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

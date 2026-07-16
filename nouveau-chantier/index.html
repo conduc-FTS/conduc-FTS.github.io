@@ -6,6 +6,21 @@
 <title>FTS — Ouverture de chantier (Conducteur)</title>
 <link rel="stylesheet" href="../css/dashboard.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+.suivi-calendrier-scroll { overflow-x: auto; margin-top: 8px; }
+.suivi-calendrier, .suivi-production { border-collapse: collapse; width: 100%; font-size: 0.8rem; }
+.suivi-calendrier th, .suivi-calendrier td,
+.suivi-production th, .suivi-production td {
+  border: 1px solid var(--border); padding: 6px 10px; text-align: center; white-space: nowrap;
+}
+.suivi-calendrier th, .suivi-production th { background: var(--anthracite); color: white; font-size: 0.72rem; text-transform: uppercase; }
+.suivi-calendrier td:first-child, .suivi-production td:first-child { text-align: left; font-weight: 700; background: #FAFAFA; }
+.statut-badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; color: white; }
+.statut-TRAVAIL { background: #27AE60; }
+.statut-PANNE { background: #C0392B; }
+.statut-ARRET { background: #888888; }
+.statut-TRANSPORT { background: #3A86FF; }
+</style>
 </head>
 <body>
 
@@ -47,6 +62,30 @@
     <p class="form-status" id="chantierStatus"></p>
   </section>
 
+  <section class="panel" id="panel-suivi">
+    <h2 class="panel-title">Suivi chantier</h2>
+    <p class="panel-sub">Calendrier matériel et cadence de production, à partir des rapports journaliers enregistrés.</p>
+
+    <div class="chantier-actif-row">
+      <select id="suiviChantierSelect" class="chantier-select">
+        <option value="">— Choisir un chantier —</option>
+      </select>
+      <button type="button" class="btn-secondary" id="chargerSuiviBtn">Charger le suivi</button>
+    </div>
+    <p class="form-status" id="suiviStatus"></p>
+
+    <div id="suiviResultats" hidden>
+      <h3 style="margin:18px 0 8px 0;font-size:0.95rem">Calendrier matériel</h3>
+      <div class="suivi-calendrier-scroll">
+        <table class="suivi-calendrier" id="suiviCalendrierTable"></table>
+      </div>
+
+      <h3 style="margin:22px 0 8px 0;font-size:0.95rem">Cadence de production</h3>
+      <table class="suivi-production" id="suiviProductionTable"></table>
+      <p class="form-status" id="suiviCadenceMoyenne" style="font-weight:700"></p>
+    </div>
+  </section>
+
   <section class="panel">
     <h2 class="panel-title">Compte Google</h2>
     <p class="panel-sub" id="adminAccountInfo">Non connecté</p>
@@ -62,6 +101,7 @@
 
 <script src="../js/auth.js"></script>
 <script src="../js/drive.js"></script>
+<script src="../js/sheets.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -148,6 +188,112 @@ document.addEventListener("DOMContentLoaded", () => {
       submitBtn.disabled = false;
     }
   });
+
+  // --- Suivi chantier ---
+  const suiviChantierSelect = document.getElementById("suiviChantierSelect");
+  const chargerSuiviBtn = document.getElementById("chargerSuiviBtn");
+  const suiviStatus = document.getElementById("suiviStatus");
+
+  async function peuplerSuiviChantierSelect() {
+    if (!window.FTSAuth || !FTSAuth.isSignedIn() || !window.FTSDrive) return;
+    try {
+      const chantiers = await FTSDrive.listChantiers();
+      suiviChantierSelect.innerHTML = '<option value="">— Choisir un chantier —</option>';
+      chantiers.forEach((c) => {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = c.name;
+        opt.dataset.name = c.name;
+        suiviChantierSelect.appendChild(opt);
+      });
+    } catch (err) {
+      console.error("Erreur chargement liste chantiers (suivi) :", err);
+    }
+  }
+
+  if (window.FTSAuth) {
+    FTSAuth.onAuthChange((signedIn) => { if (signedIn) peuplerSuiviChantierSelect(); });
+    if (FTSAuth.isSignedIn()) peuplerSuiviChantierSelect();
+  }
+
+  chargerSuiviBtn.addEventListener("click", async () => {
+    const option = suiviChantierSelect.selectedOptions[0];
+    const chantierId = suiviChantierSelect.value;
+    if (!chantierId) { suiviStatus.textContent = "Choisis un chantier d'abord."; return; }
+    if (!window.FTSSheets) { suiviStatus.textContent = "Erreur : module Sheets non chargé."; return; }
+
+    suiviStatus.textContent = "Chargement du suivi...";
+    document.getElementById("suiviResultats").hidden = true;
+
+    try {
+      const { materiel, production } = await FTSSheets.lireSuiviComplet(chantierId, option.dataset.name);
+      afficherCalendrierMateriel(materiel);
+      afficherProduction(production);
+      document.getElementById("suiviResultats").hidden = false;
+      suiviStatus.textContent = materiel.length === 0 && production.length === 0
+        ? "Aucune donnée pour l'instant — elle apparaîtra après le premier rapport journalier enregistré sur ce chantier."
+        : "";
+    } catch (err) {
+      console.error("Erreur chargement suivi :", err);
+      suiviStatus.textContent = `Erreur : ${err.message}`;
+    }
+  });
+
+  function afficherCalendrierMateriel(lignes) {
+    const table = document.getElementById("suiviCalendrierTable");
+    if (lignes.length === 0) {
+      table.innerHTML = "<tr><td>Aucune donnée matériel enregistrée.</td></tr>";
+      return;
+    }
+
+    const dates = [...new Set(lignes.map((l) => l.date))];
+    const machines = [...new Set(lignes.map((l) => l.machine))];
+
+    // Dernier statut connu par (machine, date) si plusieurs saisies le même jour
+    const parCase = {};
+    lignes.forEach((l) => { parCase[`${l.machine}||${l.date}`] = l; });
+
+    let html = "<tr><th>Machine</th>" + dates.map((d) => `<th>${d}</th>`).join("") + "</tr>";
+    machines.forEach((m) => {
+      html += `<tr><td>${escapeHtmlSuivi(m)}</td>`;
+      dates.forEach((d) => {
+        const l = parCase[`${m}||${d}`];
+        if (l) {
+          html += `<td><span class="statut-badge statut-${l.statut}">${l.statut}${l.ftsLoc ? " · " + l.ftsLoc : ""}</span></td>`;
+        } else {
+          html += "<td>—</td>";
+        }
+      });
+      html += "</tr>";
+    });
+    table.innerHTML = html;
+  }
+
+  function afficherProduction(lignes) {
+    const table = document.getElementById("suiviProductionTable");
+    const moyenneEl = document.getElementById("suiviCadenceMoyenne");
+
+    if (lignes.length === 0) {
+      table.innerHTML = "<tr><td>Aucune donnée de production enregistrée.</td></tr>";
+      moyenneEl.textContent = "";
+      return;
+    }
+
+    let html = "<tr><th>Date</th><th>Nb pieux</th><th>Longueur totale (m)</th><th>Longueur moyenne/pieu (m)</th></tr>";
+    lignes.forEach((l) => {
+      html += `<tr><td>${l.date}</td><td>${l.nbPieux}</td><td>${l.longueurTotale.toFixed(2)}</td><td>${l.longueurMoyenne.toFixed(2)}</td></tr>`;
+    });
+    table.innerHTML = html;
+
+    const cadenceMoyenne = lignes.reduce((sum, l) => sum + l.longueurTotale, 0) / lignes.length;
+    moyenneEl.textContent = `Cadence moyenne : ${cadenceMoyenne.toFixed(1)} ml/jour sur ${lignes.length} jour${lignes.length > 1 ? "s" : ""} de production enregistrés.`;
+  }
+
+  function escapeHtmlSuivi(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
 });
 </script>
 </body>

@@ -54,7 +54,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
     gap: 10px;
     flex: 1;
   }
-  .logo-img { height: 38px; width: auto; display: block; }
+  .logo-img { height: 38px; width: auto; display: block; border-radius: 6px; }
   .logo-fts span { color: var(--jaune); }
   .app-title {
     font-size: 13px;
@@ -542,8 +542,22 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   </div>
 </div>
 
+<!-- ALERTE PIEUX DÉJÀ RÉALISÉS -->
+<div class="modal-overlay" id="modalDoublonPieux">
+  <div class="modal" style="border-top:5px solid #C0392B;max-width:400px">
+    <h3>⚠️ Numéro(s) de pieu déjà utilisé(s)</h3>
+    <p style="margin-bottom:10px">Ces pieux ont déjà été réalisés un autre jour sur ce chantier — vérifie qu'il ne s'agit pas d'une erreur de numérotation avant de continuer :</p>
+    <p id="doublonPieuxListe" style="background:#FDECEA;border-radius:6px;padding:10px;font-size:13px;font-weight:600;color:#8E2E22;margin-bottom:16px"></p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="fermerAlerteDoublons()">Modifier</button>
+      <button class="btn-confirm" onclick="confirmerMalgreDoublons()" style="background:#C0392B;color:#fff">Confirmer quand même</button>
+    </div>
+  </div>
+</div>
+
 <script src="/js/auth.js"></script>
 <script src="/js/drive.js"></script>
+<script src="/js/sheets.js"></script>
 <script>
 const DRIVE_FOLDER_NAME = 'Rapports Journaliers FTS';
 
@@ -621,8 +635,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Personnel
   const pRows = document.getElementById('personnelRows');
+  let personnelHtml = '';
   for (let i = 1; i <= N_PERS; i++) {
-    pRows.innerHTML += `
+    personnelHtml += `
       <div class="personnel-row">
         <input type="text" id="nom_${i}" placeholder="Prénom NOM" style="text-transform:uppercase">
         <input type="number" id="heure_${i}" step="0.5" min="0" max="24" style="text-align:center" placeholder="7.5">
@@ -630,6 +645,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <label class="pers-check"><input type="checkbox" id="fts_p_${i}"><span class="pers-check-box">✓</span></label>
         <label class="pers-check"><input type="checkbox" id="int_${i}"><span class="pers-check-box">✓</span></label>
       </div>`;
+  }
+  pRows.innerHTML = personnelHtml;
+  for (let i = 1; i <= N_PERS; i++) {
     const nomInput = document.getElementById(`nom_${i}`);
     nomInput.addEventListener('input', () => {
       const pos = nomInput.selectionStart;
@@ -792,11 +810,59 @@ function clearSig() {
 // Récupérer le token si on revient d'une auth Google (hash dans l'URL)
 // Restaurer le token au chargement si disponible
 // ─── Validation & génération PDF ──────────────────────────────
-function validerRapport() {
+async function validerRapport() {
   const date    = document.getElementById('date').value;
   const chantier = document.getElementById('chantier').value.trim();
   if (!date)     { showToast('⚠️ Veuillez renseigner la date', 'error'); return; }
   if (!chantier) { showToast('⚠️ Veuillez renseigner le chantier', 'error'); return; }
+
+  // Vérification des numéros de pieu déjà réalisés un autre jour
+  if (window.FTSAuth && FTSAuth.isSignedIn() && window.FTSSheets && chantierActif) {
+    const numerosPieux = [];
+    for (let i = 1; i <= N_PIEUX; i++) {
+      const v = document.getElementById(`pieu_${i}`)?.value?.trim();
+      if (v) numerosPieux.push(v);
+    }
+    if (numerosPieux.length > 0) {
+      try {
+        const chantierRoot = await FTSDrive.findChantierFolder(chantierActif.name);
+        if (chantierRoot) {
+          const conflits = await FTSSheets.verifierPieuxDejaRealises(
+            chantierRoot.id, chantierRoot.name, numerosPieux, formatDate(date)
+          );
+          if (conflits.length > 0) {
+            afficherAlerteDoublonsPieux(conflits);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Vérification des doublons de pieux impossible :', e);
+        // On ne bloque pas l'enregistrement si la vérification échoue elle-même
+      }
+    }
+  }
+
+  afficherModalConfirmation();
+}
+
+function afficherAlerteDoublonsPieux(conflits) {
+  const liste = conflits.map((c) => `Pieu n°${c.numero} — déjà réalisé le ${c.date}`).join('<br>');
+  document.getElementById('doublonPieuxListe').innerHTML = liste;
+  document.getElementById('modalDoublonPieux').classList.add('open');
+}
+
+function fermerAlerteDoublons() {
+  document.getElementById('modalDoublonPieux').classList.remove('open');
+}
+
+function confirmerMalgreDoublons() {
+  fermerAlerteDoublons();
+  afficherModalConfirmation();
+}
+
+function afficherModalConfirmation() {
+  const date    = document.getElementById('date').value;
+  const chantier = document.getElementById('chantier').value.trim();
   const dest = driveToken ? 'Google Drive de l\'entreprise' : 'téléchargement local (Drive non connecté)';
   document.getElementById('modalMsg').textContent = `Le rapport du ${formatDate(date)} – ${chantier} sera enregistré en PDF vers : ${dest}.`;
   document.getElementById('modalOverlay').classList.add('open');
@@ -970,14 +1036,11 @@ async function genererPDF() {
       const mat = document.getElementById(`mat_${i}`)?.value || '';
       if (mat) { doc.setTextColor(...C_TXT); doc.text(mat, colX[6]+2, ry+ROW_H/2+1.5); }
 
-      // Statut (TRAVAIL / PANNE / ARRET / TRANSPORT), en couleur
+      // Statut (TRAVAIL / PANNE / ARRET / TRANSPORT), texte neutre
       const statut = document.getElementById(`statut_${i}`)?.value || '';
       if (statut) {
-        const statutColorsPieu = { TRAVAIL:[39,174,96], PANNE:[192,57,43], ARRET:[136,136,136], TRANSPORT:[58,134,255] };
-        const sc = statutColorsPieu[statut] || C_ANTH;
-        doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...sc);
+        doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(...C_TXT);
         doc.text(statut, colX[7]+cols[7]/2, ry+ROW_H/2+1.5, {align:'center'});
-        doc.setFont('helvetica','normal');
       }
 
       // FTS / LOC
@@ -1272,7 +1335,61 @@ async function uploadToDrive(blob, fileName) {
   );
 
   await FTSDrive.uploadFile(blob, fileName, 'application/pdf', rapportsFolderId);
+
+  // Alimenter le suivi chantier (calendrier matériel + cadence de production),
+  // dans un classeur séparé du dossier du chantier. Une erreur ici n'empêche
+  // pas le rapport d'être considéré comme enregistré (le PDF est prioritaire).
+  try {
+    await enregistrerSuiviChantier();
+  } catch (e) {
+    console.warn('Suivi chantier non mis à jour :', e);
+  }
+
   showToast('✅ Rapport enregistré sur Drive !', 'success');
+}
+
+/**
+ * Alimente le classeur "Suivi {chantier}" : une ligne par machine du jour
+ * (statut + FTS/LOC) et une ligne de production (nb pieux + longueur totale).
+ */
+async function enregistrerSuiviChantier() {
+  if (!window.FTSSheets) return;
+
+  const chantierRoot = await FTSDrive.findChantierFolder(chantierActif.name);
+  if (!chantierRoot) return;
+
+  const dateAffichage = formatDate(document.getElementById('date').value);
+
+  // Machines du jour, depuis le bloc "Suivi matériel du jour"
+  const machines = getSuiviMateriel().map((m) => ({
+    nom: m.nom,
+    statut: m.statut,
+    ftsLoc: m.type,
+  }));
+
+  // Production du jour : pieux ayant une longueur de forage renseignée
+  let nbPieux = 0;
+  let longueurTotale = 0;
+  const numerosPieux = [];
+  for (let i = 1; i <= N_PIEUX; i++) {
+    const lg = parseFloat(document.getElementById(`lg_${i}`)?.value);
+    if (!isNaN(lg) && lg > 0) {
+      nbPieux++;
+      longueurTotale += lg;
+    }
+    const numero = document.getElementById(`pieu_${i}`)?.value?.trim();
+    if (numero) numerosPieux.push(numero);
+  }
+
+  await FTSSheets.enregistrerDonneesRapport({
+    chantierFolderId: chantierRoot.id,
+    chantierName: chantierRoot.name,
+    date: dateAffichage,
+    machines,
+    nbPieux,
+    longueurTotale,
+    numerosPieux,
+  });
 }
 
 function downloadLocal(blob, fileName) {

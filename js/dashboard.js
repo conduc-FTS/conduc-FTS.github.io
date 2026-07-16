@@ -40,6 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (signedIn) {
       chargerChantiers();
       renderChantierBadgeEtActivite();
+      chargerDocumentsChantier();
     }
   }
 
@@ -138,6 +139,7 @@ document.addEventListener("DOMContentLoaded", () => {
       localStorage.removeItem(CHANTIER_ACTIF_KEY);
       chantierActifStatus.textContent = "Aucun chantier actif sélectionné.";
       renderChantierBadgeEtActivite();
+      document.getElementById("panel-documents").hidden = true;
       return;
     }
 
@@ -145,6 +147,7 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.setItem(CHANTIER_ACTIF_KEY, JSON.stringify({ id, name }));
     chantierActifStatus.textContent = `Chantier actif : ${name}`;
     renderChantierBadgeEtActivite();
+    chargerDocumentsChantier();
   });
 
   refreshChantiersBtn.addEventListener("click", chargerChantiers);
@@ -254,6 +257,158 @@ document.addEventListener("DOMContentLoaded", () => {
     date.setUTCDate(date.getUTCDate() + 4 - dayNum);
     const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
     return Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
+  }
+
+  // --- Documents du chantier (visualisation Drive intégrée) ---
+  const ICONES_DOSSIER = {
+    "PLAN": "📐", "NDC": "📄", "SECURITE": "🦺", "RAPPORT JOURNALIER": "📋",
+    "DICT": "📑", "SONDAGE": "🧭", "SECURITE / ACCUEIL SECURITE": "🛡️",
+  };
+
+  async function chargerDocumentsChantier() {
+    const panel = document.getElementById("panel-documents");
+    const foldersEl = document.getElementById("docsFolders");
+    const filesEl = document.getElementById("docsFiles");
+    const breadcrumb = document.getElementById("docsBreadcrumb");
+
+    const actif = getChantierActifSauvegarde();
+    if (!actif || !window.FTSAuth || !FTSAuth.isSignedIn() || !window.FTSDrive) {
+      panel.hidden = true;
+      return;
+    }
+
+    panel.hidden = false;
+    filesEl.innerHTML = "";
+    breadcrumb.innerHTML = "";
+    foldersEl.innerHTML = '<div class="docs-empty">Chargement des dossiers...</div>';
+
+    try {
+      const spaceIdx = actif.name.search(/\s/);
+      const code = spaceIdx > 0 ? actif.name.slice(0, spaceIdx) : actif.name;
+      const { dossiers } = await FTSDrive.getSousDossiersChantier(code);
+      afficherDossiers(dossiers);
+    } catch (err) {
+      console.error("Erreur chargement documents :", err);
+      foldersEl.innerHTML = `<div class="docs-empty">Erreur : ${err.message}</div>`;
+    }
+  }
+
+  function afficherDossiers(dossiers) {
+    const foldersEl = document.getElementById("docsFolders");
+    const filesEl = document.getElementById("docsFiles");
+    const breadcrumb = document.getElementById("docsBreadcrumb");
+
+    filesEl.innerHTML = "";
+    breadcrumb.innerHTML = "";
+    foldersEl.hidden = false;
+
+    if (!dossiers || dossiers.length === 0) {
+      foldersEl.innerHTML = '<div class="docs-empty">Aucun sous-dossier trouvé.</div>';
+      return;
+    }
+
+    foldersEl.innerHTML = dossiers
+      .map(
+        (d) => `
+        <div class="docs-folder-tile" data-id="${d.id}" data-name="${escapeHtml(d.name)}">
+          <span class="icon">${ICONES_DOSSIER[d.name] || "📁"}</span>
+          <span class="name">${escapeHtml(d.name)}</span>
+        </div>`
+      )
+      .join("");
+
+    foldersEl.querySelectorAll(".docs-folder-tile").forEach((tile) => {
+      tile.addEventListener("click", () => {
+        ouvrirDossier(tile.dataset.id, tile.dataset.name, dossiers);
+      });
+    });
+  }
+
+  async function ouvrirDossier(folderId, folderName, dossiersParent) {
+    const foldersEl = document.getElementById("docsFolders");
+    const filesEl = document.getElementById("docsFiles");
+    const breadcrumb = document.getElementById("docsBreadcrumb");
+
+    foldersEl.hidden = true;
+    breadcrumb.innerHTML = `<a id="docsBackLink">← Documents</a> / ${escapeHtml(folderName)}`;
+    document.getElementById("docsBackLink").addEventListener("click", () => afficherDossiers(dossiersParent));
+
+    filesEl.innerHTML = '<div class="docs-empty">Chargement des fichiers...</div>';
+
+    try {
+      const fichiers = await FTSDrive.listFilesInFolder(folderId);
+      if (fichiers.length === 0) {
+        filesEl.innerHTML = '<div class="docs-empty">Ce dossier est vide.</div>';
+        return;
+      }
+      filesEl.innerHTML = fichiers
+        .map(
+          (f) => `
+          <div class="docs-file-row" data-id="${f.id}" data-name="${escapeHtml(f.name)}" data-link="${f.webViewLink || ""}">
+            <span class="icon">${iconePourFichier(f.mimeType)}</span>
+            <div class="info">
+              <div class="filename">${escapeHtml(f.name)}</div>
+              <div class="meta">${formatTailleFichier(f.size)} · ${formatDateCourte(f.modifiedTime)}</div>
+            </div>
+          </div>`
+        )
+        .join("");
+
+      filesEl.querySelectorAll(".docs-file-row").forEach((row) => {
+        row.addEventListener("click", () => {
+          ouvrirApercu(row.dataset.id, row.dataset.name, row.dataset.link);
+        });
+      });
+    } catch (err) {
+      console.error("Erreur listage fichiers :", err);
+      filesEl.innerHTML = `<div class="docs-empty">Erreur : ${err.message}</div>`;
+    }
+  }
+
+  function iconePourFichier(mimeType) {
+    if (!mimeType) return "📄";
+    if (mimeType.includes("pdf")) return "📕";
+    if (mimeType.startsWith("image/")) return "🖼️";
+    if (mimeType.includes("spreadsheet") || mimeType.includes("excel")) return "📊";
+    if (mimeType.includes("document") || mimeType.includes("word")) return "📝";
+    return "📄";
+  }
+
+  function formatTailleFichier(bytes) {
+    if (!bytes) return "—";
+    const ko = Number(bytes) / 1024;
+    if (ko < 1024) return `${Math.round(ko)} Ko`;
+    return `${(ko / 1024).toFixed(1)} Mo`;
+  }
+
+  function formatDateCourte(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return d.toLocaleDateString("fr-FR") + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function ouvrirApercu(fileId, fileName, webViewLink) {
+    const overlay = document.getElementById("docPreviewOverlay");
+    const frame = document.getElementById("docPreviewFrame");
+    const title = document.getElementById("docPreviewTitle");
+    const openLink = document.getElementById("docPreviewOpenLink");
+
+    title.textContent = fileName;
+    openLink.href = webViewLink || `https://drive.google.com/file/d/${fileId}/view`;
+    frame.src = `https://drive.google.com/file/d/${fileId}/preview`;
+    overlay.classList.add("open");
+  }
+
+  document.getElementById("docPreviewClose").addEventListener("click", fermerApercu);
+  document.getElementById("docPreviewOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "docPreviewOverlay") fermerApercu();
+  });
+
+  function fermerApercu() {
+    const overlay = document.getElementById("docPreviewOverlay");
+    const frame = document.getElementById("docPreviewFrame");
+    overlay.classList.remove("open");
+    frame.src = "";
   }
 
 });

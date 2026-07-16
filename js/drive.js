@@ -376,6 +376,57 @@ const FTSDrive = (() => {
     return data.files || [];
   }
 
+  /**
+   * Liste les sous-dossiers d'un chantier (PLAN, NDC, SECURITE, RAPPORT
+   * JOURNALIER, DICT, SONDAGE), plus ACCUEIL SECURITE imbriqué dans
+   * SECURITE, pour affichage dans l'onglet Chantiers du dashboard.
+   *
+   * @param {string} codeChantier
+   * @returns {Promise<Array<{id:string, name:string}>>}
+   */
+  async function getSousDossiersChantier(codeChantier) {
+    const chantier = await findChantierFolder(codeChantier);
+    if (!chantier) {
+      throw new Error(`Aucun dossier chantier trouvé pour le code "${codeChantier}".`);
+    }
+
+    const sousDossiers = await listSubfolders(chantier.id);
+    const resultat = sousDossiers.map((f) => ({ id: f.id, name: f.name }));
+
+    const securite = sousDossiers.find((f) => f.name === "SECURITE");
+    if (securite) {
+      const accueilSecu = await listSubfolders(securite.id);
+      const accueil = accueilSecu.find((f) => f.name === SECURITE_SUBFOLDER);
+      if (accueil) {
+        resultat.push({ id: accueil.id, name: "SECURITE / ACCUEIL SECURITE" });
+      }
+    }
+
+    return { chantierName: chantier.name, dossiers: resultat };
+  }
+
+  /**
+   * Liste les fichiers (pas les dossiers) directement à l'intérieur
+   * d'un dossier donné, triés du plus récent au plus ancien.
+   *
+   * @param {string} folderId
+   * @returns {Promise<Array<{id:string, name:string, modifiedTime:string, size:string, mimeType:string, webViewLink:string}>>}
+   */
+  async function listFilesInFolder(folderId) {
+    const q = encodeURIComponent(
+      `'${folderId}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false`
+    );
+    const res = await fetch(
+      `${API_BASE}/files?q=${q}&fields=files(id,name,modifiedTime,size,mimeType,webViewLink)&orderBy=modifiedTime desc&pageSize=100&spaces=drive`,
+      { headers: authHeader() }
+    );
+    if (!res.ok) {
+      throw new Error(`Erreur listage des fichiers : ${res.status}`);
+    }
+    const data = await res.json();
+    return data.files || [];
+  }
+
   return {
     creerArborescenceChantier,
     findChantierFolder,
@@ -387,6 +438,8 @@ const FTSDrive = (() => {
     uploadFile,
     getFolderCreatedTime,
     getActiviteRecenteChantier,
+    getSousDossiersChantier,
+    listFilesInFolder,
   };
 })();
 

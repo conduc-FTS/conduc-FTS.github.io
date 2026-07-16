@@ -12,7 +12,7 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw_dashboard.js").catch(() => {});
 }
 </script>
-<title>FTS Dashboard</title>
+<title>Tableau de bord</title>
 <link rel="stylesheet" href="css/dashboard.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -26,7 +26,7 @@ if ("serviceWorker" in navigator) {
       <img src="/assets/logo-fts.png" alt="FTS" class="logo-badge-img">
 
       <div class="brand-titles">
-        <h1>FTS Dashboard</h1>
+        <h1>TABLEAU DE BORD</h1>
         <p>Fondations et Travaux Spéciaux</p>
       </div>
     </a>
@@ -112,8 +112,37 @@ if ("serviceWorker" in navigator) {
         </div>
         <p class="form-status" id="chantierActifStatus"></p>
       </div>
+
+      <!-- Documents du chantier -->
+      <div class="panel" id="panel-documents" hidden>
+        <h2 class="panel-title">Documents du chantier</h2>
+        <p class="panel-sub">Consulte les dossiers et fichiers directement ici, sans ouvrir Google Drive.</p>
+
+        <!-- Fil d'ariane -->
+        <div id="docsBreadcrumb" class="docs-breadcrumb"></div>
+
+        <!-- Grille des dossiers -->
+        <div id="docsFolders" class="docs-folders-grid"></div>
+
+        <!-- Liste des fichiers d'un dossier -->
+        <div id="docsFiles" class="docs-files-list"></div>
+      </div>
     </div>
   </main>
+
+  <!-- Aperçu de fichier -->
+  <div class="doc-preview-overlay" id="docPreviewOverlay">
+    <div class="doc-preview-box">
+      <div class="doc-preview-header">
+        <span id="docPreviewTitle">Fichier</span>
+        <div>
+          <a id="docPreviewOpenLink" href="#" target="_blank" class="btn-secondary" style="margin-right:8px">Ouvrir dans Drive ↗</a>
+          <button class="icon-btn-dark" id="docPreviewClose">✕</button>
+        </div>
+      </div>
+      <iframe id="docPreviewFrame" class="doc-preview-frame"></iframe>
+    </div>
+  </div>
 
   <!-- Vue RÉGLAGES -->
   <main class="app-view" id="view-reglages">
@@ -126,7 +155,7 @@ if ("serviceWorker" in navigator) {
       </div>
       <div class="panel">
         <h2 class="panel-title">À propos</h2>
-        <p class="panel-sub">FTS Dashboard — Fondations et Travaux Spéciaux.<br>Une seule appli pour l'ouverture de chantier, les rapports, les accueils et la fiche matériel.</p>
+        <p class="panel-sub">TABLEAU DE BORD — Fondations et Travaux Spéciaux.<br>Une seule appli pour l'ouverture de chantier, les rapports, les accueils et la fiche matériel.</p>
       </div>
     </div>
   </main>

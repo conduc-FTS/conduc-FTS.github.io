@@ -33,10 +33,10 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .vignette-chantier .v-code { font-size: 0.68rem; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.5px; }
 .vignette-chantier .v-nom { font-size: 0.9rem; font-weight: 800; margin-top: 2px; line-height: 1.25; }
 .vignette-chantier .v-stats { display: flex; }
-.vignette-chantier .v-stat { flex: 1; padding: 12px 14px; text-align: center; border-right: 1px solid #F0F0F0; }
+.vignette-chantier .v-stat { flex: 1; padding: 12px 10px; text-align: center; border-right: 1px solid #F0F0F0; }
 .vignette-chantier .v-stat:last-child { border-right: none; }
-.vignette-chantier .v-stat .v-n { font-size: 1.15rem; font-weight: 800; color: var(--anthracite); }
-.vignette-chantier .v-stat .v-l { font-size: 0.62rem; color: var(--text-sub); text-transform: uppercase; margin-top: 2px; }
+.vignette-chantier .v-stat .v-n { font-size: 1.05rem; font-weight: 800; color: var(--anthracite); }
+.vignette-chantier .v-stat .v-l { font-size: 0.6rem; color: var(--text-sub); text-transform: uppercase; margin-top: 2px; }
 .v-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
 .v-dot-travail { background: #27AE60; } .v-dot-panne { background: #C0392B; }
 .v-dot-arret { background: #888; } .v-dot-transport { background: #3A86FF; }
@@ -140,24 +140,6 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
     <p class="panel-sub">Clique sur un chantier pour voir son calendrier matériel et sa cadence de production en détail.</p>
     <div id="vignettesStatus" class="form-status"></div>
     <div id="vignettesGrid" class="vignettes-grid"></div>
-  </section>
-
-  <section class="panel" id="panel-suivi">
-    <h2 class="panel-title">Détail chantier</h2>
-    <p class="panel-sub">Clique sur un chantier ci-dessus pour afficher son calendrier matériel et sa cadence de production.</p>
-
-    <p class="form-status" id="suiviStatus"></p>
-
-    <div id="suiviResultats" hidden>
-      <h3 style="margin:18px 0 8px 0;font-size:0.95rem">Calendrier matériel</h3>
-      <div class="suivi-calendrier-scroll">
-        <table class="suivi-calendrier" id="suiviCalendrierTable"></table>
-      </div>
-
-      <h3 style="margin:22px 0 8px 0;font-size:0.95rem">Cadence de production</h3>
-      <table class="suivi-production" id="suiviProductionTable"></table>
-      <p class="form-status" id="suiviCadenceMoyenne" style="font-weight:700"></p>
-    </div>
   </section>
 
   </div>
@@ -322,8 +304,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // --- Détail chantier (affiché au clic sur une vignette) ---
-  const suiviStatus = document.getElementById("suiviStatus");
+  // --- Chantiers en cours ---
 
 
   if (window.FTSAuth) {
@@ -358,18 +339,19 @@ document.addEventListener("DOMContentLoaded", () => {
       const cartes = await Promise.all(
         chantiers.map(async (c) => {
           try {
-            const [resume, meta] = await Promise.all([
+            const [resume, meta, createdTime] = await Promise.all([
               FTSSheets.resumeChantier(c.id, c.name),
               FTSDrive.getMetadonneesChantier(c.id),
+              FTSDrive.getFolderCreatedTime(c.id),
             ]);
-            return { chantier: c, resume, meta };
+            return { chantier: c, resume, meta, createdTime };
           } catch (e) {
-            return { chantier: c, resume: { derniereMachine: null, totalMicropieux: 0 }, meta: {} };
+            return { chantier: c, resume: { derniereMachine: null, totalMicropieux: 0 }, meta: {}, createdTime: null };
           }
         })
       );
 
-      grid.innerHTML = cartes.map(({ chantier, resume, meta }) => {
+      grid.innerHTML = cartes.map(({ chantier, resume, meta, createdTime }) => {
         const spaceIdx = chantier.name.search(/\s/);
         const code = spaceIdx > 0 ? chantier.name.slice(0, spaceIdx) : chantier.name;
         const nom = spaceIdx > 0 ? chantier.name.slice(spaceIdx + 1) : "";
@@ -387,6 +369,12 @@ document.addEventListener("DOMContentLoaded", () => {
           ? `<div class="v-progress-wrap"><div class="v-progress-bar"><div class="v-progress-fill" style="width:${Math.min(100, (resume.totalMicropieux / prevu) * 100)}%"></div></div></div>`
           : "";
 
+        let joursTxt = "—";
+        if (createdTime) {
+          const jours = Math.floor((Date.now() - new Date(createdTime).getTime()) / 86400000) + 1;
+          joursTxt = jours > 0 ? String(jours) : "1";
+        }
+
         return `
           <div class="vignette-chantier" data-id="${chantier.id}" data-name="${escapeHtmlVignette(chantier.name)}">
             <div class="v-head">
@@ -394,6 +382,7 @@ document.addEventListener("DOMContentLoaded", () => {
               <div class="v-nom">${escapeHtmlVignette(nom || chantier.name)}</div>
             </div>
             <div class="v-stats">
+              <div class="v-stat"><div class="v-n">${joursTxt}</div><div class="v-l">Jour(s)</div></div>
               <div class="v-stat"><div class="v-n">${machineTxt}</div><div class="v-l">${machineSousTxt} (hier)</div></div>
               <div class="v-stat"><div class="v-n">${totalTxt}</div><div class="v-l">Micropieux</div></div>
             </div>
@@ -403,7 +392,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       grid.querySelectorAll(".vignette-chantier").forEach((carte) => {
         carte.addEventListener("click", () => {
-          chargerEtAfficherSuivi(carte.dataset.id, carte.dataset.name);
+          const url = `../detail-chantier/index.html?id=${encodeURIComponent(carte.dataset.id)}&name=${encodeURIComponent(carte.dataset.name)}`;
+          window.location.href = url;
         });
       });
     } catch (err) {
@@ -418,82 +408,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return div.innerHTML;
   }
 
-  async function chargerEtAfficherSuivi(chantierId, chantierName) {
-    if (!window.FTSSheets) { suiviStatus.textContent = "Erreur : module Sheets non chargé."; return; }
-
-    suiviStatus.textContent = "Chargement du suivi...";
-    document.getElementById("suiviResultats").hidden = true;
-
-    try {
-      const { materiel, production } = await FTSSheets.lireSuiviComplet(chantierId, chantierName);
-      afficherCalendrierMateriel(materiel);
-      afficherProduction(production);
-      document.getElementById("suiviResultats").hidden = false;
-      suiviStatus.textContent = materiel.length === 0 && production.length === 0
-        ? "Aucune donnée pour l'instant — elle apparaîtra après le premier rapport journalier enregistré sur ce chantier."
-        : "";
-      document.getElementById("panel-suivi").scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch (err) {
-      console.error("Erreur chargement suivi :", err);
-      suiviStatus.textContent = `Erreur : ${err.message}`;
-    }
-  }
-
-  function afficherCalendrierMateriel(lignes) {
-    const table = document.getElementById("suiviCalendrierTable");
-    if (lignes.length === 0) {
-      table.innerHTML = "<tr><td>Aucune donnée matériel enregistrée.</td></tr>";
-      return;
-    }
-
-    const dates = [...new Set(lignes.map((l) => l.date))];
-    const machines = [...new Set(lignes.map((l) => l.machine))];
-
-    // Dernier statut connu par (machine, date) si plusieurs saisies le même jour
-    const parCase = {};
-    lignes.forEach((l) => { parCase[`${l.machine}||${l.date}`] = l; });
-
-    let html = "<tr><th>Machine</th>" + dates.map((d) => `<th>${d}</th>`).join("") + "</tr>";
-    machines.forEach((m) => {
-      html += `<tr><td>${escapeHtmlSuivi(m)}</td>`;
-      dates.forEach((d) => {
-        const l = parCase[`${m}||${d}`];
-        if (l) {
-          html += `<td><span class="statut-badge statut-${l.statut}">${l.statut}${l.ftsLoc ? " · " + l.ftsLoc : ""}</span></td>`;
-        } else {
-          html += "<td>—</td>";
-        }
-      });
-      html += "</tr>";
-    });
-    table.innerHTML = html;
-  }
-
-  function afficherProduction(lignes) {
-    const table = document.getElementById("suiviProductionTable");
-    const moyenneEl = document.getElementById("suiviCadenceMoyenne");
-
-    if (lignes.length === 0) {
-      table.innerHTML = "<tr><td>Aucune donnée de production enregistrée.</td></tr>";
-      moyenneEl.textContent = "";
-      return;
-    }
-
-    let html = "<tr><th>Date</th><th>Nb pieux</th><th>Longueur totale (m)</th><th>Longueur moyenne/pieu (m)</th></tr>";
-    lignes.forEach((l) => {
-      html += `<tr><td>${l.date}</td><td>${l.nbPieux}</td><td>${l.longueurTotale.toFixed(2)}</td><td>${l.longueurMoyenne.toFixed(2)}</td></tr>`;
-    });
-    table.innerHTML = html;
-
-    const cadenceMoyenne = lignes.reduce((sum, l) => sum + l.longueurTotale, 0) / lignes.length;
-    moyenneEl.textContent = `Cadence moyenne : ${cadenceMoyenne.toFixed(1)} ml/jour sur ${lignes.length} jour${lignes.length > 1 ? "s" : ""} de rapport enregistrés.`;
-  }
-
-  function escapeHtmlSuivi(str) {
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-  }
 
   // --- Onglets ---
   document.querySelectorAll(".nc-tab").forEach((tab) => {

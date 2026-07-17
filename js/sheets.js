@@ -293,9 +293,21 @@ const FTSSheets = (() => {
       ? `${String(derniereDate.getDate()).padStart(2, "0")}/${String(derniereDate.getMonth() + 1).padStart(2, "0")}/${derniereDate.getFullYear()}`
       : null;
 
-    const premiereLigne = derniereDateStr
-      ? materiel.find((r) => r[0] === derniereDateStr)
-      : null;
+    const lignesDuJour = derniereDateStr
+      ? materiel.filter((r) => r[0] === derniereDateStr)
+      : [];
+
+    // Les foreuses sont les seules machines qui comptent vraiment pour
+    // la vignette (le statut d'une pelle ou d'un groupe électrogène est
+    // moins parlant). On reconnaît les modèles courants par mots-clés ;
+    // si aucun ne correspond, on retombe sur la première ligne du jour.
+    const MOTS_CLES_FOREUSE = ["FUTURO", "MA12", "MA 12", "COMACCHIO", "BERETTA", "PH15", "PH 15", "CASAGRANDE", "SOILMEC", "IMT"];
+    const estForeuse = (nomMachine) => {
+      const n = (nomMachine || "").toUpperCase();
+      return MOTS_CLES_FOREUSE.some((mot) => n.includes(mot));
+    };
+    const ligneForeuse = lignesDuJour.find((r) => estForeuse(r[1]));
+    const premiereLigne = ligneForeuse || lignesDuJour[0] || null;
 
     const totalMicropieux = production.reduce((sum, r) => sum + (Number(r[1]) || 0), 0);
 

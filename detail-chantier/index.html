@@ -74,7 +74,9 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   <section class="panel">
     <h2 class="panel-title">Cadence de production</h2>
     <div id="productionResultats" hidden>
-      <table class="suivi-production" id="suiviProductionTable"></table>
+      <div class="suivi-calendrier-scroll">
+        <table class="suivi-production" id="suiviProductionTable"></table>
+      </div>
       <p class="form-status" id="suiviCadenceMoyenne" style="font-weight:700"></p>
     </div>
   </section>

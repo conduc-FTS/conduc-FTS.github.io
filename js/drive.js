@@ -252,13 +252,14 @@ const FTSDrive = (() => {
     // Métadonnées du chantier (adresse, GPS, nombre de micropieux prévus)
     // stockées sur le dossier lui-même, en JSON dans son champ description —
     // réutilisées plus tard pour le plan d'accès et les carrés récapitulatifs.
-    if (chantier.adresse || chantier.gps || chantier.micropieuxPrevus) {
+    if (chantier.adresse || chantier.gps || chantier.micropieuxPrevus || chantier.dureeChantier) {
       const metaExistante = await getMetadonneesChantier(chantierId);
       const metaMisAJour = {
         ...metaExistante,
         ...(chantier.adresse ? { adresse: chantier.adresse } : {}),
         ...(chantier.gps ? { gps: chantier.gps } : {}),
         ...(chantier.micropieuxPrevus ? { micropieuxPrevus: Number(chantier.micropieuxPrevus) } : {}),
+        ...(chantier.dureeChantier ? { dureeChantier: Number(chantier.dureeChantier) } : {}),
       };
       await setMetadonneesChantier(chantierId, metaMisAJour);
     }

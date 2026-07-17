@@ -97,15 +97,27 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <main class="dashboard">
 
   <div class="nc-tabs">
-    <button type="button" class="nc-tab active" data-view="nc-view-chantiers">Chantiers</button>
+    <button type="button" class="nc-tab active" data-view="nc-view-chantiers">Chantiers en cours</button>
+    <button type="button" class="nc-tab" data-view="nc-view-creer-chantier">Créer un chantier</button>
     <button type="button" class="nc-tab" data-view="nc-view-pointage-materiel">Pointage Matériel</button>
     <button type="button" class="nc-tab" data-view="nc-view-pointage-personnel">Pointage Personnel</button>
   </div>
 
   <div class="nc-view active" id="nc-view-chantiers">
 
+  <section class="panel" id="panel-vignettes">
+    <h2 class="panel-title">Chantiers en cours</h2>
+    <p class="panel-sub">Clique sur un chantier pour voir son calendrier matériel et sa cadence de production en détail.</p>
+    <div id="vignettesStatus" class="form-status"></div>
+    <div id="vignettesGrid" class="vignettes-grid"></div>
+  </section>
+
+  </div>
+
+  <div class="nc-view" id="nc-view-creer-chantier">
+
   <section class="panel" id="panel-ouverture">
-    <h2 class="panel-title">Ouverture de chantier</h2>
+    <h2 class="panel-title">Créer un chantier</h2>
     <p class="panel-sub">Crée l'arborescence Drive du chantier avant de le partager avec le chef de chantier. Réservé aux conducteurs de travaux — cette page n'apparaît pas dans l'appli tablette du chef.</p>
 
     <form class="chantier-form" id="chantierForm">
@@ -129,17 +141,14 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <label for="nbMicropieuxPrevus">Nombre de micropieux prévus (optionnel)</label>
         <input type="number" id="nbMicropieuxPrevus" placeholder="ex : 25" min="0">
       </div>
+      <div class="field">
+        <label for="dureeChantier">Durée de chantier (jours, optionnel)</label>
+        <input type="number" id="dureeChantier" placeholder="ex : 15" min="0">
+      </div>
       <button type="submit" class="btn-primary">Créer le chantier</button>
     </form>
 
     <p class="form-status" id="chantierStatus"></p>
-  </section>
-
-  <section class="panel" id="panel-vignettes">
-    <h2 class="panel-title">Chantiers en cours</h2>
-    <p class="panel-sub">Clique sur un chantier pour voir son calendrier matériel et sa cadence de production en détail.</p>
-    <div id="vignettesStatus" class="form-status"></div>
-    <div id="vignettesGrid" class="vignettes-grid"></div>
   </section>
 
   </div>
@@ -274,6 +283,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const adresseChantier = document.getElementById("adresseChantier").value.trim();
     const gpsChantier = document.getElementById("gpsChantier").value.trim();
     const nbMicropieuxPrevus = document.getElementById("nbMicropieuxPrevus").value.trim();
+    const dureeChantier = document.getElementById("dureeChantier").value.trim();
     const submitBtn = chantierForm.querySelector(".btn-primary");
 
     if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
@@ -289,7 +299,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chantierStatus.textContent = "Création de l'arborescence Drive en cours...";
 
     try {
-      const result = await FTSDrive.creerArborescenceChantier({ numAffaire, nom: nomChantier, adresse: adresseChantier, gps: gpsChantier, micropieuxPrevus: nbMicropieuxPrevus });
+      const result = await FTSDrive.creerArborescenceChantier({ numAffaire, nom: nomChantier, adresse: adresseChantier, gps: gpsChantier, micropieuxPrevus: nbMicropieuxPrevus, dureeChantier });
       const subfolderNames = Object.keys(result.subfolders).filter((k) => !k.includes("/"));
       const statusPrefix = result.reused
         ? `Dossier chantier "${result.chantierName}" déjà existant, sous-dossiers vérifiés`
@@ -365,15 +375,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const prevu = meta.micropieuxPrevus;
         const totalTxt = prevu ? `${resume.totalMicropieux} / ${prevu}` : `${resume.totalMicropieux}`;
-        const progressHtml = prevu
+        const progressMicropieuxHtml = prevu
           ? `<div class="v-progress-wrap"><div class="v-progress-bar"><div class="v-progress-fill" style="width:${Math.min(100, (resume.totalMicropieux / prevu) * 100)}%"></div></div></div>`
           : "";
 
         let joursTxt = "—";
+        let jours = null;
         if (createdTime) {
-          const jours = Math.floor((Date.now() - new Date(createdTime).getTime()) / 86400000) + 1;
+          jours = Math.floor((Date.now() - new Date(createdTime).getTime()) / 86400000) + 1;
           joursTxt = jours > 0 ? String(jours) : "1";
         }
+
+        const dureeChantier = meta.dureeChantier;
+        const progressJoursHtml = (dureeChantier && jours !== null)
+          ? `<div class="v-progress-wrap"><div class="v-progress-bar"><div class="v-progress-fill" style="width:${Math.min(100, (jours / dureeChantier) * 100)}%"></div></div></div>`
+          : "";
 
         return `
           <div class="vignette-chantier" data-id="${chantier.id}" data-name="${escapeHtmlVignette(chantier.name)}">
@@ -382,11 +398,12 @@ document.addEventListener("DOMContentLoaded", () => {
               <div class="v-nom">${escapeHtmlVignette(nom || chantier.name)}</div>
             </div>
             <div class="v-stats">
-              <div class="v-stat"><div class="v-n">${joursTxt}</div><div class="v-l">Jour(s)</div></div>
+              <div class="v-stat"><div class="v-n">${joursTxt}${dureeChantier ? ` / ${dureeChantier}` : ""}</div><div class="v-l">Jour(s)</div></div>
               <div class="v-stat"><div class="v-n">${machineTxt}</div><div class="v-l">${machineSousTxt} (hier)</div></div>
               <div class="v-stat"><div class="v-n">${totalTxt}</div><div class="v-l">Micropieux</div></div>
             </div>
-            ${progressHtml}
+            ${progressJoursHtml}
+            ${progressMicropieuxHtml}
           </div>`;
       }).join("");
 

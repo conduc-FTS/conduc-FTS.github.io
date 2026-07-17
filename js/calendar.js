@@ -37,7 +37,12 @@ const FTSCalendar = (() => {
    * agendas du compte connecté.
    */
   async function getOuCreerAgenda(nom) {
-    const resListe = await fetch(`${API_BASE}/users/me/calendarList?minAccessRole=owner`, {
+    // Important : PAS de filtre minAccessRole=owner ici. Si un autre
+    // compte (ex: le chef de chantier) a déjà créé cet agenda et l'a
+    // partagé avec le compte courant, il doit être retrouvé tel quel —
+    // sinon on créerait un second agenda vide sous ce compte-ci, et les
+    // pointages du chef resteraient invisibles ici.
+    const resListe = await fetch(`${API_BASE}/users/me/calendarList`, {
       headers: authHeader(),
     });
     if (!resListe.ok) throw new Error(`Erreur listage des agendas : ${resListe.status}`);

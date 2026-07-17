@@ -97,6 +97,48 @@ const FTSSheets = (() => {
     return res.json();
   }
 
+  async function getSheetId(spreadsheetId, onglet) {
+    const res = await fetch(`${API_BASE}/${spreadsheetId}?fields=sheets.properties`, {
+      headers: authHeader(),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const sheet = (data.sheets || []).find((s) => s.properties.title === onglet);
+    return sheet ? sheet.properties.sheetId : null;
+  }
+
+  /**
+   * Supprime toutes les lignes d'un onglet dont la colonne Date (A)
+   * correspond exactement à la date donnée. Utilisé pour qu'un rapport
+   * refait le même jour (après correction d'une erreur) REMPLACE les
+   * données déjà enregistrées plutôt que de s'y ajouter en double.
+   */
+  async function supprimerLignesDate(spreadsheetId, onglet, date) {
+    const sheetId = await getSheetId(spreadsheetId, onglet);
+    if (sheetId == null) return;
+
+    const lignes = await lireOnglet(spreadsheetId, onglet);
+    const indices = [];
+    lignes.forEach((l, idx) => {
+      if (l[0] === date) indices.push(idx + 1); // +1 : la lecture démarre à la ligne 2 (index de grille 1)
+    });
+    if (indices.length === 0) return;
+
+    // Suppression de bas en haut pour ne pas décaler les index restants
+    indices.sort((a, b) => b - a);
+    const requests = indices.map((rowIndex) => ({
+      deleteDimension: {
+        range: { sheetId, dimension: "ROWS", startIndex: rowIndex, endIndex: rowIndex + 1 },
+      },
+    }));
+
+    await fetch(`${API_BASE}/${spreadsheetId}:batchUpdate`, {
+      method: "POST",
+      headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({ requests }),
+    });
+  }
+
   async function ajouterLignes(spreadsheetId, onglet, values) {
     const res = await fetch(
       `${API_BASE}/${spreadsheetId}/values/${encodeURIComponent(onglet)}!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
@@ -128,6 +170,15 @@ const FTSSheets = (() => {
   async function enregistrerDonneesRapport({ chantierFolderId, chantierName, date, machines, nbPieux, longueurTotale, numerosPieux }) {
     const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
 
+    // Un rapport refait le même jour (après correction d'une erreur) doit
+    // REMPLACER les données déjà enregistrées pour cette date, pas s'y
+    // ajouter en double.
+    await Promise.all([
+      supprimerLignesDate(spreadsheetId, ONGLET_MATERIEL, date),
+      supprimerLignesDate(spreadsheetId, ONGLET_PRODUCTION, date),
+      supprimerLignesDate(spreadsheetId, ONGLET_PIEUX, date),
+    ]);
+
     if (machines && machines.length > 0) {
       const lignesMateriel = machines
         .filter((m) => m.nom)
@@ -137,12 +188,13 @@ const FTSSheets = (() => {
       }
     }
 
-    if (nbPieux > 0) {
-      const moyenne = longueurTotale / nbPieux;
-      await ajouterLignes(spreadsheetId, ONGLET_PRODUCTION, [
-        [date, nbPieux, longueurTotale.toFixed(2), moyenne.toFixed(2)],
-      ]);
-    }
+    // Toujours une ligne de production, même à 0 pieu réalisé ce jour-là :
+    // nécessaire pour un suivi journalier continu et une cadence moyenne
+    // qui reflète aussi les jours sans production.
+    const moyenne = nbPieux > 0 ? longueurTotale / nbPieux : 0;
+    await ajouterLignes(spreadsheetId, ONGLET_PRODUCTION, [
+      [date, nbPieux, longueurTotale.toFixed(2), moyenne.toFixed(2)],
+    ]);
 
     if (numerosPieux && numerosPieux.length > 0) {
       await ajouterLignes(spreadsheetId, ONGLET_PIEUX, numerosPieux.map((n) => [date, n]));

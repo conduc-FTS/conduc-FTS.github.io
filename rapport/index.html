@@ -236,18 +236,18 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   .personnel-header .ph-nom { text-align: left; }
   .pers-check {
     display: flex; align-items: center; justify-content: center;
-    height: 40px;
+    height: 32px;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
   }
   .pers-check input[type="checkbox"] { display: none; }
   .pers-check-box {
-    width: 32px; height: 32px;
+    width: 24px; height: 24px;
     border: 2px solid var(--bordure);
     border-radius: 4px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 20px;
+    font-size: 15px;
     color: transparent;
     background: var(--blanc);
     transition: all 0.15s;
@@ -457,16 +457,17 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
     <table id="tablePieux">
       <thead>
         <tr>
-          <th rowspan="2" style="min-width:50px">N° PIEU</th>
+          <th rowspan="2" style="min-width:50px">N° Mpx</th>
           <th colspan="2" class="jaune">FORAGE</th>
-          <th colspan="2">TUBE</th>
-          <th rowspan="2" style="min-width:52px">BARRE</th>
+          <th colspan="3">TUBE</th>
+          <th rowspan="2" style="min-width:90px">BARRE</th>
           <th colspan="3" class="jaune">MATÉRIEL</th>
         </tr>
         <tr>
-          <th>Longueur</th>
-          <th>Ø forage</th>
+          <th>Longueur (m)</th>
+          <th>Ø forage (mm)</th>
           <th>Ø tube principale</th>
+          <th>Ø tube secondaire</th>
           <th>GAINAGE</th>
           <th style="min-width:180px">Désignation</th>
           <th style="min-width:100px">Statut</th>
@@ -542,6 +543,18 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   </div>
 </div>
 
+<!-- ALERTE RAPPORT DÉJÀ EXISTANT -->
+<div class="modal-overlay" id="modalRapportExistant">
+  <div class="modal" style="border-top:5px solid #C0392B;max-width:400px">
+    <h3>⚠️ Un rapport existe déjà</h3>
+    <p style="margin-bottom:16px">Un rapport journalier a déjà été enregistré pour ce chantier à cette date. Si tu continues, il sera remplacé par celui-ci.</p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="fermerAlerteRapportExistant()">Modifier</button>
+      <button class="btn-confirm" onclick="confirmerRemplacementRapport()" style="background:#C0392B;color:#fff">Oui, remplacer</button>
+    </div>
+  </div>
+</div>
+
 <!-- ALERTE PIEUX DÉJÀ RÉALISÉS -->
 <div class="modal-overlay" id="modalDoublonPieux">
   <div class="modal" style="border-top:5px solid #C0392B;max-width:400px">
@@ -563,14 +576,15 @@ const DRIVE_FOLDER_NAME = 'Rapports Journaliers FTS';
 
 // ─── Données métier ────────────────────────────────────────────
 const DROPDOWN = {
-  1: ['FUTURO n°1','FUTURO n°2','FUTURO ELEC','T41 n°1','T41 n°2','T46','MC6','MC8','MC15','DCH','EGT','MACHINE LOC'],
-  2: ['MIXO n°1','MIXO n°2','MA12','TCHNIWELL','AUTONOME'],
-  3: ['GROUPE 40KVA','GROUPE 60KVA','GROUPE 80KVA','GROUPE 100 KVA'],
-  4: ['PH15'],
-  5: ['COMPRESSEUR 7000l','COMPRESSEUR 10000l','COMPRESSEUR 15000l','COMPRESSEUR 20000l','COMPRESSEUR 25000l'],
-  6: ['BUGGY','TELSCO 6m','TELESCO 7m','TELESCO 9m','TELESCO 10m','TELESCO 12m','TELESCO 17m','TELSCO 21m','GYROSCOPIQUE 17m','GYROSCOPIQUE 21m','PELLE 20t Volet Variable'],
-  7: ['PELLE 2.7t','PELLE 3.5t','PELLE 5t','PELLE 8t','PELLE 14t'],
-  8: ["MFT 4\"","MFT 5\"","MFT 6\"","MFT 8\"","MFT 12\"",'TARRIERE'],
+  1: ['GEO 205','FUTURO 1','FUTURO 2','FUTURO ELECTRIQUE','BERETTA T41 (1)','BERETTA T41 (2)','BERETTA T46','COMACCHIO MC6','COMACCHIO MC8','COMACCHIO MC15','DCH 100','EGT 1500','MACHINE LOCATION'],
+  2: ['MIXO MI 100 N°1','MIXO MI 100 N°2','MA 12','TMD + PATOUILLEUR','CENTRALE TECNIWELL','CENTRALE AUTONOME'],
+  3: ['PH15','Autre (à définir)'],
+  4: ['GROUPE 40KVA','GROUPE 60KVA','GROUPE 80KVA','GROUPE 100KVA'],
+  5: ['PAJOT 600kg','PAJOT 1400kg N°1','PAJOT 1400kg N°2','LOCATION'],
+  6: ['BUGGYSCOPIC','Télésco 6M','Télésco 7M','Télésco 9M','Télésco 10M','Télésco 12M','Télésco 17M','Télésco 21M','GYROSCOPIQUE21M+TREUIL5T','GYROSCOPIQUE25M+TREUIL5T','PELLE volet variable'],
+  7: ['Compresseur 7 000L','Compresseur 10 000L','Compresseur 15 000L','Compresseur 20 000L','Compresseur 25 000L','Autre (à définir)'],
+  8: ["MFT 4\"","MFT 5\"","MFT 6\"","MFT 8\"","MFT 12\"",'TRICONE','FISHTAIL','TRILAME 73','TRILAME 88,9','TRILAME 114','TRILAME 127','TRILAME 139,7','TRILAME 177,8','TARIERE'],
+  9: ['MiniPelle 2,7 T','MiniPelle 3,5 T','MiniPelle 5 T','MiniPelle 8 T','MiniPelle 14 T'],
 };
 const N_PIEUX = 26;
 const N_MATERIEL = 16;
@@ -602,6 +616,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Tableau pieux
   const tbody = document.getElementById('tbodyPieux');
+  const TUBE_OPTIONS = ['50/60','73','88,9','114','127','139.7','152,4','177,8'];
+  const BARRE_OPTIONS = ['Gewi 16','Gewi 20','Gewi 25','Gewi 28','Gewi 32','Gewi 40','Gewi 50','Gewi 60','Dywidag 28.5','Dywidag 32','Dywidag 36','Dywidag 40','Dywidag 47.5','Dywidag 65','Dywidag 75'];
+  const tubeOptionsHtml = (id) => `<select id="${id}"><option value=""></option>${TUBE_OPTIONS.map(v=>`<option value="${v}">${v}</option>`).join('')}</select>`;
   for (let i = 1; i <= N_PIEUX; i++) {
     const dropHtml = DROPDOWN[i]
       ? `<select id="mat_${i}"><option value=""></option>${DROPDOWN[i].map(v=>`<option value="${v}">${v}</option>`).join('')}</select>`
@@ -611,9 +628,15 @@ document.addEventListener('DOMContentLoaded', () => {
         <td><input type="text" id="pieu_${i}" style="text-align:center"></td>
         <td><input type="number" id="lg_${i}" step="0.01" style="text-align:center"></td>
         <td><input type="number" id="df_${i}" step="0.01" style="text-align:center"></td>
-        <td><input type="number" id="tp_${i}" step="0.01" style="text-align:center"></td>
+        <td>${tubeOptionsHtml('tp_' + i)}</td>
+        <td>${tubeOptionsHtml('ts_' + i)}</td>
         <td><input type="number" id="gn_${i}" step="0.01" style="text-align:center"></td>
-        <td class="td-check"><label class="check-cell"><input type="checkbox" id="barre_${i}"><span class="check-icon">✓</span></label></td>
+        <td>
+          <select id="barre_${i}" style="font-size:11px;font-weight:700;border:1.5px solid #DDD;border-radius:4px;padding:4px 2px;width:100%;background:#fff;">
+            <option value="">Vide</option>
+            ${BARRE_OPTIONS.map(v=>`<option value="${v}">${v}</option>`).join('')}
+          </select>
+        </td>
         <td>${dropHtml}</td>
         <td>
           <select id="statut_${i}" style="font-size:11px;font-weight:700;border:1.5px solid #DDD;border-radius:4px;padding:4px 2px;width:100%;background:#fff;">
@@ -843,6 +866,40 @@ async function validerRapport() {
     }
   }
 
+  // Vérification qu'un rapport n'existe pas déjà pour cette date
+  if (window.FTSAuth && FTSAuth.isSignedIn() && window.FTSDrive && chantierActif) {
+    try {
+      const { id: rapportsFolderId } = await FTSDrive.getDossierModuleChantier(
+        chantierActif.name,
+        'RAPPORT JOURNALIER'
+      );
+      const dossierVal = document.getElementById('dossier').value.trim().toUpperCase();
+      const fileNameAttendu = `${date}_Rapport journalier_${dossierVal}.pdf`;
+      const fichiers = await FTSDrive.listFilesInFolder(rapportsFolderId);
+      const existeDeja = fichiers.some((f) => f.name === fileNameAttendu);
+      if (existeDeja) {
+        afficherAlerteRapportExistant();
+        return;
+      }
+    } catch (e) {
+      console.warn('Vérification de rapport existant impossible :', e);
+      // On ne bloque pas l'enregistrement si la vérification échoue elle-même
+    }
+  }
+
+  afficherModalConfirmation();
+}
+
+function afficherAlerteRapportExistant() {
+  document.getElementById('modalRapportExistant').classList.add('open');
+}
+
+function fermerAlerteRapportExistant() {
+  document.getElementById('modalRapportExistant').classList.remove('open');
+}
+
+function confirmerRemplacementRapport() {
+  fermerAlerteRapportExistant();
   afficherModalConfirmation();
 }
 
@@ -957,10 +1014,10 @@ async function genererPDF() {
   y += HDR_H + 1;
 
   // Colonnes tableau — total = W - 2*M = 285mm
-  // Moitié gauche (142.5mm) : N°pieu | Longueur | Øforage | Øtube | Gainage | Barre
+  // Moitié gauche (142.5mm) : N°Mpx | Longueur | Øforage | Øtube princ. | Øtube sec. | Gainage | Barre
   // Moitié droite (142.5mm) : Désignation | Statut | FTS/LOC
-  const cols = [14, 24, 26, 28, 24, 26.5, 38, 56, 48.5];
-  // vérification : 14+24+26+28+24+26.5 = 142.5 (gauche) / 38+56+48.5 = 142.5 (droite)
+  const cols = [12, 20, 20, 18, 18, 16, 38.5, 38, 56, 48.5];
+  // vérification : 12+20+20+18+18+16+38.5 = 142.5 (gauche) / 38+56+48.5 = 142.5 (droite)
   const colX = [M];
   cols.forEach(w => colX.push(colX[colX.length-1] + w));
   const totalW = cols.reduce((a,b)=>a+b,0);
@@ -972,15 +1029,15 @@ async function genererPDF() {
   doc.setFillColor(...C_ANTH);
   doc.rect(colX[0], y, totalW, HDR2 / 2, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_WHITE);
-  [[0,1,'N° PIEU'],[1,3,'FORAGE'],[3,5,'TUBE'],[5,6,'BARRE'],[6,9,'MATÉRIEL']].forEach(([a,b,lbl]) => {
+  [[0,1,'N° MPX'],[1,3,'FORAGE'],[3,6,'TUBE'],[6,7,'BARRE'],[7,10,'MATÉRIEL']].forEach(([a,b,lbl]) => {
     doc.text(lbl, (colX[a]+colX[b])/2, y + HDR2/4 + 1.2, {align:'center'});
   });
 
   // Ligne 2 : fond gris uniforme pour FORAGE/TUBE, jaune pour MATÉRIEL
-  const subs = ['','Longueur (m)','Ø forage','Ø tube princ.','GAINAGE','','Désignation','Statut','FTS/LOC'];
-  const jauneCols = new Set([6,7,8]); // MATÉRIEL uniquement (Longueur/Ø forage passent en gris comme Ø tube/gainage)
+  const subs = ['','Longueur (m)','Ø forage','Ø tube princ.','Ø tube sec.','GAINAGE','','Désignation','Statut','FTS/LOC'];
+  const jauneCols = new Set([7,8,9]); // MATÉRIEL uniquement
   subs.forEach((s, i) => {
-    if (i === 0 || i === 5) return;
+    if (i === 0 || i === 6) return;
     doc.setFillColor(...(jauneCols.has(i) ? C_JAUNE : C_GRIS));
     doc.setDrawColor(...C_BORD);
     doc.rect(colX[i], y + HDR2/2, cols[i], HDR2/2, 'FD');
@@ -989,22 +1046,22 @@ async function genererPDF() {
     doc.text(s, colX[i] + cols[i]/2, y + HDR2 - 1.5, {align:'center'});
   });
 
-  // Cellules fusionnées N° PIEU et BARRE (pleine hauteur, fond anthracite)
+  // Cellules fusionnées N° MPX et BARRE (pleine hauteur, fond anthracite)
   doc.setFillColor(...C_ANTH);
   doc.setDrawColor(...C_BORD);
   doc.rect(colX[0], y, cols[0], HDR2, 'FD');
-  doc.rect(colX[5], y, cols[5], HDR2, 'FD');
+  doc.rect(colX[6], y, cols[6], HDR2, 'FD');
   doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_WHITE);
-  doc.text('N° PIEU', colX[0]+cols[0]/2, y+HDR2/2+1.5, {align:'center'});
-  doc.text('BARRE',   colX[5]+cols[5]/2, y+HDR2/2+1.5, {align:'center'});
+  doc.text('N° MPX', colX[0]+cols[0]/2, y+HDR2/2+1.5, {align:'center'});
+  doc.text('BARRE',  colX[6]+cols[6]/2, y+HDR2/2+1.5, {align:'center'});
 
   // Séparateurs verticaux dans la ligne 1
   doc.setDrawColor(...C_BORD);
   doc.line(colX[1], y, colX[1], y+HDR2/2);
   doc.line(colX[3], y, colX[3], y+HDR2/2);
-  doc.line(colX[5], y, colX[5], y+HDR2/2);
   doc.line(colX[6], y, colX[6], y+HDR2/2);
-  doc.line(colX[9], y, colX[9], y+HDR2/2);
+  doc.line(colX[7], y, colX[7], y+HDR2/2);
+  doc.line(colX[10], y, colX[10], y+HDR2/2);
   y += HDR2;
 
   // ── Lignes pieux ───────────────────────────────────────────────
@@ -1015,7 +1072,7 @@ async function genererPDF() {
     // alternance gris très clair / blanc
     if (i % 2 === 0) { doc.setFillColor(...C_GRIS2); doc.rect(colX[0], ry, totalW, ROW_H, 'F'); }
     doc.setDrawColor(...C_BORD);
-    doc.line(colX[0], ry+ROW_H, colX[9], ry+ROW_H);
+    doc.line(colX[0], ry+ROW_H, colX[10], ry+ROW_H);
     colX.forEach(x => doc.line(x, ry, x, ry+ROW_H));
 
     const vals = [
@@ -1023,33 +1080,36 @@ async function genererPDF() {
       document.getElementById(`lg_${i}`)?.value   || '',
       document.getElementById(`df_${i}`)?.value   || '',
       document.getElementById(`tp_${i}`)?.value   || '',
+      document.getElementById(`ts_${i}`)?.value   || '',
       document.getElementById(`gn_${i}`)?.value   || '',
     ];
     vals.forEach((v,ci) => {
       if (v) { doc.setTextColor(...C_TXT); doc.text(v, colX[ci]+cols[ci]/2, ry+ROW_H/2+1.5, {align:'center'}); }
     });
 
-    // Barre ✓ vectoriel
-    if (document.getElementById(`barre_${i}`)?.checked) {
-      drawCoche(doc, colX[5], ry, cols[5], ROW_H, C_ANTH);
+    // Barre : texte du type de barre choisi (vide si "Vide")
+    const barre = document.getElementById(`barre_${i}`)?.value || '';
+    if (barre) {
+      doc.setFont('helvetica','normal'); doc.setFontSize(6.2); doc.setTextColor(...C_TXT);
+      doc.text(barre, colX[6]+cols[6]/2, ry+ROW_H/2+1.5, {align:'center'});
     }
 
     if (i <= N_MATERIEL) {
       const mat = document.getElementById(`mat_${i}`)?.value || '';
-      if (mat) { doc.setTextColor(...C_TXT); doc.text(mat, colX[6]+2, ry+ROW_H/2+1.5); }
+      if (mat) { doc.setTextColor(...C_TXT); doc.text(mat, colX[7]+2, ry+ROW_H/2+1.5); }
 
       // Statut (TRAVAIL / PANNE / ARRET / TRANSPORT), texte neutre
       const statut = document.getElementById(`statut_${i}`)?.value || '';
       if (statut) {
         doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(...C_TXT);
-        doc.text(statut, colX[7]+cols[7]/2, ry+ROW_H/2+1.5, {align:'center'});
+        doc.text(statut, colX[8]+cols[8]/2, ry+ROW_H/2+1.5, {align:'center'});
       }
 
       // FTS / LOC
       const ftsLoc = document.getElementById(`fts_loc_${i}`)?.value || '';
       if (ftsLoc) {
         doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_ANTH);
-        doc.text(ftsLoc, colX[8]+cols[8]/2, ry+ROW_H/2+1.5, {align:'center'});
+        doc.text(ftsLoc, colX[9]+cols[9]/2, ry+ROW_H/2+1.5, {align:'center'});
         doc.setFont('helvetica','normal');
       }
     }
@@ -1058,18 +1118,18 @@ async function genererPDF() {
 
   // ── PERSONNEL ──────────────────────────────────────────────────
   const P_START = y + 16 * ROW_H;
-  const PW = colX[9] - colX[6];
+  const PW = colX[10] - colX[7];
   // sous-colonnes : NOM large, HEURES, GD, FTS, Intérim — toutes proportionnelles à PW
   const narrowW2 = 18; // fixe (même largeur que FTS/LOC matériel)
   const hrW = 18;
   const nomW2 = PW - hrW - 3 * narrowW2;
   const pcols = [
-    colX[6],
-    colX[6] + nomW2,
-    colX[6] + nomW2 + hrW,
-    colX[6] + nomW2 + hrW + narrowW2,
-    colX[6] + nomW2 + hrW + 2 * narrowW2,
-    colX[9]
+    colX[7],
+    colX[7] + nomW2,
+    colX[7] + nomW2 + hrW,
+    colX[7] + nomW2 + hrW + narrowW2,
+    colX[7] + nomW2 + hrW + 2 * narrowW2,
+    colX[10]
   ];
 
   doc.setFillColor(...C_ANTH);
@@ -1116,7 +1176,7 @@ async function genererPDF() {
   const BOTTOM_H = H - M - y;
   // left = 4 premières colonnes, right = colonnes 4 à 9
   const LEFT_W  = colX[4] - colX[0];   // ~74mm
-  const RIGHT_W = colX[9] - colX[4] - 0.5; // ~211mm
+  const RIGHT_W = colX[10] - colX[4] - 0.5; // ~211mm
   const obsX    = colX[4] + 0.5;
   const LABEL_H = 5.5;
   const NOM_H   = 8;
@@ -1340,7 +1400,7 @@ async function uploadToDrive(blob, fileName) {
     'RAPPORT JOURNALIER'
   );
 
-  await FTSDrive.uploadFile(blob, fileName, 'application/pdf', rapportsFolderId);
+  await FTSDrive.uploadFile(blob, fileName, 'application/pdf', rapportsFolderId, { remplacerSiExiste: true });
 
   // Archivage en double dans le suivi administratif personnel du chef
   // (ADMINISTRATIF / {chef} / RAPPORT JOURNALIER / RJ {année}). Une erreur
@@ -1353,7 +1413,7 @@ async function uploadToDrive(blob, fileName) {
         ? document.getElementById('date').value.split('-')[0]
         : new Date().getFullYear();
       const dossierChefId = await FTSDrive.getDossierRapportChef(nomChef, annee);
-      await FTSDrive.uploadFile(blob, fileName, 'application/pdf', dossierChefId);
+      await FTSDrive.uploadFile(blob, fileName, 'application/pdf', dossierChefId, { remplacerSiExiste: true });
     }
   } catch (e) {
     console.warn('Archivage administratif (dossier du chef) non effectué :', e);

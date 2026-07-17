@@ -308,7 +308,49 @@ const FTSDrive = (() => {
    * @param {string} mimeType  ex: "application/pdf"
    * @param {string} folderId
    */
-  async function uploadFile(blob, fileName, mimeType, folderId) {
+  /**
+   * Cherche des fichiers (pas des dossiers) portant EXACTEMENT ce nom
+   * dans un dossier donné.
+   */
+  async function findFilesExact(name, parentId) {
+    const q = encodeURIComponent(
+      `name = '${escapeForQuery(name)}' and '${parentId}' in parents and trashed = false`
+    );
+    const res = await fetch(`${API_BASE}/files?q=${q}&fields=files(id,name)&spaces=drive`, {
+      headers: authHeader(),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.files || [];
+  }
+
+  async function deleteFile(fileId) {
+    await fetch(`${API_BASE}/files/${fileId}`, { method: "DELETE", headers: authHeader() });
+  }
+
+  /**
+   * Envoie un fichier (Blob) dans un dossier Drive donné.
+   * Utilisée par tous les modules (rapport, accueils, fiche matériel)
+   * pour déposer leur PDF au bon endroit.
+   *
+   * @param {Blob} blob
+   * @param {string} fileName
+   * @param {string} mimeType  ex: "application/pdf"
+   * @param {string} folderId
+   * @param {Object} [options]
+   * @param {boolean} [options.remplacerSiExiste]  si true, supprime tout
+   *   fichier existant portant le même nom dans ce dossier avant l'envoi
+   *   (évite les doublons si un rapport du même jour est refait après
+   *   correction d'une erreur).
+   */
+  async function uploadFile(blob, fileName, mimeType, folderId, options) {
+    if (options && options.remplacerSiExiste) {
+      const existants = await findFilesExact(fileName, folderId);
+      for (const f of existants) {
+        await deleteFile(f.id);
+      }
+    }
+
     const metadata = { name: fileName, parents: [folderId] };
     const form = new FormData();
     form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));

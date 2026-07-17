@@ -295,7 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
     table.innerHTML = html;
 
     const cadenceMoyenne = lignes.reduce((sum, l) => sum + l.longueurTotale, 0) / lignes.length;
-    moyenneEl.textContent = `Cadence moyenne : ${cadenceMoyenne.toFixed(1)} ml/jour sur ${lignes.length} jour${lignes.length > 1 ? "s" : ""} de production enregistrés.`;
+    moyenneEl.textContent = `Cadence moyenne : ${cadenceMoyenne.toFixed(1)} ml/jour sur ${lignes.length} jour${lignes.length > 1 ? "s" : ""} de rapport enregistrés.`;
   }
 
   function escapeHtmlSuivi(str) {

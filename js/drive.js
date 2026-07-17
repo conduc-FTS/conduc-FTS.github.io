@@ -427,6 +427,44 @@ const FTSDrive = (() => {
     return data.files || [];
   }
 
+  /**
+   * Trouve (ou crée) l'arborescence d'archivage personnel d'un chef de
+   * chantier pour les rapports journaliers :
+   *   ADMINISTRATIF / {NOM DU CHEF} / RAPPORT JOURNALIER / RJ {année}
+   *
+   * La recherche du dossier du chef est tolérante à l'ordre des mots
+   * (ex: "HUGO LAJUS" retrouve aussi bien "LAJUS HUGO" si c'est déjà
+   * organisé ainsi sur le Drive), pour éviter de créer un doublon si
+   * le nom a été saisi dans un ordre différent d'une fois sur l'autre.
+   *
+   * @param {string} nomChef  ex: "HUGO LAJUS"
+   * @param {string|number} annee  ex: 2026
+   * @returns {Promise<string>} id du dossier "RJ {année}"
+   */
+  async function getDossierRapportChef(nomChef, annee) {
+    if (!nomChef || !nomChef.trim()) {
+      throw new Error("Nom du chef de chantier requis pour l'archivage administratif.");
+    }
+
+    const administratifId = await getRootFolder(ROOT_ADMINISTRATIF);
+    const dossiersChef = await listSubfolders(administratifId);
+
+    // Comparaison tolérante à l'ordre des mots (espaces normalisés, mots triés)
+    const motsCibles = nomChef.trim().toUpperCase().split(/\s+/).sort().join(" ");
+    const existant = dossiersChef.find(
+      (f) => f.name.trim().toUpperCase().split(/\s+/).sort().join(" ") === motsCibles
+    );
+
+    const chefId = existant
+      ? existant.id
+      : await createFolder(nomChef.trim().toUpperCase(), administratifId);
+
+    const rapportJournalierId = await findOrCreateFolder("RAPPORT JOURNALIER", chefId);
+    const anneeId = await findOrCreateFolder(`RJ ${annee}`, rapportJournalierId);
+
+    return anneeId;
+  }
+
   return {
     creerArborescenceChantier,
     findChantierFolder,
@@ -440,6 +478,7 @@ const FTSDrive = (() => {
     getActiviteRecenteChantier,
     getSousDossiersChantier,
     listFilesInFolder,
+    getDossierRapportChef,
   };
 })();
 

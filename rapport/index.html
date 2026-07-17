@@ -1357,6 +1357,8 @@ async function uploadToDrive(blob, fileName) {
     }
   } catch (e) {
     console.warn('Archivage administratif (dossier du chef) non effectué :', e);
+    showToast('⚠️ Rapport enregistré, mais archivage ADMINISTRATIF échoué : ' + e.message, 'error');
+    await new Promise((r) => setTimeout(r, 3500)); // laisser le temps de lire avant le toast suivant
   }
 
   // Alimenter le suivi chantier (calendrier matériel + cadence de production),

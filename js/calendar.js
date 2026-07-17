@@ -144,10 +144,72 @@ const FTSCalendar = (() => {
     }
   }
 
+  /**
+   * Liste les événements d'un agenda de pointage sur une période donnée,
+   * triés par date. Utilisé par les onglets "Pointage Matériel" /
+   * "Pointage Personnel" pour affichage et modification.
+   *
+   * @param {"machine"|"personnel"} type
+   * @param {string} dateDebutISO  format AAAA-MM-JJ
+   * @param {string} dateFinISO    format AAAA-MM-JJ
+   */
+  async function listerPointage(type, dateDebutISO, dateFinISO) {
+    const nom = type === "machine" ? NOM_CAL_MACHINE : NOM_CAL_PERSONNEL;
+    const calendarId = await getOuCreerAgenda(nom);
+    const timeMin = `${dateDebutISO}T00:00:00Z`;
+    const timeMax = `${dateFinISO}T23:59:59Z`;
+    const res = await fetch(
+      `${API_BASE}/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${timeMin}&timeMax=${timeMax}&maxResults=250&singleEvents=true&orderBy=startTime`,
+      { headers: authHeader() }
+    );
+    if (!res.ok) throw new Error(`Erreur listage pointage : ${res.status}`);
+    const data = await res.json();
+    return (data.items || []).map((e) => ({
+      id: e.id,
+      date: e.start?.date || (e.start?.dateTime || "").slice(0, 10),
+      titre: e.summary || "",
+    }));
+  }
+
+  /**
+   * Modifie le titre d'un événement de pointage existant (correction
+   * d'une erreur de saisie : nom, statut, etc.).
+   */
+  async function modifierPointage(type, eventId, nouveauTitre) {
+    const nom = type === "machine" ? NOM_CAL_MACHINE : NOM_CAL_PERSONNEL;
+    const calendarId = await getOuCreerAgenda(nom);
+    const res = await fetch(`${API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`, {
+      method: "PATCH",
+      headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({ summary: nouveauTitre }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`Erreur modification : ${err.error?.message || res.status}`);
+    }
+    return res.json();
+  }
+
+  /**
+   * Supprime un événement de pointage (ligne saisie par erreur).
+   */
+  async function supprimerPointage(type, eventId) {
+    const nom = type === "machine" ? NOM_CAL_MACHINE : NOM_CAL_PERSONNEL;
+    const calendarId = await getOuCreerAgenda(nom);
+    const res = await fetch(`${API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`, {
+      method: "DELETE",
+      headers: authHeader(),
+    });
+    if (!res.ok && res.status !== 410) throw new Error(`Erreur suppression : ${res.status}`);
+  }
+
   return {
     getOuCreerAgenda,
     enregistrerPointageMachine,
     enregistrerPointagePersonnel,
+    listerPointage,
+    modifierPointage,
+    supprimerPointage,
   };
 })();
 

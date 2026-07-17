@@ -22,6 +22,7 @@ const ASSETS = [
   "/js/auth.js",
   "/js/drive.js",
   "/js/notifications.js",
+  "/js/calendar.js",
   "/js/dashboard.js",
   "/manifest_dashboard.json",
   "/icon-dashboard-192.png",

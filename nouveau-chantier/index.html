@@ -56,6 +56,24 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .statut-PANNE { background: #C0392B; }
 .statut-ARRET { background: #888888; }
 .statut-TRANSPORT { background: #3A86FF; }
+
+.nc-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.nc-tab {
+  padding: 10px 18px; border-radius: 20px; border: 1px solid var(--border);
+  background: white; cursor: pointer; font-weight: 700; font-size: 0.85rem;
+  color: var(--text-sub);
+}
+.nc-tab.active { background: var(--anthracite); color: white; border-color: var(--anthracite); }
+.nc-view { display: none; }
+.nc-view.active { display: block; }
+
+.pointage-periode-row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+.pointage-table-scroll { overflow-x: auto; margin-top: 16px; }
+.pointage-table { border-collapse: collapse; width: 100%; min-width: 480px; font-size: 0.85rem; }
+.pointage-table th, .pointage-table td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }
+.pointage-table th { background: var(--anthracite); color: white; font-size: 0.72rem; text-transform: uppercase; }
+.pointage-table td:first-child { white-space: nowrap; font-weight: 700; }
+.pointage-input { width: 100%; min-width: 220px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; }
 </style>
 </head>
 <body>
@@ -77,6 +95,14 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 </header>
 
 <main class="dashboard">
+
+  <div class="nc-tabs">
+    <button type="button" class="nc-tab active" data-view="nc-view-chantiers">Chantiers</button>
+    <button type="button" class="nc-tab" data-view="nc-view-pointage-materiel">Pointage Matériel</button>
+    <button type="button" class="nc-tab" data-view="nc-view-pointage-personnel">Pointage Personnel</button>
+  </div>
+
+  <div class="nc-view active" id="nc-view-chantiers">
 
   <section class="panel" id="panel-ouverture">
     <h2 class="panel-title">Ouverture de chantier</h2>
@@ -117,15 +143,9 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   </section>
 
   <section class="panel" id="panel-suivi">
-    <h2 class="panel-title">Suivi chantier</h2>
-    <p class="panel-sub">Calendrier matériel et cadence de production, à partir des rapports journaliers enregistrés.</p>
+    <h2 class="panel-title">Détail chantier</h2>
+    <p class="panel-sub">Clique sur un chantier ci-dessus pour afficher son calendrier matériel et sa cadence de production.</p>
 
-    <div class="chantier-actif-row">
-      <select id="suiviChantierSelect" class="chantier-select">
-        <option value="">— Choisir un chantier —</option>
-      </select>
-      <button type="button" class="btn-secondary" id="chargerSuiviBtn">Charger le suivi</button>
-    </div>
     <p class="form-status" id="suiviStatus"></p>
 
     <div id="suiviResultats" hidden>
@@ -139,6 +159,62 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
       <p class="form-status" id="suiviCadenceMoyenne" style="font-weight:700"></p>
     </div>
   </section>
+
+  </div>
+
+  <div class="nc-view" id="nc-view-pointage-materiel">
+    <section class="panel">
+      <h2 class="panel-title">Pointage Matériel</h2>
+      <p class="panel-sub">Événements de l'agenda "FTS - Pointage Machine" sur la période choisie. Modifie ou supprime une ligne saisie par erreur.</p>
+
+      <div class="pointage-periode-row">
+        <div class="field">
+          <label for="pointageMaterielDateDebut">Du</label>
+          <input type="date" id="pointageMaterielDateDebut">
+        </div>
+        <div class="field">
+          <label for="pointageMaterielDateFin">Au</label>
+          <input type="date" id="pointageMaterielDateFin">
+        </div>
+        <button type="button" class="btn-secondary" id="pointageMaterielChargerBtn">Charger</button>
+      </div>
+      <p class="form-status" id="pointageMaterielStatus"></p>
+
+      <div class="pointage-table-scroll">
+      <table class="pointage-table">
+        <thead><tr><th>Date</th><th>Titre</th><th>Actions</th></tr></thead>
+        <tbody id="pointageMaterielTableBody"></tbody>
+      </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="nc-view" id="nc-view-pointage-personnel">
+    <section class="panel">
+      <h2 class="panel-title">Pointage Personnel</h2>
+      <p class="panel-sub">Événements de l'agenda "FTS - Pointage Personnel" sur la période choisie. Modifie ou supprime une ligne saisie par erreur.</p>
+
+      <div class="pointage-periode-row">
+        <div class="field">
+          <label for="pointagePersonnelDateDebut">Du</label>
+          <input type="date" id="pointagePersonnelDateDebut">
+        </div>
+        <div class="field">
+          <label for="pointagePersonnelDateFin">Au</label>
+          <input type="date" id="pointagePersonnelDateFin">
+        </div>
+        <button type="button" class="btn-secondary" id="pointagePersonnelChargerBtn">Charger</button>
+      </div>
+      <p class="form-status" id="pointagePersonnelStatus"></p>
+
+      <div class="pointage-table-scroll">
+      <table class="pointage-table">
+        <thead><tr><th>Date</th><th>Titre</th><th>Actions</th></tr></thead>
+        <tbody id="pointagePersonnelTableBody"></tbody>
+      </table>
+      </div>
+    </section>
+  </div>
 
   <section class="panel">
     <h2 class="panel-title">Compte Google</h2>
@@ -156,6 +232,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <script src="../js/auth.js"></script>
 <script src="../js/drive.js"></script>
 <script src="../js/sheets.js"></script>
+<script src="../js/calendar.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -245,32 +322,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // --- Suivi chantier ---
-  const suiviChantierSelect = document.getElementById("suiviChantierSelect");
-  const chargerSuiviBtn = document.getElementById("chargerSuiviBtn");
+  // --- Détail chantier (affiché au clic sur une vignette) ---
   const suiviStatus = document.getElementById("suiviStatus");
 
-  async function peuplerSuiviChantierSelect() {
-    if (!window.FTSAuth || !FTSAuth.isSignedIn() || !window.FTSDrive) return;
-    try {
-      const chantiers = await FTSDrive.listChantiers();
-      suiviChantierSelect.innerHTML = '<option value="">— Choisir un chantier —</option>';
-      chantiers.forEach((c) => {
-        const opt = document.createElement("option");
-        opt.value = c.id;
-        opt.textContent = c.name;
-        opt.dataset.name = c.name;
-        suiviChantierSelect.appendChild(opt);
-      });
-    } catch (err) {
-      console.error("Erreur chargement liste chantiers (suivi) :", err);
-    }
-  }
 
   if (window.FTSAuth) {
     FTSAuth.onAuthChange((signedIn) => {
       if (signedIn) {
-        peuplerSuiviChantierSelect();
         chargerVignettesChantiers();
       }
     });
@@ -345,7 +403,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       grid.querySelectorAll(".vignette-chantier").forEach((carte) => {
         carte.addEventListener("click", () => {
-          suiviChantierSelect.value = carte.dataset.id;
           chargerEtAfficherSuivi(carte.dataset.id, carte.dataset.name);
         });
       });
@@ -360,13 +417,6 @@ document.addEventListener("DOMContentLoaded", () => {
     div.textContent = str || "";
     return div.innerHTML;
   }
-
-  chargerSuiviBtn.addEventListener("click", async () => {
-    const option = suiviChantierSelect.selectedOptions[0];
-    const chantierId = suiviChantierSelect.value;
-    if (!chantierId) { suiviStatus.textContent = "Choisis un chantier d'abord."; return; }
-    await chargerEtAfficherSuivi(chantierId, option.dataset.name);
-  });
 
   async function chargerEtAfficherSuivi(chantierId, chantierName) {
     if (!window.FTSSheets) { suiviStatus.textContent = "Erreur : module Sheets non chargé."; return; }
@@ -444,6 +494,107 @@ document.addEventListener("DOMContentLoaded", () => {
     div.textContent = str;
     return div.innerHTML;
   }
+
+  // --- Onglets ---
+  document.querySelectorAll(".nc-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".nc-tab").forEach((t) => t.classList.remove("active"));
+      document.querySelectorAll(".nc-view").forEach((v) => v.classList.remove("active"));
+      tab.classList.add("active");
+      document.getElementById(tab.dataset.view).classList.add("active");
+    });
+  });
+
+  // --- Pointage Matériel / Pointage Personnel (lecture + modification) ---
+  function escapeHtmlPointage(str) {
+    const div = document.createElement("div");
+    div.textContent = str || "";
+    return div.innerHTML;
+  }
+
+  function initPointageOnglet(prefix, type) {
+    const dateDebutInput = document.getElementById(`${prefix}DateDebut`);
+    const dateFinInput = document.getElementById(`${prefix}DateFin`);
+    const chargerBtn = document.getElementById(`${prefix}ChargerBtn`);
+    const status = document.getElementById(`${prefix}Status`);
+    const tbody = document.getElementById(`${prefix}TableBody`);
+
+    const aujourdhui = new Date();
+    const ilYA6Jours = new Date(aujourdhui);
+    ilYA6Jours.setDate(ilYA6Jours.getDate() - 6);
+    dateDebutInput.value = ilYA6Jours.toISOString().slice(0, 10);
+    dateFinInput.value = aujourdhui.toISOString().slice(0, 10);
+
+    async function charger() {
+      if (!window.FTSAuth || !FTSAuth.isSignedIn()) { status.textContent = "Connecte-toi d'abord."; return; }
+      if (!window.FTSCalendar) { status.textContent = "Erreur : module Agenda non chargé."; return; }
+      if (!dateDebutInput.value || !dateFinInput.value) { status.textContent = "Choisis une période."; return; }
+
+      status.textContent = "Chargement...";
+      tbody.innerHTML = "";
+
+      try {
+        const evenements = await FTSCalendar.listerPointage(type, dateDebutInput.value, dateFinInput.value);
+        if (evenements.length === 0) {
+          status.textContent = "Aucun pointage sur cette période.";
+          return;
+        }
+        status.textContent = "";
+
+        tbody.innerHTML = evenements.map((e) => `
+          <tr data-id="${e.id}">
+            <td>${e.date}</td>
+            <td><input type="text" class="pointage-input" value="${escapeHtmlPointage(e.titre)}"></td>
+            <td style="white-space:nowrap">
+              <button type="button" class="btn-secondary pointage-save">Enregistrer</button>
+              <button type="button" class="btn-secondary pointage-delete">Supprimer</button>
+            </td>
+          </tr>
+        `).join("");
+
+        tbody.querySelectorAll(".pointage-save").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const tr = btn.closest("tr");
+            const input = tr.querySelector(".pointage-input");
+            btn.disabled = true;
+            try {
+              await FTSCalendar.modifierPointage(type, tr.dataset.id, input.value.trim());
+              status.textContent = "Modification enregistrée.";
+            } catch (err) {
+              console.error(err);
+              status.textContent = `Erreur : ${err.message}`;
+            } finally {
+              btn.disabled = false;
+            }
+          });
+        });
+
+        tbody.querySelectorAll(".pointage-delete").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const tr = btn.closest("tr");
+            if (!confirm("Supprimer ce pointage ?")) return;
+            btn.disabled = true;
+            try {
+              await FTSCalendar.supprimerPointage(type, tr.dataset.id);
+              tr.remove();
+            } catch (err) {
+              console.error(err);
+              status.textContent = `Erreur : ${err.message}`;
+              btn.disabled = false;
+            }
+          });
+        });
+      } catch (err) {
+        console.error(err);
+        status.textContent = `Erreur : ${err.message}`;
+      }
+    }
+
+    chargerBtn.addEventListener("click", charger);
+  }
+
+  initPointageOnglet("pointageMateriel", "machine");
+  initPointageOnglet("pointagePersonnel", "personnel");
 });
 </script>
 </body>

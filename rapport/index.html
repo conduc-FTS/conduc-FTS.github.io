@@ -508,7 +508,18 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
       </div>
       <div class="chef-row" style="padding:6px 0 0 0">
         <div class="field-label">Nom du chef de chantier</div>
-        <input type="text" id="nomChef" placeholder="Prénom NOM">
+        <input type="text" id="nomChef" list="listeChefs" placeholder="Prénom NOM" autocomplete="off">
+        <datalist id="listeChefs">
+          <option value="Hamid ABBOUCHE">
+          <option value="Cédric BERGADIEU">
+          <option value="Frédéric BOURBON">
+          <option value="Jeff CORBELLA">
+          <option value="David DIAS">
+          <option value="Bruno LABARTHE">
+          <option value="Hugo LAJUS">
+          <option value="Roger RAIDI">
+          <option value="Romain SEREMPIOUQUE">
+        </datalist>
       </div>
     </div>
   </div>
@@ -578,17 +589,17 @@ const DRIVE_FOLDER_NAME = 'Rapports Journaliers FTS';
 const DROPDOWN = {
   1: ['GEO 205','FUTURO 1','FUTURO 2','FUTURO ELECTRIQUE','BERETTA T41 (1)','BERETTA T41 (2)','BERETTA T46','COMACCHIO MC6','COMACCHIO MC8','COMACCHIO MC15','DCH 100','EGT 1500','MACHINE LOCATION'],
   2: ['MIXO MI 100 N°1','MIXO MI 100 N°2','MA 12','TMD + PATOUILLEUR','CENTRALE TECNIWELL','CENTRALE AUTONOME'],
-  3: ['PH15','Autre (à définir)'],
+  3: ['PH15'],
   4: ['GROUPE 40KVA','GROUPE 60KVA','GROUPE 80KVA','GROUPE 100KVA'],
   5: ['PAJOT 600kg','PAJOT 1400kg N°1','PAJOT 1400kg N°2','LOCATION'],
   6: ['BUGGYSCOPIC','Télésco 6M','Télésco 7M','Télésco 9M','Télésco 10M','Télésco 12M','Télésco 17M','Télésco 21M','GYROSCOPIQUE21M+TREUIL5T','GYROSCOPIQUE25M+TREUIL5T','PELLE volet variable'],
-  7: ['Compresseur 7 000L','Compresseur 10 000L','Compresseur 15 000L','Compresseur 20 000L','Compresseur 25 000L','Autre (à définir)'],
+  7: ['Compresseur 7 000L','Compresseur 10 000L','Compresseur 15 000L','Compresseur 20 000L','Compresseur 25 000L'],
   8: ["MFT 4\"","MFT 5\"","MFT 6\"","MFT 8\"","MFT 12\"",'TRICONE','FISHTAIL','TRILAME 73','TRILAME 88,9','TRILAME 114','TRILAME 127','TRILAME 139,7','TRILAME 177,8','TARIERE'],
   9: ['MiniPelle 2,7 T','MiniPelle 3,5 T','MiniPelle 5 T','MiniPelle 8 T','MiniPelle 14 T'],
 };
 const N_PIEUX = 26;
-const N_MATERIEL = 16;
-const N_PERS  = 4;
+const N_MATERIEL = 12;
+const N_PERS  = 6;
 
 // driveToken n'est plus une variable locale : elle est dérivée de l'auth partagée FTSAuth
 function driveTokenGetter() { return window.FTSAuth ? FTSAuth.getToken() : null; }
@@ -621,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const tubeOptionsHtml = (id) => `<select id="${id}"><option value=""></option>${TUBE_OPTIONS.map(v=>`<option value="${v}">${v}</option>`).join('')}</select>`;
   for (let i = 1; i <= N_PIEUX; i++) {
     const dropHtml = DROPDOWN[i]
-      ? `<select id="mat_${i}"><option value=""></option>${DROPDOWN[i].map(v=>`<option value="${v}">${v}</option>`).join('')}</select>`
+      ? `<input type="text" id="mat_${i}" list="dl_mat_${i}" autocomplete="off"><datalist id="dl_mat_${i}">${DROPDOWN[i].map(v=>`<option value="${v}">`).join('')}</datalist>`
       : `<input type="text" id="mat_${i}">`;
     tbody.innerHTML += `
       <tr>
@@ -633,7 +644,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td><input type="number" id="gn_${i}" step="0.01" style="text-align:center"></td>
         <td>
           <select id="barre_${i}" style="font-size:11px;font-weight:700;border:1.5px solid #DDD;border-radius:4px;padding:4px 2px;width:100%;background:#fff;">
-            <option value="">Vide</option>
+            <option value=""></option>
             ${BARRE_OPTIONS.map(v=>`<option value="${v}">${v}</option>`).join('')}
           </select>
         </td>
@@ -1066,7 +1077,7 @@ async function genererPDF() {
 
   // ── Lignes pieux ───────────────────────────────────────────────
   doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
-  const N_MATERIEL = 16;
+  // N_MATERIEL est déclaré globalement en haut du fichier (partagé avec le suivi chantier)
   for (let i = 1; i <= N_PIEUX; i++) {
     const ry = y + (i-1)*ROW_H;
     // alternance gris très clair / blanc
@@ -1117,7 +1128,7 @@ async function genererPDF() {
   }
 
   // ── PERSONNEL ──────────────────────────────────────────────────
-  const P_START = y + 16 * ROW_H;
+  const P_START = y + N_MATERIEL * ROW_H;
   const PW = colX[10] - colX[7];
   // sous-colonnes : NOM large, HEURES, GD, FTS, Intérim — toutes proportionnelles à PW
   const narrowW2 = 18; // fixe (même largeur que FTS/LOC matériel)

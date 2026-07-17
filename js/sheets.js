@@ -265,10 +265,51 @@ const FTSSheets = (() => {
     };
   }
 
+  /**
+   * Résumé condensé d'un chantier pour affichage sur une vignette :
+   * la première machine du rapport le plus récent (avec son statut),
+   * et le total de micropieux réalisés depuis le début du chantier.
+   * Beaucoup plus léger que lireSuiviComplet pour un simple aperçu.
+   */
+  async function resumeChantier(chantierFolderId, chantierName) {
+    const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
+    const [materiel, production] = await Promise.all([
+      lireOnglet(spreadsheetId, ONGLET_MATERIEL),
+      lireOnglet(spreadsheetId, ONGLET_PRODUCTION),
+    ]);
+
+    // Date la plus récente présente dans l'onglet Matériel (les dates
+    // sont au format JJ/MM/AAAA, donc on convertit pour bien comparer)
+    const versDate = (s) => {
+      const [j, m, a] = (s || "").split("/");
+      return j && m && a ? new Date(`${a}-${m}-${j}`) : null;
+    };
+    let derniereDate = null;
+    materiel.forEach((r) => {
+      const d = versDate(r[0]);
+      if (d && (!derniereDate || d > derniereDate)) derniereDate = d;
+    });
+    const derniereDateStr = derniereDate
+      ? `${String(derniereDate.getDate()).padStart(2, "0")}/${String(derniereDate.getMonth() + 1).padStart(2, "0")}/${derniereDate.getFullYear()}`
+      : null;
+
+    const premiereLigne = derniereDateStr
+      ? materiel.find((r) => r[0] === derniereDateStr)
+      : null;
+
+    const totalMicropieux = production.reduce((sum, r) => sum + (Number(r[1]) || 0), 0);
+
+    return {
+      derniereMachine: premiereLigne ? { nom: premiereLigne[1], statut: premiereLigne[2], date: premiereLigne[0] } : null,
+      totalMicropieux,
+    };
+  }
+
   return {
     getOuCreerClasseurSuivi,
     enregistrerDonneesRapport,
     lireSuiviComplet,
+    resumeChantier,
     verifierPieuxDejaRealises,
   };
 })();

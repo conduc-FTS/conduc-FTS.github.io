@@ -581,6 +581,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <script src="/js/auth.js"></script>
 <script src="/js/drive.js"></script>
 <script src="/js/sheets.js"></script>
+<script src="/js/calendar.js"></script>
 <script>
 const DRIVE_FOLDER_NAME = 'Rapports Journaliers FTS';
 
@@ -1500,6 +1501,41 @@ async function enregistrerSuiviChantier() {
     longueurTotale,
     numerosPieux,
   });
+
+  // Pointage machine et personnel via Google Agenda (agendas partagés,
+  // séparés du suivi interne). Une erreur ici n'empêche pas le reste
+  // d'avoir déjà réussi (PDF, Sheet).
+  if (window.FTSCalendar) {
+    const dateISO = document.getElementById('date').value; // format AAAA-MM-JJ attendu par l'API Agenda
+
+    try {
+      await FTSCalendar.enregistrerPointageMachine(
+        chantierRoot.name,
+        dateISO,
+        machines.map((m) => ({ nom: m.nom, statut: m.statut }))
+      );
+    } catch (e) {
+      console.warn('Pointage machine (Agenda) non effectué :', e);
+    }
+
+    try {
+      const personnel = [];
+      for (let k = 1; k <= N_PERS; k++) {
+        const nom = document.getElementById(`nom_${k}`)?.value?.trim();
+        if (!nom) continue;
+        personnel.push({
+          nom,
+          type: document.getElementById(`int_${k}`)?.checked ? 'Intérim' : 'FTS',
+          gd: !!document.getElementById(`gd_${k}`)?.checked,
+        });
+      }
+      if (personnel.length > 0) {
+        await FTSCalendar.enregistrerPointagePersonnel(chantierRoot.name, dateISO, personnel);
+      }
+    } catch (e) {
+      console.warn('Pointage personnel (Agenda) non effectué :', e);
+    }
+  }
 }
 
 function downloadLocal(blob, fileName) {

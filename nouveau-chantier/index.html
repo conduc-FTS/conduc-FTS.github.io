@@ -13,6 +13,36 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <link rel="stylesheet" href="../css/dashboard.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
+.vignettes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 10px;
+}
+.vignette-chantier {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.vignette-chantier:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.12); }
+.vignette-chantier .v-head { background: var(--anthracite); color: white; padding: 12px 16px; }
+.vignette-chantier .v-code { font-size: 0.68rem; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.5px; }
+.vignette-chantier .v-nom { font-size: 0.9rem; font-weight: 800; margin-top: 2px; line-height: 1.25; }
+.vignette-chantier .v-stats { display: flex; }
+.vignette-chantier .v-stat { flex: 1; padding: 12px 14px; text-align: center; border-right: 1px solid #F0F0F0; }
+.vignette-chantier .v-stat:last-child { border-right: none; }
+.vignette-chantier .v-stat .v-n { font-size: 1.15rem; font-weight: 800; color: var(--anthracite); }
+.vignette-chantier .v-stat .v-l { font-size: 0.62rem; color: var(--text-sub); text-transform: uppercase; margin-top: 2px; }
+.v-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+.v-dot-travail { background: #27AE60; } .v-dot-panne { background: #C0392B; }
+.v-dot-arret { background: #888; } .v-dot-transport { background: #3A86FF; }
+.v-progress-wrap { padding: 0 14px 12px 14px; }
+.v-progress-bar { height: 5px; background: #EEE; border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.v-progress-fill { height: 100%; background: var(--fts-yellow); }
 .suivi-calendrier-scroll { overflow-x: auto; margin-top: 8px; }
 .suivi-calendrier, .suivi-production { border-collapse: collapse; width: 100%; font-size: 0.8rem; }
 .suivi-calendrier th, .suivi-calendrier td,
@@ -65,10 +95,25 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <label for="adresseChantier">Adresse / commune (optionnel)</label>
         <input type="text" id="adresseChantier" placeholder="ex : Talence / Bordeaux">
       </div>
+      <div class="field">
+        <label for="gpsChantier">Coordonnées GPS (optionnel, si pas d'adresse précise)</label>
+        <input type="text" id="gpsChantier" placeholder="ex : 44.833328, -0.577580">
+      </div>
+      <div class="field">
+        <label for="nbMicropieuxPrevus">Nombre de micropieux prévus (optionnel)</label>
+        <input type="number" id="nbMicropieuxPrevus" placeholder="ex : 25" min="0">
+      </div>
       <button type="submit" class="btn-primary">Créer le chantier</button>
     </form>
 
     <p class="form-status" id="chantierStatus"></p>
+  </section>
+
+  <section class="panel" id="panel-vignettes">
+    <h2 class="panel-title">Chantiers en cours</h2>
+    <p class="panel-sub">Clique sur un chantier pour voir son calendrier matériel et sa cadence de production en détail.</p>
+    <div id="vignettesStatus" class="form-status"></div>
+    <div id="vignettesGrid" class="vignettes-grid"></div>
   </section>
 
   <section class="panel" id="panel-suivi">
@@ -168,6 +213,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const numAffaire = document.getElementById("numAffaire").value.trim();
     const nomChantier = document.getElementById("nomChantier").value.trim();
     const adresseChantier = document.getElementById("adresseChantier").value.trim();
+    const gpsChantier = document.getElementById("gpsChantier").value.trim();
+    const nbMicropieuxPrevus = document.getElementById("nbMicropieuxPrevus").value.trim();
     const submitBtn = chantierForm.querySelector(".btn-primary");
 
     if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
@@ -183,7 +230,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chantierStatus.textContent = "Création de l'arborescence Drive en cours...";
 
     try {
-      const result = await FTSDrive.creerArborescenceChantier({ numAffaire, nom: nomChantier, adresse: adresseChantier });
+      const result = await FTSDrive.creerArborescenceChantier({ numAffaire, nom: nomChantier, adresse: adresseChantier, gps: gpsChantier, micropieuxPrevus: nbMicropieuxPrevus });
       const subfolderNames = Object.keys(result.subfolders).filter((k) => !k.includes("/"));
       const statusPrefix = result.reused
         ? `Dossier chantier "${result.chantierName}" déjà existant, sous-dossiers vérifiés`
@@ -221,32 +268,126 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (window.FTSAuth) {
-    FTSAuth.onAuthChange((signedIn) => { if (signedIn) peuplerSuiviChantierSelect(); });
-    if (FTSAuth.isSignedIn()) peuplerSuiviChantierSelect();
+    FTSAuth.onAuthChange((signedIn) => {
+      if (signedIn) {
+        peuplerSuiviChantierSelect();
+        chargerVignettesChantiers();
+      }
+    });
+    if (FTSAuth.isSignedIn()) {
+      chargerVignettesChantiers();
+    }
+  }
+
+  const ICONE_STATUT = { TRAVAIL: "v-dot-travail", PANNE: "v-dot-panne", ARRET: "v-dot-arret", TRANSPORT: "v-dot-transport" };
+
+  async function chargerVignettesChantiers() {
+    const grid = document.getElementById("vignettesGrid");
+    const status = document.getElementById("vignettesStatus");
+    if (!window.FTSDrive || !window.FTSSheets) return;
+
+    status.textContent = "Chargement des chantiers...";
+    grid.innerHTML = "";
+
+    try {
+      const chantiers = await FTSDrive.listChantiers();
+      if (chantiers.length === 0) {
+        status.textContent = "Aucun chantier créé pour l'instant.";
+        return;
+      }
+      status.textContent = "";
+
+      const cartes = await Promise.all(
+        chantiers.map(async (c) => {
+          try {
+            const [resume, meta] = await Promise.all([
+              FTSSheets.resumeChantier(c.id, c.name),
+              FTSDrive.getMetadonneesChantier(c.id),
+            ]);
+            return { chantier: c, resume, meta };
+          } catch (e) {
+            return { chantier: c, resume: { derniereMachine: null, totalMicropieux: 0 }, meta: {} };
+          }
+        })
+      );
+
+      grid.innerHTML = cartes.map(({ chantier, resume, meta }) => {
+        const spaceIdx = chantier.name.search(/\s/);
+        const code = spaceIdx > 0 ? chantier.name.slice(0, spaceIdx) : chantier.name;
+        const nom = spaceIdx > 0 ? chantier.name.slice(spaceIdx + 1) : "";
+
+        const dm = resume.derniereMachine;
+        const dotClass = dm ? (ICONE_STATUT[dm.statut] || "v-dot-arret") : "v-dot-arret";
+        const machineTxt = dm
+          ? `<span class="v-dot ${dotClass}"></span>${dm.statut || "?"}`
+          : `<span style="color:var(--text-sub);font-weight:400">—</span>`;
+        const machineSousTxt = dm ? escapeHtmlVignette(dm.nom) : "Aucune donnée";
+
+        const prevu = meta.micropieuxPrevus;
+        const totalTxt = prevu ? `${resume.totalMicropieux} / ${prevu}` : `${resume.totalMicropieux}`;
+        const progressHtml = prevu
+          ? `<div class="v-progress-wrap"><div class="v-progress-bar"><div class="v-progress-fill" style="width:${Math.min(100, (resume.totalMicropieux / prevu) * 100)}%"></div></div></div>`
+          : "";
+
+        return `
+          <div class="vignette-chantier" data-id="${chantier.id}" data-name="${escapeHtmlVignette(chantier.name)}">
+            <div class="v-head">
+              <div class="v-code">${escapeHtmlVignette(code)}</div>
+              <div class="v-nom">${escapeHtmlVignette(nom || chantier.name)}</div>
+            </div>
+            <div class="v-stats">
+              <div class="v-stat"><div class="v-n">${machineTxt}</div><div class="v-l">${machineSousTxt} (hier)</div></div>
+              <div class="v-stat"><div class="v-n">${totalTxt}</div><div class="v-l">Micropieux</div></div>
+            </div>
+            ${progressHtml}
+          </div>`;
+      }).join("");
+
+      grid.querySelectorAll(".vignette-chantier").forEach((carte) => {
+        carte.addEventListener("click", () => {
+          suiviChantierSelect.value = carte.dataset.id;
+          chargerEtAfficherSuivi(carte.dataset.id, carte.dataset.name);
+        });
+      });
+    } catch (err) {
+      console.error("Erreur chargement vignettes :", err);
+      status.textContent = `Erreur : ${err.message}`;
+    }
+  }
+
+  function escapeHtmlVignette(str) {
+    const div = document.createElement("div");
+    div.textContent = str || "";
+    return div.innerHTML;
   }
 
   chargerSuiviBtn.addEventListener("click", async () => {
     const option = suiviChantierSelect.selectedOptions[0];
     const chantierId = suiviChantierSelect.value;
     if (!chantierId) { suiviStatus.textContent = "Choisis un chantier d'abord."; return; }
+    await chargerEtAfficherSuivi(chantierId, option.dataset.name);
+  });
+
+  async function chargerEtAfficherSuivi(chantierId, chantierName) {
     if (!window.FTSSheets) { suiviStatus.textContent = "Erreur : module Sheets non chargé."; return; }
 
     suiviStatus.textContent = "Chargement du suivi...";
     document.getElementById("suiviResultats").hidden = true;
 
     try {
-      const { materiel, production } = await FTSSheets.lireSuiviComplet(chantierId, option.dataset.name);
+      const { materiel, production } = await FTSSheets.lireSuiviComplet(chantierId, chantierName);
       afficherCalendrierMateriel(materiel);
       afficherProduction(production);
       document.getElementById("suiviResultats").hidden = false;
       suiviStatus.textContent = materiel.length === 0 && production.length === 0
         ? "Aucune donnée pour l'instant — elle apparaîtra après le premier rapport journalier enregistré sur ce chantier."
         : "";
+      document.getElementById("panel-suivi").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       console.error("Erreur chargement suivi :", err);
       suiviStatus.textContent = `Erreur : ${err.message}`;
     }
-  });
+  }
 
   function afficherCalendrierMateriel(lignes) {
     const table = document.getElementById("suiviCalendrierTable");

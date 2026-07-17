@@ -121,6 +121,34 @@ const FTSDrive = (() => {
     return data.files || [];
   }
 
+  /**
+   * Métadonnées d'un chantier (adresse, GPS, nombre de micropieux prévus),
+   * stockées en JSON dans le champ "description" du dossier du chantier
+   * sur Drive — pas besoin d'un fichier séparé pour ces quelques valeurs.
+   * Prévu pour le futur plan d'accès et les carrés récapitulatifs des
+   * chantiers en cours.
+   */
+  async function getMetadonneesChantier(chantierId) {
+    const res = await fetch(`${API_BASE}/files/${chantierId}?fields=description`, {
+      headers: authHeader(),
+    });
+    if (!res.ok) return {};
+    const data = await res.json();
+    try {
+      return data.description ? JSON.parse(data.description) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  async function setMetadonneesChantier(chantierId, metadonnees) {
+    await fetch(`${API_BASE}/files/${chantierId}?fields=id`, {
+      method: "PATCH",
+      headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({ description: JSON.stringify(metadonnees) }),
+    });
+  }
+
   async function createFolder(name, parentId) {
     const metadata = { name, mimeType: "application/vnd.google-apps.folder" };
     if (parentId) metadata.parents = [parentId];
@@ -220,6 +248,20 @@ const FTSDrive = (() => {
       SECURITE_SUBFOLDER,
       subfolders["SECURITE"]
     );
+
+    // Métadonnées du chantier (adresse, GPS, nombre de micropieux prévus)
+    // stockées sur le dossier lui-même, en JSON dans son champ description —
+    // réutilisées plus tard pour le plan d'accès et les carrés récapitulatifs.
+    if (chantier.adresse || chantier.gps || chantier.micropieuxPrevus) {
+      const metaExistante = await getMetadonneesChantier(chantierId);
+      const metaMisAJour = {
+        ...metaExistante,
+        ...(chantier.adresse ? { adresse: chantier.adresse } : {}),
+        ...(chantier.gps ? { gps: chantier.gps } : {}),
+        ...(chantier.micropieuxPrevus ? { micropieuxPrevus: Number(chantier.micropieuxPrevus) } : {}),
+      };
+      await setMetadonneesChantier(chantierId, metaMisAJour);
+    }
 
     return {
       chantierId,
@@ -520,6 +562,7 @@ const FTSDrive = (() => {
     getActiviteRecenteChantier,
     getSousDossiersChantier,
     listFilesInFolder,
+    getMetadonneesChantier,
     getDossierRapportChef,
   };
 })();

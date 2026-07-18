@@ -201,7 +201,9 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
           <input type="date" id="pointageMaterielDateFin">
         </div>
         <button type="button" class="btn-secondary" id="pointageMaterielChargerBtn">Charger</button>
+        <button type="button" class="btn-secondary" id="pointageMaterielSyncBtn">📅 Synchroniser vers Google Agenda</button>
       </div>
+      <p class="panel-sub" style="margin:8px 0 0 0;font-size:0.78rem">La synchronisation crée/actualise l'agenda "FTS - Pointage Machine" sous ton compte Google — partage-le ensuite depuis Google Agenda (calendar.google.com) avec qui doit le voir.</p>
       <p class="form-status" id="pointageMaterielStatus"></p>
 
       <div class="pointage-list" id="pointageMaterielTableBody"></div>
@@ -223,7 +225,9 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
           <input type="date" id="pointagePersonnelDateFin">
         </div>
         <button type="button" class="btn-secondary" id="pointagePersonnelChargerBtn">Charger</button>
+        <button type="button" class="btn-secondary" id="pointagePersonnelSyncBtn">📅 Synchroniser vers Google Agenda</button>
       </div>
+      <p class="panel-sub" style="margin:8px 0 0 0;font-size:0.78rem">La synchronisation crée/actualise l'agenda "FTS - Pointage Personnel" sous ton compte Google — partage-le ensuite depuis Google Agenda (calendar.google.com) avec qui doit le voir.</p>
       <p class="form-status" id="pointagePersonnelStatus"></p>
 
       <div class="pointage-list" id="pointagePersonnelTableBody"></div>
@@ -473,9 +477,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const dateDebutInput = document.getElementById(`${prefix}DateDebut`);
     const dateFinInput = document.getElementById(`${prefix}DateFin`);
     const chargerBtn = document.getElementById(`${prefix}ChargerBtn`);
+    const syncBtn = document.getElementById(`${prefix}SyncBtn`);
     const status = document.getElementById(`${prefix}Status`);
     const liste = document.getElementById(`${prefix}TableBody`);
     const estMateriel = onglet === "Materiel";
+    let dernieresEntrees = [];
 
     const aujourdhui = new Date();
     const ilYA6Jours = new Date(aujourdhui);
@@ -603,6 +609,8 @@ document.addEventListener("DOMContentLoaded", () => {
           // Met à jour l'affichage sans recharger toute la liste
           const [, champ2, champ3, champ4] = valeurs;
           const chantierName = carte.dataset.chantier || "";
+          const entree = dernieresEntrees.find((e) => e.spreadsheetId === carte.dataset.spreadsheet && e.sheetRow === Number(carte.dataset.row));
+          if (entree) entree.cols = valeurs;
           if (estMateriel) {
             carte.querySelector(".pc-view .titre").innerHTML = `${escapeHtmlPointage(champ2)} <span class="pc-badge st-${champ3}">${champ3}</span>`;
             carte.querySelector(".pc-view .detail").textContent = champ4 ? `${chantierName} · ${champ4}` : chantierName;
@@ -633,6 +641,10 @@ document.addEventListener("DOMContentLoaded", () => {
           const row = Number(carte.dataset.row);
           await FTSSheets.supprimerLignePointage(spreadsheetId, onglet, row);
           decalerApresSuppression(spreadsheetId, row);
+          dernieresEntrees = dernieresEntrees.filter((e) => !(e.spreadsheetId === spreadsheetId && e.sheetRow === row));
+          dernieresEntrees.forEach((e) => {
+            if (e.spreadsheetId === spreadsheetId && e.sheetRow > row) e.sheetRow -= 1;
+          });
           carte.remove();
           if (liste.children.length === 0) status.textContent = "Aucun pointage sur cette période.";
         } catch (err) {
@@ -658,6 +670,7 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
         status.textContent = "";
+        dernieresEntrees = entrees;
         liste.innerHTML = entrees.map(carteHtml).join("");
         liste.querySelectorAll(".pointage-card").forEach(attacherActions);
       } catch (err) {
@@ -666,7 +679,52 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    function convertirDateFRversISO(s) {
+      const [j, m, a] = (s || "").split("/");
+      return j && m && a ? `${a}-${m.padStart(2, "0")}-${j.padStart(2, "0")}` : null;
+    }
+
+    function grouperParChantierEtDate(entrees) {
+      const groupes = {};
+      entrees.forEach((e) => {
+        const dateISO = convertirDateFRversISO(e.cols[0]);
+        if (!dateISO) return;
+        const cle = `${e.chantierName}||${dateISO}`;
+        if (!groupes[cle]) groupes[cle] = { chantierName: e.chantierName, dateISO, items: [] };
+        groupes[cle].items.push(e.cols);
+      });
+      return Object.values(groupes);
+    }
+
+    async function synchroniser() {
+      if (!window.FTSAuth || !FTSAuth.isSignedIn()) { status.textContent = "Connecte-toi d'abord."; return; }
+      if (!window.FTSCalendar) { status.textContent = "Erreur : module Agenda non chargé."; return; }
+      if (dernieresEntrees.length === 0) { status.textContent = "Charge d'abord une période avant de synchroniser."; return; }
+
+      syncBtn.disabled = true;
+      status.textContent = "Synchronisation avec Google Agenda...";
+      try {
+        const groupes = grouperParChantierEtDate(dernieresEntrees);
+        for (const g of groupes) {
+          if (estMateriel) {
+            const machines = g.items.map((cols) => ({ nom: cols[1], statut: cols[2] }));
+            await FTSCalendar.enregistrerPointageMachine(g.chantierName, g.dateISO, machines);
+          } else {
+            const personnel = g.items.map((cols) => ({ nom: cols[1], type: cols[2], gd: cols[3] === "GD" }));
+            await FTSCalendar.enregistrerPointagePersonnel(g.chantierName, g.dateISO, personnel);
+          }
+        }
+        status.textContent = `Synchronisé avec Google Agenda (${groupes.length} jour(s) × chantier mis à jour).`;
+      } catch (err) {
+        console.error(err);
+        status.textContent = `Erreur de synchronisation : ${err.message}`;
+      } finally {
+        syncBtn.disabled = false;
+      }
+    }
+
     chargerBtn.addEventListener("click", charger);
+    syncBtn.addEventListener("click", synchroniser);
   }
 
   initPointageOnglet("pointageMateriel", "Materiel");

@@ -415,6 +415,21 @@ const FTSSheets = (() => {
     });
   }
 
+  /**
+   * Ajoute une ligne de pointage saisie manuellement par le conducteur
+   * (ex: le chef a oublié de pointer une machine ou une personne).
+   *
+   * @param {string} chantierFolderId
+   * @param {string} chantierName
+   * @param {"Materiel"|"Personnel"} onglet
+   * @param {Array} valeurs  colonnes dans l'ordre de l'onglet, ex: [date, machine, statut, ftsLoc]
+   */
+  async function ajouterLignePointage(chantierFolderId, chantierName, onglet, valeurs) {
+    const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
+    await ajouterLignes(spreadsheetId, onglet, [valeurs]);
+    return spreadsheetId;
+  }
+
   return {
     getOuCreerClasseurSuivi,
     enregistrerDonneesRapport,
@@ -424,6 +439,7 @@ const FTSSheets = (() => {
     listerPointageToutesChantiers,
     modifierLignePointage,
     supprimerLignePointage,
+    ajouterLignePointage,
     ONGLET_MATERIEL,
     ONGLET_PERSONNEL,
   };

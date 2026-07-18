@@ -249,10 +249,11 @@ const FTSDrive = (() => {
       subfolders["SECURITE"]
     );
 
-    // Métadonnées du chantier (adresse, GPS, nombre de micropieux prévus)
-    // stockées sur le dossier lui-même, en JSON dans son champ description —
-    // réutilisées plus tard pour le plan d'accès et les carrés récapitulatifs.
-    if (chantier.adresse || chantier.gps || chantier.micropieuxPrevus || chantier.dureeChantier) {
+    // Métadonnées du chantier (adresse, GPS, nombre de micropieux prévus,
+    // durée, montant vendu) stockées sur le dossier lui-même, en JSON dans
+    // son champ description — réutilisées plus tard pour le plan d'accès
+    // et les carrés récapitulatifs.
+    if (chantier.adresse || chantier.gps || chantier.micropieuxPrevus || chantier.dureeChantier || chantier.montantVendu) {
       const metaExistante = await getMetadonneesChantier(chantierId);
       const metaMisAJour = {
         ...metaExistante,
@@ -260,6 +261,7 @@ const FTSDrive = (() => {
         ...(chantier.gps ? { gps: chantier.gps } : {}),
         ...(chantier.micropieuxPrevus ? { micropieuxPrevus: Number(chantier.micropieuxPrevus) } : {}),
         ...(chantier.dureeChantier ? { dureeChantier: Number(chantier.dureeChantier) } : {}),
+        ...(chantier.montantVendu ? { montantVendu: Number(chantier.montantVendu) } : {}),
       };
       await setMetadonneesChantier(chantierId, metaMisAJour);
     }
@@ -564,6 +566,7 @@ const FTSDrive = (() => {
     getSousDossiersChantier,
     listFilesInFolder,
     getMetadonneesChantier,
+    setMetadonneesChantier,
     getDossierRapportChef,
   };
 })();

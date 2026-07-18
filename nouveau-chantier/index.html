@@ -29,19 +29,27 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 .vignette-chantier:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.12); }
-.vignette-chantier .v-head { background: var(--anthracite); color: white; padding: 12px 16px 12px 13px; border-left: 4px solid var(--fts-yellow); }
+.vignette-chantier .v-head {
+  background: var(--anthracite); color: white; padding: 12px 14px 12px 13px;
+  border-left: 4px solid var(--fts-yellow);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+}
 .vignette-chantier .v-code { font-size: 0.68rem; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.5px; }
 .vignette-chantier .v-nom { font-size: 0.9rem; font-weight: 800; margin-top: 2px; line-height: 1.25; }
-.vignette-chantier .v-stats { display: flex; }
-.vignette-chantier .v-stat { flex: 1; padding: 12px 10px; text-align: center; border-right: 1px solid #F0F0F0; }
-.vignette-chantier .v-stat:last-child { border-right: none; }
-.vignette-chantier .v-stat .v-n { font-size: 1.05rem; font-weight: 800; color: var(--anthracite); }
-.vignette-chantier .v-stat .v-l { font-size: 0.6rem; color: var(--text-sub); text-transform: uppercase; margin-top: 2px; }
+.vignette-chantier .v-statut-machine {
+  display: flex; align-items: center; gap: 5px; flex-shrink: 0;
+  background: rgba(255,255,255,0.1); padding: 4px 10px 4px 8px; border-radius: 12px;
+  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.02em; white-space: nowrap; margin-top: 1px;
+}
+.vignette-chantier .v-stats-2col { display: grid; grid-template-columns: 1fr 1fr; }
+.vignette-chantier .v-stat-box { padding: 12px 14px 14px 14px; border-right: 1px solid #F0F0F0; }
+.vignette-chantier .v-stat-box:last-child { border-right: none; }
+.vignette-chantier .v-stat-box .v-n { font-size: 1.05rem; font-weight: 800; color: var(--anthracite); }
+.vignette-chantier .v-stat-box .v-l { font-size: 0.6rem; color: var(--text-sub); text-transform: uppercase; margin-top: 2px; }
 .v-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
 .v-dot-travail { background: #27AE60; } .v-dot-panne { background: #C0392B; }
 .v-dot-arret { background: #888; } .v-dot-transport { background: #3A86FF; }
-.v-progress-wrap { padding: 0 14px 12px 14px; }
-.v-progress-bar { height: 5px; background: #EEE; border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.v-progress-bar { height: 5px; background: #EEE; border-radius: 3px; overflow: hidden; margin-top: 8px; }
 .v-progress-fill { height: 100%; background: var(--fts-yellow); }
 .suivi-calendrier-scroll { overflow-x: auto; margin-top: 8px; }
 .suivi-calendrier, .suivi-production { border-collapse: collapse; width: 100%; font-size: 0.8rem; }
@@ -187,6 +195,10 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <label for="dureeChantier">Durée de chantier (jours, optionnel)</label>
         <input type="number" id="dureeChantier" placeholder="ex : 15" min="0">
       </div>
+      <div class="field">
+        <label for="montantVendu">Montant total vendu (€, optionnel)</label>
+        <input type="number" id="montantVendu" placeholder="ex : 45000" min="0" step="0.01">
+      </div>
       <button type="submit" class="btn-primary">Créer le chantier</button>
     </form>
 
@@ -324,6 +336,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const gpsChantier = document.getElementById("gpsChantier").value.trim();
     const nbMicropieuxPrevus = document.getElementById("nbMicropieuxPrevus").value.trim();
     const dureeChantier = document.getElementById("dureeChantier").value.trim();
+    const montantVendu = document.getElementById("montantVendu").value.trim();
     const submitBtn = chantierForm.querySelector(".btn-primary");
 
     if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
@@ -339,7 +352,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chantierStatus.textContent = "Création de l'arborescence Drive en cours...";
 
     try {
-      const result = await FTSDrive.creerArborescenceChantier({ numAffaire, nom: nomChantier, adresse: adresseChantier, gps: gpsChantier, micropieuxPrevus: nbMicropieuxPrevus, dureeChantier });
+      const result = await FTSDrive.creerArborescenceChantier({ numAffaire, nom: nomChantier, adresse: adresseChantier, gps: gpsChantier, micropieuxPrevus: nbMicropieuxPrevus, dureeChantier, montantVendu });
       const subfolderNames = Object.keys(result.subfolders).filter((k) => !k.includes("/"));
       const statusPrefix = result.reused
         ? `Dossier chantier "${result.chantierName}" déjà existant, sous-dossiers vérifiés`
@@ -408,15 +421,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const dm = resume.derniereMachine;
         const dotClass = dm ? (ICONE_STATUT[dm.statut] || "v-dot-arret") : "v-dot-arret";
-        const machineTxt = dm
-          ? `<span class="v-dot ${dotClass}"></span>${dm.statut || "?"}`
-          : `<span style="color:var(--text-sub);font-weight:400">—</span>`;
-        const machineSousTxt = dm ? escapeHtmlVignette(dm.nom) : "Aucune donnée";
+        const statutMachineHtml = dm
+          ? `<span class="v-statut-machine"><span class="v-dot ${dotClass}"></span>${dm.statut || "?"}</span>`
+          : `<span class="v-statut-machine" style="opacity:0.6"><span class="v-dot v-dot-arret"></span>—</span>`;
 
         const prevu = meta.micropieuxPrevus;
         const totalTxt = prevu ? `${resume.totalMicropieux} / ${prevu}` : `${resume.totalMicropieux}`;
         const progressMicropieuxHtml = prevu
-          ? `<div class="v-progress-wrap"><div class="v-progress-bar"><div class="v-progress-fill" style="width:${Math.min(100, (resume.totalMicropieux / prevu) * 100)}%"></div></div></div>`
+          ? `<div class="v-progress-bar"><div class="v-progress-fill" style="width:${Math.min(100, (resume.totalMicropieux / prevu) * 100)}%"></div></div>`
           : "";
 
         let joursTxt = "—";
@@ -428,22 +440,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const dureeChantier = meta.dureeChantier;
         const progressJoursHtml = (dureeChantier && jours !== null)
-          ? `<div class="v-progress-wrap"><div class="v-progress-bar"><div class="v-progress-fill" style="width:${Math.min(100, (jours / dureeChantier) * 100)}%"></div></div></div>`
+          ? `<div class="v-progress-bar"><div class="v-progress-fill" style="width:${Math.min(100, (jours / dureeChantier) * 100)}%"></div></div>`
           : "";
 
         return `
           <div class="vignette-chantier" data-id="${chantier.id}" data-name="${escapeHtmlVignette(chantier.name)}">
             <div class="v-head">
-              <div class="v-code">${escapeHtmlVignette(code)}</div>
-              <div class="v-nom">${escapeHtmlVignette(nom || chantier.name)}</div>
+              <div>
+                <div class="v-code">${escapeHtmlVignette(code)}</div>
+                <div class="v-nom">${escapeHtmlVignette(nom || chantier.name)}</div>
+              </div>
+              ${statutMachineHtml}
             </div>
-            <div class="v-stats">
-              <div class="v-stat"><div class="v-n">${joursTxt}${dureeChantier ? ` / ${dureeChantier}` : ""}</div><div class="v-l">Jour(s)</div></div>
-              <div class="v-stat"><div class="v-n">${machineTxt}</div><div class="v-l">${machineSousTxt} (hier)</div></div>
-              <div class="v-stat"><div class="v-n">${totalTxt}</div><div class="v-l">Micropieux</div></div>
+            <div class="v-stats-2col">
+              <div class="v-stat-box">
+                <div class="v-n">${joursTxt}${dureeChantier ? ` / ${dureeChantier}` : ""}</div>
+                <div class="v-l">Jour(s)</div>
+                ${progressJoursHtml}
+              </div>
+              <div class="v-stat-box">
+                <div class="v-n">${totalTxt}</div>
+                <div class="v-l">Micropieux</div>
+                ${progressMicropieuxHtml}
+              </div>
             </div>
-            ${progressJoursHtml}
-            ${progressMicropieuxHtml}
           </div>`;
       }).join("");
 

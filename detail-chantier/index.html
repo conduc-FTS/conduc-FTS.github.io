@@ -62,6 +62,27 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   </section>
 
   <section class="panel">
+    <h2 class="panel-title">Prévisions</h2>
+    <p class="panel-sub">Modifie la durée prévue ou le nombre de micropieux prévus — les barres de progression sur la vignette du chantier se mettront à jour en conséquence.</p>
+    <div class="chantier-form" style="grid-template-columns:1fr">
+      <div class="field">
+        <label for="previsionDuree">Durée de chantier (jours)</label>
+        <input type="number" id="previsionDuree" min="0" placeholder="ex : 15">
+      </div>
+      <div class="field">
+        <label for="previsionMicropieux">Nombre de micropieux prévus</label>
+        <input type="number" id="previsionMicropieux" min="0" placeholder="ex : 25">
+      </div>
+      <div class="field">
+        <label for="previsionMontant">Montant total vendu (€)</label>
+        <input type="number" id="previsionMontant" min="0" step="0.01" placeholder="ex : 45000">
+      </div>
+      <button type="button" class="btn-primary" id="previsionEnregistrerBtn">Enregistrer</button>
+    </div>
+    <p class="form-status" id="previsionStatus"></p>
+  </section>
+
+  <section class="panel">
     <h2 class="panel-title">Calendrier matériel</h2>
     <p class="form-status" id="suiviStatus">Chargement du suivi...</p>
     <div id="suiviResultats" hidden>
@@ -122,6 +143,46 @@ document.addEventListener("DOMContentLoaded", () => {
       // silencieux : l'info jours est secondaire
     }
   }
+
+  async function chargerPrevisions() {
+    if (!chantierId || !window.FTSDrive) return;
+    try {
+      const meta = await FTSDrive.getMetadonneesChantier(chantierId);
+      if (meta.dureeChantier) document.getElementById("previsionDuree").value = meta.dureeChantier;
+      if (meta.micropieuxPrevus) document.getElementById("previsionMicropieux").value = meta.micropieuxPrevus;
+      if (meta.montantVendu) document.getElementById("previsionMontant").value = meta.montantVendu;
+    } catch (e) {
+      console.warn("Erreur chargement prévisions :", e);
+    }
+  }
+
+  document.getElementById("previsionEnregistrerBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("previsionEnregistrerBtn");
+    const previsionStatus = document.getElementById("previsionStatus");
+    if (!chantierId || !window.FTSDrive) { previsionStatus.textContent = "Erreur : module Drive non chargé."; return; }
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { previsionStatus.textContent = "Connecte-toi d'abord."; return; }
+
+    const duree = document.getElementById("previsionDuree").value.trim();
+    const micropieux = document.getElementById("previsionMicropieux").value.trim();
+    const montant = document.getElementById("previsionMontant").value.trim();
+
+    btn.disabled = true;
+    previsionStatus.textContent = "Enregistrement...";
+    try {
+      const metaExistante = await FTSDrive.getMetadonneesChantier(chantierId);
+      const metaMisAJour = { ...metaExistante };
+      if (duree) metaMisAJour.dureeChantier = Number(duree); else delete metaMisAJour.dureeChantier;
+      if (micropieux) metaMisAJour.micropieuxPrevus = Number(micropieux); else delete metaMisAJour.micropieuxPrevus;
+      if (montant) metaMisAJour.montantVendu = Number(montant); else delete metaMisAJour.montantVendu;
+      await FTSDrive.setMetadonneesChantier(chantierId, metaMisAJour);
+      previsionStatus.textContent = "Prévisions enregistrées.";
+    } catch (err) {
+      console.error(err);
+      previsionStatus.textContent = `Erreur : ${err.message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   async function chargerSuivi() {
     if (!chantierId) {
@@ -207,6 +268,7 @@ document.addEventListener("DOMContentLoaded", () => {
         adminAccountInfo.textContent = info ? info.email : "Connecté";
         userDot.classList.add("online");
         afficherJoursDepuisOuverture();
+        chargerPrevisions();
         chargerSuivi();
       } else {
         adminAccountInfo.textContent = "Non connecté";
@@ -220,6 +282,7 @@ document.addEventListener("DOMContentLoaded", () => {
         userDot.classList.add("online");
       });
       afficherJoursDepuisOuverture();
+      chargerPrevisions();
       chargerSuivi();
     } else {
       suiviStatus.textContent = "Connecte-toi depuis le dashboard principal, puis reviens sur cette page.";

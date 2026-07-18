@@ -68,12 +68,45 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .nc-view.active { display: block; }
 
 .pointage-periode-row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
-.pointage-table-scroll { overflow-x: auto; margin-top: 16px; }
-.pointage-table { border-collapse: collapse; width: 100%; min-width: 480px; font-size: 0.85rem; }
-.pointage-table th, .pointage-table td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }
-.pointage-table th { background: var(--anthracite); color: white; font-size: 0.72rem; text-transform: uppercase; }
-.pointage-table td:first-child { white-space: nowrap; font-weight: 700; }
-.pointage-input { width: 100%; min-width: 220px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; }
+
+.activite-dot.grey { background: #9AA0AA; }
+
+.pointage-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.pointage-card {
+  background: white; border: 1px solid var(--border); border-radius: 12px;
+  padding: 13px 16px; display: flex; align-items: flex-start; gap: 12px;
+}
+.pointage-card .pc-dot { margin-top: 6px; }
+.pointage-card .pc-body { flex: 1; min-width: 0; }
+.pointage-card .pc-body .titre { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 700; font-size: 0.92rem; }
+.pointage-card .pc-body .detail { font-size: 0.78rem; color: var(--text-sub); margin-top: 3px; }
+.pointage-card .pc-date { font-size: 0.76rem; color: var(--text-sub); white-space: nowrap; margin-top: 2px; }
+.pointage-card .pc-actions { display: flex; gap: 6px; flex-shrink: 0; margin-top: 1px; }
+.pc-icon-btn {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  width: 30px; height: 30px; cursor: pointer; font-size: 0.85rem; line-height: 1;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.pc-icon-btn:hover { background: #EDEEF1; }
+
+.pc-badge { display: inline-block; padding: 2px 9px; border-radius: 8px; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.02em; color: white; }
+.pc-badge.st-TRAVAIL { background: #3FAE63; }
+.pc-badge.st-PANNE { background: #E24C4C; }
+.pc-badge.st-ARRET { background: #9AA0AA; }
+.pc-badge.st-TRANSPORT { background: #4C82F0; }
+.pc-badge.st-FTS { background: #4C82F0; }
+.pc-badge.st-Interim { background: #E8B923; color: var(--anthracite); }
+.pc-badge.st-GD { background: var(--anthracite); color: var(--fts-yellow); }
+
+.pointage-card .pc-edit { display: none; flex: 1; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pointage-card.editing .pc-view { display: none; }
+.pointage-card.editing .pc-edit { display: flex; }
+.pointage-card.editing .pc-actions-view { display: none; }
+.pc-edit input[type="text"], .pc-edit select {
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem;
+}
+.pc-edit .pi-machine, .pc-edit .pi-nom { flex: 1; min-width: 120px; }
+.pc-edit-gd-label { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: var(--text-sub); }
 </style>
 </head>
 <body>
@@ -171,12 +204,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
       </div>
       <p class="form-status" id="pointageMaterielStatus"></p>
 
-      <div class="pointage-table-scroll">
-      <table class="pointage-table">
-        <thead><tr><th>Date</th><th>Chantier</th><th>Machine</th><th>Statut</th><th>FTS/LOC</th><th>Actions</th></tr></thead>
-        <tbody id="pointageMaterielTableBody"></tbody>
-      </table>
-      </div>
+      <div class="pointage-list" id="pointageMaterielTableBody"></div>
     </section>
   </div>
 
@@ -198,12 +226,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
       </div>
       <p class="form-status" id="pointagePersonnelStatus"></p>
 
-      <div class="pointage-table-scroll">
-      <table class="pointage-table">
-        <thead><tr><th>Date</th><th>Chantier</th><th>Nom</th><th>Type</th><th>GD</th><th>Actions</th></tr></thead>
-        <tbody id="pointagePersonnelTableBody"></tbody>
-      </table>
-      </div>
+      <div class="pointage-list" id="pointagePersonnelTableBody"></div>
     </section>
   </div>
 
@@ -444,13 +467,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const STATUTS_MACHINE = ["TRAVAIL", "PANNE", "ARRET", "TRANSPORT"];
+  const DOT_STATUT_MACHINE = { TRAVAIL: "green", PANNE: "red", ARRET: "grey", TRANSPORT: "blue" };
 
   function initPointageOnglet(prefix, onglet) {
     const dateDebutInput = document.getElementById(`${prefix}DateDebut`);
     const dateFinInput = document.getElementById(`${prefix}DateFin`);
     const chargerBtn = document.getElementById(`${prefix}ChargerBtn`);
     const status = document.getElementById(`${prefix}Status`);
-    const tbody = document.getElementById(`${prefix}TableBody`);
+    const liste = document.getElementById(`${prefix}TableBody`);
     const estMateriel = onglet === "Materiel";
 
     const aujourdhui = new Date();
@@ -459,82 +483,139 @@ document.addEventListener("DOMContentLoaded", () => {
     dateDebutInput.value = ilYA6Jours.toISOString().slice(0, 10);
     dateFinInput.value = aujourdhui.toISOString().slice(0, 10);
 
-    function ligneHtml(entree) {
+    function carteHtml(entree) {
       const [date, champ2, champ3, champ4] = entree.cols;
-      const attrs = `data-spreadsheet="${entree.spreadsheetId}" data-row="${entree.sheetRow}"`;
+      const attrs = `data-spreadsheet="${entree.spreadsheetId}" data-row="${entree.sheetRow}" data-chantier="${escapeHtmlPointage(entree.chantierName)}"`;
+      const chantierCourt = entree.chantierName.split(/\s+/)[0];
+
       if (estMateriel) {
+        const dot = DOT_STATUT_MACHINE[champ3] || "grey";
         const optionsStatut = STATUTS_MACHINE.map((s) =>
           `<option value="${s}" ${s === champ3 ? "selected" : ""}>${s}</option>`
         ).join("");
         return `
-          <tr ${attrs}>
-            <td>${date}</td>
-            <td>${escapeHtmlPointage(entree.chantierName)}</td>
-            <td><input type="text" class="pointage-input pi-machine" value="${escapeHtmlPointage(champ2)}"></td>
-            <td><select class="pointage-input pi-statut">${optionsStatut}</select></td>
-            <td><input type="text" class="pointage-input pi-ftsloc" value="${escapeHtmlPointage(champ4)}" style="min-width:80px"></td>
-            <td style="white-space:nowrap">
-              <button type="button" class="btn-secondary pointage-save">Enregistrer</button>
-              <button type="button" class="btn-secondary pointage-delete">Supprimer</button>
-            </td>
-          </tr>`;
+          <div class="pointage-card" ${attrs}>
+            <span class="activite-dot ${dot} pc-dot"></span>
+            <div class="pc-body">
+              <div class="pc-view">
+                <div class="titre">${escapeHtmlPointage(champ2)} <span class="pc-badge st-${champ3}">${champ3 || "?"}</span></div>
+                <div class="detail">${escapeHtmlPointage(entree.chantierName)}${champ4 ? " · " + escapeHtmlPointage(champ4) : ""}</div>
+              </div>
+              <div class="pc-edit">
+                <input type="text" class="pi-machine" value="${escapeHtmlPointage(champ2)}" placeholder="Machine">
+                <select class="pi-statut">${optionsStatut}</select>
+                <input type="text" class="pi-ftsloc" value="${escapeHtmlPointage(champ4)}" placeholder="FTS / LOC" style="width:90px">
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div class="pc-date">${date}</div>
+              <div class="pc-actions pc-actions-view">
+                <button type="button" class="pc-icon-btn pc-edit-btn" title="Modifier">✏️</button>
+                <button type="button" class="pc-icon-btn pc-delete-btn" title="Supprimer">🗑️</button>
+              </div>
+              <div class="pc-actions pc-actions-edit" style="display:none">
+                <button type="button" class="pc-icon-btn pc-save-btn" title="Enregistrer">✅</button>
+                <button type="button" class="pc-icon-btn pc-cancel-btn" title="Annuler">✖️</button>
+              </div>
+            </div>
+          </div>`;
       }
+
+      const gd = champ4 === "GD";
+      const dotP = champ3 === "Intérim" ? "yellow" : "blue";
       return `
-        <tr ${attrs}>
-          <td>${date}</td>
-          <td>${escapeHtmlPointage(entree.chantierName)}</td>
-          <td><input type="text" class="pointage-input pi-nom" value="${escapeHtmlPointage(champ2)}"></td>
-          <td>
-            <select class="pointage-input pi-type">
-              <option value="FTS" ${champ3 === "FTS" ? "selected" : ""}>FTS</option>
-              <option value="Intérim" ${champ3 === "Intérim" ? "selected" : ""}>Intérim</option>
-            </select>
-          </td>
-          <td style="text-align:center"><input type="checkbox" class="pointage-input pi-gd" ${champ4 === "GD" ? "checked" : ""}></td>
-          <td style="white-space:nowrap">
-            <button type="button" class="btn-secondary pointage-save">Enregistrer</button>
-            <button type="button" class="btn-secondary pointage-delete">Supprimer</button>
-          </td>
-        </tr>`;
+        <div class="pointage-card" ${attrs}>
+          <span class="activite-dot ${dotP} pc-dot"></span>
+          <div class="pc-body">
+            <div class="pc-view">
+              <div class="titre">${escapeHtmlPointage(champ2)} <span class="pc-badge st-${champ3 === "Intérim" ? "Interim" : "FTS"}">${champ3}</span>${gd ? ' <span class="pc-badge st-GD">GD</span>' : ""}</div>
+              <div class="detail">${escapeHtmlPointage(entree.chantierName)}</div>
+            </div>
+            <div class="pc-edit">
+              <input type="text" class="pi-nom" value="${escapeHtmlPointage(champ2)}" placeholder="Nom">
+              <select class="pi-type">
+                <option value="FTS" ${champ3 === "FTS" ? "selected" : ""}>FTS</option>
+                <option value="Intérim" ${champ3 === "Intérim" ? "selected" : ""}>Intérim</option>
+              </select>
+              <label class="pc-edit-gd-label"><input type="checkbox" class="pi-gd" ${gd ? "checked" : ""}> GD</label>
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div class="pc-date">${date}</div>
+            <div class="pc-actions pc-actions-view">
+              <button type="button" class="pc-icon-btn pc-edit-btn" title="Modifier">✏️</button>
+              <button type="button" class="pc-icon-btn pc-delete-btn" title="Supprimer">🗑️</button>
+            </div>
+            <div class="pc-actions pc-actions-edit" style="display:none">
+              <button type="button" class="pc-icon-btn pc-save-btn" title="Enregistrer">✅</button>
+              <button type="button" class="pc-icon-btn pc-cancel-btn" title="Annuler">✖️</button>
+            </div>
+          </div>
+        </div>`;
     }
 
-    function lireValeursLigne(tr) {
-      const date = tr.children[0].textContent;
+    function lireValeursCarte(carte, date) {
       if (estMateriel) {
         return [
           date,
-          tr.querySelector(".pi-machine").value.trim(),
-          tr.querySelector(".pi-statut").value,
-          tr.querySelector(".pi-ftsloc").value.trim(),
+          carte.querySelector(".pi-machine").value.trim(),
+          carte.querySelector(".pi-statut").value,
+          carte.querySelector(".pi-ftsloc").value.trim(),
         ];
       }
       return [
         date,
-        tr.querySelector(".pi-nom").value.trim(),
-        tr.querySelector(".pi-type").value,
-        tr.querySelector(".pi-gd").checked ? "GD" : "",
+        carte.querySelector(".pi-nom").value.trim(),
+        carte.querySelector(".pi-type").value,
+        carte.querySelector(".pi-gd").checked ? "GD" : "",
       ];
     }
 
-    // Après une suppression, les lignes suivantes du MÊME classeur+onglet
+    // Après une suppression, les cartes suivantes du MÊME classeur+onglet
     // remontent d'un rang dans la feuille : on décale leur data-row en
     // conséquence pour que les prochaines actions ciblent la bonne ligne.
-    function decalerLignesApresSuppression(spreadsheetId, rowSupprime) {
-      tbody.querySelectorAll("tr").forEach((tr) => {
-        if (tr.dataset.spreadsheet !== spreadsheetId) return;
-        const r = Number(tr.dataset.row);
-        if (r > rowSupprime) tr.dataset.row = String(r - 1);
+    function decalerApresSuppression(spreadsheetId, rowSupprime) {
+      liste.querySelectorAll(".pointage-card").forEach((carte) => {
+        if (carte.dataset.spreadsheet !== spreadsheetId) return;
+        const r = Number(carte.dataset.row);
+        if (r > rowSupprime) carte.dataset.row = String(r - 1);
       });
     }
 
-    function attacherActions(tr, entreeSpreadsheetId) {
-      tr.querySelector(".pointage-save").addEventListener("click", async () => {
-        const btn = tr.querySelector(".pointage-save");
+    function basculerEdition(carte, actif) {
+      carte.classList.toggle("editing", actif);
+      carte.querySelector(".pc-actions-view").style.display = actif ? "none" : "flex";
+      carte.querySelector(".pc-actions-edit").style.display = actif ? "flex" : "none";
+    }
+
+    function attacherActions(carte) {
+      const dateAffichee = carte.querySelector(".pc-date").textContent;
+
+      carte.querySelector(".pc-edit-btn").addEventListener("click", () => basculerEdition(carte, true));
+      carte.querySelector(".pc-cancel-btn").addEventListener("click", () => basculerEdition(carte, false));
+
+      carte.querySelector(".pc-save-btn").addEventListener("click", async () => {
+        const btn = carte.querySelector(".pc-save-btn");
         btn.disabled = true;
         try {
-          const valeurs = lireValeursLigne(tr);
-          await FTSSheets.modifierLignePointage(tr.dataset.spreadsheet, onglet, Number(tr.dataset.row), valeurs);
+          const valeurs = lireValeursCarte(carte, dateAffichee);
+          await FTSSheets.modifierLignePointage(carte.dataset.spreadsheet, onglet, Number(carte.dataset.row), valeurs);
+          // Met à jour l'affichage sans recharger toute la liste
+          const [, champ2, champ3, champ4] = valeurs;
+          const chantierName = carte.dataset.chantier || "";
+          if (estMateriel) {
+            carte.querySelector(".pc-view .titre").innerHTML = `${escapeHtmlPointage(champ2)} <span class="pc-badge st-${champ3}">${champ3}</span>`;
+            carte.querySelector(".pc-view .detail").textContent = champ4 ? `${chantierName} · ${champ4}` : chantierName;
+            carte.querySelector(".pc-dot").className = `activite-dot ${DOT_STATUT_MACHINE[champ3] || "grey"} pc-dot`;
+          } else {
+            const gd = champ4 === "GD";
+            carte.querySelector(".pc-view .titre").innerHTML =
+              `${escapeHtmlPointage(champ2)} <span class="pc-badge st-${champ3 === "Intérim" ? "Interim" : "FTS"}">${champ3}</span>${gd ? ' <span class="pc-badge st-GD">GD</span>' : ""}`;
+            carte.querySelector(".pc-view .detail").textContent = chantierName;
+            carte.querySelector(".pc-dot").className = `activite-dot ${champ3 === "Intérim" ? "yellow" : "blue"} pc-dot`;
+          }
           status.textContent = "Modification enregistrée.";
+          basculerEdition(carte, false);
         } catch (err) {
           console.error(err);
           status.textContent = `Erreur : ${err.message}`;
@@ -543,16 +624,17 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
 
-      tr.querySelector(".pointage-delete").addEventListener("click", async () => {
-        const btn = tr.querySelector(".pointage-delete");
+      carte.querySelector(".pc-delete-btn").addEventListener("click", async () => {
+        const btn = carte.querySelector(".pc-delete-btn");
         if (!confirm("Supprimer cette ligne ?")) return;
         btn.disabled = true;
         try {
-          const spreadsheetId = tr.dataset.spreadsheet;
-          const row = Number(tr.dataset.row);
+          const spreadsheetId = carte.dataset.spreadsheet;
+          const row = Number(carte.dataset.row);
           await FTSSheets.supprimerLignePointage(spreadsheetId, onglet, row);
-          decalerLignesApresSuppression(spreadsheetId, row);
-          tr.remove();
+          decalerApresSuppression(spreadsheetId, row);
+          carte.remove();
+          if (liste.children.length === 0) status.textContent = "Aucun pointage sur cette période.";
         } catch (err) {
           console.error(err);
           status.textContent = `Erreur : ${err.message}`;
@@ -567,7 +649,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!dateDebutInput.value || !dateFinInput.value) { status.textContent = "Choisis une période."; return; }
 
       status.textContent = "Chargement...";
-      tbody.innerHTML = "";
+      liste.innerHTML = "";
 
       try {
         const entrees = await FTSSheets.listerPointageToutesChantiers(onglet, dateDebutInput.value, dateFinInput.value);
@@ -576,8 +658,8 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
         status.textContent = "";
-        tbody.innerHTML = entrees.map(ligneHtml).join("");
-        tbody.querySelectorAll("tr").forEach((tr) => attacherActions(tr, tr.dataset.spreadsheet));
+        liste.innerHTML = entrees.map(carteHtml).join("");
+        liste.querySelectorAll(".pointage-card").forEach(attacherActions);
       } catch (err) {
         console.error(err);
         status.textContent = `Erreur : ${err.message}`;

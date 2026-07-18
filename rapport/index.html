@@ -1492,19 +1492,33 @@ async function enregistrerSuiviChantier() {
     if (numero) numerosPieux.push(numero);
   }
 
+  // Personnel présent le jour du rapport
+  const personnel = [];
+  for (let k = 1; k <= N_PERS; k++) {
+    const nom = document.getElementById(`nom_${k}`)?.value?.trim();
+    if (!nom) continue;
+    personnel.push({
+      nom,
+      type: document.getElementById(`int_${k}`)?.checked ? 'Intérim' : 'FTS',
+      gd: !!document.getElementById(`gd_${k}`)?.checked,
+    });
+  }
+
   await FTSSheets.enregistrerDonneesRapport({
     chantierFolderId: chantierRoot.id,
     chantierName: chantierRoot.name,
     date: dateAffichage,
     machines,
+    personnel,
     nbPieux,
     longueurTotale,
     numerosPieux,
   });
 
-  // Pointage machine et personnel via Google Agenda (agendas partagés,
-  // séparés du suivi interne). Une erreur ici n'empêche pas le reste
-  // d'avoir déjà réussi (PDF, Sheet).
+  // Pointage machine et personnel via Google Agenda en plus des Sheets
+  // (agendas partagés, séparés du suivi interne — laissé en best-effort
+  // pour qui veut le voir dans son Google Agenda perso ; le conducteur,
+  // lui, lit directement les Sheets ci-dessus, plus fiable entre comptes).
   if (window.FTSCalendar) {
     const dateISO = document.getElementById('date').value; // format AAAA-MM-JJ attendu par l'API Agenda
 
@@ -1519,16 +1533,6 @@ async function enregistrerSuiviChantier() {
     }
 
     try {
-      const personnel = [];
-      for (let k = 1; k <= N_PERS; k++) {
-        const nom = document.getElementById(`nom_${k}`)?.value?.trim();
-        if (!nom) continue;
-        personnel.push({
-          nom,
-          type: document.getElementById(`int_${k}`)?.checked ? 'Intérim' : 'FTS',
-          gd: !!document.getElementById(`gd_${k}`)?.checked,
-        });
-      }
       if (personnel.length > 0) {
         await FTSCalendar.enregistrerPointagePersonnel(chantierRoot.name, dateISO, personnel);
       }

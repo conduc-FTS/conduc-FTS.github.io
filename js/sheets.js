@@ -1,11 +1,19 @@
 /**
- * sheets.js — Suivi chantier via Google Sheets (matériel + production).
+ * sheets.js — Suivi chantier via Google Sheets (matériel + personnel + production).
  *
  * Un seul classeur par chantier, nommé "Suivi {NOM DU CHANTIER}",
  * déposé directement dans le dossier du chantier sur Drive.
- * Deux onglets :
+ * Trois onglets de pointage/suivi :
  *   - "Materiel"   : Date | Machine | Statut | FTS/LOC
+ *   - "Personnel"  : Date | Nom | Type | GD
  *   - "Production" : Date | Nb pieux | Longueur totale (m) | Longueur moyenne/jour (m)
+ *
+ * Le Pointage Matériel/Personnel affiché côté conducteur est extrait
+ * directement de ces onglets (via listerPointageToutesChantiers), et
+ * non plus de Google Agenda : les Sheets sont déjà accessibles au
+ * conducteur (propriétaire du dossier chantier), quel que soit le
+ * compte Google du chef qui a soumis le rapport — ça évite d'avoir à
+ * partager un agenda avec chaque nouveau chef un par un.
  *
  * Utilise l'API Google Sheets v4, avec le même token que Drive/Gmail
  * (scope spreadsheets ajouté à l'auth partagée).
@@ -16,6 +24,7 @@ const FTSSheets = (() => {
   const DRIVE_API_BASE = "https://www.googleapis.com/drive/v3";
 
   const ONGLET_MATERIEL = "Materiel";
+  const ONGLET_PERSONNEL = "Personnel";
   const ONGLET_PRODUCTION = "Production";
   const ONGLET_PIEUX = "Pieux";
 
@@ -58,6 +67,7 @@ const FTSSheets = (() => {
         properties: { title: nomClasseur },
         sheets: [
           { properties: { title: ONGLET_MATERIEL } },
+          { properties: { title: ONGLET_PERSONNEL } },
           { properties: { title: ONGLET_PRODUCTION } },
           { properties: { title: ONGLET_PIEUX } },
         ],
@@ -76,8 +86,9 @@ const FTSSheets = (() => {
       headers: authHeader(),
     });
 
-    // En-têtes des deux onglets
+    // En-têtes des onglets
     await ecrireValeurs(spreadsheetId, `${ONGLET_MATERIEL}!A1:D1`, [["Date", "Machine", "Statut", "FTS/LOC"]]);
+    await ecrireValeurs(spreadsheetId, `${ONGLET_PERSONNEL}!A1:D1`, [["Date", "Nom", "Type", "GD"]]);
     await ecrireValeurs(spreadsheetId, `${ONGLET_PRODUCTION}!A1:D1`, [["Date", "Nb pieux", "Longueur totale (m)", "Longueur moyenne/jour (m)"]]);
     await ecrireValeurs(spreadsheetId, `${ONGLET_PIEUX}!A1:B1`, [["Date", "N° Pieu"]]);
 
@@ -154,20 +165,21 @@ const FTSSheets = (() => {
 
   /**
    * Enregistre les données d'un rapport journalier dans le suivi du chantier :
-   * une ligne par machine (statut du jour), une ligne de production du jour,
-   * et une ligne par numéro de pieu réalisé (pour la détection de doublons
-   * sur les jours suivants).
+   * une ligne par machine (statut du jour), une ligne par personne présente,
+   * une ligne de production du jour, et une ligne par numéro de pieu réalisé
+   * (pour la détection de doublons sur les jours suivants).
    *
    * @param {Object} opts
    * @param {string} opts.chantierFolderId
    * @param {string} opts.chantierName
    * @param {string} opts.date            format JJ/MM/AAAA (affichage)
    * @param {Array<{nom:string, statut:string, ftsLoc:string}>} opts.machines
+   * @param {Array<{nom:string, type:string, gd:boolean}>} [opts.personnel]  type: "FTS"|"Intérim"
    * @param {number} opts.nbPieux
    * @param {number} opts.longueurTotale
    * @param {string[]} [opts.numerosPieux]  numéros de pieu saisis ce jour
    */
-  async function enregistrerDonneesRapport({ chantierFolderId, chantierName, date, machines, nbPieux, longueurTotale, numerosPieux }) {
+  async function enregistrerDonneesRapport({ chantierFolderId, chantierName, date, machines, personnel, nbPieux, longueurTotale, numerosPieux }) {
     const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
 
     // Un rapport refait le même jour (après correction d'une erreur) doit
@@ -175,6 +187,7 @@ const FTSSheets = (() => {
     // ajouter en double.
     await Promise.all([
       supprimerLignesDate(spreadsheetId, ONGLET_MATERIEL, date),
+      supprimerLignesDate(spreadsheetId, ONGLET_PERSONNEL, date),
       supprimerLignesDate(spreadsheetId, ONGLET_PRODUCTION, date),
       supprimerLignesDate(spreadsheetId, ONGLET_PIEUX, date),
     ]);
@@ -185,6 +198,15 @@ const FTSSheets = (() => {
         .map((m) => [date, m.nom, m.statut || "", m.ftsLoc || ""]);
       if (lignesMateriel.length > 0) {
         await ajouterLignes(spreadsheetId, ONGLET_MATERIEL, lignesMateriel);
+      }
+    }
+
+    if (personnel && personnel.length > 0) {
+      const lignesPersonnel = personnel
+        .filter((p) => p.nom)
+        .map((p) => [date, p.nom, p.type || "FTS", p.gd ? "GD" : ""]);
+      if (lignesPersonnel.length > 0) {
+        await ajouterLignes(spreadsheetId, ONGLET_PERSONNEL, lignesPersonnel);
       }
     }
 
@@ -317,12 +339,93 @@ const FTSSheets = (() => {
     };
   }
 
+  function parseDateFR(s) {
+    const [j, m, a] = (s || "").split("/");
+    return j && m && a ? new Date(`${a}-${m}-${j}`) : null;
+  }
+
+  /**
+   * Agrège les lignes Matériel ou Personnel de TOUS les chantiers actifs,
+   * sur une période donnée. C'est ce qui alimente les onglets Pointage
+   * Matériel / Pointage Personnel côté conducteur — une simple lecture
+   * des Sheets déjà accessibles, plutôt qu'un agenda séparé par compte.
+   *
+   * @param {"Materiel"|"Personnel"} onglet
+   * @param {string} dateDebutISO  format AAAA-MM-JJ
+   * @param {string} dateFinISO    format AAAA-MM-JJ
+   * @returns {Promise<Array<{chantierName, chantierFolderId, spreadsheetId, sheetRow, cols}>>}
+   */
+  async function listerPointageToutesChantiers(onglet, dateDebutISO, dateFinISO) {
+    if (!window.FTSDrive) throw new Error("Module Drive non chargé.");
+    const chantiers = await FTSDrive.listChantiers();
+    const dateDebut = new Date(`${dateDebutISO}T00:00:00`);
+    const dateFin = new Date(`${dateFinISO}T23:59:59`);
+
+    const parChantier = await Promise.all(
+      chantiers.map(async (c) => {
+        try {
+          const spreadsheetId = await getOuCreerClasseurSuivi(c.id, c.name);
+          const lignes = await lireOnglet(spreadsheetId, onglet);
+          return lignes
+            .map((r, idx) => ({
+              chantierName: c.name,
+              chantierFolderId: c.id,
+              spreadsheetId,
+              sheetRow: idx + 2, // +2 : ligne 1 = en-tête, lireOnglet démarre à la ligne 2
+              cols: r,
+            }))
+            .filter((entry) => {
+              const d = parseDateFR(entry.cols[0]);
+              return d && d >= dateDebut && d <= dateFin;
+            });
+        } catch (e) {
+          console.warn(`Erreur lecture pointage pour "${c.name}" :`, e);
+          return [];
+        }
+      })
+    );
+
+    return parChantier.flat().sort((a, b) => (parseDateFR(b.cols[0]) || 0) - (parseDateFR(a.cols[0]) || 0));
+  }
+
+  /**
+   * Remplace le contenu d'une ligne de pointage (correction d'une erreur
+   * de saisie). `valeurs` doit contenir toutes les colonnes de l'onglet,
+   * dans l'ordre (ex: [date, machine, statut, ftsLoc]).
+   */
+  async function modifierLignePointage(spreadsheetId, onglet, sheetRow, valeurs) {
+    const finCol = String.fromCharCode("A".charCodeAt(0) + valeurs.length - 1);
+    await ecrireValeurs(spreadsheetId, `${onglet}!A${sheetRow}:${finCol}${sheetRow}`, [valeurs]);
+  }
+
+  /**
+   * Supprime une ligne de pointage saisie par erreur.
+   */
+  async function supprimerLignePointage(spreadsheetId, onglet, sheetRow) {
+    const sheetId = await getSheetId(spreadsheetId, onglet);
+    if (sheetId == null) return;
+    await fetch(`${API_BASE}/${spreadsheetId}:batchUpdate`, {
+      method: "POST",
+      headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requests: [{
+          deleteDimension: { range: { sheetId, dimension: "ROWS", startIndex: sheetRow - 1, endIndex: sheetRow } },
+        }],
+      }),
+    });
+  }
+
   return {
     getOuCreerClasseurSuivi,
     enregistrerDonneesRapport,
     lireSuiviComplet,
     resumeChantier,
     verifierPieuxDejaRealises,
+    listerPointageToutesChantiers,
+    modifierLignePointage,
+    supprimerLignePointage,
+    ONGLET_MATERIEL,
+    ONGLET_PERSONNEL,
   };
 })();
 

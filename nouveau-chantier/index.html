@@ -156,7 +156,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   <div class="nc-view" id="nc-view-pointage-materiel">
     <section class="panel">
       <h2 class="panel-title">Pointage Matériel</h2>
-      <p class="panel-sub">Événements de l'agenda "FTS - Pointage Machine" sur la période choisie. Modifie ou supprime une ligne saisie par erreur.</p>
+      <p class="panel-sub">Extrait des rapports journaliers de tous les chantiers, sur la période choisie. Modifie ou supprime une ligne saisie par erreur.</p>
 
       <div class="pointage-periode-row">
         <div class="field">
@@ -173,7 +173,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 
       <div class="pointage-table-scroll">
       <table class="pointage-table">
-        <thead><tr><th>Date</th><th>Titre</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Date</th><th>Chantier</th><th>Machine</th><th>Statut</th><th>FTS/LOC</th><th>Actions</th></tr></thead>
         <tbody id="pointageMaterielTableBody"></tbody>
       </table>
       </div>
@@ -183,7 +183,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   <div class="nc-view" id="nc-view-pointage-personnel">
     <section class="panel">
       <h2 class="panel-title">Pointage Personnel</h2>
-      <p class="panel-sub">Événements de l'agenda "FTS - Pointage Personnel" sur la période choisie. Modifie ou supprime une ligne saisie par erreur.</p>
+      <p class="panel-sub">Extrait des rapports journaliers de tous les chantiers, sur la période choisie. Modifie ou supprime une ligne saisie par erreur.</p>
 
       <div class="pointage-periode-row">
         <div class="field">
@@ -200,7 +200,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 
       <div class="pointage-table-scroll">
       <table class="pointage-table">
-        <thead><tr><th>Date</th><th>Titre</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Date</th><th>Chantier</th><th>Nom</th><th>Type</th><th>GD</th><th>Actions</th></tr></thead>
         <tbody id="pointagePersonnelTableBody"></tbody>
       </table>
       </div>
@@ -436,19 +436,22 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // --- Pointage Matériel / Pointage Personnel (lecture + modification) ---
+  // --- Pointage Matériel / Pointage Personnel (extraits des rapports journaliers, tous chantiers) ---
   function escapeHtmlPointage(str) {
     const div = document.createElement("div");
     div.textContent = str || "";
     return div.innerHTML;
   }
 
-  function initPointageOnglet(prefix, type) {
+  const STATUTS_MACHINE = ["TRAVAIL", "PANNE", "ARRET", "TRANSPORT"];
+
+  function initPointageOnglet(prefix, onglet) {
     const dateDebutInput = document.getElementById(`${prefix}DateDebut`);
     const dateFinInput = document.getElementById(`${prefix}DateFin`);
     const chargerBtn = document.getElementById(`${prefix}ChargerBtn`);
     const status = document.getElementById(`${prefix}Status`);
     const tbody = document.getElementById(`${prefix}TableBody`);
+    const estMateriel = onglet === "Materiel";
 
     const aujourdhui = new Date();
     const ilYA6Jours = new Date(aujourdhui);
@@ -456,65 +459,125 @@ document.addEventListener("DOMContentLoaded", () => {
     dateDebutInput.value = ilYA6Jours.toISOString().slice(0, 10);
     dateFinInput.value = aujourdhui.toISOString().slice(0, 10);
 
+    function ligneHtml(entree) {
+      const [date, champ2, champ3, champ4] = entree.cols;
+      const attrs = `data-spreadsheet="${entree.spreadsheetId}" data-row="${entree.sheetRow}"`;
+      if (estMateriel) {
+        const optionsStatut = STATUTS_MACHINE.map((s) =>
+          `<option value="${s}" ${s === champ3 ? "selected" : ""}>${s}</option>`
+        ).join("");
+        return `
+          <tr ${attrs}>
+            <td>${date}</td>
+            <td>${escapeHtmlPointage(entree.chantierName)}</td>
+            <td><input type="text" class="pointage-input pi-machine" value="${escapeHtmlPointage(champ2)}"></td>
+            <td><select class="pointage-input pi-statut">${optionsStatut}</select></td>
+            <td><input type="text" class="pointage-input pi-ftsloc" value="${escapeHtmlPointage(champ4)}" style="min-width:80px"></td>
+            <td style="white-space:nowrap">
+              <button type="button" class="btn-secondary pointage-save">Enregistrer</button>
+              <button type="button" class="btn-secondary pointage-delete">Supprimer</button>
+            </td>
+          </tr>`;
+      }
+      return `
+        <tr ${attrs}>
+          <td>${date}</td>
+          <td>${escapeHtmlPointage(entree.chantierName)}</td>
+          <td><input type="text" class="pointage-input pi-nom" value="${escapeHtmlPointage(champ2)}"></td>
+          <td>
+            <select class="pointage-input pi-type">
+              <option value="FTS" ${champ3 === "FTS" ? "selected" : ""}>FTS</option>
+              <option value="Intérim" ${champ3 === "Intérim" ? "selected" : ""}>Intérim</option>
+            </select>
+          </td>
+          <td style="text-align:center"><input type="checkbox" class="pointage-input pi-gd" ${champ4 === "GD" ? "checked" : ""}></td>
+          <td style="white-space:nowrap">
+            <button type="button" class="btn-secondary pointage-save">Enregistrer</button>
+            <button type="button" class="btn-secondary pointage-delete">Supprimer</button>
+          </td>
+        </tr>`;
+    }
+
+    function lireValeursLigne(tr) {
+      const date = tr.children[0].textContent;
+      if (estMateriel) {
+        return [
+          date,
+          tr.querySelector(".pi-machine").value.trim(),
+          tr.querySelector(".pi-statut").value,
+          tr.querySelector(".pi-ftsloc").value.trim(),
+        ];
+      }
+      return [
+        date,
+        tr.querySelector(".pi-nom").value.trim(),
+        tr.querySelector(".pi-type").value,
+        tr.querySelector(".pi-gd").checked ? "GD" : "",
+      ];
+    }
+
+    // Après une suppression, les lignes suivantes du MÊME classeur+onglet
+    // remontent d'un rang dans la feuille : on décale leur data-row en
+    // conséquence pour que les prochaines actions ciblent la bonne ligne.
+    function decalerLignesApresSuppression(spreadsheetId, rowSupprime) {
+      tbody.querySelectorAll("tr").forEach((tr) => {
+        if (tr.dataset.spreadsheet !== spreadsheetId) return;
+        const r = Number(tr.dataset.row);
+        if (r > rowSupprime) tr.dataset.row = String(r - 1);
+      });
+    }
+
+    function attacherActions(tr, entreeSpreadsheetId) {
+      tr.querySelector(".pointage-save").addEventListener("click", async () => {
+        const btn = tr.querySelector(".pointage-save");
+        btn.disabled = true;
+        try {
+          const valeurs = lireValeursLigne(tr);
+          await FTSSheets.modifierLignePointage(tr.dataset.spreadsheet, onglet, Number(tr.dataset.row), valeurs);
+          status.textContent = "Modification enregistrée.";
+        } catch (err) {
+          console.error(err);
+          status.textContent = `Erreur : ${err.message}`;
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      tr.querySelector(".pointage-delete").addEventListener("click", async () => {
+        const btn = tr.querySelector(".pointage-delete");
+        if (!confirm("Supprimer cette ligne ?")) return;
+        btn.disabled = true;
+        try {
+          const spreadsheetId = tr.dataset.spreadsheet;
+          const row = Number(tr.dataset.row);
+          await FTSSheets.supprimerLignePointage(spreadsheetId, onglet, row);
+          decalerLignesApresSuppression(spreadsheetId, row);
+          tr.remove();
+        } catch (err) {
+          console.error(err);
+          status.textContent = `Erreur : ${err.message}`;
+          btn.disabled = false;
+        }
+      });
+    }
+
     async function charger() {
       if (!window.FTSAuth || !FTSAuth.isSignedIn()) { status.textContent = "Connecte-toi d'abord."; return; }
-      if (!window.FTSCalendar) { status.textContent = "Erreur : module Agenda non chargé."; return; }
+      if (!window.FTSSheets) { status.textContent = "Erreur : module Sheets non chargé."; return; }
       if (!dateDebutInput.value || !dateFinInput.value) { status.textContent = "Choisis une période."; return; }
 
       status.textContent = "Chargement...";
       tbody.innerHTML = "";
 
       try {
-        const evenements = await FTSCalendar.listerPointage(type, dateDebutInput.value, dateFinInput.value);
-        if (evenements.length === 0) {
+        const entrees = await FTSSheets.listerPointageToutesChantiers(onglet, dateDebutInput.value, dateFinInput.value);
+        if (entrees.length === 0) {
           status.textContent = "Aucun pointage sur cette période.";
           return;
         }
         status.textContent = "";
-
-        tbody.innerHTML = evenements.map((e) => `
-          <tr data-id="${e.id}">
-            <td>${e.date}</td>
-            <td><input type="text" class="pointage-input" value="${escapeHtmlPointage(e.titre)}"></td>
-            <td style="white-space:nowrap">
-              <button type="button" class="btn-secondary pointage-save">Enregistrer</button>
-              <button type="button" class="btn-secondary pointage-delete">Supprimer</button>
-            </td>
-          </tr>
-        `).join("");
-
-        tbody.querySelectorAll(".pointage-save").forEach((btn) => {
-          btn.addEventListener("click", async () => {
-            const tr = btn.closest("tr");
-            const input = tr.querySelector(".pointage-input");
-            btn.disabled = true;
-            try {
-              await FTSCalendar.modifierPointage(type, tr.dataset.id, input.value.trim());
-              status.textContent = "Modification enregistrée.";
-            } catch (err) {
-              console.error(err);
-              status.textContent = `Erreur : ${err.message}`;
-            } finally {
-              btn.disabled = false;
-            }
-          });
-        });
-
-        tbody.querySelectorAll(".pointage-delete").forEach((btn) => {
-          btn.addEventListener("click", async () => {
-            const tr = btn.closest("tr");
-            if (!confirm("Supprimer ce pointage ?")) return;
-            btn.disabled = true;
-            try {
-              await FTSCalendar.supprimerPointage(type, tr.dataset.id);
-              tr.remove();
-            } catch (err) {
-              console.error(err);
-              status.textContent = `Erreur : ${err.message}`;
-              btn.disabled = false;
-            }
-          });
-        });
+        tbody.innerHTML = entrees.map(ligneHtml).join("");
+        tbody.querySelectorAll("tr").forEach((tr) => attacherActions(tr, tr.dataset.spreadsheet));
       } catch (err) {
         console.error(err);
         status.textContent = `Erreur : ${err.message}`;
@@ -524,8 +587,8 @@ document.addEventListener("DOMContentLoaded", () => {
     chargerBtn.addEventListener("click", charger);
   }
 
-  initPointageOnglet("pointageMateriel", "machine");
-  initPointageOnglet("pointagePersonnel", "personnel");
+  initPointageOnglet("pointageMateriel", "Materiel");
+  initPointageOnglet("pointagePersonnel", "Personnel");
 });
 </script>
 </body>

@@ -384,7 +384,11 @@ const FTSSheets = (() => {
 
   function parseDateFR(s) {
     const [j, m, a] = (s || "").split("/");
-    return j && m && a ? new Date(`${a}-${m}-${j}`) : null;
+    // new Date(année, mois, jour) avec des nombres est TOUJOURS interprété
+    // en heure locale (contrairement à new Date("AAAA-MM-JJ"), qui est
+    // interprété en UTC) — nécessaire pour rester cohérent avec dateDebut/
+    // dateFin ci-dessous, construits eux aussi en heure locale.
+    return j && m && a ? new Date(Number(a), Number(m) - 1, Number(j)) : null;
   }
 
   /**

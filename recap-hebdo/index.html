@@ -95,6 +95,33 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 @media (max-width: 640px) {
   .rh-semaine-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+.rh-controls-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.pointage-ajout-form {
+  background: var(--bg); border: 1px dashed var(--border); border-radius: 12px;
+  padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: end;
+}
+.pointage-ajout-form .field { min-width: 140px; }
+.pointage-ajout-form select, .pointage-ajout-form input[type="text"], .pointage-ajout-form input[type="date"] {
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem; width: 100%;
+}
+.pc-edit-gd-label { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: var(--text-sub); }
+
+.pc-icon-btn {
+  background: white; border: 1px solid var(--border); border-radius: 6px;
+  width: 22px; height: 22px; cursor: pointer; font-size: 0.68rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 0;
+}
+.rh-entree-actions { display: flex; gap: 3px; flex-shrink: 0; }
+.rh-entree-edit { display: none; flex-wrap: wrap; gap: 5px; align-items: center; margin: 4px 0; width: 100%; }
+.rh-entree-edit input[type="text"], .rh-entree-edit select {
+  padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.72rem; min-width: 60px;
+}
+.rh-entree-row.editing .rh-entree-view { display: none; }
+.rh-entree-row.editing .rh-entree-edit { display: flex; }
+.rh-entree-row { flex-wrap: wrap; }
+.rh-entree-view { display: flex; justify-content: space-between; align-items: center; flex: 1; gap: 6px; min-width: 0; }
 </style>
 </head>
 <body>
@@ -128,6 +155,12 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
     </div>
     <div class="rh-legende" id="legendeChantiers"></div>
   </div>
+
+  <div class="rh-controls-row">
+    <button type="button" class="rh-btn-actuelle" id="ajouterBtn">➕ Ajouter une entrée</button>
+    <button type="button" class="rh-btn-actuelle" id="syncBtn">📅 Synchroniser vers Google Agenda</button>
+  </div>
+  <div class="pointage-ajout-form" id="ajoutForm" hidden></div>
 
   <div class="rh-layout">
     <div>
@@ -170,6 +203,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <script src="../js/auth.js"></script>
 <script src="../js/drive.js"></script>
 <script src="../js/sheets.js"></script>
+<script src="../js/calendar.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -206,7 +240,9 @@ document.addEventListener("DOMContentLoaded", () => {
     return date;
   }
 
-  function isoDate(d) { return d.toISOString().slice(0, 10); }
+  function isoDate(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
   function frDate(d) { const [a, m, j] = isoDate(d).split("-"); return `${j}/${m}/${a}`; }
   function numeroSemaine(d) {
     const t = new Date(d);
@@ -215,6 +251,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const s = new Date(t.getFullYear(), 0, 4);
     return 1 + Math.round(((t - s) / 86400000 - 3 + ((s.getDay() + 6) % 7)) / 7);
   }
+
+  const STATUTS_MACHINE = ["TRAVAIL", "PANNE", "ARRET", "TRANSPORT"];
+  let dernieresEntrees = [];
+  let derniersJours = [];
+  let chantiersCache = null;
 
   let lundiCourant = lundiDeLaSemaine(new Date());
 
@@ -239,7 +280,10 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const entrees = await FTSSheets.listerPointageToutesChantiers(onglet, isoDate(lundiCourant), isoDate(samedi));
       status.textContent = "";
+      dernieresEntrees = entrees;
+      derniersJours = jours;
       afficherSemaine(jours, entrees);
+      attacherActionsEntrees();
     } catch (err) {
       console.error(err);
       status.textContent = `Erreur : ${err.message}`;
@@ -289,12 +333,52 @@ document.addEventListener("DOMContentLoaded", () => {
         const nom = nomChantier.slice(code.length).trim();
         const couleur = couleurChantier(nomChantier);
         const lignes = parChantier[nomChantier].map((e) => {
+          const attrs = `data-spreadsheet="${e.spreadsheetId}" data-row="${e.sheetRow}"`;
           if (estMateriel) {
-            const [, machine, statut] = e.cols;
-            return `<div class="rh-entree-row"><span class="rh-entree-nom"><span class="rh-entree-dot" style="background:${DOT_COULEUR_STATUT[statut] || "#888"}"></span>${escapeHtmlRH(machine)}</span><span class="rh-entree-val">${escapeHtmlRH(statut)}</span></div>`;
+            const [, machine, statut, ftsLoc] = e.cols;
+            const optionsStatut = STATUTS_MACHINE.map((s) => `<option value="${s}" ${s === statut ? "selected" : ""}>${s}</option>`).join("");
+            return `
+              <div class="rh-entree-row" ${attrs}>
+                <div class="rh-entree-view">
+                  <span class="rh-entree-nom"><span class="rh-entree-dot" style="background:${DOT_COULEUR_STATUT[statut] || "#888"}"></span>${escapeHtmlRH(machine)}</span>
+                  <span class="rh-entree-val">${escapeHtmlRH(statut)}</span>
+                  <span class="rh-entree-actions">
+                    <button type="button" class="pc-icon-btn rh-edit-btn" title="Modifier">✏️</button>
+                    <button type="button" class="pc-icon-btn rh-delete-btn" title="Supprimer">🗑️</button>
+                  </span>
+                </div>
+                <div class="rh-entree-edit">
+                  <input type="text" class="ri-machine" value="${escapeHtmlRH(machine)}" style="width:70px">
+                  <select class="ri-statut">${optionsStatut}</select>
+                  <input type="text" class="ri-ftsloc" value="${escapeHtmlRH(ftsLoc)}" placeholder="FTS/LOC" style="width:55px">
+                  <button type="button" class="pc-icon-btn rh-save-btn" title="Enregistrer">✅</button>
+                  <button type="button" class="pc-icon-btn rh-cancel-btn" title="Annuler">✖️</button>
+                </div>
+              </div>`;
           }
-          const [, nomP, , gd, heures] = e.cols;
-          return `<div class="rh-entree-row"><span class="rh-entree-nom">${escapeHtmlRH(nomP)}${gd === "GD" ? '<span class="rh-gd-tag">GD</span>' : ""}</span><span class="rh-entree-val">${heures ? escapeHtmlRH(heures) + "h" : ""}</span></div>`;
+          const [, nomP, type, gd, heures] = e.cols;
+          return `
+            <div class="rh-entree-row" ${attrs}>
+              <div class="rh-entree-view">
+                <span class="rh-entree-nom">${escapeHtmlRH(nomP)}${gd === "GD" ? '<span class="rh-gd-tag">GD</span>' : ""}</span>
+                <span class="rh-entree-val">${heures ? escapeHtmlRH(heures) + "h" : ""}</span>
+                <span class="rh-entree-actions">
+                  <button type="button" class="pc-icon-btn rh-edit-btn" title="Modifier">✏️</button>
+                  <button type="button" class="pc-icon-btn rh-delete-btn" title="Supprimer">🗑️</button>
+                </span>
+              </div>
+              <div class="rh-entree-edit">
+                <input type="text" class="ri-nom" value="${escapeHtmlRH(nomP)}" style="width:80px">
+                <select class="ri-type">
+                  <option value="FTS" ${type === "FTS" ? "selected" : ""}>FTS</option>
+                  <option value="Intérim" ${type === "Intérim" ? "selected" : ""}>Intérim</option>
+                </select>
+                <input type="text" class="ri-heures" value="${escapeHtmlRH(heures)}" placeholder="h" style="width:36px">
+                <label class="pc-edit-gd-label"><input type="checkbox" class="ri-gd" ${gd === "GD" ? "checked" : ""}> GD</label>
+                <button type="button" class="pc-icon-btn rh-save-btn" title="Enregistrer">✅</button>
+                <button type="button" class="pc-icon-btn rh-cancel-btn" title="Annuler">✖️</button>
+              </div>
+            </div>`;
         }).join("");
         return `
           <div class="rh-chantier-bloc" style="border-left-color:${couleur}">
@@ -407,6 +491,175 @@ document.addEventListener("DOMContentLoaded", () => {
     div.textContent = str || "";
     return div.innerHTML;
   }
+
+  function attacherActionsEntrees() {
+    document.querySelectorAll(".rh-entree-row").forEach((row) => {
+      const editBtn = row.querySelector(".rh-edit-btn");
+      const cancelBtn = row.querySelector(".rh-cancel-btn");
+      const saveBtn = row.querySelector(".rh-save-btn");
+      const deleteBtn = row.querySelector(".rh-delete-btn");
+      if (!editBtn) return;
+
+      editBtn.addEventListener("click", () => row.classList.add("editing"));
+      cancelBtn.addEventListener("click", () => row.classList.remove("editing"));
+
+      saveBtn.addEventListener("click", async () => {
+        saveBtn.disabled = true;
+        const spreadsheetId = row.dataset.spreadsheet;
+        const sheetRow = Number(row.dataset.row);
+        // On retrouve la date d'origine via dernieresEntrees (non affichée dans la ligne compacte)
+        const entree = dernieresEntrees.find((e) => e.spreadsheetId === spreadsheetId && e.sheetRow === sheetRow);
+        const date = entree ? entree.cols[0] : "";
+        try {
+          const valeurs = estMateriel
+            ? [date, row.querySelector(".ri-machine").value.trim(), row.querySelector(".ri-statut").value, row.querySelector(".ri-ftsloc").value.trim()]
+            : [date, row.querySelector(".ri-nom").value.trim(), row.querySelector(".ri-type").value, row.querySelector(".ri-gd").checked ? "GD" : "", row.querySelector(".ri-heures").value.trim()];
+          await FTSSheets.modifierLignePointage(spreadsheetId, onglet, sheetRow, valeurs);
+          document.getElementById("rhStatus").textContent = "Modification enregistrée.";
+          chargerSemaine();
+        } catch (err) {
+          console.error(err);
+          document.getElementById("rhStatus").textContent = `Erreur : ${err.message}`;
+          saveBtn.disabled = false;
+        }
+      });
+
+      deleteBtn.addEventListener("click", async () => {
+        if (!confirm("Supprimer cette ligne ?")) return;
+        deleteBtn.disabled = true;
+        try {
+          await FTSSheets.supprimerLignePointage(row.dataset.spreadsheet, onglet, Number(row.dataset.row));
+          document.getElementById("rhStatus").textContent = "Ligne supprimée.";
+          chargerSemaine();
+        } catch (err) {
+          console.error(err);
+          document.getElementById("rhStatus").textContent = `Erreur : ${err.message}`;
+          deleteBtn.disabled = false;
+        }
+      });
+    });
+  }
+
+  async function ouvrirFormulaireAjout() {
+    const ajoutForm = document.getElementById("ajoutForm");
+    if (ajoutForm.hidden === false) { ajoutForm.hidden = true; return; }
+
+    const ajouterBtn = document.getElementById("ajouterBtn");
+    if (!chantiersCache) {
+      if (!window.FTSDrive) { document.getElementById("rhStatus").textContent = "Erreur : module Drive non chargé."; return; }
+      ajouterBtn.disabled = true;
+      try {
+        chantiersCache = await FTSDrive.listChantiers();
+      } catch (err) {
+        document.getElementById("rhStatus").textContent = `Erreur : ${err.message}`;
+        ajouterBtn.disabled = false;
+        return;
+      }
+      ajouterBtn.disabled = false;
+    }
+
+    const optionsChantiers = chantiersCache.map((c) => `<option value="${c.id}" data-nom="${escapeHtmlRH(c.name)}">${escapeHtmlRH(c.name)}</option>`).join("");
+    const aujourdhuiISO = isoDate(new Date());
+
+    const champsSpecifiques = estMateriel
+      ? `
+        <div class="field"><label>Machine</label><input type="text" id="ajoutChamp2" placeholder="ex : FUTURO 1"></div>
+        <div class="field"><label>Statut</label><select id="ajoutChamp3">${STATUTS_MACHINE.map((s) => `<option value="${s}">${s}</option>`).join("")}</select></div>
+        <div class="field"><label>FTS / LOC</label><input type="text" id="ajoutChamp4" placeholder="FTS"></div>`
+      : `
+        <div class="field"><label>Nom</label><input type="text" id="ajoutChamp2" placeholder="ex : Jean Dupont"></div>
+        <div class="field"><label>Type</label><select id="ajoutChamp3"><option value="FTS">FTS</option><option value="Intérim">Intérim</option></select></div>
+        <div class="field" style="min-width:auto"><label class="pc-edit-gd-label" style="margin-top:8px"><input type="checkbox" id="ajoutChamp4"> GD</label></div>
+        <div class="field"><label>Heures</label><input type="text" id="ajoutChamp5" placeholder="ex : 7.5" style="max-width:80px"></div>`;
+
+    ajoutForm.innerHTML = `
+      <div class="field"><label>Chantier</label><select id="ajoutChantier">${optionsChantiers}</select></div>
+      <div class="field"><label>Date</label><input type="date" id="ajoutDate" value="${aujourdhuiISO}"></div>
+      ${champsSpecifiques}
+      <button type="button" class="btn-primary" id="ajoutValider">Enregistrer</button>
+      <button type="button" class="btn-secondary" id="ajoutAnnuler">Annuler</button>
+    `;
+    ajoutForm.hidden = false;
+
+    document.getElementById("ajoutAnnuler").addEventListener("click", () => { ajoutForm.hidden = true; });
+    document.getElementById("ajoutValider").addEventListener("click", async () => {
+      const btn = document.getElementById("ajoutValider");
+      const chantierSelect = document.getElementById("ajoutChantier");
+      const chantierId = chantierSelect.value;
+      const chantierName = chantierSelect.selectedOptions[0]?.dataset.nom || "";
+      const dateISO = document.getElementById("ajoutDate").value;
+      const champ2 = document.getElementById("ajoutChamp2").value.trim();
+      const champ3 = document.getElementById("ajoutChamp3").value;
+      const champ4Input = document.getElementById("ajoutChamp4");
+      const champ4 = estMateriel ? champ4Input.value.trim() : (champ4Input.checked ? "GD" : "");
+      const champ5 = !estMateriel ? (document.getElementById("ajoutChamp5")?.value.trim() || "") : "";
+
+      if (!chantierId || !dateISO || !champ2) { document.getElementById("rhStatus").textContent = "Chantier, date et nom/machine sont obligatoires."; return; }
+
+      const [a, m, j] = dateISO.split("-");
+      const dateAffichage = `${j}/${m}/${a}`;
+
+      btn.disabled = true;
+      document.getElementById("rhStatus").textContent = "Ajout en cours...";
+      try {
+        const valeurs = estMateriel ? [dateAffichage, champ2, champ3, champ4] : [dateAffichage, champ2, champ3, champ4, champ5];
+        await FTSSheets.ajouterLignePointage(chantierId, chantierName, onglet, valeurs);
+        document.getElementById("rhStatus").textContent = "Entrée ajoutée.";
+        ajoutForm.hidden = true;
+        chargerSemaine();
+      } catch (err) {
+        console.error(err);
+        document.getElementById("rhStatus").textContent = `Erreur : ${err.message}`;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
+  function convertirDateFRversISO(s) {
+    const [j, m, a] = (s || "").split("/");
+    return j && m && a ? `${a}-${m.padStart(2, "0")}-${j.padStart(2, "0")}` : null;
+  }
+
+  async function synchroniserAgenda() {
+    const status = document.getElementById("rhStatus");
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { status.textContent = "Connecte-toi d'abord."; return; }
+    if (!window.FTSCalendar) { status.textContent = "Erreur : module Agenda non chargé."; return; }
+    if (dernieresEntrees.length === 0) { status.textContent = "Charge d'abord une semaine avant de synchroniser."; return; }
+
+    const syncBtn = document.getElementById("syncBtn");
+    syncBtn.disabled = true;
+    status.textContent = "Synchronisation avec Google Agenda...";
+    try {
+      const groupes = {};
+      dernieresEntrees.forEach((e) => {
+        const dateISO = convertirDateFRversISO(e.cols[0]);
+        if (!dateISO) return;
+        const cle = `${e.chantierName}||${dateISO}`;
+        if (!groupes[cle]) groupes[cle] = { chantierName: e.chantierName, dateISO, items: [] };
+        groupes[cle].items.push(e.cols);
+      });
+      const listeGroupes = Object.values(groupes);
+      for (const g of listeGroupes) {
+        if (estMateriel) {
+          const machines = g.items.map((cols) => ({ nom: cols[1], statut: cols[2], ftsLoc: cols[3] }));
+          await FTSCalendar.enregistrerPointageMachine(g.chantierName, g.dateISO, machines);
+        } else {
+          const personnel = g.items.map((cols) => ({ nom: cols[1], type: cols[2], gd: cols[3] === "GD", heures: cols[4] }));
+          await FTSCalendar.enregistrerPointagePersonnel(g.chantierName, g.dateISO, personnel);
+        }
+      }
+      status.textContent = `Synchronisé avec Google Agenda (${listeGroupes.length} jour(s) × chantier mis à jour).`;
+    } catch (err) {
+      console.error(err);
+      status.textContent = `Erreur de synchronisation : ${err.message}`;
+    } finally {
+      syncBtn.disabled = false;
+    }
+  }
+
+  document.getElementById("ajouterBtn").addEventListener("click", ouvrirFormulaireAjout);
+  document.getElementById("syncBtn").addEventListener("click", synchroniserAgenda);
 
   function exporterCSV() {
     const lignes = estMateriel

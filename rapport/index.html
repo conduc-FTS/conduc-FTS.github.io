@@ -612,7 +612,11 @@ const sigCtx = document.getElementById('sigCanvas').getContext('2d');
 // ─── Init ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   // Date du jour par défaut
-  document.getElementById('date').valueAsDate = new Date();
+  {
+    const n = new Date();
+    const isoLocal = n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0") + "-" + String(n.getDate()).padStart(2, "0");
+    document.getElementById('date').value = isoLocal;
+  }
   document.getElementById('headerLogo').src = '/assets/logo-fts.png';
 
   // Forcer MAJUSCULES sur dossier et chantier (CSS ne suffit pas pour la valeur réelle)

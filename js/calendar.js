@@ -87,7 +87,7 @@ const FTSCalendar = (() => {
     }
   }
 
-  async function creerEvenementJournee(calendarId, dateISO, titre, colorId) {
+  async function creerEvenementJournee(calendarId, dateISO, titre, colorId, description) {
     const res = await fetch(`${API_BASE}/calendars/${encodeURIComponent(calendarId)}/events`, {
       method: "POST",
       headers: { ...authHeader(), "Content-Type": "application/json" },
@@ -96,6 +96,7 @@ const FTSCalendar = (() => {
         start: { date: dateISO },
         end: { date: dateISO },
         colorId,
+        ...(description ? { description } : {}),
       }),
     });
     if (!res.ok) {
@@ -122,7 +123,8 @@ const FTSCalendar = (() => {
     const couleurs = { TRAVAIL: COULEUR_TRAVAIL, PANNE: COULEUR_PANNE, ARRET: COULEUR_ARRET, TRANSPORT: COULEUR_TRANSPORT };
     for (const m of machines) {
       if (!m.nom) continue;
-      const titre = `${prefixe} ${m.nom} — ${m.statut || "?"}`;
+      const suffixeLoc = m.ftsLoc ? ` (${m.ftsLoc})` : "";
+      const titre = `${prefixe} ${m.nom} — ${m.statut || "?"}${suffixeLoc}`;
       await creerEvenementJournee(calendarId, dateISO, titre, couleurs[m.statut] || undefined);
     }
   }
@@ -133,7 +135,7 @@ const FTSCalendar = (() => {
    *
    * @param {string} chantierName
    * @param {string} dateISO
-   * @param {Array<{nom:string, type:string, gd:boolean}>} personnel  type: "FTS"|"Intérim"
+   * @param {Array<{nom:string, type:string, gd:boolean, heures?:string}>} personnel  type: "FTS"|"Intérim"
    */
   async function enregistrerPointagePersonnel(chantierName, dateISO, personnel) {
     const calendarId = await getOuCreerAgenda(NOM_CAL_PERSONNEL);
@@ -143,7 +145,8 @@ const FTSCalendar = (() => {
     for (const p of personnel) {
       if (!p.nom) continue;
       const suffixeGD = p.gd ? " · GD" : "";
-      const titre = `${prefixe} ${p.nom} — ${p.type}${suffixeGD}`;
+      const suffixeHeures = p.heures ? ` — ${p.heures}h` : "";
+      const titre = `${prefixe} ${p.nom}${suffixeHeures} (${p.type}${suffixeGD})`;
       const couleur = p.type === "Intérim" ? COULEUR_INTERIM : COULEUR_FTS;
       await creerEvenementJournee(calendarId, dateISO, titre, couleur);
     }

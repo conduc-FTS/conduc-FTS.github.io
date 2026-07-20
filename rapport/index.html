@@ -1499,6 +1499,7 @@ async function enregistrerSuiviChantier() {
     if (!nom) continue;
     personnel.push({
       nom,
+      heures: document.getElementById(`heure_${k}`)?.value?.trim() || '',
       type: document.getElementById(`int_${k}`)?.checked ? 'Intérim' : 'FTS',
       gd: !!document.getElementById(`gd_${k}`)?.checked,
     });

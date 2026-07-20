@@ -224,6 +224,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <button type="button" class="btn-secondary" id="pointageMaterielChargerBtn">Charger</button>
         <button type="button" class="btn-secondary" id="pointageMaterielSyncBtn">📅 Synchroniser vers Google Agenda</button>
         <button type="button" class="btn-secondary" id="pointageMaterielAjouterBtn">➕ Ajouter une entrée</button>
+        <a href="../recap-hebdo/index.html?type=materiel" class="btn-secondary" style="text-decoration:none;display:inline-block">📊 Récapitulatif hebdomadaire</a>
       </div>
       <p class="panel-sub" style="margin:8px 0 0 0;font-size:0.78rem">La synchronisation crée/actualise l'agenda "FTS - Pointage Machine" sous ton compte Google — partage-le ensuite depuis Google Agenda (calendar.google.com) avec qui doit le voir.</p>
       <p class="form-status" id="pointageMaterielStatus"></p>
@@ -250,6 +251,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <button type="button" class="btn-secondary" id="pointagePersonnelChargerBtn">Charger</button>
         <button type="button" class="btn-secondary" id="pointagePersonnelSyncBtn">📅 Synchroniser vers Google Agenda</button>
         <button type="button" class="btn-secondary" id="pointagePersonnelAjouterBtn">➕ Ajouter une entrée</button>
+        <a href="../recap-hebdo/index.html?type=personnel" class="btn-secondary" style="text-decoration:none;display:inline-block">📊 Récapitulatif hebdomadaire</a>
       </div>
       <p class="panel-sub" style="margin:8px 0 0 0;font-size:0.78rem">La synchronisation crée/actualise l'agenda "FTS - Pointage Personnel" sous ton compte Google — partage-le ensuite depuis Google Agenda (calendar.google.com) avec qui doit le voir.</p>
       <p class="form-status" id="pointagePersonnelStatus"></p>
@@ -564,13 +566,14 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const gd = champ4 === "GD";
+      const heures = entree.cols[4] || "";
       const dotP = champ3 === "Intérim" ? "yellow" : "blue";
       return `
         <div class="pointage-card" ${attrs}>
           <span class="activite-dot ${dotP} pc-dot"></span>
           <div class="pc-body">
             <div class="pc-view">
-              <div class="titre">${escapeHtmlPointage(champ2)} <span class="pc-badge st-${champ3 === "Intérim" ? "Interim" : "FTS"}">${champ3}</span>${gd ? ' <span class="pc-badge st-GD">GD</span>' : ""}</div>
+              <div class="titre">${escapeHtmlPointage(champ2)} <span class="pc-badge st-${champ3 === "Intérim" ? "Interim" : "FTS"}">${champ3}</span>${gd ? ' <span class="pc-badge st-GD">GD</span>' : ""}${heures ? ` <span class="pc-badge" style="background:var(--anthracite)">${escapeHtmlPointage(heures)}h</span>` : ""}</div>
               <div class="detail">${escapeHtmlPointage(entree.chantierName)}</div>
             </div>
             <div class="pc-edit">
@@ -579,6 +582,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <option value="FTS" ${champ3 === "FTS" ? "selected" : ""}>FTS</option>
                 <option value="Intérim" ${champ3 === "Intérim" ? "selected" : ""}>Intérim</option>
               </select>
+              <input type="text" class="pi-heures" value="${escapeHtmlPointage(heures)}" placeholder="Heures" style="width:70px">
               <label class="pc-edit-gd-label"><input type="checkbox" class="pi-gd" ${gd ? "checked" : ""}> GD</label>
             </div>
           </div>
@@ -610,6 +614,7 @@ document.addEventListener("DOMContentLoaded", () => {
         carte.querySelector(".pi-nom").value.trim(),
         carte.querySelector(".pi-type").value,
         carte.querySelector(".pi-gd").checked ? "GD" : "",
+        carte.querySelector(".pi-heures").value.trim(),
       ];
     }
 
@@ -643,7 +648,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const valeurs = lireValeursCarte(carte, dateAffichee);
           await FTSSheets.modifierLignePointage(carte.dataset.spreadsheet, onglet, Number(carte.dataset.row), valeurs);
           // Met à jour l'affichage sans recharger toute la liste
-          const [, champ2, champ3, champ4] = valeurs;
+          const [, champ2, champ3, champ4, champ5] = valeurs;
           const chantierName = carte.dataset.chantier || "";
           const entree = dernieresEntrees.find((e) => e.spreadsheetId === carte.dataset.spreadsheet && e.sheetRow === Number(carte.dataset.row));
           if (entree) entree.cols = valeurs;
@@ -654,7 +659,7 @@ document.addEventListener("DOMContentLoaded", () => {
           } else {
             const gd = champ4 === "GD";
             carte.querySelector(".pc-view .titre").innerHTML =
-              `${escapeHtmlPointage(champ2)} <span class="pc-badge st-${champ3 === "Intérim" ? "Interim" : "FTS"}">${champ3}</span>${gd ? ' <span class="pc-badge st-GD">GD</span>' : ""}`;
+              `${escapeHtmlPointage(champ2)} <span class="pc-badge st-${champ3 === "Intérim" ? "Interim" : "FTS"}">${champ3}</span>${gd ? ' <span class="pc-badge st-GD">GD</span>' : ""}${champ5 ? ` <span class="pc-badge" style="background:var(--anthracite)">${escapeHtmlPointage(champ5)}h</span>` : ""}`;
             carte.querySelector(".pc-view .detail").textContent = chantierName;
             carte.querySelector(".pc-dot").className = `activite-dot ${champ3 === "Intérim" ? "yellow" : "blue"} pc-dot`;
           }
@@ -743,10 +748,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const groupes = grouperParChantierEtDate(dernieresEntrees);
         for (const g of groupes) {
           if (estMateriel) {
-            const machines = g.items.map((cols) => ({ nom: cols[1], statut: cols[2] }));
+            const machines = g.items.map((cols) => ({ nom: cols[1], statut: cols[2], ftsLoc: cols[3] }));
             await FTSCalendar.enregistrerPointageMachine(g.chantierName, g.dateISO, machines);
           } else {
-            const personnel = g.items.map((cols) => ({ nom: cols[1], type: cols[2], gd: cols[3] === "GD" }));
+            const personnel = g.items.map((cols) => ({ nom: cols[1], type: cols[2], gd: cols[3] === "GD", heures: cols[4] }));
             await FTSCalendar.enregistrerPointagePersonnel(g.chantierName, g.dateISO, personnel);
           }
         }
@@ -806,6 +811,10 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
           <div class="field" style="min-width:auto">
             <label class="pc-edit-gd-label" style="margin-top:8px"><input type="checkbox" id="${prefix}AjoutChamp4"> GD</label>
+          </div>
+          <div class="field">
+            <label>Heures</label>
+            <input type="text" id="${prefix}AjoutChamp5" placeholder="ex : 7.5" style="max-width:80px">
           </div>`;
 
       ajoutForm.innerHTML = `
@@ -834,6 +843,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const champ3 = document.getElementById(`${prefix}AjoutChamp3`).value;
         const champ4Input = document.getElementById(`${prefix}AjoutChamp4`);
         const champ4 = estMateriel ? champ4Input.value.trim() : (champ4Input.checked ? "GD" : "");
+        const champ5 = !estMateriel ? (document.getElementById(`${prefix}AjoutChamp5`)?.value.trim() || "") : "";
 
         if (!chantierId || !dateISO || !champ2) { status.textContent = "Chantier, date et nom/machine sont obligatoires."; return; }
 
@@ -843,7 +853,8 @@ document.addEventListener("DOMContentLoaded", () => {
         btn.disabled = true;
         status.textContent = "Ajout en cours...";
         try {
-          await FTSSheets.ajouterLignePointage(chantierId, chantierName, onglet, [dateAffichage, champ2, champ3, champ4]);
+          const valeurs = estMateriel ? [dateAffichage, champ2, champ3, champ4] : [dateAffichage, champ2, champ3, champ4, champ5];
+          await FTSSheets.ajouterLignePointage(chantierId, chantierName, onglet, valeurs);
           status.textContent = "Entrée ajoutée.";
           ajoutForm.hidden = true;
           // Recharge la liste pour récupérer le bon numéro de ligne de la nouvelle entrée

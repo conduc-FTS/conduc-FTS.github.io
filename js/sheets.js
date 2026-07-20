@@ -90,7 +90,7 @@ const FTSSheets = (() => {
 
     // En-têtes des onglets
     await ecrireValeurs(spreadsheetId, `${ONGLET_MATERIEL}!A1:D1`, [["Date", "Machine", "Statut", "FTS/LOC"]]);
-    await ecrireValeurs(spreadsheetId, `${ONGLET_PERSONNEL}!A1:D1`, [["Date", "Nom", "Type", "GD"]]);
+    await ecrireValeurs(spreadsheetId, `${ONGLET_PERSONNEL}!A1:E1`, [["Date", "Nom", "Type", "GD", "Heures"]]);
     await ecrireValeurs(spreadsheetId, `${ONGLET_PRODUCTION}!A1:D1`, [["Date", "Nb pieux", "Longueur totale (m)", "Longueur moyenne/jour (m)"]]);
     await ecrireValeurs(spreadsheetId, `${ONGLET_PIEUX}!A1:B1`, [["Date", "N° Pieu"]]);
 
@@ -99,7 +99,7 @@ const FTSSheets = (() => {
 
   const EN_TETES_ONGLETS = {
     [ONGLET_MATERIEL]: ["Date", "Machine", "Statut", "FTS/LOC"],
-    [ONGLET_PERSONNEL]: ["Date", "Nom", "Type", "GD"],
+    [ONGLET_PERSONNEL]: ["Date", "Nom", "Type", "GD", "Heures"],
     [ONGLET_PRODUCTION]: ["Date", "Nb pieux", "Longueur totale (m)", "Longueur moyenne/jour (m)"],
     [ONGLET_PIEUX]: ["Date", "N° Pieu"],
   };
@@ -132,7 +132,9 @@ const FTSSheets = (() => {
     });
 
     for (const onglet of manquants) {
-      await ecrireValeurs(spreadsheetId, `${onglet}!A1:D1`, [EN_TETES_ONGLETS[onglet]]);
+      const entetes = EN_TETES_ONGLETS[onglet];
+      const finCol = String.fromCharCode("A".charCodeAt(0) + entetes.length - 1);
+      await ecrireValeurs(spreadsheetId, `${onglet}!A1:${finCol}1`, [entetes]);
     }
   }
 
@@ -215,7 +217,7 @@ const FTSSheets = (() => {
    * @param {string} opts.chantierName
    * @param {string} opts.date            format JJ/MM/AAAA (affichage)
    * @param {Array<{nom:string, statut:string, ftsLoc:string}>} opts.machines
-   * @param {Array<{nom:string, type:string, gd:boolean}>} [opts.personnel]  type: "FTS"|"Intérim"
+   * @param {Array<{nom:string, type:string, gd:boolean, heures?:string}>} [opts.personnel]  type: "FTS"|"Intérim"
    * @param {number} opts.nbPieux
    * @param {number} opts.longueurTotale
    * @param {string[]} [opts.numerosPieux]  numéros de pieu saisis ce jour
@@ -245,7 +247,7 @@ const FTSSheets = (() => {
     if (personnel && personnel.length > 0) {
       const lignesPersonnel = personnel
         .filter((p) => p.nom)
-        .map((p) => [date, p.nom, p.type || "FTS", p.gd ? "GD" : ""]);
+        .map((p) => [date, p.nom, p.type || "FTS", p.gd ? "GD" : "", p.heures || ""]);
       if (lignesPersonnel.length > 0) {
         await ajouterLignes(spreadsheetId, ONGLET_PERSONNEL, lignesPersonnel);
       }

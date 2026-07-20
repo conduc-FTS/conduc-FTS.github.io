@@ -56,7 +56,9 @@ const FTSSheets = (() => {
     if (!resFind.ok) throw new Error(`Erreur recherche classeur suivi : ${resFind.status}`);
     const dataFind = await resFind.json();
     if (dataFind.files && dataFind.files.length > 0) {
-      return dataFind.files[0].id;
+      const spreadsheetId = dataFind.files[0].id;
+      await assurerOngletsPresents(spreadsheetId);
+      return spreadsheetId;
     }
 
     // Sinon, créer le classeur avec ses deux onglets
@@ -93,6 +95,45 @@ const FTSSheets = (() => {
     await ecrireValeurs(spreadsheetId, `${ONGLET_PIEUX}!A1:B1`, [["Date", "N° Pieu"]]);
 
     return spreadsheetId;
+  }
+
+  const EN_TETES_ONGLETS = {
+    [ONGLET_MATERIEL]: ["Date", "Machine", "Statut", "FTS/LOC"],
+    [ONGLET_PERSONNEL]: ["Date", "Nom", "Type", "GD"],
+    [ONGLET_PRODUCTION]: ["Date", "Nb pieux", "Longueur totale (m)", "Longueur moyenne/jour (m)"],
+    [ONGLET_PIEUX]: ["Date", "N° Pieu"],
+  };
+
+  /**
+   * Retrofit : les classeurs de suivi créés avant l'ajout d'un onglet
+   * (ex: "Personnel", ajouté après coup) ne l'ont pas. Écrire dedans
+   * échoue alors silencieusement en pleine sauvegarde de rapport,
+   * coupant tout ce qui suit (production, pieux). On vérifie donc à
+   * chaque ouverture du classeur que les 4 onglets attendus existent,
+   * et on crée ceux qui manquent avec leur en-tête.
+   */
+  async function assurerOngletsPresents(spreadsheetId) {
+    const res = await fetch(`${API_BASE}/${spreadsheetId}?fields=sheets.properties.title`, {
+      headers: authHeader(),
+    });
+    if (!res.ok) return; // best-effort : ne bloque pas le rapport si cette vérif échoue
+    const data = await res.json();
+    const titresExistants = new Set((data.sheets || []).map((s) => s.properties.title));
+
+    const manquants = Object.keys(EN_TETES_ONGLETS).filter((onglet) => !titresExistants.has(onglet));
+    if (manquants.length === 0) return;
+
+    await fetch(`${API_BASE}/${spreadsheetId}:batchUpdate`, {
+      method: "POST",
+      headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requests: manquants.map((onglet) => ({ addSheet: { properties: { title: onglet } } })),
+      }),
+    });
+
+    for (const onglet of manquants) {
+      await ecrireValeurs(spreadsheetId, `${onglet}!A1:D1`, [EN_TETES_ONGLETS[onglet]]);
+    }
   }
 
   async function ecrireValeurs(spreadsheetId, range, values) {

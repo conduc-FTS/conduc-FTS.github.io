@@ -357,19 +357,18 @@ document.addEventListener("DOMContentLoaded", () => {
       const cartes = await Promise.all(
         chantiers.map(async (c) => {
           try {
-            const [resume, meta, createdTime] = await Promise.all([
+            const [resume, meta] = await Promise.all([
               FTSSheets.resumeChantier(c.id, c.name),
               FTSDrive.getMetadonneesChantier(c.id),
-              FTSDrive.getFolderCreatedTime(c.id),
             ]);
-            return { chantier: c, resume, meta, createdTime };
+            return { chantier: c, resume, meta };
           } catch (e) {
-            return { chantier: c, resume: { derniereMachine: null, totalMicropieux: 0 }, meta: {}, createdTime: null };
+            return { chantier: c, resume: { derniereMachine: null, totalMicropieux: 0, premierJour: null }, meta: {} };
           }
         })
       );
 
-      grid.innerHTML = cartes.map(({ chantier, resume, meta, createdTime }) => {
+      grid.innerHTML = cartes.map(({ chantier, resume, meta }) => {
         const spaceIdx = chantier.name.search(/\s/);
         const code = spaceIdx > 0 ? chantier.name.slice(0, spaceIdx) : chantier.name;
         const nom = spaceIdx > 0 ? chantier.name.slice(spaceIdx + 1) : "";
@@ -386,10 +385,13 @@ document.addEventListener("DOMContentLoaded", () => {
           ? `<div class="v-progress-bar"><div class="v-progress-fill" style="width:${Math.min(100, (resume.totalMicropieux / prevu) * 100)}%"></div></div>`
           : "";
 
+        // "Jours" compte depuis le premier rapport journalier réellement
+        // soumis pour ce chantier (pas la date de création du dossier
+        // Drive, qui peut précéder le démarrage réel des travaux).
         let joursTxt = "—";
         let jours = null;
-        if (createdTime) {
-          jours = Math.floor((Date.now() - new Date(createdTime).getTime()) / 86400000) + 1;
+        if (resume.premierJour) {
+          jours = Math.floor((Date.now() - resume.premierJour.getTime()) / 86400000) + 1;
           joursTxt = jours > 0 ? String(jours) : "1";
         }
 

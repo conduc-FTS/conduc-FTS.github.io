@@ -343,20 +343,25 @@ const FTSSheets = (() => {
       lireOnglet(spreadsheetId, ONGLET_PRODUCTION),
     ]);
 
-    // Date la plus récente présente dans l'onglet Matériel (les dates
-    // sont au format JJ/MM/AAAA, donc on convertit pour bien comparer)
-    const versDate = (s) => {
-      const [j, m, a] = (s || "").split("/");
-      return j && m && a ? new Date(`${a}-${m}-${j}`) : null;
-    };
+    // Date la plus récente présente dans l'onglet Matériel, et date la
+    // plus ancienne tous onglets confondus (= date du premier rapport
+    // journalier réellement soumis pour ce chantier, utilisée pour "jours
+    // depuis le premier jour de chantier" — pas la date de création du
+    // dossier Drive, qui peut être bien antérieure au démarrage réel).
     let derniereDate = null;
     materiel.forEach((r) => {
-      const d = versDate(r[0]);
+      const d = parseDateFR(r[0]);
       if (d && (!derniereDate || d > derniereDate)) derniereDate = d;
     });
     const derniereDateStr = derniereDate
       ? `${String(derniereDate.getDate()).padStart(2, "0")}/${String(derniereDate.getMonth() + 1).padStart(2, "0")}/${derniereDate.getFullYear()}`
       : null;
+
+    let premierJour = null;
+    [...materiel, ...production].forEach((r) => {
+      const d = parseDateFR(r[0]);
+      if (d && (!premierJour || d < premierJour)) premierJour = d;
+    });
 
     const lignesDuJour = derniereDateStr
       ? materiel.filter((r) => r[0] === derniereDateStr)
@@ -379,6 +384,7 @@ const FTSSheets = (() => {
     return {
       derniereMachine: premiereLigne ? { nom: premiereLigne[1], statut: premiereLigne[2], date: premiereLigne[0] } : null,
       totalMicropieux,
+      premierJour,
     };
   }
 

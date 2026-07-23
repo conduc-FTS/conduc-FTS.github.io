@@ -132,11 +132,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function afficherJoursDepuisOuverture() {
-    if (!chantierId || !window.FTSDrive) return;
+    if (!chantierId || !window.FTSSheets) return;
     try {
-      const createdTime = await FTSDrive.getFolderCreatedTime(chantierId);
-      if (!createdTime) return;
-      const jours = Math.floor((Date.now() - new Date(createdTime).getTime()) / 86400000) + 1;
+      const resume = await FTSSheets.resumeChantier(chantierId, chantierName);
+      if (!resume.premierJour) return;
+      const jours = Math.floor((Date.now() - resume.premierJour.getTime()) / 86400000) + 1;
       document.getElementById("chantierJours").innerHTML =
         `<span class="chantier-jours-badge">Chantier actif depuis ${jours > 0 ? jours : 1} jour${jours > 1 ? "s" : ""}</span>`;
     } catch (e) {

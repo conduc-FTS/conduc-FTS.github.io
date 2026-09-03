@@ -67,7 +67,8 @@ body { margin: 0; display: flex; min-height: 100vh; }
 .se-search-box { display: flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 0.82rem; }
 .se-search-box input { border: none; background: none; outline: none; font-size: 0.82rem; width: 200px; font-family: inherit; }
 
-.se-table { width: 100%; border-collapse: collapse; }
+.se-table-scroll { overflow-x: auto; }
+.se-table { width: 100%; min-width: 720px; border-collapse: collapse; }
 .se-table th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-sub); font-weight: 700; padding: 10px 20px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
 .se-table th .se-arrow { opacity: 0.35; margin-left: 4px; }
 .se-table th.sorted .se-arrow { opacity: 1; color: var(--anthracite); }
@@ -175,6 +176,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
         </div>
       </div>
       <div id="tableWrap">
+        <div class="se-table-scroll">
         <table class="se-table">
           <thead>
             <tr>
@@ -188,6 +190,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
           </thead>
           <tbody id="chantiersTbody"></tbody>
         </table>
+        </div>
         <div class="se-empty-state" id="chantiersEmpty" hidden></div>
       </div>
     </div>

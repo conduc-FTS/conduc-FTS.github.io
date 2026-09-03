@@ -1083,11 +1083,9 @@ async function genererPDF() {
     if (i <= N_MATERIEL) {
       const mat = document.getElementById(`mat_${i}`)?.value || '';
       if (mat) { doc.setTextColor(...C_TXT); doc.text(mat, colX[6]+2, ry+ROW_H/2+1.5); }
-      ['fts','loc'].forEach((k,ci) => {
-        if (document.getElementById(`${k}_${i}`)?.checked) {
-          drawCoche(doc, colX[7+ci], ry, cols[7+ci], ROW_H, C_NOIR, ROW_H);
-        }
-      });
+      const ftsLoc = document.getElementById(`fts_loc_${i}`)?.value || '';
+      if (ftsLoc === 'FTS') drawCoche(doc, colX[7], ry, cols[7], ROW_H, C_NOIR, ROW_H);
+      if (ftsLoc === 'LOC') drawCoche(doc, colX[8], ry, cols[8], ROW_H, C_NOIR, ROW_H);
     }
     doc.setTextColor(...C_TXT);
   }

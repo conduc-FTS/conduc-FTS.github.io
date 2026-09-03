@@ -146,7 +146,7 @@ if ("serviceWorker" in navigator) {
   </div>
 
   <!-- Vue RÉGLAGES -->
-  <main class="app-view" id="view-reglages">
+ <main class="app-view" id="view-reglages">
     <div class="app-body" style="flex-direction:column;max-width:600px">
       <div class="panel">
         <h2 class="panel-title">Compte Google</h2>
@@ -180,36 +180,5 @@ if ("serviceWorker" in navigator) {
 <script src="js/drive.js"></script>
 <script src="js/notifications.js"></script>
 <script src="js/dashboard.js"></script>
-  <script>
-// Transmission du chantier actif vers les apps
-(function() {
-  function mettreAJourTiles(code, nom) {
-    document.querySelectorAll('a.app-tile').forEach(function(a) {
-      const base = (a.getAttribute('href') || '').split('?')[0];
-      a.setAttribute('href', base + '?code=' + encodeURIComponent(code) + '&nom=' + encodeURIComponent(nom));
-    });
-  }
-
-  // Au chargement : restaurer le chantier sauvegardé
-  try {
-    const actif = JSON.parse(localStorage.getItem('fts_chantier_actif') || 'null');
-    if (actif && actif.code) mettreAJourTiles(actif.code, actif.nom || '');
-  } catch(e) {}
-
-  // Quand Hugo sélectionne un chantier → sauvegarder + mettre à jour les liens
-  document.addEventListener('change', function(e) {
-    if (e.target.id !== 'chantierActifSelect') return;
-    const texte = e.target.options[e.target.selectedIndex]?.text?.trim() || '';
-    if (!texte || texte.includes('lectio')) return;
-    const parts = texte.split(' ');
-    const code = parts[0];
-    const nom  = parts.slice(1).join(' ');
-    try {
-      localStorage.setItem('fts_chantier_actif', JSON.stringify({ code, nom }));
-    } catch(e) {}
-    mettreAJourTiles(code, nom);
-  });
-})();
-</script>
 </body>
 </html>

@@ -828,6 +828,15 @@ function clearSig() {
 }
 
 // ─── Google Drive ──────────────────────────────────────────────
+// Code utilisé pour retrouver le dossier Drive du chantier : le N° dossier
+// (ex. 26FTS087). Si vide, on tente le premier mot du champ chantier.
+function codeChantierRecherche() {
+  const dossier = document.getElementById('dossier').value.trim();
+  if (dossier) return dossier;
+  const chantier = document.getElementById('chantier').value.trim();
+  return chantier.split(/\s+/)[0] || '';
+}
+
 // ─── Validation & génération PDF ──────────────────────────────
 async function validerRapport() {
   const date    = document.getElementById('date').value;
@@ -844,7 +853,7 @@ async function validerRapport() {
     }
     if (numerosPieux.length > 0) {
       try {
-        const chantierRoot = await FTSDrive.findChantierFolder(chantier);
+        const chantierRoot = await FTSDrive.findChantierFolder(codeChantierRecherche());
         if (chantierRoot) {
           const conflits = await FTSSheets.verifierPieuxDejaRealises(
             chantierRoot.id, chantierRoot.name, numerosPieux, formatDate(date)
@@ -863,7 +872,7 @@ async function validerRapport() {
   // Vérification qu'un rapport n'existe pas déjà pour cette date
   if (window.FTSAuth && FTSAuth.isSignedIn() && window.FTSDrive) {
     try {
-      const { id: rapportsFolderId } = await FTSDrive.getDossierModuleChantier(chantier, 'RAPPORT JOURNALIER');
+      const { id: rapportsFolderId } = await FTSDrive.getDossierModuleChantier(codeChantierRecherche(), 'RAPPORT JOURNALIER');
       const dossierVal = document.getElementById('dossier').value.trim().toUpperCase();
       const fileNameAttendu = `${date}_Rapport journalier_${dossierVal}.pdf`;
       const fichiers = await FTSDrive.listFilesInFolder(rapportsFolderId);
@@ -1351,9 +1360,9 @@ async function uploadToDrive(blob, fileName) {
   showToast('⏳ Envoi sur Google Drive...', '');
 
   const chantierName = document.getElementById('chantier').value.trim();
-  if (!chantierName) throw new Error('Veuillez renseigner le chantier avant d\'enregistrer.');
+  if (!codeChantierRecherche()) throw new Error('Veuillez renseigner le N° dossier avant d\'enregistrer.');
 
-  const { id: rapportsFolderId } = await FTSDrive.getDossierModuleChantier(chantierName, 'RAPPORT JOURNALIER');
+  const { id: rapportsFolderId } = await FTSDrive.getDossierModuleChantier(codeChantierRecherche(), 'RAPPORT JOURNALIER');
   await FTSDrive.uploadFile(blob, fileName, 'application/pdf', rapportsFolderId, { remplacerSiExiste: true });
 
   // Archivage en double dans le suivi administratif personnel du chef
@@ -1393,7 +1402,7 @@ async function uploadToDrive(blob, fileName) {
 async function enregistrerSuiviChantier(chantierName) {
   if (!window.FTSSheets) return;
 
-  const chantierRoot = await FTSDrive.findChantierFolder(chantierName);
+  const chantierRoot = await FTSDrive.findChantierFolder(codeChantierRecherche());
   if (!chantierRoot) return;
 
   const dateAffichage = formatDate(document.getElementById('date').value);

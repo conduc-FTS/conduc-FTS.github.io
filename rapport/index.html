@@ -507,15 +507,15 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <div class="field-label">Nom du chef de chantier</div>
         <input type="text" id="nomChef" list="listeChefs" placeholder="Prénom NOM" autocomplete="off">
         <datalist id="listeChefs">
-          <option value="Hamid ABBOUCHE">
-          <option value="Cédric BERGADIEU">
-          <option value="Frédéric BOURBON">
-          <option value="Jeff CORBELLA">
-          <option value="David DIAS">
-          <option value="Bruno LABARTHE">
-          <option value="Hugo LAJUS">
-          <option value="Roger RAIDI">
-          <option value="Romain SEREMPIOUQUE">
+          <option value="HAMID ABBOUCHE">
+          <option value="CÉDRIC BERGADIEU">
+          <option value="FRÉDÉRIC BOURBON">
+          <option value="JEFF CORBELLA">
+          <option value="DAVID DIAS">
+          <option value="BRUNO LABARTHE">
+          <option value="HUGO LAJUS">
+          <option value="ROGER RAIDI">
+          <option value="ROMAIN SEREMPIOUQUE">
         </datalist>
       </div>
     </div>
@@ -682,6 +682,33 @@ document.addEventListener('DOMContentLoaded', () => {
         <label class="pers-check"><input type="checkbox" id="int_${i}"><span class="pers-check-box">✓</span></label>
       </div>`;
   }
+
+  // Pré-remplissage depuis le chantier actif choisi sur le dashboard
+  // (localStorage 'fts_chantier_actif'). Les deux champs restent modifiables.
+  try {
+    const raw = localStorage.getItem('fts_chantier_actif');
+    const actif = raw ? JSON.parse(raw) : null;
+    if (actif && actif.name) {
+      const spaceIdx = actif.name.search(/\s/);
+      const code = spaceIdx > 0 ? actif.name.slice(0, spaceIdx) : actif.name;
+      const nom  = spaceIdx > 0 ? actif.name.slice(spaceIdx + 1) : actif.name;
+      if (!document.getElementById('dossier').value)  document.getElementById('dossier').value  = code.toUpperCase();
+      if (!document.getElementById('chantier').value) document.getElementById('chantier').value = nom.toUpperCase();
+    }
+  } catch (e) { /* pas de chantier actif : saisie manuelle */ }
+
+  // MAJUSCULES forcées sur le personnel et le nom du chef (comme dossier/chantier)
+  const forcerMajuscules = (el) => {
+    if (!el) return;
+    el.style.textTransform = 'uppercase';
+    el.addEventListener('input', () => {
+      const pos = el.selectionStart;
+      el.value = el.value.toUpperCase();
+      try { el.setSelectionRange(pos, pos); } catch (e) {}
+    });
+  };
+  for (let i = 1; i <= N_PERS; i++) forcerMajuscules(document.getElementById(`nom_${i}`));
+  forcerMajuscules(document.getElementById('nomChef'));
 
   initSignature();
 

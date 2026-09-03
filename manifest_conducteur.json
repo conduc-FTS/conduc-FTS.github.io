@@ -1,8 +1,8 @@
 {
-  "name": "Dashboard Conducteur FTS",
-  "short_name": "Dashboard Conducteur",
-  "description": "Ouverture de chantier, suivi et vérification des doublons de pieux — pour les conducteurs de travaux",
-  "start_url": "/nouveau-chantier/",
+  "name": "Supervision Encadrement FTS",
+  "short_name": "Supervision",
+  "description": "Vue d'ensemble des chantiers, creation de chantier, pointage materiel/personnel — pour les conducteurs de travaux",
+  "start_url": "/supervision-encadrement/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",

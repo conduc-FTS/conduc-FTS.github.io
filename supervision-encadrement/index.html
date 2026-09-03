@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#3A3A3A">
+<link rel="manifest" href="../manifest_conducteur.json">
+<link rel="icon" type="image/png" sizes="192x192" href="../icon-dashboard-192.png">
+<script>
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashboard.js").catch(() => {}); }
+</script>
+<title>FTS — Supervision Encadrement</title>
+<link rel="stylesheet" href="../css/dashboard.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; display: flex; min-height: 100vh; }
+
+/* ─── Barre latérale ─────────────────────────────────────── */
+.se-sidebar {
+  width: 230px; background: var(--anthracite); color: white;
+  display: flex; flex-direction: column; flex-shrink: 0;
+  position: sticky; top: 0; height: 100vh;
+}
+.se-sidebar-brand { padding: 20px 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.se-sidebar-brand img { height: 32px; width: auto; background: white; border-radius: 6px; padding: 3px 6px; flex-shrink: 0; }
+.se-sidebar-brand div div:first-child { font-weight: 800; font-size: 0.82rem; letter-spacing: 0.02em; }
+.se-sidebar-brand div div:last-child { font-size: 0.66rem; color: #B8BAC0; }
+.se-sidebar-nav { flex: 1; padding: 14px 10px; display: flex; flex-direction: column; gap: 3px; }
+.se-sidebar-nav button, .se-sidebar-nav a {
+  color: #C9CBCF; text-decoration: none; padding: 10px 12px; border-radius: 8px;
+  font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 10px;
+  background: none; border: none; cursor: pointer; width: 100%; text-align: left; font-family: inherit;
+}
+.se-sidebar-nav button.active { background: var(--fts-yellow); color: var(--anthracite); }
+.se-sidebar-nav button:hover:not(.active), .se-sidebar-nav a:hover { background: rgba(255,255,255,0.06); }
+.se-sidebar-footer { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.72rem; color: #B8BAC0; }
+.se-sidebar-footer .email { color: white; font-weight: 600; display: block; margin: 2px 0 8px 0; word-break: break-all; }
+.se-sidebar-footer button {
+  background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 6px;
+  padding: 7px 10px; font-size: 0.74rem; font-weight: 600; cursor: pointer; width: 100%;
+}
+.se-sidebar-footer button:hover { background: rgba(255,255,255,0.18); }
+
+.se-main { flex: 1; padding: 30px 36px; max-width: 1500px; }
+.se-view { display: none; }
+.se-view.active { display: block; }
+.se-page-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
+.se-page-sub { color: var(--text-sub); font-size: 0.88rem; margin-bottom: 22px; }
+
+/* ─── KPI ─────────────────────────────────────────────────── */
+.se-kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+.se-kpi-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.se-kpi-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-sub); font-weight: 700; margin-bottom: 8px; }
+.se-kpi-value { font-size: 1.7rem; font-weight: 800; }
+.se-kpi-value.alert { color: #C0392B; }
+.se-kpi-sub { font-size: 0.74rem; color: var(--text-sub); margin-top: 3px; }
+
+/* ─── Panel + tableau ─────────────────────────────────────── */
+.se-panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.se-panel-head { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 10px; }
+.se-panel-head h2 { font-size: 1rem; font-weight: 800; margin: 0; }
+.se-panel-head-right { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.se-filter-chips { display: flex; gap: 6px; background: var(--bg); padding: 3px; border-radius: 8px; }
+.se-filter-chip { font-size: 0.76rem; font-weight: 700; color: var(--text-sub); padding: 5px 12px; border-radius: 6px; cursor: pointer; border: none; background: none; font-family: inherit; }
+.se-filter-chip.active { background: white; color: var(--anthracite); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+.se-search-box { display: flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 0.82rem; }
+.se-search-box input { border: none; background: none; outline: none; font-size: 0.82rem; width: 200px; font-family: inherit; }
+
+.se-table { width: 100%; border-collapse: collapse; }
+.se-table th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-sub); font-weight: 700; padding: 10px 20px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
+.se-table th .se-arrow { opacity: 0.35; margin-left: 4px; }
+.se-table th.sorted .se-arrow { opacity: 1; color: var(--anthracite); }
+.se-table td { padding: 13px 20px; border-bottom: 1px solid var(--border); font-size: 0.86rem; vertical-align: middle; }
+.se-table tr:last-child td { border-bottom: none; }
+.se-table tbody tr { cursor: pointer; }
+.se-table tbody tr:hover td { background: #FAFBFC; }
+.se-code { color: var(--text-sub); font-size: 0.72rem; display: block; }
+.se-nom { font-weight: 700; }
+.se-type-badge { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 6px; white-space: nowrap; }
+.se-type-mp { background: #EAF1FE; color: #2A5DBF; }
+.se-type-pieux { background: #FDEEF1; color: #B84A63; }
+.se-statut-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+.se-statut-chip .se-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.se-statut-travail { background: #EAF6EE; color: #1D6E3E; } .se-statut-travail .se-dot { background: #27AE60; }
+.se-statut-panne { background: #FDECEA; color: #8E2E22; } .se-statut-panne .se-dot { background: #C0392B; }
+.se-statut-arret { background: #F0F1F3; color: #5B6270; } .se-statut-arret .se-dot { background: #9AA0AA; }
+.se-statut-transport { background: #EAF1FE; color: #2A5DBF; } .se-statut-transport .se-dot { background: #4C82F0; }
+.se-progress-cell { display: flex; flex-direction: column; gap: 4px; min-width: 80px; }
+.se-progress-nums { font-weight: 700; font-size: 0.84rem; }
+.se-progress-bar { height: 5px; background: #EEE; border-radius: 3px; overflow: hidden; }
+.se-progress-fill { height: 100%; background: var(--fts-yellow); }
+.se-progress-fill.retard { background: #C0392B; }
+.se-alert-badge { color: #C0392B; font-size: 0.66rem; font-weight: 800; margin-left: 6px; white-space: nowrap; }
+.se-last-activity { color: var(--text-sub); font-size: 0.8rem; white-space: nowrap; }
+.se-empty-state { padding: 40px 20px; text-align: center; color: var(--text-sub); font-size: 0.88rem; }
+
+@media (max-width: 1000px) {
+  .se-kpi-row { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 720px) {
+  body { flex-direction: column; }
+  .se-sidebar { width: 100%; height: auto; position: static; flex-direction: row; align-items: center; }
+  .se-sidebar-nav { flex-direction: row; overflow-x: auto; }
+  .se-sidebar-footer { display: none; }
+  .se-main { padding: 20px; }
+  .se-kpi-row { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="se-sidebar">
+  <div class="se-sidebar-brand">
+    <img src="../assets/logo-fts.png" alt="FTS">
+    <div>
+      <div>SUPERVISION</div>
+      <div>Fondations et Travaux Spéciaux</div>
+    </div>
+  </div>
+  <div class="se-sidebar-nav">
+    <button type="button" class="se-nav-btn active" data-view="se-view-overview">📊 Vue d'ensemble</button>
+    <button type="button" class="se-nav-btn" data-view="se-view-creer">➕ Créer un chantier</button>
+    <a href="../recap-hebdo/index.html?type=materiel">🔧 Pointage Matériel</a>
+    <a href="../recap-hebdo/index.html?type=personnel">👷 Pointage Personnel</a>
+  </div>
+  <div class="se-sidebar-footer">
+    <span id="userDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#9AA0AA;margin-right:5px"></span>Connexion
+    <span class="email" id="userLabel">Non connecté</span>
+    <button type="button" id="signInBtn">Se connecter</button>
+    <button type="button" id="signOutBtn" hidden>Se déconnecter</button>
+  </div>
+</div>
+
+<div class="se-main">
+
+  <!-- ─── VUE D'ENSEMBLE ─────────────────────────────────── -->
+  <div class="se-view active" id="se-view-overview">
+    <div class="se-page-title">Vue d'ensemble</div>
+    <div class="se-page-sub" id="overviewDate"></div>
+
+    <div class="se-kpi-row">
+      <div class="se-kpi-card">
+        <div class="se-kpi-label">Chantiers actifs</div>
+        <div class="se-kpi-value" id="kpiChantiers">—</div>
+        <div class="se-kpi-sub" id="kpiChantiersSub">&nbsp;</div>
+      </div>
+      <div class="se-kpi-card">
+        <div class="se-kpi-label">Total micropieux réalisés</div>
+        <div class="se-kpi-value" id="kpiMicropieux">—</div>
+        <div class="se-kpi-sub">tous chantiers, cumul</div>
+      </div>
+      <div class="se-kpi-card">
+        <div class="se-kpi-label">Chantiers en retard</div>
+        <div class="se-kpi-value" id="kpiRetard">—</div>
+        <div class="se-kpi-sub">jours écoulés &gt; durée prévue</div>
+      </div>
+      <div class="se-kpi-card">
+        <div class="se-kpi-label">Heures pointées cette semaine</div>
+        <div class="se-kpi-value" id="kpiHeures">—</div>
+        <div class="se-kpi-sub" id="kpiHeuresSub">&nbsp;</div>
+      </div>
+    </div>
+
+    <div class="se-panel">
+      <div class="se-panel-head">
+        <h2>Chantiers en cours</h2>
+        <div class="se-panel-head-right">
+          <div class="se-filter-chips" id="typeFilterChips">
+            <button type="button" class="se-filter-chip active" data-type="">Tous</button>
+            <button type="button" class="se-filter-chip" data-type="Micropieux">Micropieux</button>
+            <button type="button" class="se-filter-chip" data-type="Pieux">Pieux</button>
+          </div>
+          <div class="se-search-box">🔍<input type="text" id="rechercheChantier" placeholder="Rechercher..."></div>
+        </div>
+      </div>
+      <div id="tableWrap">
+        <table class="se-table">
+          <thead>
+            <tr>
+              <th data-sort="nom">Chantier <span class="se-arrow">↕</span></th>
+              <th data-sort="type">Type <span class="se-arrow">↕</span></th>
+              <th>Statut foreuse</th>
+              <th data-sort="jours">Jours <span class="se-arrow">↕</span></th>
+              <th data-sort="micropieux">Micropieux <span class="se-arrow">↕</span></th>
+              <th>Dernière activité</th>
+            </tr>
+          </thead>
+          <tbody id="chantiersTbody"></tbody>
+        </table>
+        <div class="se-empty-state" id="chantiersEmpty" hidden></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── CRÉER UN CHANTIER ──────────────────────────────── -->
+  <div class="se-view" id="se-view-creer">
+    <div class="se-page-title">Créer un chantier</div>
+    <div class="se-page-sub">Crée l'arborescence Drive avant de le partager avec le chef de chantier — n'apparaît pas dans l'appli tablette du chef.</div>
+
+    <div class="se-panel" style="padding: 22px 24px">
+      <form class="chantier-form" id="chantierForm">
+        <div class="field">
+          <label for="numAffaire">N° affaire</label>
+          <input type="text" id="numAffaire" placeholder="ex : 25 FTS 381" required>
+        </div>
+        <div class="field">
+          <label for="nomChantier">Nom du chantier</label>
+          <input type="text" id="nomChantier" placeholder="ex : CAP8000 Auchan Lac" required>
+        </div>
+        <div class="field">
+          <label for="typeChantier">Type de chantier</label>
+          <select id="typeChantier">
+            <option value="Micropieux">Micropieux</option>
+            <option value="Pieux">Pieux</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="adresseChantier">Adresse / commune (optionnel)</label>
+          <input type="text" id="adresseChantier" placeholder="ex : Talence / Bordeaux">
+        </div>
+        <div class="field">
+          <label for="gpsChantier">Coordonnées GPS (optionnel, si pas d'adresse précise)</label>
+          <input type="text" id="gpsChantier" placeholder="ex : 44.833328, -0.577580">
+        </div>
+        <div class="field">
+          <label for="nbMicropieuxPrevus">Nombre de micropieux prévus (optionnel)</label>
+          <input type="number" id="nbMicropieuxPrevus" placeholder="ex : 25" min="0">
+        </div>
+        <div class="field">
+          <label for="dureeChantier">Durée de chantier (jours, optionnel)</label>
+          <input type="number" id="dureeChantier" placeholder="ex : 15" min="0">
+        </div>
+        <div class="field">
+          <label for="montantVendu">Montant total vendu (€, optionnel)</label>
+          <input type="number" id="montantVendu" placeholder="ex : 45000" min="0" step="0.01">
+        </div>
+        <button type="submit" class="btn-primary">Créer le chantier</button>
+      </form>
+      <p class="form-status" id="chantierStatus"></p>
+    </div>
+  </div>
+
+</div>
+
+<script src="../js/auth.js"></script>
+<script src="../js/drive.js"></script>
+<script src="../js/sheets.js"></script>
+<script src="../js/calendar.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+  // Date locale au format AAAA-MM-JJ, sans toISOString() (UTC — décale la
+  // date d'un jour la nuit en France l'été).
+  function dateLocaleISO(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  document.getElementById("overviewDate").textContent =
+    "Supervision de tous les chantiers en cours — " + new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  // --- Navigation barre latérale ---
+  document.querySelectorAll(".se-nav-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".se-nav-btn").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".se-view").forEach((v) => v.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById(btn.dataset.view).classList.add("active");
+    });
+  });
+
+  // --- Compte Google ---
+  if (window.FTSAuth) {
+    FTSAuth.init();
+    FTSAuth.onAuthChange(updateUserBlock);
+    updateUserBlock(FTSAuth.isSignedIn());
+  }
+
+  async function updateUserBlock(signedIn) {
+    const dot = document.getElementById("userDot");
+    const label = document.getElementById("userLabel");
+    const signInBtn = document.getElementById("signInBtn");
+    const signOutBtn = document.getElementById("signOutBtn");
+
+    if (!signedIn) {
+      dot.style.background = "#9AA0AA";
+      label.textContent = "Non connecté";
+      signInBtn.hidden = false;
+      signOutBtn.hidden = true;
+      return;
+    }
+    dot.style.background = "#27AE60";
+    signInBtn.hidden = true;
+    signOutBtn.hidden = false;
+    label.textContent = "Connecté";
+    if (window.FTSAuth) {
+      const info = await FTSAuth.getUserInfo();
+      if (info) label.textContent = info.email || info.name || "Connecté";
+    }
+    chargerVueEnsemble();
+  }
+
+  document.getElementById("signInBtn").addEventListener("click", () => window.FTSAuth && FTSAuth.signIn());
+  document.getElementById("signOutBtn").addEventListener("click", () => window.FTSAuth && FTSAuth.signOut());
+
+  // --- Créer un chantier ---
+  ["numAffaire", "nomChantier", "adresseChantier"].forEach((id) => {
+    const el = document.getElementById(id);
+    el.addEventListener("input", () => {
+      const pos = el.selectionStart;
+      el.value = el.value.toUpperCase();
+      el.setSelectionRange(pos, pos);
+    });
+  });
+
+  const chantierForm = document.getElementById("chantierForm");
+  const chantierStatus = document.getElementById("chantierStatus");
+
+  chantierForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const numAffaire = document.getElementById("numAffaire").value.trim();
+    const nomChantier = document.getElementById("nomChantier").value.trim();
+    const typeChantier = document.getElementById("typeChantier").value;
+    const adresseChantier = document.getElementById("adresseChantier").value.trim();
+    const gpsChantier = document.getElementById("gpsChantier").value.trim();
+    const nbMicropieuxPrevus = document.getElementById("nbMicropieuxPrevus").value.trim();
+    const dureeChantier = document.getElementById("dureeChantier").value.trim();
+    const montantVendu = document.getElementById("montantVendu").value.trim();
+    const submitBtn = chantierForm.querySelector(".btn-primary");
+
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
+      chantierStatus.textContent = "Connecte-toi d'abord pour créer l'arborescence Drive.";
+      return;
+    }
+    if (!window.FTSDrive) {
+      chantierStatus.textContent = "Erreur : module Drive non chargé.";
+      return;
+    }
+
+    submitBtn.disabled = true;
+    chantierStatus.textContent = "Création de l'arborescence Drive en cours...";
+
+    try {
+      const result = await FTSDrive.creerArborescenceChantier({
+        numAffaire, nom: nomChantier, typeChantier, adresse: adresseChantier, gps: gpsChantier,
+        micropieuxPrevus: nbMicropieuxPrevus, dureeChantier, montantVendu,
+      });
+      const subfolderNames = Object.keys(result.subfolders).filter((k) => !k.includes("/"));
+      const statusPrefix = result.reused
+        ? `Dossier chantier "${result.chantierName}" déjà existant, sous-dossiers vérifiés`
+        : `Chantier "${result.chantierName}" (${typeChantier}) créé sur Drive`;
+      chantierStatus.textContent = `${statusPrefix} (${subfolderNames.join(", ")}, + ACCUEIL SECURITE dans SECURITE). Il apparaîtra dans le sélecteur "Chantier actif" de l'appli.`;
+      chantierForm.reset();
+      chargerVueEnsemble();
+    } catch (err) {
+      console.error("Erreur création chantier :", err);
+      chantierStatus.textContent = `Erreur : ${err.message}`;
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  // --- Vue d'ensemble : chargement des données ---
+  const ICONE_STATUT = {
+    TRAVAIL: "se-statut-travail", PANNE: "se-statut-panne",
+    ARRET: "se-statut-arret", TRANSPORT: "se-statut-transport",
+  };
+
+  let donneesChantiers = [];
+  let filtreType = "";
+  let filtreRecherche = "";
+  let triColonne = "nom";
+  let triSens = 1;
+
+  function escapeHtmlSE(str) {
+    const div = document.createElement("div");
+    div.textContent = str || "";
+    return div.innerHTML;
+  }
+
+  async function chargerVueEnsemble() {
+    const tbody = document.getElementById("chantiersTbody");
+    const empty = document.getElementById("chantiersEmpty");
+    if (!window.FTSDrive || !window.FTSSheets) return;
+
+    tbody.innerHTML = "";
+    empty.hidden = false;
+    empty.textContent = "Chargement des chantiers...";
+
+    try {
+      const chantiers = await FTSDrive.listChantiers();
+      if (chantiers.length === 0) {
+        empty.textContent = "Aucun chantier créé pour l'instant.";
+        document.getElementById("kpiChantiers").textContent = "0";
+        document.getElementById("kpiMicropieux").textContent = "0";
+        document.getElementById("kpiRetard").textContent = "0";
+        return;
+      }
+
+      const details = await Promise.all(
+        chantiers.map(async (c) => {
+          try {
+            const [resume, meta] = await Promise.all([
+              FTSSheets.resumeChantier(c.id, c.name),
+              FTSDrive.getMetadonneesChantier(c.id),
+            ]);
+            return { chantier: c, resume, meta };
+          } catch (e) {
+            return { chantier: c, resume: { derniereMachine: null, totalMicropieux: 0, premierJour: null }, meta: {} };
+          }
+        })
+      );
+
+      donneesChantiers = details.map(({ chantier, resume, meta }) => {
+        const spaceIdx = chantier.name.search(/\s/);
+        const code = spaceIdx > 0 ? chantier.name.slice(0, spaceIdx) : chantier.name;
+        const nom = spaceIdx > 0 ? chantier.name.slice(spaceIdx + 1) : chantier.name;
+
+        let jours = null;
+        if (resume.premierJour) {
+          jours = Math.floor((Date.now() - resume.premierJour.getTime()) / 86400000) + 1;
+          if (jours < 1) jours = 1;
+        }
+        const duree = meta.dureeChantier || null;
+        const prevu = meta.micropieuxPrevus || null;
+        const enRetard = !!(duree && jours !== null && jours > duree);
+
+        return {
+          id: chantier.id, code, nom, nomComplet: chantier.name,
+          type: meta.typeChantier || "Micropieux",
+          statut: resume.derniereMachine?.statut || null,
+          jours, duree, enRetard,
+          micropieux: resume.totalMicropieux || 0, prevu,
+          derniereDate: resume.derniereMachine?.date || null,
+        };
+      });
+
+      // KPI
+      document.getElementById("kpiChantiers").textContent = String(donneesChantiers.length);
+      const enTravail = donneesChantiers.filter((c) => c.statut === "TRAVAIL").length;
+      document.getElementById("kpiChantiersSub").textContent = `${enTravail} en travail`;
+      document.getElementById("kpiMicropieux").textContent = String(donneesChantiers.reduce((s, c) => s + c.micropieux, 0));
+      const nbRetard = donneesChantiers.filter((c) => c.enRetard).length;
+      const kpiRetardEl = document.getElementById("kpiRetard");
+      kpiRetardEl.textContent = String(nbRetard);
+      kpiRetardEl.classList.toggle("alert", nbRetard > 0);
+
+      chargerHeuresSemaine();
+      afficherTableau();
+    } catch (err) {
+      console.error("Erreur chargement vue d'ensemble :", err);
+      empty.textContent = `Erreur : ${err.message}`;
+    }
+  }
+
+  function lundiDeLaSemaine(d) {
+    const date = new Date(d);
+    const jour = date.getDay();
+    const diff = jour === 0 ? -6 : 1 - jour;
+    date.setDate(date.getDate() + diff);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }
+
+  async function chargerHeuresSemaine() {
+    const kpiHeures = document.getElementById("kpiHeures");
+    const kpiHeuresSub = document.getElementById("kpiHeuresSub");
+    try {
+      const lundi = lundiDeLaSemaine(new Date());
+      const samedi = new Date(lundi);
+      samedi.setDate(samedi.getDate() + 5);
+      const entrees = await FTSSheets.listerPointageToutesChantiers("Personnel", dateLocaleISO(lundi), dateLocaleISO(samedi));
+      const totalHeures = entrees.reduce((s, e) => s + (parseFloat((e.cols[4] || "").replace(",", ".")) || 0), 0);
+      const personnesUniques = new Set(entrees.map((e) => e.cols[1])).size;
+      kpiHeures.textContent = `${totalHeures.toFixed(0)}h`;
+      kpiHeuresSub.textContent = `${personnesUniques} personne${personnesUniques > 1 ? "s" : ""}`;
+    } catch (e) {
+      kpiHeures.textContent = "—";
+      kpiHeuresSub.textContent = "indisponible";
+    }
+  }
+
+  function afficherTableau() {
+    const tbody = document.getElementById("chantiersTbody");
+    const empty = document.getElementById("chantiersEmpty");
+
+    let lignes = donneesChantiers.filter((c) => {
+      if (filtreType && c.type !== filtreType) return false;
+      if (filtreRecherche) {
+        const cible = (c.code + " " + c.nom).toLowerCase();
+        if (!cible.includes(filtreRecherche.toLowerCase())) return false;
+      }
+      return true;
+    });
+
+    const cles = {
+      nom: (c) => c.nomComplet,
+      type: (c) => c.type,
+      jours: (c) => (c.jours === null ? -1 : c.jours),
+      micropieux: (c) => c.micropieux,
+    };
+    const cleTri = cles[triColonne] || cles.nom;
+    lignes.sort((a, b) => {
+      const va = cleTri(a), vb = cleTri(b);
+      if (va < vb) return -1 * triSens;
+      if (va > vb) return 1 * triSens;
+      return 0;
+    });
+
+    if (lignes.length === 0) {
+      tbody.innerHTML = "";
+      empty.hidden = false;
+      empty.textContent = "Aucun chantier ne correspond à ce filtre.";
+      return;
+    }
+    empty.hidden = true;
+
+    tbody.innerHTML = lignes.map((c) => {
+      const typeClass = c.type === "Pieux" ? "se-type-pieux" : "se-type-mp";
+      const statutHtml = c.statut
+        ? `<span class="se-statut-chip ${ICONE_STATUT[c.statut] || "se-statut-arret"}"><span class="se-dot"></span>${c.statut}</span>`
+        : `<span class="se-statut-chip se-statut-arret"><span class="se-dot"></span>—</span>`;
+
+      const joursTxt = c.jours === null ? "—" : (c.duree ? `${c.jours} / ${c.duree}j` : `${c.jours}j`);
+      const joursBar = c.duree
+        ? `<div class="se-progress-bar"><div class="se-progress-fill ${c.enRetard ? "retard" : ""}" style="width:${Math.min(100, (c.jours / c.duree) * 100)}%"></div></div>`
+        : "";
+
+      const mpTxt = c.prevu ? `${c.micropieux} / ${c.prevu}` : String(c.micropieux);
+      const mpBar = c.prevu
+        ? `<div class="se-progress-bar"><div class="se-progress-fill" style="width:${Math.min(100, (c.micropieux / c.prevu) * 100)}%"></div></div>`
+        : "";
+
+      return `
+        <tr data-id="${c.id}" data-name="${escapeHtmlSE(c.nomComplet)}">
+          <td><span class="se-code">${escapeHtmlSE(c.code)}</span><span class="se-nom">${escapeHtmlSE(c.nom)}${c.enRetard ? '<span class="se-alert-badge">⚠ RETARD</span>' : ""}</span></td>
+          <td><span class="se-type-badge ${typeClass}">${c.type}</span></td>
+          <td>${statutHtml}</td>
+          <td><div class="se-progress-cell"><span class="se-progress-nums">${joursTxt}</span>${joursBar}</div></td>
+          <td><div class="se-progress-cell"><span class="se-progress-nums">${mpTxt}</span>${mpBar}</div></td>
+          <td class="se-last-activity">${c.derniereDate ? escapeHtmlSE(c.derniereDate) : "Aucune donnée"}</td>
+        </tr>`;
+    }).join("");
+
+    tbody.querySelectorAll("tr").forEach((tr) => {
+      tr.addEventListener("click", () => {
+        window.location.href = `../detail-chantier/index.html?id=${encodeURIComponent(tr.dataset.id)}&name=${encodeURIComponent(tr.dataset.name)}`;
+      });
+    });
+  }
+
+  document.querySelectorAll(".se-filter-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll(".se-filter-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      filtreType = chip.dataset.type;
+      afficherTableau();
+    });
+  });
+
+  document.getElementById("rechercheChantier").addEventListener("input", (e) => {
+    filtreRecherche = e.target.value;
+    afficherTableau();
+  });
+
+  document.querySelectorAll("th[data-sort]").forEach((th) => {
+    th.addEventListener("click", () => {
+      const col = th.dataset.sort;
+      if (triColonne === col) { triSens *= -1; } else { triColonne = col; triSens = 1; }
+      document.querySelectorAll("th[data-sort]").forEach((t) => t.classList.remove("sorted"));
+      th.classList.add("sorted");
+      afficherTableau();
+    });
+  });
+
+  if (window.FTSAuth && FTSAuth.isSignedIn()) {
+    chargerVueEnsemble();
+  }
+});
+</script>
+</body>
+</html>

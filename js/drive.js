@@ -249,14 +249,15 @@ const FTSDrive = (() => {
       subfolders["SECURITE"]
     );
 
-    // Métadonnées du chantier (adresse, GPS, nombre de micropieux prévus,
-    // durée, montant vendu) stockées sur le dossier lui-même, en JSON dans
-    // son champ description — réutilisées plus tard pour le plan d'accès
-    // et les carrés récapitulatifs.
-    if (chantier.adresse || chantier.gps || chantier.micropieuxPrevus || chantier.dureeChantier || chantier.montantVendu) {
+    // Métadonnées du chantier (type, adresse, GPS, nombre de micropieux
+    // prévus, durée, montant vendu) stockées sur le dossier lui-même, en
+    // JSON dans son champ description — réutilisées plus tard pour le plan
+    // d'accès et les carrés récapitulatifs.
+    {
       const metaExistante = await getMetadonneesChantier(chantierId);
       const metaMisAJour = {
         ...metaExistante,
+        typeChantier: chantier.typeChantier || metaExistante.typeChantier || "Micropieux",
         ...(chantier.adresse ? { adresse: chantier.adresse } : {}),
         ...(chantier.gps ? { gps: chantier.gps } : {}),
         ...(chantier.micropieuxPrevus ? { micropieuxPrevus: Number(chantier.micropieuxPrevus) } : {}),

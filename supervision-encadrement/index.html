@@ -435,11 +435,14 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       // KPI
-      document.getElementById("kpiChantiers").textContent = String(donneesChantiers.length);
-      const enTravail = donneesChantiers.filter((c) => c.statut === "TRAVAIL").length;
+      // "Actif" = au moins un rapport journalier soumis (jours > 0) —
+      // un chantier tout juste créé, sans encore de rapport, ne compte pas.
+      const chantiersActifs = donneesChantiers.filter((c) => c.jours && c.jours > 0);
+      document.getElementById("kpiChantiers").textContent = String(chantiersActifs.length);
+      const enTravail = chantiersActifs.filter((c) => c.statut === "TRAVAIL").length;
       document.getElementById("kpiChantiersSub").textContent = `${enTravail} en travail`;
       document.getElementById("kpiMicropieux").textContent = String(donneesChantiers.reduce((s, c) => s + c.micropieux, 0));
-      const nbRetard = donneesChantiers.filter((c) => c.enRetard).length;
+      const nbRetard = chantiersActifs.filter((c) => c.enRetard).length;
       const kpiRetardEl = document.getElementById("kpiRetard");
       kpiRetardEl.textContent = String(nbRetard);
       kpiRetardEl.classList.toggle("alert", nbRetard > 0);

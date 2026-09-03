@@ -391,10 +391,21 @@ const FTSSheets = (() => {
 
     const totalMicropieux = production.reduce((sum, r) => sum + (Number(r[1]) || 0), 0);
 
+    // "Jours de chantier" = nombre de jours où un rapport a réellement été
+    // soumis (une ligne Production par jour de rapport, jamais dupliquée
+    // vu qu'une resoumission du même jour remplace la ligne). PAS un
+    // décompte calendaire depuis le premier rapport : si un chef est
+    // envoyé sur un autre chantier entre-temps, l'étude est en stand-by
+    // et ces jours de pause ne doivent pas compter.
+    const joursRapportesSet = new Set();
+    production.forEach((r) => { if (r[0]) joursRapportesSet.add(r[0]); });
+    const joursRapportes = joursRapportesSet.size;
+
     return {
       derniereMachine: premiereLigne ? { nom: premiereLigne[1], statut: premiereLigne[2], date: premiereLigne[0] } : null,
       totalMicropieux,
       premierJour,
+      joursRapportes,
     };
   }
 

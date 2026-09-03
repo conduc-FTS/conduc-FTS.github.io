@@ -142,10 +142,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!chantierId || !window.FTSSheets) return;
     try {
       const resume = await FTSSheets.resumeChantier(chantierId, chantierName);
-      if (!resume.premierJour) return;
-      const jours = Math.floor((Date.now() - resume.premierJour.getTime()) / 86400000) + 1;
+      if (!resume.joursRapportes) return;
+      const jours = resume.joursRapportes;
       document.getElementById("chantierJours").innerHTML =
-        `<span class="chantier-jours-badge">Chantier actif depuis ${jours > 0 ? jours : 1} jour${jours > 1 ? "s" : ""}</span>`;
+        `<span class="chantier-jours-badge">${jours} jour${jours > 1 ? "s" : ""} de rapport</span>`;
     } catch (e) {
       // silencieux : l'info jours est secondaire
     }

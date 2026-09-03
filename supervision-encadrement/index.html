@@ -153,7 +153,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
       <div class="se-kpi-card">
         <div class="se-kpi-label">Chantiers en retard</div>
         <div class="se-kpi-value" id="kpiRetard">—</div>
-        <div class="se-kpi-sub">jours écoulés &gt; durée prévue</div>
+        <div class="se-kpi-sub">jours de rapport &gt; durée prévue</div>
       </div>
       <div class="se-kpi-card">
         <div class="se-kpi-label">Heures pointées cette semaine</div>
@@ -406,7 +406,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ]);
             return { chantier: c, resume, meta };
           } catch (e) {
-            return { chantier: c, resume: { derniereMachine: null, totalMicropieux: 0, premierJour: null }, meta: {} };
+            return { chantier: c, resume: { derniereMachine: null, totalMicropieux: 0, joursRapportes: 0 }, meta: {} };
           }
         })
       );
@@ -416,11 +416,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const code = spaceIdx > 0 ? chantier.name.slice(0, spaceIdx) : chantier.name;
         const nom = spaceIdx > 0 ? chantier.name.slice(spaceIdx + 1) : chantier.name;
 
-        let jours = null;
-        if (resume.premierJour) {
-          jours = Math.floor((Date.now() - resume.premierJour.getTime()) / 86400000) + 1;
-          if (jours < 1) jours = 1;
-        }
+        // "Jours" = nombre de jours où un rapport a été soumis (voir
+        // resumeChantier) — pas un décompte calendaire, pour ne pas
+        // compter les périodes de stand-by (chef envoyé ailleurs).
+        let jours = resume.joursRapportes > 0 ? resume.joursRapportes : null;
         const duree = meta.dureeChantier || null;
         const prevu = meta.micropieuxPrevus || null;
         const enRetard = !!(duree && jours !== null && jours > duree);

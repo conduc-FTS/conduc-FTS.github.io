@@ -605,7 +605,7 @@ const DROPDOWN = {
   8: ["MFT 4\"","MFT 5\"","MFT 6\"","MFT 8\"","MFT 12\"",'TARRIERE'],
 };
 const N_PIEUX = 26;
-const N_PERS  = 5;
+const N_PERS  = 6;
 
 let sigDrawing = false;
 let sigHasContent = false;
@@ -958,6 +958,7 @@ async function genererPDF() {
   const C_GRIS2 = [245, 245, 245];    // gris très clair (lignes paires)
   const C_BORD  = [195, 195, 195];    // bordures
   const C_TXT   = [40, 40, 40];       // texte principal
+  const C_NOIR  = [20, 20, 20];        // coches (GD/FTS/Interim/BARRE)
   const C_WHITE = [255, 255, 255];
 
   // ── Titre ─────────────────────────────────────────────────────
@@ -1076,7 +1077,7 @@ async function genererPDF() {
 
     // Barre ✓ vectoriel
     if (document.getElementById(`barre_${i}`)?.checked) {
-      drawCoche(doc, colX[5], ry, cols[5], ROW_H, C_JAUNE);
+      drawCoche(doc, colX[5], ry, cols[5], ROW_H, C_NOIR, ROW_H);
     }
 
     if (i <= N_MATERIEL) {
@@ -1084,7 +1085,7 @@ async function genererPDF() {
       if (mat) { doc.setTextColor(...C_TXT); doc.text(mat, colX[6]+2, ry+ROW_H/2+1.5); }
       ['fts','loc'].forEach((k,ci) => {
         if (document.getElementById(`${k}_${i}`)?.checked) {
-          drawCoche(doc, colX[7+ci], ry, cols[7+ci], ROW_H, C_JAUNE);
+          drawCoche(doc, colX[7+ci], ry, cols[7+ci], ROW_H, C_NOIR, ROW_H);
         }
       });
     }
@@ -1107,6 +1108,17 @@ async function genererPDF() {
     colX[9]
   ];
 
+  // Le bloc PERSONNEL se superpose aux lignes 17→26 du tableau matériel :
+  // on blanchit d'abord la zone pour effacer leurs traits (sinon ils
+  // apparaissent en double à travers les cellules personnel), et on
+  // dimensionne les lignes pour tenir EXACTEMENT dans la hauteur restante
+  // (fin du tableau pieux), sans déborder sur Signature/Observations.
+  const P_HDR_H = 5.5 + 4.5;
+  const P_END   = y + N_PIEUX * ROW_H;
+  doc.setFillColor(...C_WHITE);
+  doc.rect(pcols[0], P_START, PW, P_END - P_START, 'F');
+  const entryH = (P_END - P_START - P_HDR_H) / N_PERS;
+
   doc.setFillColor(...C_ANTH);
   doc.rect(pcols[0], P_START, PW, 5.5, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...C_WHITE);
@@ -1120,9 +1132,8 @@ async function genererPDF() {
     doc.text(lbl, (pcols[i]+pcols[i+1])/2, P_START+5.5+4.5/2+1.2, {align:'center'});
   });
 
-  const entryH = ROW_H * 2;
   for (let k = 1; k <= N_PERS; k++) {
-    const ey = P_START + 5.5 + 4.5 + (k-1)*entryH;
+    const ey = P_START + P_HDR_H + (k-1)*entryH;
     if (k % 2 === 0) { doc.setFillColor(...C_GRIS2); pcols.slice(0,-1).forEach((x,i) => doc.rect(x, ey, pcols[i+1]-x, entryH, 'F')); }
     pcols.slice(0,-1).forEach((x,i) => {
       doc.setDrawColor(...C_BORD);
@@ -1136,7 +1147,7 @@ async function genererPDF() {
     ['gd','fts_p','int'].forEach((id,ci) => {
       if (document.getElementById(`${id}_${k}`)?.checked) {
         const cx0 = pcols[2+ci], cx1 = pcols[3+ci];
-        drawCoche(doc, cx0, ey, cx1-cx0, entryH, C_JAUNE);
+        drawCoche(doc, cx0, ey, cx1-cx0, entryH, C_NOIR, ROW_H);
       }
     });
   }
@@ -1261,8 +1272,13 @@ async function genererPDF() {
 }
 
 // ─── Dessine une coche ✓ en lignes vectorielles dans un rectangle (x,y,w,h) ──
-function drawCoche(doc, x, y, w, h, color) {
-  const s   = Math.min(w, h) * 0.72;   // taille carrée basée sur la plus petite dim
+function drawCoche(doc, x, y, w, h, color, tailleRef) {
+  // tailleRef (optionnel) : référence de taille fixe, indépendante de la
+  // hauteur réelle de la cellule — pour que GD/FTS/Intérim (personnel) et
+  // BARRE (matériel) affichent toutes une coche de MÊME taille, même si
+  // leurs lignes n'ont pas la même hauteur (ex: personnel à 6 lignes).
+  const ref = tailleRef != null ? Math.min(w, tailleRef) : Math.min(w, h);
+  const s   = ref * 0.72;
   const ox  = x + (w - s) / 2;
   const oy  = y + (h - s) / 2;
   const lw  = Math.max(0.7, s * 0.14);

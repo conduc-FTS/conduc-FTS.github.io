@@ -80,6 +80,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
 .se-nom { font-weight: 700; }
 .se-type-badge { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 6px; white-space: nowrap; }
 .se-type-mp { background: #EAF1FE; color: #2A5DBF; }
+.se-type-battage { background: #EAF6EE; color: #1D6E3E; }
 .se-type-pieux { background: #FDEEF1; color: #B84A63; }
 .se-statut-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
 .se-statut-chip .se-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
@@ -107,6 +108,23 @@ body { margin: 0; display: flex; min-height: 100vh; }
   .se-main { padding: 20px; }
   .se-kpi-row { grid-template-columns: 1fr 1fr; }
 }
+.se-subtabs { display: flex; gap: 8px; margin-bottom: 18px; }
+.se-subtab { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 0.83rem; font-weight: 700; color: var(--text-sub); cursor: pointer; }
+.se-subtab.active { background: var(--anthracite); color: white; border-color: var(--anthracite); }
+.se-stats-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
+.se-stats-controls-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.se-famille-chip { padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: 1.5px solid var(--border); background: white; color: var(--text-sub); }
+.se-famille-chip.mp.active { background: #EAF1FE; color: #2A5DBF; border-color: #2A5DBF; }
+.se-famille-chip.pieux.active { background: #FDEEF1; color: #B84A63; border-color: #B84A63; }
+.se-periode-select { padding: 7px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.82rem; background: white; }
+.se-chart { display: flex; align-items: flex-end; gap: 10px; height: 150px; padding: 0 4px; }
+.se-bar-group { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; min-width: 0; }
+.se-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 2px; }
+.se-bar-label { font-size: 0.64rem; color: var(--text-sub); font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.se-bar-val { font-size: 0.7rem; font-weight: 800; }
+.se-pct-bar { display: inline-block; width: 60px; height: 5px; background: #EEE; border-radius: 3px; overflow: hidden; margin-left: 8px; vertical-align: middle; }
+.se-pct-fill { height: 100%; background: var(--fts-yellow); }
+.se-export-btn { background: var(--fts-yellow); border: 1px solid var(--fts-yellow); color: var(--anthracite); padding: 9px 16px; border-radius: 8px; font-weight: 800; font-size: 0.82rem; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -125,6 +143,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
     <button type="button" class="se-nav-btn" data-view="se-view-archives">🗄️ Archives</button>
     <a href="../recap-hebdo/index.html?type=materiel">🔧 Pointage Matériel</a>
     <a href="../recap-hebdo/index.html?type=personnel">👷 Pointage Personnel</a>
+    <button type="button" class="se-nav-btn" data-view="se-view-stats">📈 Statistiques</button>
   </div>
   <div class="se-sidebar-footer">
     <span id="userDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#9AA0AA;margin-right:5px"></span>Connexion
@@ -217,6 +236,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
           <label for="typeChantier">Type de chantier</label>
           <select id="typeChantier">
             <option value="Micropieux">Micropieux</option>
+            <option value="Battage">Battage</option>
             <option value="Pieux">Pieux</option>
           </select>
         </div>
@@ -243,6 +263,95 @@ body { margin: 0; display: flex; min-height: 100vh; }
         <button type="submit" class="btn-primary">Créer le chantier</button>
       </form>
       <p class="form-status" id="chantierStatus"></p>
+    </div>
+  </div>
+
+  <!-- ─── STATISTIQUES ────────────────────────────────────── -->
+  <div class="se-view" id="se-view-stats">
+    <div class="se-page-title">Statistiques</div>
+    <div class="se-page-sub">Analyse sur plusieurs chantiers et sur la durée — exportable pour un suivi pluriannuel.</div>
+
+    <div class="se-subtabs">
+      <button type="button" class="se-subtab active" data-statview="stats-avancement">Avancement chantier</button>
+      <button type="button" class="se-subtab" data-statview="stats-personnel">Personnel</button>
+    </div>
+
+    <!-- Avancement chantier -->
+    <div id="stats-avancement">
+      <div class="se-stats-controls">
+        <div class="se-stats-controls-left">
+          <button type="button" class="se-famille-chip mp active" data-famille="mp">● Micropieux + Battage</button>
+          <button type="button" class="se-famille-chip pieux" data-famille="pieux">● Pieux</button>
+          <select class="se-periode-select" id="statsAvancPeriode">
+            <option value="toutes">Toutes périodes</option>
+            <option value="annee">Cette année</option>
+            <option value="trimestre">Ce trimestre</option>
+            <option value="mois">Ce mois</option>
+          </select>
+        </div>
+        <button type="button" class="se-export-btn" id="statsAvancExportBtn">⬇ Exporter Excel</button>
+      </div>
+
+      <div class="se-kpi-row">
+        <div class="se-kpi-card"><div class="se-kpi-label">Volume réalisé (période)</div><div class="se-kpi-value" id="statsAvancVolume">—</div></div>
+        <div class="se-kpi-card"><div class="se-kpi-label">Cadence moyenne</div><div class="se-kpi-value" id="statsAvancCadence">—</div></div>
+        <div class="se-kpi-card"><div class="se-kpi-label">Chantiers actifs (période)</div><div class="se-kpi-value" id="statsAvancChantiers">—</div></div>
+        <div class="se-kpi-card"><div class="se-kpi-label">Chantiers en retard</div><div class="se-kpi-value" id="statsAvancRetard">—</div></div>
+      </div>
+
+      <div class="se-panel">
+        <h2 style="margin-bottom:14px">Volume réalisé par mois</h2>
+        <div class="se-chart" id="statsAvancChart"></div>
+      </div>
+
+      <div class="se-panel">
+        <h2 style="margin-bottom:14px">Classement des chantiers par avancement (réalisé / prévu)</h2>
+        <div class="se-table-scroll">
+        <table class="se-table">
+          <thead><tr><th>Chantier</th><th>Cadence (ml/j)</th><th>Avancement</th><th>Statut</th></tr></thead>
+          <tbody id="statsAvancTbody"></tbody>
+        </table>
+        </div>
+        <div class="se-empty-state" id="statsAvancEmpty" hidden></div>
+      </div>
+    </div>
+
+    <!-- Personnel -->
+    <div id="stats-personnel" style="display:none">
+      <div class="se-stats-controls">
+        <div class="se-stats-controls-left">
+          <select class="se-periode-select" id="statsPersPeriode">
+            <option value="toutes">Toutes périodes</option>
+            <option value="annee">Cette année</option>
+            <option value="trimestre">Ce trimestre</option>
+            <option value="mois" selected>Ce mois</option>
+          </select>
+        </div>
+        <button type="button" class="se-export-btn" id="statsPersExportBtn">⬇ Exporter Excel</button>
+      </div>
+
+      <div class="se-kpi-row">
+        <div class="se-kpi-card"><div class="se-kpi-label">Heures totales (période)</div><div class="se-kpi-value" id="statsPersHeures">—</div></div>
+        <div class="se-kpi-card"><div class="se-kpi-label">Dont Intérim</div><div class="se-kpi-value" id="statsPersInterim">—</div></div>
+        <div class="se-kpi-card"><div class="se-kpi-label">Jours GD (total)</div><div class="se-kpi-value" id="statsPersGD">—</div></div>
+        <div class="se-kpi-card"><div class="se-kpi-label">Personnes actives</div><div class="se-kpi-value" id="statsPersNb">—</div></div>
+      </div>
+
+      <div class="se-panel">
+        <h2 style="margin-bottom:14px">Heures par personne — période sélectionnée</h2>
+        <div class="se-chart" id="statsPersChart"></div>
+      </div>
+
+      <div class="se-panel">
+        <h2 style="margin-bottom:14px">Détail par personne</h2>
+        <div class="se-table-scroll">
+        <table class="se-table">
+          <thead><tr><th>Nom</th><th>Type</th><th>Heures</th><th>Jours GD</th><th>Chantiers</th></tr></thead>
+          <tbody id="statsPersTbody"></tbody>
+        </table>
+        </div>
+        <div class="se-empty-state" id="statsPersEmpty" hidden></div>
+      </div>
     </div>
   </div>
 
@@ -291,6 +400,7 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.classList.add("active");
       document.getElementById(btn.dataset.view).classList.add("active");
       if (btn.dataset.view === "se-view-archives") chargerArchives();
+      if (btn.dataset.view === "se-view-stats") chargerStatsAvancement();
     });
   });
 
@@ -518,7 +628,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const afficherTermines = document.getElementById("afficherTermines").checked;
     let lignes = donneesChantiers.filter((c) => {
       if (c.termine && !afficherTermines) return false;
-      if (filtreType && c.type !== filtreType) return false;
+      if (filtreType) {
+        const memeFamille = filtreType === "Micropieux" ? (c.type === "Micropieux" || c.type === "Battage") : c.type === filtreType;
+        if (!memeFamille) return false;
+      }
       if (filtreRecherche) {
         const cible = (c.code + " " + c.nom).toLowerCase();
         if (!cible.includes(filtreRecherche.toLowerCase())) return false;
@@ -549,7 +662,7 @@ document.addEventListener("DOMContentLoaded", () => {
     empty.hidden = true;
 
     tbody.innerHTML = lignes.map((c) => {
-      const typeClass = c.type === "Pieux" ? "se-type-pieux" : "se-type-mp";
+      const typeClass = c.type === "Pieux" ? "se-type-pieux" : c.type === "Battage" ? "se-type-battage" : "se-type-mp";
       const statutHtml = c.statut
         ? `<span class="se-statut-chip ${ICONE_STATUT[c.statut] || "se-statut-arret"}"><span class="se-dot"></span>${c.statut}</span>`
         : `<span class="se-statut-chip se-statut-arret"><span class="se-dot"></span>—</span>`;
@@ -641,7 +754,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return `
           <tr data-id="${chantier.id}" data-name="${escapeHtmlSE(chantier.name)}">
             <td><span class="se-code">${escapeHtmlSE(code)}</span><span class="se-nom">${escapeHtmlSE(nom)}</span></td>
-            <td><span class="se-type-badge ${meta.typeChantier === "Pieux" ? "se-type-pieux" : "se-type-mp"}">${meta.typeChantier || "Micropieux"}</span></td>
+            <td><span class="se-type-badge ${meta.typeChantier === "Pieux" ? "se-type-pieux" : meta.typeChantier === "Battage" ? "se-type-battage" : "se-type-mp"}">${meta.typeChantier || "Micropieux"}</span></td>
             <td class="se-last-activity">${meta.dateArchivage ? escapeHtmlSE(meta.dateArchivage) : "—"}</td>
             <td><button type="button" class="btn-rouvrir desarchiver-row-btn" style="padding:6px 12px;font-size:.78rem">Désarchiver</button></td>
           </tr>`;
@@ -672,6 +785,263 @@ document.addEventListener("DOMContentLoaded", () => {
       empty.hidden = false;
       empty.textContent = `Erreur : ${err.message}`;
     }
+  }
+
+  // --- Statistiques : sous-onglets ---
+  document.querySelectorAll(".se-subtab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".se-subtab").forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      document.getElementById("stats-avancement").style.display = tab.dataset.statview === "stats-avancement" ? "block" : "none";
+      document.getElementById("stats-personnel").style.display = tab.dataset.statview === "stats-personnel" ? "block" : "none";
+      if (tab.dataset.statview === "stats-personnel") chargerStatsPersonnel();
+    });
+  });
+
+  function bornesPeriode(valeur) {
+    const n = new Date();
+    if (valeur === "mois") return [new Date(n.getFullYear(), n.getMonth(), 1), new Date(n.getFullYear(), n.getMonth() + 1, 0)];
+    if (valeur === "trimestre") { const t = Math.floor(n.getMonth() / 3); return [new Date(n.getFullYear(), t * 3, 1), new Date(n.getFullYear(), t * 3 + 3, 0)]; }
+    if (valeur === "annee") return [new Date(n.getFullYear(), 0, 1), new Date(n.getFullYear(), 11, 31)];
+    return [null, null];
+  }
+
+  function parseDateFRLocale(s) {
+    const [j, m, a] = (s || "").split("/");
+    return j && m && a ? new Date(Number(a), Number(m) - 1, Number(j)) : null;
+  }
+
+  function dansPeriode(date, debut, fin) {
+    if (!debut) return true;
+    return date && date >= debut && date <= fin;
+  }
+
+  let familleAvancement = "mp";
+
+  document.querySelectorAll(".se-famille-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll(".se-famille-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      familleAvancement = chip.dataset.famille;
+      chargerStatsAvancement();
+    });
+  });
+  document.getElementById("statsAvancPeriode").addEventListener("change", chargerStatsAvancement);
+
+  let dernieresLignesAvancement = [];
+
+  async function chargerStatsAvancement() {
+    const tbody = document.getElementById("statsAvancTbody");
+    const empty = document.getElementById("statsAvancEmpty");
+    if (!window.FTSDrive || !window.FTSSheets) return;
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { empty.hidden = false; empty.textContent = "Connecte-toi d'abord."; return; }
+
+    tbody.innerHTML = "";
+    empty.hidden = false;
+    empty.textContent = "Chargement...";
+
+    const [debut, fin] = bornesPeriode(document.getElementById("statsAvancPeriode").value);
+
+    try {
+      const tousChantiers = await FTSDrive.listChantiers();
+      const chantiersMeta = await Promise.all(tousChantiers.map(async (c) => ({ chantier: c, meta: await FTSDrive.getMetadonneesChantier(c.id).catch(() => ({})) })));
+
+      const ciblés = chantiersMeta.filter(({ meta }) => {
+        const type = meta.typeChantier || "Micropieux";
+        return familleAvancement === "mp" ? (type === "Micropieux" || type === "Battage") : type === "Pieux";
+      });
+
+      if (ciblés.length === 0) {
+        empty.textContent = "Aucun chantier dans cette famille.";
+        document.getElementById("statsAvancVolume").textContent = "0 ml";
+        document.getElementById("statsAvancCadence").textContent = "—";
+        document.getElementById("statsAvancChantiers").textContent = "0";
+        document.getElementById("statsAvancRetard").textContent = "0";
+        document.getElementById("statsAvancChart").innerHTML = "";
+        return;
+      }
+
+      const details = await Promise.all(ciblés.map(async ({ chantier, meta }) => {
+        try {
+          const suivi = await FTSSheets.lireSuiviComplet(chantier.id, chantier.name);
+          return { chantier, meta, production: suivi.production };
+        } catch (e) {
+          return { chantier, meta, production: [] };
+        }
+      }));
+
+      // Filtrage par période sur les lignes de Production
+      let volumeTotal = 0, joursProdTotal = 0;
+      const parMois = {};
+      const chantiersActifsPeriode = new Set();
+      const lignesClassement = [];
+
+      details.forEach(({ chantier, meta, production }) => {
+        const prodPeriode = production.filter((p) => dansPeriode(parseDateFRLocale(p.date), debut, fin));
+        if (prodPeriode.length > 0) chantiersActifsPeriode.add(chantier.id);
+
+        prodPeriode.forEach((p) => {
+          volumeTotal += p.longueurTotale;
+          joursProdTotal += 1;
+          const d = parseDateFRLocale(p.date);
+          if (d) {
+            const cle = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+            parMois[cle] = (parMois[cle] || 0) + p.longueurTotale;
+          }
+        });
+
+        const totalMl = production.reduce((s, p) => s + p.longueurTotale, 0);
+        const nbJours = production.length;
+        const cadence = nbJours > 0 ? totalMl / nbJours : 0;
+        const prevu = meta.micropieuxPrevus || null;
+        const totalPieux = production.reduce((s, p) => s + p.nbPieux, 0);
+        const pct = prevu ? Math.min(100, (totalPieux / prevu) * 100) : null;
+        const duree = meta.dureeChantier || null;
+        const joursRapport = nbJours;
+        const enRetard = !!(duree && joursRapport > duree) && meta.statutChantier !== "Termine";
+
+        lignesClassement.push({ nom: chantier.name, cadence, pct, enRetard, hasPct: pct !== null });
+      });
+
+      dernieresLignesAvancement = lignesClassement;
+
+      // KPI
+      document.getElementById("statsAvancVolume").textContent = `${volumeTotal.toFixed(0)} ml`;
+      document.getElementById("statsAvancCadence").textContent = joursProdTotal > 0 ? `${(volumeTotal / joursProdTotal).toFixed(1)} ml/j` : "—";
+      document.getElementById("statsAvancChantiers").textContent = String(chantiersActifsPeriode.size);
+      document.getElementById("statsAvancRetard").textContent = String(lignesClassement.filter((l) => l.enRetard).length);
+
+      // Graphique : volume par mois (6 derniers mois avec données, triés)
+      const moisTries = Object.keys(parMois).sort().slice(-6);
+      const maxVal = Math.max(1, ...moisTries.map((m) => parMois[m]));
+      const couleurFamille = familleAvancement === "mp" ? "#4C82F0" : "#C0392B";
+      document.getElementById("statsAvancChart").innerHTML = moisTries.length === 0
+        ? '<p class="se-empty-state" style="padding:10px">Aucune donnée sur cette période.</p>'
+        : moisTries.map((m) => {
+            const [a, mo] = m.split("-");
+            const label = new Date(Number(a), Number(mo) - 1, 1).toLocaleDateString("fr-FR", { month: "short" });
+            const val = parMois[m];
+            const hauteur = Math.max(3, (val / maxVal) * 100);
+            return `<div class="se-bar-group"><span class="se-bar-val">${val.toFixed(0)}</span><div class="se-bar" style="height:${hauteur}%;background:${couleurFamille}"></div><span class="se-bar-label">${label}</span></div>`;
+          }).join("");
+
+      // Classement
+      const avecPct = lignesClassement.filter((l) => l.hasPct).sort((a, b) => b.pct - a.pct);
+      if (avecPct.length === 0) {
+        empty.hidden = false;
+        empty.textContent = "Aucun chantier avec un nombre de micropieux prévus renseigné, pour établir un classement.";
+      } else {
+        empty.hidden = true;
+        tbody.innerHTML = avecPct.map((l) => `
+          <tr>
+            <td>${escapeHtmlSE(l.nom)}</td>
+            <td>${l.cadence.toFixed(1)}</td>
+            <td>${l.pct.toFixed(0)}% <span class="se-pct-bar"><span class="se-pct-fill" style="width:${l.pct}%;${l.enRetard ? "background:#C0392B" : ""}"></span></span></td>
+            <td><span class="se-statut-chip ${l.enRetard ? "se-statut-panne" : "se-statut-travail"}"><span class="se-dot"></span>${l.enRetard ? "Retard" : "Dans les temps"}</span></td>
+          </tr>`).join("");
+      }
+    } catch (err) {
+      console.error("Erreur chargement statistiques avancement :", err);
+      empty.hidden = false;
+      empty.textContent = `Erreur : ${err.message}`;
+    }
+  }
+
+  document.getElementById("statsAvancExportBtn").addEventListener("click", () => {
+    const lignes = [["Chantier", "Cadence (ml/j)", "Avancement (%)", "Statut"]];
+    dernieresLignesAvancement.forEach((l) => lignes.push([l.nom, l.cadence.toFixed(1), l.hasPct ? l.pct.toFixed(0) : "", l.enRetard ? "Retard" : "Dans les temps"]));
+    exporterCSVGenerique(lignes, `Statistiques_avancement_${familleAvancement}.csv`);
+  });
+
+  document.getElementById("statsPersPeriode").addEventListener("change", chargerStatsPersonnel);
+
+  let dernieresLignesPersonnel = [];
+
+  async function chargerStatsPersonnel() {
+    const tbody = document.getElementById("statsPersTbody");
+    const empty = document.getElementById("statsPersEmpty");
+    if (!window.FTSSheets) return;
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { empty.hidden = false; empty.textContent = "Connecte-toi d'abord."; return; }
+
+    tbody.innerHTML = "";
+    empty.hidden = false;
+    empty.textContent = "Chargement...";
+
+    let [debut, fin] = bornesPeriode(document.getElementById("statsPersPeriode").value);
+    if (!debut) { debut = new Date(2000, 0, 1); fin = new Date(2099, 11, 31); }
+
+    try {
+      const entrees = await FTSSheets.listerPointageToutesChantiers("Personnel", dateLocaleISO(debut), dateLocaleISO(fin));
+      if (entrees.length === 0) {
+        empty.textContent = "Aucune donnée sur cette période.";
+        document.getElementById("statsPersHeures").textContent = "0h";
+        document.getElementById("statsPersInterim").textContent = "0h";
+        document.getElementById("statsPersGD").textContent = "0j";
+        document.getElementById("statsPersNb").textContent = "0";
+        document.getElementById("statsPersChart").innerHTML = "";
+        return;
+      }
+      empty.hidden = true;
+
+      const parPersonne = {};
+      let totalHeures = 0, totalInterim = 0, totalGD = 0;
+      entrees.forEach((e) => {
+        const [, nom, type, gd, heuresStr] = e.cols;
+        const heures = parseFloat((heuresStr || "").replace(",", ".")) || 0;
+        if (!parPersonne[nom]) parPersonne[nom] = { nom, type, heures: 0, gd: 0, chantiers: new Set() };
+        parPersonne[nom].heures += heures;
+        if (gd === "GD") parPersonne[nom].gd += 1;
+        parPersonne[nom].chantiers.add(e.chantierName);
+        totalHeures += heures;
+        if (type === "Intérim") totalInterim += heures;
+        if (gd === "GD") totalGD += 1;
+      });
+
+      const liste = Object.values(parPersonne).sort((a, b) => b.heures - a.heures);
+      dernieresLignesPersonnel = liste;
+
+      document.getElementById("statsPersHeures").textContent = `${totalHeures.toFixed(0)}h`;
+      document.getElementById("statsPersInterim").textContent = `${totalInterim.toFixed(0)}h`;
+      document.getElementById("statsPersGD").textContent = `${totalGD}j`;
+      document.getElementById("statsPersNb").textContent = String(liste.length);
+
+      const maxHeures = Math.max(1, ...liste.map((p) => p.heures));
+      document.getElementById("statsPersChart").innerHTML = liste.slice(0, 8).map((p) => {
+        const hauteur = Math.max(3, (p.heures / maxHeures) * 100);
+        const couleur = p.type === "Intérim" ? "#E8B923" : "#4C82F0";
+        return `<div class="se-bar-group"><span class="se-bar-val">${p.heures.toFixed(0)}h</span><div class="se-bar" style="height:${hauteur}%;background:${couleur}"></div><span class="se-bar-label">${escapeHtmlSE(p.nom)}</span></div>`;
+      }).join("");
+
+      tbody.innerHTML = liste.map((p) => `
+        <tr>
+          <td>${escapeHtmlSE(p.nom)}</td>
+          <td><span class="se-statut-chip ${p.type === "Intérim" ? "se-statut-panne" : "se-statut-travail"}"><span class="se-dot"></span>${p.type}</span></td>
+          <td>${p.heures.toFixed(1)}h</td>
+          <td>${p.gd}j</td>
+          <td>${[...p.chantiers].map((c) => escapeHtmlSE(c.split(/\s+/)[0])).join(", ")}</td>
+        </tr>`).join("");
+    } catch (err) {
+      console.error("Erreur chargement statistiques personnel :", err);
+      empty.hidden = false;
+      empty.textContent = `Erreur : ${err.message}`;
+    }
+  }
+
+  document.getElementById("statsPersExportBtn").addEventListener("click", () => {
+    const lignes = [["Nom", "Type", "Heures", "Jours GD", "Chantiers"]];
+    dernieresLignesPersonnel.forEach((p) => lignes.push([p.nom, p.type, p.heures.toFixed(1), p.gd, [...p.chantiers].join(" / ")]));
+    exporterCSVGenerique(lignes, "Statistiques_personnel.csv");
+  });
+
+  function exporterCSVGenerique(lignes, nomFichier) {
+    const csv = lignes.map((l) => l.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nomFichier;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   if (window.FTSAuth && FTSAuth.isSignedIn()) {

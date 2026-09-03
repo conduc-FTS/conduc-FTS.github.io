@@ -506,6 +506,111 @@ const FTSSheets = (() => {
     return spreadsheetId;
   }
 
+  const NOM_CLASSEUR_HISTORIQUE = "Historique Chantiers FTS";
+  const ONGLET_HISTORIQUE = "Historique";
+  const EN_TETE_HISTORIQUE = [
+    "Date clôture", "N° affaire", "Nom chantier", "Type",
+    "Jours de rapport", "Volume total (micropieux)", "Durée prévue (j)",
+    "Montant vendu (€)", "Heures personnel cumulées",
+  ];
+
+  /**
+   * Classeur "Historique Chantiers FTS", rangé dans ADMINISTRATIF — donc
+   * HORS de tout dossier chantier. Objectif : si un chantier terminé est
+   * un jour archivé ou supprimé du Drive, ses chiffres de clôture restent
+   * consultables ici indéfiniment.
+   */
+  async function getOuCreerClasseurHistorique() {
+    if (!window.FTSDrive) throw new Error("Module Drive non chargé.");
+    const administratifId = await FTSDrive.getRootFolder("ADMINISTRATIF");
+
+    const q = encodeURIComponent(
+      `name='${NOM_CLASSEUR_HISTORIQUE.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.spreadsheet' and '${administratifId}' in parents and trashed=false`
+    );
+    const resFind = await fetch(
+      `${DRIVE_API_BASE}/files?q=${q}&fields=files(id)&includeItemsFromAllDrives=true&supportsAllDrives=true`,
+      { headers: authHeader() }
+    );
+    if (!resFind.ok) throw new Error(`Erreur recherche classeur historique : ${resFind.status}`);
+    const dataFind = await resFind.json();
+    if (dataFind.files && dataFind.files.length > 0) return dataFind.files[0].id;
+
+    const resCreate = await fetch(API_BASE, {
+      method: "POST",
+      headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        properties: { title: NOM_CLASSEUR_HISTORIQUE },
+        sheets: [{ properties: { title: ONGLET_HISTORIQUE } }],
+      }),
+    });
+    if (!resCreate.ok) {
+      const err = await resCreate.json().catch(() => ({}));
+      throw new Error(`Erreur création classeur historique : ${err.error?.message || resCreate.status}`);
+    }
+    const created = await resCreate.json();
+    const spreadsheetId = created.spreadsheetId;
+
+    await fetch(`${DRIVE_API_BASE}/files/${spreadsheetId}?addParents=${administratifId}&removeParents=root&fields=id,parents`, {
+      method: "PATCH",
+      headers: authHeader(),
+    });
+    await ecrireValeurs(spreadsheetId, `${ONGLET_HISTORIQUE}!A1:I1`, [EN_TETE_HISTORIQUE]);
+    return spreadsheetId;
+  }
+
+  /**
+   * Marque un chantier comme terminé : enregistre un instantané de ses
+   * chiffres dans le classeur Historique (qui survivra même si le dossier
+   * chantier est un jour archivé/supprimé), puis pose le statut sur le
+   * dossier chantier lui-même.
+   */
+  async function cloturerChantier(chantierFolderId, chantierName) {
+    const [resume, meta] = await Promise.all([
+      resumeChantier(chantierFolderId, chantierName),
+      FTSDrive.getMetadonneesChantier(chantierFolderId),
+    ]);
+
+    const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
+    const personnel = await lireOnglet(spreadsheetId, ONGLET_PERSONNEL);
+    const totalHeures = personnel.reduce((s, r) => s + (parseFloat((r[4] || "").replace(",", ".")) || 0), 0);
+
+    const spaceIdx = chantierName.search(/\s/);
+    const code = spaceIdx > 0 ? chantierName.slice(0, spaceIdx) : chantierName;
+    const nom = spaceIdx > 0 ? chantierName.slice(spaceIdx + 1) : "";
+
+    const aujourdhui = new Date();
+    const dateClotureAffichage = `${String(aujourdhui.getDate()).padStart(2, "0")}/${String(aujourdhui.getMonth() + 1).padStart(2, "0")}/${aujourdhui.getFullYear()}`;
+
+    const histSpreadsheetId = await getOuCreerClasseurHistorique();
+    await ajouterLignes(histSpreadsheetId, ONGLET_HISTORIQUE, [[
+      forcerTexteDate(dateClotureAffichage),
+      code, nom, meta.typeChantier || "Micropieux",
+      resume.joursRapportes || 0, resume.totalMicropieux || 0,
+      meta.dureeChantier || "", meta.montantVendu || "",
+      totalHeures.toFixed(1),
+    ]]);
+
+    await FTSDrive.setMetadonneesChantier(chantierFolderId, {
+      ...meta,
+      statutChantier: "Termine",
+      dateFinChantier: dateClotureAffichage,
+    });
+
+    return { dateClotureAffichage, joursRapportes: resume.joursRapportes || 0, totalMicropieux: resume.totalMicropieux || 0 };
+  }
+
+  /**
+   * Rouvre un chantier marqué terminé par erreur (ne retire pas la ligne
+   * déjà écrite dans l'Historique — elle sert de trace, sans conséquence).
+   */
+  async function reouvrirChantier(chantierFolderId) {
+    const meta = await FTSDrive.getMetadonneesChantier(chantierFolderId);
+    const metaMisAJour = { ...meta };
+    delete metaMisAJour.statutChantier;
+    delete metaMisAJour.dateFinChantier;
+    await FTSDrive.setMetadonneesChantier(chantierFolderId, metaMisAJour);
+  }
+
   return {
     getOuCreerClasseurSuivi,
     enregistrerDonneesRapport,
@@ -516,6 +621,8 @@ const FTSSheets = (() => {
     modifierLignePointage,
     supprimerLignePointage,
     ajouterLignePointage,
+    cloturerChantier,
+    reouvrirChantier,
     ONGLET_MATERIEL,
     ONGLET_PERSONNEL,
   };

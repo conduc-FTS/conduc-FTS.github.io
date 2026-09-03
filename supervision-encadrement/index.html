@@ -172,6 +172,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
             <button type="button" class="se-filter-chip" data-type="Micropieux">Micropieux</button>
             <button type="button" class="se-filter-chip" data-type="Pieux">Pieux</button>
           </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;color:var(--text-sub);white-space:nowrap"><input type="checkbox" id="afficherTermines"> Afficher les terminés</label>
           <div class="se-search-box">🔍<input type="text" id="rechercheChantier" placeholder="Rechercher..."></div>
         </div>
       </div>
@@ -419,28 +420,32 @@ document.addEventListener("DOMContentLoaded", () => {
         const code = spaceIdx > 0 ? chantier.name.slice(0, spaceIdx) : chantier.name;
         const nom = spaceIdx > 0 ? chantier.name.slice(spaceIdx + 1) : chantier.name;
 
+        const termine = meta.statutChantier === "Termine";
+
         // "Jours" = nombre de jours où un rapport a été soumis (voir
         // resumeChantier) — pas un décompte calendaire, pour ne pas
         // compter les périodes de stand-by (chef envoyé ailleurs).
         let jours = resume.joursRapportes > 0 ? resume.joursRapportes : null;
         const duree = meta.dureeChantier || null;
         const prevu = meta.micropieuxPrevus || null;
-        const enRetard = !!(duree && jours !== null && jours > duree);
+        const enRetard = !termine && !!(duree && jours !== null && jours > duree);
 
         return {
           id: chantier.id, code, nom, nomComplet: chantier.name,
           type: meta.typeChantier || "Micropieux",
           statut: resume.derniereMachine?.statut || null,
-          jours, duree, enRetard,
+          jours, duree, enRetard, termine,
+          dateFinChantier: meta.dateFinChantier || null,
           micropieux: resume.totalMicropieux || 0, prevu,
           derniereDate: resume.derniereMachine?.date || null,
         };
       });
 
       // KPI
-      // "Actif" = au moins un rapport journalier soumis (jours > 0) —
-      // un chantier tout juste créé, sans encore de rapport, ne compte pas.
-      const chantiersActifs = donneesChantiers.filter((c) => c.jours && c.jours > 0);
+      // "Actif" = au moins un rapport journalier soumis (jours > 0) et pas
+      // marqué terminé — un chantier tout juste créé sans rapport, ou déjà
+      // clôturé, ne compte pas.
+      const chantiersActifs = donneesChantiers.filter((c) => c.jours && c.jours > 0 && !c.termine);
       document.getElementById("kpiChantiers").textContent = String(chantiersActifs.length);
       const enTravail = chantiersActifs.filter((c) => c.statut === "TRAVAIL").length;
       document.getElementById("kpiChantiersSub").textContent = `${enTravail} en travail`;
@@ -489,7 +494,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const tbody = document.getElementById("chantiersTbody");
     const empty = document.getElementById("chantiersEmpty");
 
+    const afficherTermines = document.getElementById("afficherTermines").checked;
     let lignes = donneesChantiers.filter((c) => {
+      if (c.termine && !afficherTermines) return false;
       if (filtreType && c.type !== filtreType) return false;
       if (filtreRecherche) {
         const cible = (c.code + " " + c.nom).toLowerCase();
@@ -538,7 +545,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       return `
         <tr data-id="${c.id}" data-name="${escapeHtmlSE(c.nomComplet)}">
-          <td><span class="se-code">${escapeHtmlSE(c.code)}</span><span class="se-nom">${escapeHtmlSE(c.nom)}${c.enRetard ? '<span class="se-alert-badge">⚠ RETARD</span>' : ""}</span></td>
+          <td><span class="se-code">${escapeHtmlSE(c.code)}</span><span class="se-nom">${escapeHtmlSE(c.nom)}${c.enRetard ? '<span class="se-alert-badge">⚠ RETARD</span>' : ""}${c.termine ? `<span class="se-alert-badge" style="color:var(--text-sub)">✓ TERMINÉ${c.dateFinChantier ? " " + escapeHtmlSE(c.dateFinChantier) : ""}</span>` : ""}</span></td>
           <td><span class="se-type-badge ${typeClass}">${c.type}</span></td>
           <td>${statutHtml}</td>
           <td><div class="se-progress-cell"><span class="se-progress-nums">${joursTxt}</span>${joursBar}</div></td>
@@ -562,6 +569,8 @@ document.addEventListener("DOMContentLoaded", () => {
       afficherTableau();
     });
   });
+
+  document.getElementById("afficherTermines").addEventListener("change", afficherTableau);
 
   document.getElementById("rechercheChantier").addEventListener("input", (e) => {
     filtreRecherche = e.target.value;

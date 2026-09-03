@@ -32,6 +32,17 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   display: inline-block; background: var(--anthracite); color: var(--fts-yellow);
   font-weight: 800; font-size: 0.8rem; padding: 6px 14px; border-radius: 20px; margin-top: 4px;
 }
+.chantier-statut-badge {
+  display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 0.82rem;
+  padding: 6px 14px; border-radius: 20px; margin-right: 10px;
+}
+.chantier-statut-badge.en-cours { background: #EAF6EE; color: #1D6E3E; }
+.chantier-statut-badge.termine { background: #F0F1F3; color: #5B6270; }
+.chantier-statut-badge .dot { width: 7px; height: 7px; border-radius: 50%; }
+.chantier-statut-badge.en-cours .dot { background: #27AE60; }
+.chantier-statut-badge.termine .dot { background: #9AA0AA; }
+.btn-terminer { background: #C0392B; color: white; border: none; border-radius: 8px; padding: 8px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+.btn-rouvrir { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -59,6 +70,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
     <p class="panel-sub" id="chantierCode" style="margin-bottom:2px"></p>
     <h2 class="panel-title" id="chantierNom">Chargement…</h2>
     <div id="chantierJours"></div>
+    <div id="chantierStatutBloc" style="margin-top:12px"></div>
   </section>
 
   <section class="panel">
@@ -159,8 +171,46 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("previsionType").value = meta.typeChantier || "Micropieux";
       if (meta.micropieuxPrevus) document.getElementById("previsionMicropieux").value = meta.micropieuxPrevus;
       if (meta.montantVendu) document.getElementById("previsionMontant").value = meta.montantVendu;
+      afficherStatutChantier(meta);
     } catch (e) {
       console.warn("Erreur chargement prévisions :", e);
+    }
+  }
+
+  function afficherStatutChantier(meta) {
+    const bloc = document.getElementById("chantierStatutBloc");
+    const termine = meta.statutChantier === "Termine";
+    if (termine) {
+      bloc.innerHTML = `
+        <span class="chantier-statut-badge termine"><span class="dot"></span>Terminé le ${escapeHtmlSuivi(meta.dateFinChantier || "")}</span>
+        <button type="button" class="btn-rouvrir" id="rouvrirBtn">Rouvrir ce chantier</button>`;
+      document.getElementById("rouvrirBtn").addEventListener("click", async () => {
+        if (!confirm("Rouvrir ce chantier ? Il réapparaîtra comme actif dans la supervision.")) return;
+        try {
+          await FTSSheets.reouvrirChantier(chantierId);
+          chargerPrevisions();
+        } catch (err) {
+          alert(`Erreur : ${err.message}`);
+        }
+      });
+    } else {
+      bloc.innerHTML = `
+        <span class="chantier-statut-badge en-cours"><span class="dot"></span>En cours</span>
+        <button type="button" class="btn-terminer" id="terminerBtn">Marquer ce chantier comme terminé</button>`;
+      document.getElementById("terminerBtn").addEventListener("click", async () => {
+        if (!confirm(`Marquer "${chantierName}" comme terminé ? Un instantané de ses chiffres sera enregistré dans l'Historique Chantiers, et il n'apparaîtra plus comme actif dans la supervision.`)) return;
+        const btn = document.getElementById("terminerBtn");
+        btn.disabled = true;
+        btn.textContent = "Clôture en cours...";
+        try {
+          await FTSSheets.cloturerChantier(chantierId, chantierName);
+          chargerPrevisions();
+        } catch (err) {
+          alert(`Erreur : ${err.message}`);
+          btn.disabled = false;
+          btn.textContent = "Marquer ce chantier comme terminé";
+        }
+      });
     }
   }
 

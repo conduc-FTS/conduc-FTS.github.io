@@ -569,6 +569,7 @@ const FTSDrive = (() => {
     getMetadonneesChantier,
     setMetadonneesChantier,
     getDossierRapportChef,
+    getRootFolder,
   };
 })();
 

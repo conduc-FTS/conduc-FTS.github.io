@@ -180,10 +180,33 @@ document.addEventListener("DOMContentLoaded", () => {
   function afficherStatutChantier(meta) {
     const bloc = document.getElementById("chantierStatutBloc");
     const termine = meta.statutChantier === "Termine";
+    const archive = meta.archive === true;
+
+    if (archive) {
+      bloc.innerHTML = `
+        <span class="chantier-statut-badge termine"><span class="dot"></span>Archivé le ${escapeHtmlSuivi(meta.dateArchivage || "")}</span>
+        <button type="button" class="btn-rouvrir" id="desarchiverBtn">Désarchiver ce chantier</button>
+        <p class="panel-sub" style="margin:8px 0 0 0;font-size:0.78rem">Un chantier archivé n'apparaît plus dans "Chantier actif" ni dans le Rapport Journalier — désarchive-le d'abord si le client rappelle pour de nouveaux travaux.</p>`;
+      document.getElementById("desarchiverBtn").addEventListener("click", async () => {
+        if (!confirm("Désarchiver ce chantier ? Il redeviendra sélectionnable normalement (Chantier actif, Rapport Journalier).")) return;
+        const btn = document.getElementById("desarchiverBtn");
+        btn.disabled = true;
+        try {
+          await FTSDrive.desarchiverChantier(chantierId);
+          chargerPrevisions();
+        } catch (err) {
+          alert(`Erreur : ${err.message}`);
+          btn.disabled = false;
+        }
+      });
+      return;
+    }
+
     if (termine) {
       bloc.innerHTML = `
         <span class="chantier-statut-badge termine"><span class="dot"></span>Terminé le ${escapeHtmlSuivi(meta.dateFinChantier || "")}</span>
-        <button type="button" class="btn-rouvrir" id="rouvrirBtn">Rouvrir ce chantier</button>`;
+        <button type="button" class="btn-rouvrir" id="rouvrirBtn">Rouvrir ce chantier</button>
+        <button type="button" class="btn-terminer" id="archiverBtn" style="background:var(--anthracite)">Archiver le dossier Drive</button>`;
       document.getElementById("rouvrirBtn").addEventListener("click", async () => {
         if (!confirm("Rouvrir ce chantier ? Il réapparaîtra comme actif dans la supervision.")) return;
         try {
@@ -191,6 +214,20 @@ document.addEventListener("DOMContentLoaded", () => {
           chargerPrevisions();
         } catch (err) {
           alert(`Erreur : ${err.message}`);
+        }
+      });
+      document.getElementById("archiverBtn").addEventListener("click", async () => {
+        if (!confirm(`Archiver le dossier Drive de "${chantierName}" ? Il sera déplacé hors de "DOSSIER CHANTIER", vers "ARCHIVES". Réversible à tout moment via "Désarchiver".`)) return;
+        const btn = document.getElementById("archiverBtn");
+        btn.disabled = true;
+        btn.textContent = "Archivage en cours...";
+        try {
+          await FTSDrive.archiverChantier(chantierId);
+          chargerPrevisions();
+        } catch (err) {
+          alert(`Erreur : ${err.message}`);
+          btn.disabled = false;
+          btn.textContent = "Archiver le dossier Drive";
         }
       });
     } else {

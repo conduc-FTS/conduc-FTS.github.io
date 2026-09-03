@@ -52,6 +52,7 @@ const FTSDrive = (() => {
   const ROOT_ACCUEIL_INTERIMAIRE = "ACCUEIL INTERIMAIRE";
   const ROOT_ADMINISTRATIF = "ADMINISTRATIF";
   const ROOT_FICHE_MATERIEL = "FICHE MATERIEL";
+  const ROOT_ARCHIVES = "ARCHIVES";
 
   // Sous-dossiers créés à l'ouverture d'un chantier
   const CHANTIER_SUBFOLDERS = ["PLAN", "NDC", "SECURITE", "RAPPORT JOURNALIER", "DICT", "SONDAGE"];
@@ -202,6 +203,55 @@ const FTSDrive = (() => {
 
     const match = candidats.find((f) => normalizeCode(f.name).startsWith(codeNorm));
     return match ? { id: match.id, name: match.name } : null;
+  }
+
+  /**
+   * Archive/désarchive un dossier chantier en le déplaçant entre
+   * DOSSIER CHANTIER et un dossier ARCHIVES (créé automatiquement à la
+   * racine du Drive s'il n'existe pas encore — contrairement aux autres
+   * dossiers racine, celui-ci est entièrement géré par l'appli, donc pas
+   * de risque de doublon mal placé). L'identifiant Drive du dossier ne
+   * change JAMAIS lors d'un déplacement : un lien vers la page détail
+   * d'un chantier continue de fonctionner à l'identique, archivé ou non.
+   */
+  async function archiverChantier(chantierFolderId) {
+    const archivesId = await findOrCreateFolder(ROOT_ARCHIVES, null);
+    const dossierChantierRootId = await getRootFolder(ROOT_DOSSIER_CHANTIER);
+    const res = await fetch(
+      `${API_BASE}/files/${chantierFolderId}?addParents=${archivesId}&removeParents=${dossierChantierRootId}&fields=id,parents`,
+      { method: "PATCH", headers: authHeader() }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`Erreur archivage : ${err.error?.message || res.status}`);
+    }
+    const meta = await getMetadonneesChantier(chantierFolderId);
+    const aujourdhui = new Date();
+    const dateArchivage = `${String(aujourdhui.getDate()).padStart(2, "0")}/${String(aujourdhui.getMonth() + 1).padStart(2, "0")}/${aujourdhui.getFullYear()}`;
+    await setMetadonneesChantier(chantierFolderId, { ...meta, archive: true, dateArchivage });
+  }
+
+  async function desarchiverChantier(chantierFolderId) {
+    const archivesId = await findOrCreateFolder(ROOT_ARCHIVES, null);
+    const dossierChantierRootId = await getRootFolder(ROOT_DOSSIER_CHANTIER);
+    const res = await fetch(
+      `${API_BASE}/files/${chantierFolderId}?addParents=${dossierChantierRootId}&removeParents=${archivesId}&fields=id,parents`,
+      { method: "PATCH", headers: authHeader() }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`Erreur désarchivage : ${err.error?.message || res.status}`);
+    }
+    const meta = await getMetadonneesChantier(chantierFolderId);
+    const metaMisAJour = { ...meta };
+    delete metaMisAJour.archive;
+    delete metaMisAJour.dateArchivage;
+    await setMetadonneesChantier(chantierFolderId, metaMisAJour);
+  }
+
+  async function listChantiersArchives() {
+    const archivesId = await findOrCreateFolder(ROOT_ARCHIVES, null);
+    return listSubfolders(archivesId);
   }
 
   /**
@@ -570,6 +620,9 @@ const FTSDrive = (() => {
     setMetadonneesChantier,
     getDossierRapportChef,
     getRootFolder,
+    archiverChantier,
+    desarchiverChantier,
+    listChantiersArchives,
   };
 })();
 

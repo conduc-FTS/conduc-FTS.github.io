@@ -206,6 +206,16 @@ const FTSSheets = (() => {
     return res.json();
   }
 
+
+  // Une date "31/08/2026" écrite normalement est auto-convertie par Sheets
+  // en numéro de série (ex: 46268) et affichée comme un nombre brut tant que
+  // la colonne n'a pas explicitement le format "Date". On force le texte
+  // avec une apostrophe devant, exactement comme le ferait une saisie
+  // manuelle dans Sheets avec Format > Texte brut.
+  function forcerTexteDate(valeur) {
+    return /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(valeur) ? `'${valeur}` : valeur;
+  }
+
   /**
    * Enregistre les données d'un rapport journalier dans le suivi du chantier :
    * une ligne par machine (statut du jour), une ligne par personne présente,
@@ -238,7 +248,7 @@ const FTSSheets = (() => {
     if (machines && machines.length > 0) {
       const lignesMateriel = machines
         .filter((m) => m.nom)
-        .map((m) => [date, m.nom, m.statut || "", m.ftsLoc || ""]);
+        .map((m) => [forcerTexteDate(date), m.nom, m.statut || "", m.ftsLoc || ""]);
       if (lignesMateriel.length > 0) {
         await ajouterLignes(spreadsheetId, ONGLET_MATERIEL, lignesMateriel);
       }
@@ -247,7 +257,7 @@ const FTSSheets = (() => {
     if (personnel && personnel.length > 0) {
       const lignesPersonnel = personnel
         .filter((p) => p.nom)
-        .map((p) => [date, p.nom, p.type || "FTS", p.gd ? "GD" : "", p.heures || ""]);
+        .map((p) => [forcerTexteDate(date), p.nom, p.type || "FTS", p.gd ? "GD" : "", p.heures || ""]);
       if (lignesPersonnel.length > 0) {
         await ajouterLignes(spreadsheetId, ONGLET_PERSONNEL, lignesPersonnel);
       }
@@ -258,11 +268,11 @@ const FTSSheets = (() => {
     // qui reflète aussi les jours sans production.
     const moyenne = nbPieux > 0 ? longueurTotale / nbPieux : 0;
     await ajouterLignes(spreadsheetId, ONGLET_PRODUCTION, [
-      [date, nbPieux, longueurTotale.toFixed(2), moyenne.toFixed(2)],
+      [forcerTexteDate(date), nbPieux, longueurTotale.toFixed(2), moyenne.toFixed(2)],
     ]);
 
     if (numerosPieux && numerosPieux.length > 0) {
-      await ajouterLignes(spreadsheetId, ONGLET_PIEUX, numerosPieux.map((n) => [date, n]));
+      await ajouterLignes(spreadsheetId, ONGLET_PIEUX, numerosPieux.map((n) => [forcerTexteDate(date), n]));
     }
 
     return spreadsheetId;
@@ -447,8 +457,9 @@ const FTSSheets = (() => {
    * dans l'ordre (ex: [date, machine, statut, ftsLoc]).
    */
   async function modifierLignePointage(spreadsheetId, onglet, sheetRow, valeurs) {
-    const finCol = String.fromCharCode("A".charCodeAt(0) + valeurs.length - 1);
-    await ecrireValeurs(spreadsheetId, `${onglet}!A${sheetRow}:${finCol}${sheetRow}`, [valeurs]);
+    const valeursTexte = [forcerTexteDate(valeurs[0]), ...valeurs.slice(1)];
+    const finCol = String.fromCharCode("A".charCodeAt(0) + valeursTexte.length - 1);
+    await ecrireValeurs(spreadsheetId, `${onglet}!A${sheetRow}:${finCol}${sheetRow}`, [valeursTexte]);
   }
 
   /**
@@ -479,7 +490,8 @@ const FTSSheets = (() => {
    */
   async function ajouterLignePointage(chantierFolderId, chantierName, onglet, valeurs) {
     const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
-    await ajouterLignes(spreadsheetId, onglet, [valeurs]);
+    const valeursTexte = [forcerTexteDate(valeurs[0]), ...valeurs.slice(1)];
+    await ajouterLignes(spreadsheetId, onglet, [valeursTexte]);
     return spreadsheetId;
   }
 

@@ -28,6 +28,26 @@ const FTSSheets = (() => {
   const ONGLET_PRODUCTION = "Production";
   const ONGLET_PIEUX = "Pieux";
 
+  /**
+   * Remplace fetch() pour tous les appels Sheets/Drive de ce module.
+   * Google limite le nombre de requêtes par minute (quota par défaut assez
+   * bas) — dès qu'on ouvre plusieurs chantiers d'un coup (Vue d'ensemble,
+   * Statistiques), il arrive de dépasser ce quota et de recevoir une
+   * erreur 429 "Too Many Requests" totalement normale, pas une panne.
+   * On réessaie automatiquement (attente croissante) avant d'abandonner,
+   * pour que ces pics passent inaperçus au lieu de remonter à l'écran.
+   */
+  async function fetchAvecRetry(url, options, tentativesMax = 4) {
+    let derniereReponse;
+    for (let essai = 0; essai < tentativesMax; essai++) {
+      derniereReponse = await fetch(url, options);
+      if (derniereReponse.status !== 429 || essai === tentativesMax - 1) return derniereReponse;
+      const attente = 600 * Math.pow(2, essai) + Math.random() * 300; // 600ms, 1.2s, 2.4s...
+      await new Promise((resolve) => setTimeout(resolve, attente));
+    }
+    return derniereReponse;
+  }
+
   function authHeader() {
     if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
       throw new Error("Non connecté : impossible d'accéder à Google Sheets.");
@@ -50,7 +70,7 @@ const FTSSheets = (() => {
     const q = encodeURIComponent(
       `name = '${nomClasseur.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.spreadsheet' and '${chantierFolderId}' in parents and trashed = false`
     );
-    const resFind = await fetch(`${DRIVE_API_BASE}/files?q=${q}&fields=files(id,name)&spaces=drive`, {
+    const resFind = await fetchAvecRetry(`${DRIVE_API_BASE}/files?q=${q}&fields=files(id,name)&spaces=drive`, {
       headers: authHeader(),
     });
     if (!resFind.ok) throw new Error(`Erreur recherche classeur suivi : ${resFind.status}`);
@@ -62,7 +82,7 @@ const FTSSheets = (() => {
     }
 
     // Sinon, créer le classeur avec ses deux onglets
-    const resCreate = await fetch(API_BASE, {
+    const resCreate = await fetchAvecRetry(API_BASE, {
       method: "POST",
       headers: { ...authHeader(), "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -83,7 +103,7 @@ const FTSSheets = (() => {
     const spreadsheetId = created.spreadsheetId;
 
     // Déplacer le classeur créé (à la racine du Drive par défaut) dans le dossier du chantier
-    await fetch(`${DRIVE_API_BASE}/files/${spreadsheetId}?addParents=${chantierFolderId}&removeParents=root&fields=id,parents`, {
+    await fetchAvecRetry(`${DRIVE_API_BASE}/files/${spreadsheetId}?addParents=${chantierFolderId}&removeParents=root&fields=id,parents`, {
       method: "PATCH",
       headers: authHeader(),
     });
@@ -113,7 +133,7 @@ const FTSSheets = (() => {
    * et on crée ceux qui manquent avec leur en-tête.
    */
   async function assurerOngletsPresents(spreadsheetId) {
-    const res = await fetch(`${API_BASE}/${spreadsheetId}?fields=sheets.properties.title`, {
+    const res = await fetchAvecRetry(`${API_BASE}/${spreadsheetId}?fields=sheets.properties.title`, {
       headers: authHeader(),
     });
     if (!res.ok) return; // best-effort : ne bloque pas le rapport si cette vérif échoue
@@ -123,7 +143,7 @@ const FTSSheets = (() => {
     const manquants = Object.keys(EN_TETES_ONGLETS).filter((onglet) => !titresExistants.has(onglet));
     if (manquants.length === 0) return;
 
-    await fetch(`${API_BASE}/${spreadsheetId}:batchUpdate`, {
+    await fetchAvecRetry(`${API_BASE}/${spreadsheetId}:batchUpdate`, {
       method: "POST",
       headers: { ...authHeader(), "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -139,7 +159,7 @@ const FTSSheets = (() => {
   }
 
   async function ecrireValeurs(spreadsheetId, range, values) {
-    const res = await fetch(
+    const res = await fetchAvecRetry(
       `${API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
       {
         method: "PUT",
@@ -152,7 +172,7 @@ const FTSSheets = (() => {
   }
 
   async function getSheetId(spreadsheetId, onglet) {
-    const res = await fetch(`${API_BASE}/${spreadsheetId}?fields=sheets.properties`, {
+    const res = await fetchAvecRetry(`${API_BASE}/${spreadsheetId}?fields=sheets.properties`, {
       headers: authHeader(),
     });
     if (!res.ok) return null;
@@ -186,7 +206,7 @@ const FTSSheets = (() => {
       },
     }));
 
-    await fetch(`${API_BASE}/${spreadsheetId}:batchUpdate`, {
+    await fetchAvecRetry(`${API_BASE}/${spreadsheetId}:batchUpdate`, {
       method: "POST",
       headers: { ...authHeader(), "Content-Type": "application/json" },
       body: JSON.stringify({ requests }),
@@ -194,7 +214,7 @@ const FTSSheets = (() => {
   }
 
   async function ajouterLignes(spreadsheetId, onglet, values) {
-    const res = await fetch(
+    const res = await fetchAvecRetry(
       `${API_BASE}/${spreadsheetId}/values/${encodeURIComponent(onglet)}!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
       {
         method: "POST",
@@ -314,7 +334,7 @@ const FTSSheets = (() => {
    * l'écran "Suivi chantier" côté conducteur.
    */
   async function lireOnglet(spreadsheetId, onglet) {
-    const res = await fetch(`${API_BASE}/${spreadsheetId}/values/${encodeURIComponent(onglet)}!A2:Z`, {
+    const res = await fetchAvecRetry(`${API_BASE}/${spreadsheetId}/values/${encodeURIComponent(onglet)}!A2:Z`, {
       headers: authHeader(),
     });
     if (!res.ok) throw new Error(`Erreur lecture Sheets : ${res.status}`);
@@ -479,7 +499,7 @@ const FTSSheets = (() => {
   async function supprimerLignePointage(spreadsheetId, onglet, sheetRow) {
     const sheetId = await getSheetId(spreadsheetId, onglet);
     if (sheetId == null) return;
-    await fetch(`${API_BASE}/${spreadsheetId}:batchUpdate`, {
+    await fetchAvecRetry(`${API_BASE}/${spreadsheetId}:batchUpdate`, {
       method: "POST",
       headers: { ...authHeader(), "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -527,7 +547,7 @@ const FTSSheets = (() => {
     const q = encodeURIComponent(
       `name='${NOM_CLASSEUR_HISTORIQUE.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.spreadsheet' and '${administratifId}' in parents and trashed=false`
     );
-    const resFind = await fetch(
+    const resFind = await fetchAvecRetry(
       `${DRIVE_API_BASE}/files?q=${q}&fields=files(id)&includeItemsFromAllDrives=true&supportsAllDrives=true`,
       { headers: authHeader() }
     );
@@ -535,7 +555,7 @@ const FTSSheets = (() => {
     const dataFind = await resFind.json();
     if (dataFind.files && dataFind.files.length > 0) return dataFind.files[0].id;
 
-    const resCreate = await fetch(API_BASE, {
+    const resCreate = await fetchAvecRetry(API_BASE, {
       method: "POST",
       headers: { ...authHeader(), "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -550,7 +570,7 @@ const FTSSheets = (() => {
     const created = await resCreate.json();
     const spreadsheetId = created.spreadsheetId;
 
-    await fetch(`${DRIVE_API_BASE}/files/${spreadsheetId}?addParents=${administratifId}&removeParents=root&fields=id,parents`, {
+    await fetchAvecRetry(`${DRIVE_API_BASE}/files/${spreadsheetId}?addParents=${administratifId}&removeParents=root&fields=id,parents`, {
       method: "PATCH",
       headers: authHeader(),
     });

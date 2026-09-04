@@ -54,6 +54,23 @@ const FTSDrive = (() => {
   const ROOT_FICHE_MATERIEL = "FICHE MATERIEL";
   const ROOT_ARCHIVES = "ARCHIVES";
 
+  /**
+   * Même logique que dans sheets.js : Google limite le nombre de requêtes
+   * par minute, et charger plusieurs chantiers d'un coup (Vue d'ensemble,
+   * Statistiques) peut dépasser ce quota — erreur 429 normale, pas une
+   * panne. On réessaie automatiquement avant d'abandonner.
+   */
+  async function fetchAvecRetry(url, options, tentativesMax = 4) {
+    let derniereReponse;
+    for (let essai = 0; essai < tentativesMax; essai++) {
+      derniereReponse = await fetch(url, options);
+      if (derniereReponse.status !== 429 || essai === tentativesMax - 1) return derniereReponse;
+      const attente = 600 * Math.pow(2, essai) + Math.random() * 300;
+      await new Promise((resolve) => setTimeout(resolve, attente));
+    }
+    return derniereReponse;
+  }
+
   // Sous-dossiers créés à l'ouverture d'un chantier
   const CHANTIER_SUBFOLDERS = ["PLAN", "NDC", "SECURITE", "RAPPORT JOURNALIER", "DICT", "SONDAGE"];
   const SECURITE_SUBFOLDER = "ACCUEIL SECURITE"; // imbriqué dans SECURITE
@@ -94,7 +111,7 @@ const FTSDrive = (() => {
     const q = encodeURIComponent(
       `name = '${escapeForQuery(name)}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false${parentClause}`
     );
-    const res = await fetch(
+    const res = await fetchAvecRetry(
       `${API_BASE}/files?q=${q}&fields=files(id,name)&spaces=drive&includeItemsFromAllDrives=true&supportsAllDrives=true`,
       { headers: authHeader() }
     );
@@ -112,7 +129,7 @@ const FTSDrive = (() => {
     const q = encodeURIComponent(
       `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`
     );
-    const res = await fetch(`${API_BASE}/files?q=${q}&fields=files(id,name)&spaces=drive&pageSize=1000`, {
+    const res = await fetchAvecRetry(`${API_BASE}/files?q=${q}&fields=files(id,name)&spaces=drive&pageSize=1000`, {
       headers: authHeader(),
     });
     if (!res.ok) {
@@ -130,7 +147,7 @@ const FTSDrive = (() => {
    * chantiers en cours.
    */
   async function getMetadonneesChantier(chantierId) {
-    const res = await fetch(`${API_BASE}/files/${chantierId}?fields=description`, {
+    const res = await fetchAvecRetry(`${API_BASE}/files/${chantierId}?fields=description`, {
       headers: authHeader(),
     });
     if (!res.ok) return {};
@@ -143,7 +160,7 @@ const FTSDrive = (() => {
   }
 
   async function setMetadonneesChantier(chantierId, metadonnees) {
-    await fetch(`${API_BASE}/files/${chantierId}?fields=id`, {
+    await fetchAvecRetry(`${API_BASE}/files/${chantierId}?fields=id`, {
       method: "PATCH",
       headers: { ...authHeader(), "Content-Type": "application/json" },
       body: JSON.stringify({ description: JSON.stringify(metadonnees) }),
@@ -154,7 +171,7 @@ const FTSDrive = (() => {
     const metadata = { name, mimeType: "application/vnd.google-apps.folder" };
     if (parentId) metadata.parents = [parentId];
 
-    const res = await fetch(`${API_BASE}/files?fields=id,name`, {
+    const res = await fetchAvecRetry(`${API_BASE}/files?fields=id,name`, {
       method: "POST",
       headers: { ...authHeader(), "Content-Type": "application/json" },
       body: JSON.stringify(metadata),
@@ -217,7 +234,7 @@ const FTSDrive = (() => {
   async function archiverChantier(chantierFolderId) {
     const archivesId = await findOrCreateFolder(ROOT_ARCHIVES, null);
     const dossierChantierRootId = await getRootFolder(ROOT_DOSSIER_CHANTIER);
-    const res = await fetch(
+    const res = await fetchAvecRetry(
       `${API_BASE}/files/${chantierFolderId}?addParents=${archivesId}&removeParents=${dossierChantierRootId}&fields=id,parents`,
       { method: "PATCH", headers: authHeader() }
     );
@@ -234,7 +251,7 @@ const FTSDrive = (() => {
   async function desarchiverChantier(chantierFolderId) {
     const archivesId = await findOrCreateFolder(ROOT_ARCHIVES, null);
     const dossierChantierRootId = await getRootFolder(ROOT_DOSSIER_CHANTIER);
-    const res = await fetch(
+    const res = await fetchAvecRetry(
       `${API_BASE}/files/${chantierFolderId}?addParents=${dossierChantierRootId}&removeParents=${archivesId}&fields=id,parents`,
       { method: "PATCH", headers: authHeader() }
     );
@@ -412,7 +429,7 @@ const FTSDrive = (() => {
     const q = encodeURIComponent(
       `name = '${escapeForQuery(name)}' and '${parentId}' in parents and trashed = false`
     );
-    const res = await fetch(`${API_BASE}/files?q=${q}&fields=files(id,name)&spaces=drive`, {
+    const res = await fetchAvecRetry(`${API_BASE}/files?q=${q}&fields=files(id,name)&spaces=drive`, {
       headers: authHeader(),
     });
     if (!res.ok) return [];
@@ -421,7 +438,7 @@ const FTSDrive = (() => {
   }
 
   async function deleteFile(fileId) {
-    await fetch(`${API_BASE}/files/${fileId}`, { method: "DELETE", headers: authHeader() });
+    await fetchAvecRetry(`${API_BASE}/files/${fileId}`, { method: "DELETE", headers: authHeader() });
   }
 
   /**
@@ -452,7 +469,7 @@ const FTSDrive = (() => {
     form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
     form.append("file", blob);
 
-    const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink", {
+    const res = await fetchAvecRetry("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink", {
       method: "POST",
       headers: authHeader(), // ne pas fixer Content-Type : le navigateur gère le multipart/form-data
       body: form,
@@ -470,7 +487,7 @@ const FTSDrive = (() => {
    * "chantier actif depuis X jours").
    */
   async function getFolderCreatedTime(folderId) {
-    const res = await fetch(`${API_BASE}/files/${folderId}?fields=createdTime`, {
+    const res = await fetchAvecRetry(`${API_BASE}/files/${folderId}?fields=createdTime`, {
       headers: authHeader(),
     });
     if (!res.ok) return null;
@@ -505,7 +522,7 @@ const FTSDrive = (() => {
     const qFiles = encodeURIComponent(
       `(${parentsClause}) and mimeType != 'application/vnd.google-apps.folder' and trashed = false`
     );
-    const res = await fetch(
+    const res = await fetchAvecRetry(
       `${API_BASE}/files?q=${qFiles}&fields=files(id,name,createdTime,parents)&orderBy=createdTime desc&pageSize=${limite || 5}&spaces=drive`,
       { headers: authHeader() }
     );
@@ -554,7 +571,7 @@ const FTSDrive = (() => {
     const q = encodeURIComponent(
       `'${folderId}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false`
     );
-    const res = await fetch(
+    const res = await fetchAvecRetry(
       `${API_BASE}/files?q=${q}&fields=files(id,name,modifiedTime,size,mimeType,webViewLink)&orderBy=modifiedTime desc&pageSize=100&spaces=drive`,
       { headers: authHeader() }
     );

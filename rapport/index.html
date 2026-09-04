@@ -583,6 +583,19 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   </div>
 </div>
 
+<!-- ALERTE STATUT MATÉRIEL MANQUANT -->
+<div class="modal-overlay" id="modalStatutManquant">
+  <div class="modal" style="border-top:5px solid #E8B923;max-width:400px">
+    <h3>⚠️ Statut manquant</h3>
+    <p style="margin-bottom:10px">Ces machines n'ont pas de statut renseigné (TRAVAIL / PANNE / ARRÊT / TRANSPORT) — le pointage matériel du jour sera incomplet pour elles si tu continues :</p>
+    <p id="statutManquantListe" style="background:#FEF8E4;border-radius:6px;padding:10px;font-size:13px;font-weight:600;color:#8A6D00;margin-bottom:16px"></p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="fermerAlerteStatutManquant()">Modifier</button>
+      <button class="btn-confirm" onclick="confirmerMalgreStatutManquant()" style="background:#E8B923;color:#3A2E00">Confirmer quand même</button>
+    </div>
+  </div>
+</div>
+
 <script src="/js/auth.js"></script>
 <script src="/js/drive.js"></script>
 <script src="/js/sheets.js"></script>
@@ -844,6 +857,19 @@ async function validerRapport() {
   if (!date)     { showToast('⚠️ Veuillez renseigner la date', 'error'); return; }
   if (!chantier) { showToast('⚠️ Veuillez renseigner le chantier', 'error'); return; }
 
+  // Vérification : une machine renseignée doit avoir un statut (sinon le
+  // pointage matériel du jour reste incomplet sans que personne s'en aperçoive)
+  const machinesSansStatut = [];
+  for (let i = 1; i <= N_PIEUX; i++) {
+    const nom = document.getElementById(`mat_${i}`)?.value?.trim();
+    const statut = document.getElementById(`statut_${i}`)?.value;
+    if (nom && !statut) machinesSansStatut.push(nom);
+  }
+  if (machinesSansStatut.length > 0) {
+    afficherAlerteStatutManquant(machinesSansStatut);
+    return;
+  }
+
   // Vérification des numéros de pieu déjà réalisés un autre jour
   if (window.FTSAuth && FTSAuth.isSignedIn() && window.FTSSheets && window.FTSDrive) {
     const numerosPieux = [];
@@ -910,6 +936,18 @@ function fermerAlerteDoublons() {
 }
 function confirmerMalgreDoublons() {
   fermerAlerteDoublons();
+  afficherModalConfirmation();
+}
+
+function afficherAlerteStatutManquant(machines) {
+  document.getElementById('statutManquantListe').innerHTML = machines.map(m => `• ${m}`).join('<br>');
+  document.getElementById('modalStatutManquant').classList.add('open');
+}
+function fermerAlerteStatutManquant() {
+  document.getElementById('modalStatutManquant').classList.remove('open');
+}
+function confirmerMalgreStatutManquant() {
+  fermerAlerteStatutManquant();
   afficherModalConfirmation();
 }
 

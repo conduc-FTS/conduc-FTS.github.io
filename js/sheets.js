@@ -381,7 +381,7 @@ const FTSSheets = (() => {
     // la vignette (le statut d'une pelle ou d'un groupe électrogène est
     // moins parlant). On reconnaît les modèles courants par mots-clés ;
     // si aucun ne correspond, on retombe sur la première ligne du jour.
-    const MOTS_CLES_FOREUSE = ["FUTURO", "MA12", "MA 12", "COMACCHIO", "BERETTA", "PH15", "PH 15", "CASAGRANDE", "SOILMEC", "IMT"];
+    const MOTS_CLES_FOREUSE = ["FUTURO", "MA12", "MA 12", "COMACCHIO", "BERETTA", "T41", "T46", "MC6", "MC8", "MC15", "PH15", "PH 15", "CASAGRANDE", "SOILMEC", "IMT", "DCH", "EGT"];
     const estForeuse = (nomMachine) => {
       const n = (nomMachine || "").toUpperCase();
       return MOTS_CLES_FOREUSE.some((mot) => n.includes(mot));

@@ -102,12 +102,18 @@ body { margin: 0; display: flex; min-height: 100vh; }
 }
 @media (max-width: 720px) {
   body { flex-direction: column; }
-  .se-sidebar { width: 100%; height: auto; position: static; flex-direction: row; align-items: center; flex-wrap: wrap; }
-  .se-sidebar-nav { flex-direction: row; overflow-x: auto; }
+  .se-sidebar { width: 100%; height: auto; position: static; flex-wrap: wrap; align-items: center; }
+  .se-sidebar-brand { order: 1; flex: 1; min-width: 0; }
+  .se-sidebar-footer { order: 2; flex: 0 0 auto; }
+  .se-sidebar-nav {
+    order: 3; flex: 0 0 100%; flex-direction: row; overflow-x: auto;
+    border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;
+  }
+  .se-sidebar-nav button, .se-sidebar-nav a { white-space: nowrap; }
   .se-sidebar-footer {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     border-top: none; border-left: 1px solid rgba(255,255,255,0.08);
-    padding: 10px 14px; width: auto; flex: 1;
+    padding: 10px 14px; width: auto;
   }
   .se-sidebar-footer .email { display: inline; margin: 0; font-size: 0.68rem; }
   .se-sidebar-footer button { width: auto; padding: 6px 10px; }

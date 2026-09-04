@@ -102,12 +102,33 @@ body { margin: 0; display: flex; min-height: 100vh; }
 }
 @media (max-width: 720px) {
   body { flex-direction: column; }
-  .se-sidebar { width: 100%; height: auto; position: static; flex-direction: row; align-items: center; }
+  .se-sidebar { width: 100%; height: auto; position: static; flex-direction: row; align-items: center; flex-wrap: wrap; }
   .se-sidebar-nav { flex-direction: row; overflow-x: auto; }
-  .se-sidebar-footer { display: none; }
-  .se-main { padding: 20px; }
+  .se-sidebar-footer {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    border-top: none; border-left: 1px solid rgba(255,255,255,0.08);
+    padding: 10px 14px; width: auto; flex: 1;
+  }
+  .se-sidebar-footer .email { display: inline; margin: 0; font-size: 0.68rem; }
+  .se-sidebar-footer button { width: auto; padding: 6px 10px; }
+  .se-main { padding: 16px; }
   .se-kpi-row { grid-template-columns: 1fr 1fr; }
+
+  /* Le tableau des chantiers devient une liste de cartes empilées —
+     plus lisible qu'un tableau large à faire défiler pour une simple
+     consultation sur téléphone (la vraie supervision reste au bureau). */
+  .se-table-scroll { overflow-x: visible; }
+  .se-table, .se-table thead, .se-table tbody, .se-table tr { display: block; width: 100%; min-width: 0; }
+  .se-table thead { display: none; }
+  .se-table tr { border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px; padding: 10px 14px; background: white; }
+  .se-table tr:hover td { background: none; }
+  .se-table td { display: block; width: auto; border: none; padding: 5px 0; }
+  .se-table td[data-label]::before {
+    content: attr(data-label); display: block; font-size: 0.62rem; text-transform: uppercase;
+    letter-spacing: 0.03em; color: var(--text-sub); font-weight: 700; margin-bottom: 2px;
+  }
 }
+
 .se-subtabs { display: flex; gap: 8px; margin-bottom: 18px; }
 .se-subtab { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 0.83rem; font-weight: 700; color: var(--text-sub); cursor: pointer; }
 .se-subtab.active { background: var(--anthracite); color: white; border-color: var(--anthracite); }
@@ -679,12 +700,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
       return `
         <tr data-id="${c.id}" data-name="${escapeHtmlSE(c.nomComplet)}">
-          <td><span class="se-code">${escapeHtmlSE(c.code)}</span><span class="se-nom">${escapeHtmlSE(c.nom)}${c.enRetard ? '<span class="se-alert-badge">⚠ RETARD</span>' : ""}${c.termine ? `<span class="se-alert-badge" style="color:var(--text-sub)">✓ TERMINÉ${c.dateFinChantier ? " " + escapeHtmlSE(c.dateFinChantier) : ""}</span>` : ""}</span></td>
-          <td><span class="se-type-badge ${typeClass}">${c.type}</span></td>
-          <td>${statutHtml}</td>
-          <td><div class="se-progress-cell"><span class="se-progress-nums">${joursTxt}</span>${joursBar}</div></td>
-          <td><div class="se-progress-cell"><span class="se-progress-nums">${mpTxt}</span>${mpBar}</div></td>
-          <td class="se-last-activity">${c.derniereDate ? escapeHtmlSE(c.derniereDate) : "Aucune donnée"}</td>
+          <td data-label="Chantier"><span class="se-code">${escapeHtmlSE(c.code)}</span><span class="se-nom">${escapeHtmlSE(c.nom)}${c.enRetard ? '<span class="se-alert-badge">⚠ RETARD</span>' : ""}${c.termine ? `<span class="se-alert-badge" style="color:var(--text-sub)">✓ TERMINÉ${c.dateFinChantier ? " " + escapeHtmlSE(c.dateFinChantier) : ""}</span>` : ""}</span></td>
+          <td data-label="Type"><span class="se-type-badge ${typeClass}">${c.type}</span></td>
+          <td data-label="Statut foreuse">${statutHtml}</td>
+          <td data-label="Jours"><div class="se-progress-cell"><span class="se-progress-nums">${joursTxt}</span>${joursBar}</div></td>
+          <td data-label="Micropieux"><div class="se-progress-cell"><span class="se-progress-nums">${mpTxt}</span>${mpBar}</div></td>
+          <td data-label="Dernière activité" class="se-last-activity">${c.derniereDate ? escapeHtmlSE(c.derniereDate) : "Aucune donnée"}</td>
         </tr>`;
     }).join("");
 

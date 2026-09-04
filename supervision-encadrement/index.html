@@ -100,16 +100,30 @@ body { margin: 0; display: flex; min-height: 100vh; }
 @media (max-width: 1000px) {
   .se-kpi-row { grid-template-columns: repeat(2, 1fr); }
 }
-@media (max-width: 720px) {
+.se-burger { display: none; }
+
+@media (max-width: 720px) and (orientation: portrait) {
   body { flex-direction: column; }
-  .se-sidebar { width: 100%; height: auto; position: static; flex-wrap: wrap; align-items: center; }
+  .se-sidebar { width: 100%; height: auto; position: static; flex-wrap: wrap; align-items: center; position: relative; }
+
+  .se-burger {
+    display: flex; align-items: center; justify-content: center; order: 0;
+    width: 38px; height: 38px; background: rgba(255,255,255,0.08); border: none; border-radius: 8px;
+    color: white; font-size: 1.1rem; cursor: pointer; margin-right: 10px; flex-shrink: 0;
+  }
   .se-sidebar-brand { order: 1; flex: 1; min-width: 0; }
   .se-sidebar-footer { order: 2; flex: 0 0 auto; }
+
+  /* Menu déroulant en overlay, fermé par défaut — plus simple à lire
+     qu'une rangée d'onglets à faire défiler horizontalement. */
   .se-sidebar-nav {
-    order: 3; flex: 0 0 100%; flex-direction: row; overflow-x: auto;
-    border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;
+    display: none; order: 4; flex: 0 0 100%; flex-direction: column; overflow-x: visible;
+    position: absolute; top: 100%; left: 0; right: 0; background: var(--anthracite);
+    border-top: 1px solid rgba(255,255,255,0.08); box-shadow: 0 8px 16px rgba(0,0,0,0.25); z-index: 30;
   }
-  .se-sidebar-nav button, .se-sidebar-nav a { white-space: nowrap; }
+  .se-sidebar-nav.open { display: flex; }
+  .se-sidebar-nav button, .se-sidebar-nav a { white-space: normal; padding: 13px 18px; border-radius: 0; }
+
   .se-sidebar-footer {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     border-top: none; border-left: 1px solid rgba(255,255,255,0.08);
@@ -157,6 +171,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
 <body>
 
 <div class="se-sidebar">
+  <button type="button" class="se-burger" id="burgerBtn" aria-label="Menu">☰</button>
   <div class="se-sidebar-brand">
     <img src="../assets/logo-fts.png" alt="FTS">
     <div>
@@ -164,7 +179,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
       <div>Fondations et Travaux Spéciaux</div>
     </div>
   </div>
-  <div class="se-sidebar-nav">
+  <div class="se-sidebar-nav" id="sidebarNav">
     <button type="button" class="se-nav-btn active" data-view="se-view-overview">📊 Vue d'ensemble</button>
     <button type="button" class="se-nav-btn" data-view="se-view-creer">➕ Créer un chantier</button>
     <button type="button" class="se-nav-btn" data-view="se-view-archives">🗄️ Archives</button>
@@ -419,6 +434,12 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("overviewDate").textContent =
     "Supervision de tous les chantiers en cours — " + new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
+  // --- Menu hamburger (mobile portrait) ---
+  const sidebarNav = document.getElementById("sidebarNav");
+  document.getElementById("burgerBtn").addEventListener("click", () => {
+    sidebarNav.classList.toggle("open");
+  });
+
   // --- Navigation barre latérale ---
   document.querySelectorAll(".se-nav-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -428,6 +449,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById(btn.dataset.view).classList.add("active");
       if (btn.dataset.view === "se-view-archives") chargerArchives();
       if (btn.dataset.view === "se-view-stats") chargerStatsAvancement();
+      sidebarNav.classList.remove("open");
     });
   });
 

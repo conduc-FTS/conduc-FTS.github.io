@@ -100,19 +100,26 @@ body { margin: 0; display: flex; min-height: 100vh; }
 @media (max-width: 1000px) {
   .se-kpi-row { grid-template-columns: repeat(2, 1fr); }
 }
-.se-burger { display: none; }
+.se-burger { display: none; background: none; border: none; padding: 0; cursor: pointer; width: 100%; }
 
-@media (max-width: 720px) and (orientation: portrait) {
+@media (max-width: 720px) and (orientation: portrait), (max-height: 500px) and (orientation: landscape) {
   body { flex-direction: column; }
-  .se-sidebar { width: 100%; height: auto; position: static; flex-wrap: wrap; align-items: center; position: relative; }
+  .se-sidebar { width: 100%; height: auto; position: relative; display: flex; flex-wrap: wrap; align-items: center; }
 
-  .se-burger {
-    display: flex; align-items: center; justify-content: center; order: 0;
-    width: 38px; height: 38px; background: rgba(255,255,255,0.08); border: none; border-radius: 8px;
-    color: white; font-size: 1.1rem; cursor: pointer; margin-right: 10px; flex-shrink: 0;
-  }
+  /* Ligne 1 : logo toujours à gauche, statut de connexion à droite */
   .se-sidebar-brand { order: 1; flex: 1; min-width: 0; }
   .se-sidebar-footer { order: 2; flex: 0 0 auto; }
+
+  /* Ligne 2 : hamburger seul, aligné à droite, juste sous la connexion */
+  .se-burger {
+    order: 3; flex: 0 0 100%; display: flex; justify-content: flex-end; align-items: center;
+    padding: 6px 14px 10px 14px;
+  }
+  .se-burger span {
+    display: flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; background: rgba(255,255,255,0.08); border-radius: 8px;
+    color: white; font-size: 1.1rem;
+  }
 
   /* Menu déroulant en overlay, fermé par défaut — plus simple à lire
      qu'une rangée d'onglets à faire défiler horizontalement. */
@@ -171,7 +178,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
 <body>
 
 <div class="se-sidebar">
-  <button type="button" class="se-burger" id="burgerBtn" aria-label="Menu">☰</button>
+  <button type="button" class="se-burger" id="burgerBtn" aria-label="Menu"><span>☰</span></button>
   <div class="se-sidebar-brand">
     <img src="../assets/logo-fts.png" alt="FTS">
     <div>

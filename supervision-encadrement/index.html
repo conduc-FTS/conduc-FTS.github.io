@@ -104,7 +104,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
 
 @media (max-width: 720px) and (orientation: portrait), (max-height: 500px) and (orientation: landscape) {
   body { flex-direction: column; }
-  .se-sidebar { width: 100%; height: auto; position: relative; display: flex; flex-wrap: wrap; align-items: center; }
+  .se-sidebar { width: 100%; height: auto; position: relative; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; }
 
   /* Ligne 1 : logo à gauche, hamburger à droite, sur la même ligne */
   .se-sidebar-brand { order: 1; flex: 1; min-width: 0; }

@@ -462,10 +462,10 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
           <th colspan="3" class="jaune">MATÉRIEL</th>
         </tr>
         <tr>
-          <th>Longueur</th>
-          <th>Ø forage</th>
-          <th>Ø tube principale</th>
-          <th>GAINAGE</th>
+          <th>Longueur (m)</th>
+          <th>Ø forage (mm)</th>
+          <th>Ø tube principale (mm)</th>
+          <th>GAINAGE (mm)</th>
           <th style="min-width:180px">Désignation</th>
           <th style="min-width:100px">Statut</th>
           <th style="min-width:80px">FTS / LOC</th>
@@ -1081,7 +1081,7 @@ async function genererPDF() {
   });
 
   // Ligne 2 : fond jaune pour FORAGE et MATÉRIEL, fond gris pour le reste
-  const subs = ['','Longueur','Ø forage','Ø tube princ.','GAINAGE','','Désignation','Statut','FTS','LOC'];
+  const subs = ['','Longueur (m)','Ø forage (mm)','Ø tube princ. (mm)','GAINAGE (mm)','','Désignation','Statut','FTS','LOC'];
   const jauneCols = new Set([1,2,6,7,8,9]); // FORAGE + MATÉRIEL
   subs.forEach((s, i) => {
     if (i === 0 || i === 5) return;

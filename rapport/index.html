@@ -665,26 +665,25 @@ document.addEventListener('DOMContentLoaded', () => {
   // Tableau pieux
   const tbody = document.getElementById('tbodyPieux');
   for (let i = 1; i <= N_PIEUX; i++) {
-    // Ligne 12 : séparation visuelle entre le catalogue FTS et le catalogue
-    // LOC — une vraie ligne du tableau (même hauteur que les autres), donc
-    // elle apparaît aussi dans le PDF exporté. Ce n'est pas une ligne de
-    // saisie : pas de N° Mpx/mesures/désignation dessus.
-    if (i === 12) {
-      tbody.innerHTML += `
-        <tr class="designation-divider">
-          <td colspan="6"></td>
-          <td style="background:#1E1E1E;color:#fff;font-weight:800;text-align:center;padding:6px;font-size:12px;letter-spacing:0.05em;">Désignation LOC</td>
-          <td style="background:#1E1E1E;color:#fff;font-weight:800;text-align:center;padding:6px;font-size:12px;letter-spacing:0.05em;">Statut</td>
-        </tr>`;
-      continue;
-    }
-    // Saisie libre avec suggestions : les modèles courants sont proposés par
-    // catégorie, mais on peut taper n'importe quel nom de machine (matériel
-    // nouveau, location ponctuelle, etc.). FTS/LOC se déduit strictement de
-    // la position de la ligne (voir ftsLocDeduit), aucun choix à faire.
-    const dropHtml = DROPDOWN[i]
-      ? `<input type="text" id="mat_${i}" list="dl_mat_${i}" autocomplete="off" placeholder="Choisir ou saisir"><datalist id="dl_mat_${i}">${DROPDOWN[i].map(v=>`<option value="${v}">`).join('')}</datalist>`
-      : `<input type="text" id="mat_${i}" placeholder="Choisir ou saisir">`;
+    const estSeparateur = (i === 12);
+
+    // Ligne 12 : sert de séparation visuelle "Désignation LOC" / "Statut"
+    // (fond noir, texte blanc à l'écran) — mais reste une ligne normale
+    // pour N° Mpx, mesures et Barre : ces champs restent saisissables.
+    const dropHtml = estSeparateur
+      ? `<div style="background:#1E1E1E;color:#fff;font-weight:800;text-align:center;padding:8px 6px;margin:-8px -6px;font-size:12px;letter-spacing:0.05em;">Désignation LOC</div>`
+      : (DROPDOWN[i]
+          ? `<input type="text" id="mat_${i}" list="dl_mat_${i}" autocomplete="off" placeholder="Choisir ou saisir"><datalist id="dl_mat_${i}">${DROPDOWN[i].map(v=>`<option value="${v}">`).join('')}</datalist>`
+          : `<input type="text" id="mat_${i}" placeholder="Choisir ou saisir">`);
+    const statutHtml = estSeparateur
+      ? `<div style="background:#1E1E1E;color:#fff;font-weight:800;text-align:center;padding:8px 6px;margin:-8px -6px;font-size:12px;letter-spacing:0.05em;">Statut</div>`
+      : `<select id="statut_${i}" style="font-size:11px;font-weight:700;border:1.5px solid #DDD;border-radius:4px;padding:4px 2px;width:100%;background:#fff;">
+          <option value="">—</option>
+          <option value="TRAVAIL">✓ TRAVAIL</option>
+          <option value="PANNE">✗ PANNE</option>
+          <option value="ARRET">● ARRÊT</option>
+          <option value="TRANSPORT">→ TRANSPORT</option>
+        </select>`;
     tbody.innerHTML += `
       <tr>
         <td><input type="text" id="pieu_${i}" style="text-align:center"></td>
@@ -693,16 +692,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <td><input type="number" id="tp_${i}" step="0.01" list="dl_diametres" style="text-align:center"></td>
         <td><input type="number" id="gn_${i}" step="0.01" list="dl_diametres" style="text-align:center"></td>
         <td class="td-check"><label class="check-cell"><input type="checkbox" id="barre_${i}"><span class="check-icon">✓</span></label></td>
-        <td>${dropHtml}</td>
-        <td>
-          <select id="statut_${i}" style="font-size:11px;font-weight:700;border:1.5px solid #DDD;border-radius:4px;padding:4px 2px;width:100%;background:#fff;">
-            <option value="">—</option>
-            <option value="TRAVAIL">✓ TRAVAIL</option>
-            <option value="PANNE">✗ PANNE</option>
-            <option value="ARRET">● ARRÊT</option>
-            <option value="TRANSPORT">→ TRANSPORT</option>
-          </select>
-        </td>
+        <td${estSeparateur ? ' style="padding:0"' : ''}>${dropHtml}</td>
+        <td${estSeparateur ? ' style="padding:0"' : ''}>${statutHtml}</td>
       </tr>`;
   }
 
@@ -1125,27 +1116,10 @@ async function genererPDF() {
   const N_MATERIEL = 16; // au-delà, le bloc PERSONNEL recouvre ces lignes (voir plus bas)
   for (let i = 1; i <= N_PIEUX; i++) {
     const ry = y + (i-1)*ROW_H;
+    const estSeparateur = (i === 12);
 
-    // Ligne 12 : séparation "Désignation LOC" sous Désignation, et "Statut"
-    // sous Statut — les deux en fond jaune / texte noir, comme les en-têtes.
-    if (i === 12) {
-      doc.setDrawColor(...C_BORD);
-      doc.line(colX[0], ry+ROW_H, colX[8], ry+ROW_H);
-      colX.forEach(x => doc.line(x, ry, x, ry+ROW_H));
-
-      doc.setFillColor(...C_JAUNE);
-      doc.rect(colX[6], ry, cols[6], ROW_H, 'F');
-      doc.rect(colX[7], ry, cols[7], ROW_H, 'F');
-      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_ANTH);
-      doc.text('Désignation LOC', colX[6]+cols[6]/2, ry+ROW_H/2+1.2, {align:'center'});
-      doc.text('Statut', colX[7]+cols[7]/2, ry+ROW_H/2+1.2, {align:'center'});
-
-      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
-      continue;
-    }
-
-    // alternance gris très clair / blanc
-    if (i % 2 === 0) { doc.setFillColor(...C_GRIS2); doc.rect(colX[0], ry, totalW, ROW_H, 'F'); }
+    // alternance gris très clair / blanc (pas sur la ligne de séparation)
+    if (!estSeparateur && i % 2 === 0) { doc.setFillColor(...C_GRIS2); doc.rect(colX[0], ry, totalW, ROW_H, 'F'); }
     doc.setDrawColor(...C_BORD);
     doc.line(colX[0], ry+ROW_H, colX[8], ry+ROW_H);
     colX.forEach(x => doc.line(x, ry, x, ry+ROW_H));
@@ -1171,7 +1145,19 @@ async function genererPDF() {
       drawCoche(doc, colX[5], ry, cols[5], ROW_H, C_NOIR, ROW_H);
     }
 
-    if (i <= N_MATERIEL) {
+    // Ligne 12 : "Désignation LOC" sous Désignation et "Statut" sous
+    // Statut, fond jaune / texte noir, comme les en-têtes de colonne.
+    // Le reste de la ligne (N° Mpx, mesures, Barre ci-dessus) est saisi
+    // et imprimé normalement.
+    if (estSeparateur) {
+      doc.setFillColor(...C_JAUNE);
+      doc.rect(colX[6], ry, cols[6], ROW_H, 'F');
+      doc.rect(colX[7], ry, cols[7], ROW_H, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_ANTH);
+      doc.text('Désignation LOC', colX[6]+cols[6]/2, ry+ROW_H/2+1.2, {align:'center'});
+      doc.text('Statut', colX[7]+cols[7]/2, ry+ROW_H/2+1.2, {align:'center'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
+    } else if (i <= N_MATERIEL) {
       const mat = document.getElementById(`mat_${i}`)?.value || '';
       if (mat) { doc.setTextColor(...C_TXT); doc.text(mat, colX[6]+2, ry+ROW_H/2+1.5); }
       const statut = document.getElementById(`statut_${i}`)?.value || '';

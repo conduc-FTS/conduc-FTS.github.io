@@ -671,12 +671,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // (fond noir, texte blanc à l'écran) — mais reste une ligne normale
     // pour N° Mpx, mesures et Barre : ces champs restent saisissables.
     const dropHtml = estSeparateur
-      ? `<div style="background:#1E1E1E;color:#fff;font-weight:800;text-align:center;padding:8px 6px;margin:-8px -6px;font-size:12px;letter-spacing:0.05em;">Désignation LOC</div>`
+      ? `<div style="background:#1E1E1E;color:#fff;font-weight:700;text-align:center;padding:8px 6px;margin:-8px -6px;font-size:10px;letter-spacing:0.5px;">Désignation LOC</div>`
       : (DROPDOWN[i]
           ? `<input type="text" id="mat_${i}" list="dl_mat_${i}" autocomplete="off" placeholder="Choisir ou saisir"><datalist id="dl_mat_${i}">${DROPDOWN[i].map(v=>`<option value="${v}">`).join('')}</datalist>`
           : `<input type="text" id="mat_${i}" placeholder="Choisir ou saisir">`);
     const statutHtml = estSeparateur
-      ? `<div style="background:#1E1E1E;color:#fff;font-weight:800;text-align:center;padding:8px 6px;margin:-8px -6px;font-size:12px;letter-spacing:0.05em;">Statut</div>`
+      ? `<div style="background:#1E1E1E;color:#fff;font-weight:700;text-align:center;padding:8px 6px;margin:-8px -6px;font-size:10px;letter-spacing:0.5px;">Statut</div>`
       : `<select id="statut_${i}" style="font-size:11px;font-weight:700;border:1.5px solid #DDD;border-radius:4px;padding:4px 2px;width:100%;background:#fff;">
           <option value="">—</option>
           <option value="TRAVAIL">✓ TRAVAIL</option>

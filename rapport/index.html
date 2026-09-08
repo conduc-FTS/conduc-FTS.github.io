@@ -466,7 +466,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
           <th>Ø forage (mm)</th>
           <th>Ø tube principale (mm)</th>
           <th>GAINAGE (mm)</th>
-          <th style="min-width:180px">Désignation</th>
+          <th style="min-width:180px">Désignation FTS</th>
           <th style="min-width:100px">Statut</th>
           <th style="min-width:80px">FTS / LOC</th>
         </tr>
@@ -611,14 +611,21 @@ const LOGO_B64 = 'data:image/jpeg;base64,/9j/4RNKRXhpZgAATU0AKgAAAAgABwESAAMAAAA
 
 // ─── Données métier ────────────────────────────────────────────
 const DROPDOWN = {
-  1: ['FUTURO n°1','FUTURO n°2','FUTURO ELEC','T41 n°1','T41 n°2','T46','MC6','MC8','MC15','DCH','EGT','MACHINE LOC'],
-  2: ['MIXO n°1','MIXO n°2','MA12','TCHNIWELL','AUTONOME'],
-  3: ['GROUPE 40KVA','GROUPE 60KVA','GROUPE 80KVA','GROUPE 100 KVA'],
-  4: ['PH15'],
-  5: ['COMPRESSEUR 7000l','COMPRESSEUR 10000l','COMPRESSEUR 15000l','COMPRESSEUR 20000l','COMPRESSEUR 25000l'],
-  6: ['BUGGY','TELSCO 6m','TELESCO 7m','TELESCO 9m','TELESCO 10m','TELESCO 12m','TELESCO 17m','TELSCO 21m','GYROSCOPIQUE 17m','GYROSCOPIQUE 21m','PELLE 20t Volet Variable'],
-  7: ['PELLE 2.7t','PELLE 3.5t','PELLE 5t','PELLE 8t','PELLE 14t'],
-  8: ["MFT 4\"","MFT 5\"","MFT 6\"","MFT 8\"","MFT 12\"",'TARRIERE'],
+  1: ['FUTURO n°1','FUTURO n°2','FUTURO ELEC','T41 n°1','T41 n°2','T46','MC6','MC8','MC15','DCH','EGT'],
+  2: ['MIXO n°1','MIXO n°2','MA12','PH15','TECNIWELL','AUTONOME'],
+  3: ['GROUPE 60 KVA'],
+  4: ['COMPRESSEUR'],
+  5: ['PDM'],
+  6: ['DESSABLEUR'],
+  7: ['CUVE GNR'],
+  8: ['PAJOT 600','PAJOT 1400'],
+  9: ['POMPE MEMBRANE'],
+  // 10, 11, 12 : champ libre, pas de suggestions
+  // 13 : ligne de séparation visuelle "DESIGNATION LOC" (voir tbody.innerHTML plus bas)
+  14: ['BUGGY','TELESCO 6m','TELESCO 7m','TELESCO 9m','TELESCO 10m','TELESCO 12m','TELESCO 17m','TELESCO 21m','GYROSCOPIQUE 17m','GYROSCOPIQUE 21m'],
+  15: ['PELLE 2.7t','PELLE 3.5t','PELLE 5t','PELLE 8t','PELLE 14t','PELLE 20t VOLET VARIABLE'],
+  16: ['COMPRESSEUR 5000L','COMPRESSEUR 7000L','COMPRESSEUR 10000L','COMPRESSEUR 15000L','COMPRESSEUR 20000L'],
+  // 17 et au-delà : champ libre
 };
 const N_PIEUX = 26;
 const N_PERS  = 6;
@@ -652,6 +659,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Tableau pieux
   const tbody = document.getElementById('tbodyPieux');
   for (let i = 1; i <= N_PIEUX; i++) {
+    // Ligne de séparation visuelle entre le catalogue FTS et le catalogue LOC
+    // — purement pour la saisie à l'écran, n'apparaît jamais dans le PDF
+    // (qui n'imprime que les machines réellement renseignées par le chef).
+    if (i === 13) {
+      tbody.innerHTML += `
+        <tr class="designation-divider">
+          <td colspan="10" style="background:var(--anthracite,#1E1E1E);color:#FDCA01;font-weight:800;text-align:center;padding:6px;font-size:12px;letter-spacing:0.05em;">DESIGNATION LOC</td>
+        </tr>`;
+    }
     // Saisie libre avec suggestions : les modèles courants sont proposés par
     // catégorie, mais on peut taper n'importe quel nom de machine (matériel
     // nouveau, location ponctuelle, etc.).
@@ -1067,7 +1083,7 @@ async function genererPDF() {
   });
 
   // Ligne 2 : fond jaune pour FORAGE et MATÉRIEL, fond gris pour le reste
-  const subs = ['','Longueur (m)','Ø forage (mm)','Ø tube princ. (mm)','GAINAGE (mm)','','Désignation','Statut','FTS','LOC'];
+  const subs = ['','Longueur (m)','Ø forage (mm)','Ø tube princ. (mm)','GAINAGE (mm)','','Désignation FTS','Statut','FTS','LOC'];
   const jauneCols = new Set([1,2,6,7,8,9]); // FORAGE + MATÉRIEL
   subs.forEach((s, i) => {
     if (i === 0 || i === 5) return;

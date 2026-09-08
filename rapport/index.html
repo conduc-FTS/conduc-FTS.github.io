@@ -668,7 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <tr>
         <td><input type="text" id="pieu_${i}" style="text-align:center"></td>
         <td><input type="number" id="lg_${i}" step="0.01" style="text-align:center"></td>
-        <td><input type="number" id="df_${i}" step="0.01" value="250" style="text-align:center"></td>
+        <td><input type="number" id="df_${i}" step="0.01" style="text-align:center"></td>
         <td><input type="number" id="tp_${i}" step="0.01" list="dl_diametres" style="text-align:center"></td>
         <td><input type="number" id="gn_${i}" step="0.01" list="dl_diametres" style="text-align:center"></td>
         <td class="td-check"><label class="check-cell"><input type="checkbox" id="barre_${i}"><span class="check-icon">✓</span></label></td>
@@ -690,6 +690,17 @@ document.addEventListener('DOMContentLoaded', () => {
           </select>
         </td>
       </tr>`;
+  }
+
+  // Dès qu'un N° de pieu est saisi sur une ligne, Ø forage se met à 250
+  // par défaut (si encore vide) — reste modifiable ensuite au clic. Rien
+  // ne se passe sur les lignes jamais utilisées.
+  for (let i = 1; i <= N_PIEUX; i++) {
+    document.getElementById(`pieu_${i}`)?.addEventListener('input', () => {
+      const pieuInput = document.getElementById(`pieu_${i}`);
+      const df = document.getElementById(`df_${i}`);
+      if (pieuInput.value.trim() && !df.value) df.value = '250';
+    });
   }
 
   // Personnel

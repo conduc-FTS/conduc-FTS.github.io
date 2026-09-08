@@ -455,7 +455,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
     <table id="tablePieux">
       <thead>
         <tr>
-          <th rowspan="2" style="min-width:50px">N° PIEU</th>
+          <th rowspan="2" style="min-width:50px">N° Mpx</th>
           <th colspan="2" class="jaune">FORAGE</th>
           <th colspan="2">TUBE</th>
           <th rowspan="2" style="min-width:52px">BARRE</th>
@@ -1076,7 +1076,7 @@ async function genererPDF() {
   doc.setFillColor(...C_ANTH);
   doc.rect(colX[0], y, totalW, HDR2 / 2, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_WHITE);
-  [[0,1,'N° PIEU'],[1,3,'FORAGE'],[3,5,'TUBE'],[5,6,'BARRE'],[6,10,'MATÉRIEL']].forEach(([a,b,lbl]) => {
+  [[0,1,'N° Mpx'],[1,3,'FORAGE'],[3,5,'TUBE'],[5,6,'BARRE'],[6,10,'MATÉRIEL']].forEach(([a,b,lbl]) => {
     doc.text(lbl, (colX[a]+colX[b])/2, y + HDR2/4 + 1.2, {align:'center'});
   });
 
@@ -1093,13 +1093,13 @@ async function genererPDF() {
     doc.text(s, colX[i] + cols[i]/2, y + HDR2 - 1.5, {align:'center'});
   });
 
-  // Cellules fusionnées N° PIEU et BARRE (pleine hauteur, fond anthracite)
+  // Cellules fusionnées N° Mpx et BARRE (pleine hauteur, fond anthracite)
   doc.setFillColor(...C_ANTH);
   doc.setDrawColor(...C_BORD);
   doc.rect(colX[0], y, cols[0], HDR2, 'FD');
   doc.rect(colX[5], y, cols[5], HDR2, 'FD');
   doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_WHITE);
-  doc.text('N° PIEU', colX[0]+cols[0]/2, y+HDR2/2+1.5, {align:'center'});
+  doc.text('N° Mpx', colX[0]+cols[0]/2, y+HDR2/2+1.5, {align:'center'});
   doc.text('BARRE',   colX[5]+cols[5]/2, y+HDR2/2+1.5, {align:'center'});
 
   // Séparateurs verticaux dans la ligne 1

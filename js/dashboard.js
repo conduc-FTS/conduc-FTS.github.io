@@ -9,10 +9,46 @@ const JOURS_SEMAINE = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendr
 const MOIS_ANNEE = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 const MOIS_ABBR = ["JAN", "FÉV", "MAR", "AVR", "MAI", "JUIN", "JUIL", "AOÛT", "SEP", "OCT", "NOV", "DÉC"];
 
+// Chaque page (Accueil, Rapport, Matériel, ...) est un vrai rechargement de
+// navigateur, pas un onglet d'appli — une variable JS ne survit donc jamais
+// d'une page à l'autre. sessionStorage, lui, survit tant que l'onglet reste
+// ouvert : ça évite de relire les chantiers/l'activité récente à chaque
+// aller-retour entre l'Accueil et un rapport, sans jamais montrer une donnée
+// vieille de plus de 2 minutes.
+const CACHE_TTL_MS = 120000;
+
+function lireCache(cle) {
+  try {
+    const raw = sessionStorage.getItem(cle);
+    if (!raw) return null;
+    const { valeur, expire } = JSON.parse(raw);
+    if (Date.now() > expire) return null;
+    return valeur;
+  } catch (e) {
+    return null;
+  }
+}
+
+function ecrireCache(cle, valeur) {
+  try {
+    sessionStorage.setItem(cle, JSON.stringify({ valeur, expire: Date.now() + CACHE_TTL_MS }));
+  } catch (e) {
+    // sessionStorage plein ou indisponible (navigation privée) : tant pis,
+    // on continue sans cache plutôt que de faire planter la page.
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
 
   // --- Onglets ---
   const tabs = document.querySelectorAll(".app-tab");
+
+  // --- Chantier actif (déclaré tôt : chargerChantiers() peut être appelée
+  // dès l'initialisation de l'authentification, plus bas dans ce fichier) ---
+  const chantierActifSelect = document.getElementById("chantierActifSelect");
+  const chantierActifStatus = document.getElementById("chantierActifStatus");
+  const refreshChantiersBtn = document.getElementById("refreshChantiersBtn");
+
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
       tabs.forEach((t) => t.classList.remove("active"));
@@ -95,18 +131,13 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // --- Chantier actif ---
-  const chantierActifSelect = document.getElementById("chantierActifSelect");
-  const chantierActifStatus = document.getElementById("chantierActifStatus");
-  const refreshChantiersBtn = document.getElementById("refreshChantiersBtn");
-
-  async function chargerChantiers() {
+  async function chargerChantiers(forcer = false) {
     if (!window.FTSAuth || !FTSAuth.isSignedIn() || !window.FTSDrive) {
       chantierActifStatus.textContent = "Connecte-toi pour voir la liste des chantiers.";
       return;
     }
-    chantierActifStatus.textContent = "Chargement des chantiers...";
-    try {
-      const chantiers = await FTSDrive.listChantiers();
+
+    const peupler = (chantiers) => {
       chantierActifSelect.innerHTML = '<option value="">— Sélectionner un chantier —</option>';
       chantiers.forEach((c) => {
         const opt = document.createElement("option");
@@ -123,6 +154,18 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         chantierActifStatus.textContent = `${chantiers.length} chantier(s) trouvé(s).`;
       }
+    };
+
+    if (!forcer) {
+      const enCache = lireCache("fts_cache_chantiers");
+      if (enCache) { peupler(enCache); return; }
+    }
+
+    chantierActifStatus.textContent = "Chargement des chantiers...";
+    try {
+      const chantiers = await FTSDrive.listChantiers();
+      ecrireCache("fts_cache_chantiers", chantiers);
+      peupler(chantiers);
     } catch (err) {
       console.error("Erreur chargement chantiers :", err);
       chantierActifStatus.textContent = `Erreur : ${err.message}`;
@@ -157,10 +200,14 @@ document.addEventListener("DOMContentLoaded", () => {
     chargerDocumentsChantier();
   });
 
-  refreshChantiersBtn.addEventListener("click", chargerChantiers);
+  refreshChantiersBtn.addEventListener("click", () => {
+    chargerChantiers(true);
+    renderChantierBadgeEtActivite(true);
+    chargerDocumentsChantier(true);
+  });
 
   // --- Badge chantier + date + activité récente (vue Accueil) ---
-  async function renderChantierBadgeEtActivite() {
+  async function renderChantierBadgeEtActivite(forcer = false) {
     const badge = document.getElementById("chantierBadge");
     const badgeCode = document.getElementById("chantierBadgeCode");
     const badgeNom = document.getElementById("chantierBadgeNom");
@@ -186,11 +233,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!window.FTSAuth || !FTSAuth.isSignedIn() || !window.FTSDrive) return;
 
+    const cleCache = `fts_cache_activite_${actif.id}`;
+    if (!forcer) {
+      const enCache = lireCache(cleCache);
+      if (enCache) {
+        if (enCache.jours !== null) {
+          dateSub.textContent = `${dateSub.dataset.base || dateSub.textContent} · Chantier actif depuis ${enCache.jours} jour${enCache.jours > 1 ? "s" : ""}`;
+        }
+        renderActivite(enCache.fichiers);
+        return;
+      }
+    }
+
     // Nombre de jours depuis création
+    let jours = null;
     try {
       const created = await FTSDrive.getFolderCreatedTime(actif.id);
       if (created) {
-        const jours = Math.max(0, Math.floor((Date.now() - new Date(created).getTime()) / 86400000));
+        jours = Math.max(0, Math.floor((Date.now() - new Date(created).getTime()) / 86400000));
         dateSub.textContent = `${dateSub.dataset.base || dateSub.textContent} · Chantier actif depuis ${jours} jour${jours > 1 ? "s" : ""}`;
       }
     } catch (e) {
@@ -201,6 +261,7 @@ document.addEventListener("DOMContentLoaded", () => {
     activiteList.innerHTML = '<div class="activite-empty">Chargement de l\'activité...</div>';
     try {
       const fichiers = await FTSDrive.getActiviteRecenteChantier(actif.id, 6);
+      ecrireCache(cleCache, { jours, fichiers });
       renderActivite(fichiers);
     } catch (err) {
       console.error("Erreur activité récente :", err);
@@ -272,7 +333,7 @@ document.addEventListener("DOMContentLoaded", () => {
     "DICT": "📑", "SONDAGE": "🪨", "SECURITE / ACCUEIL SECURITE": "🛡️",
   };
 
-  async function chargerDocumentsChantier() {
+  async function chargerDocumentsChantier(forcer = false) {
     const panel = document.getElementById("panel-documents");
     const foldersEl = document.getElementById("docsFolders");
     const filesEl = document.getElementById("docsFiles");
@@ -288,12 +349,19 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("docsChantierNom").textContent = actif.name;
     filesEl.innerHTML = "";
     breadcrumb.innerHTML = "";
-    foldersEl.innerHTML = '<div class="docs-empty">Chargement des dossiers...</div>';
 
+    const cleCache = `fts_cache_docs_${actif.id}`;
+    if (!forcer) {
+      const enCache = lireCache(cleCache);
+      if (enCache) { afficherDossiers(enCache); return; }
+    }
+
+    foldersEl.innerHTML = '<div class="docs-empty">Chargement des dossiers...</div>';
     try {
       const spaceIdx = actif.name.search(/\s/);
       const code = spaceIdx > 0 ? actif.name.slice(0, spaceIdx) : actif.name;
       const { dossiers } = await FTSDrive.getSousDossiersChantier(code);
+      ecrireCache(cleCache, dossiers);
       afficherDossiers(dossiers);
     } catch (err) {
       console.error("Erreur chargement documents :", err);

@@ -537,18 +537,12 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   </div>
 </div>
 
-<!-- STATUT CONNEXION (partagée avec le dashboard) -->
+<!-- STATUT CONNEXION (partagée avec le dashboard — se connecter se fait
+     depuis la page principale, pas ici, comme pour les autres modules) -->
 <div class="section" style="margin-bottom:80px">
   <div class="drive-status">
     <div class="drive-dot" id="driveDot"></div>
     <span id="driveLabel">Connexion : vérification...</span>
-    <button class="btn-drive-connect" id="btnDrive" onclick="FTSAuth.signIn()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M6.18 15L3 20.5h18L17.82 15H6.18zm5.82-13L4.09 15h3.64L12 7l4.27 8H19.9L12 2z"/></svg>
-      Connecter
-    </button>
-    <button class="btn-drive-connect" id="btnDisconnect" onclick="FTSAuth.signOut()" style="display:none;background:#888">
-      Changer de compte
-    </button>
   </div>
 </div>
 
@@ -749,28 +743,20 @@ document.addEventListener('DOMContentLoaded', () => {
     FTSAuth.onAuthChange(async (signedIn) => {
       const dot = document.getElementById('driveDot');
       const label = document.getElementById('driveLabel');
-      const btnDrive = document.getElementById('btnDrive');
-      const btnDisconnect = document.getElementById('btnDisconnect');
       if (signedIn) {
         const info = await FTSAuth.getUserInfo();
         dot.className = 'drive-dot connected';
-        label.textContent = info ? `✓ Connecté : ${info.email}` : '✓ Connecté';
-        btnDrive.style.display = 'none';
-        btnDisconnect.style.display = '';
+        label.textContent = info ? `✓ Connecté (via le dashboard) : ${info.email}` : '✓ Connecté (via le dashboard)';
       } else {
         dot.className = 'drive-dot';
-        label.textContent = 'Non connecté — le PDF sera téléchargé localement';
-        btnDrive.style.display = '';
-        btnDisconnect.style.display = 'none';
+        label.textContent = 'Non connecté — connecte-toi depuis le dashboard';
       }
     });
     FTSAuth.init();
     if (FTSAuth.isSignedIn()) {
       FTSAuth.getUserInfo().then((info) => {
         document.getElementById('driveDot').className = 'drive-dot connected';
-        document.getElementById('driveLabel').textContent = info ? `✓ Connecté : ${info.email}` : '✓ Connecté';
-        document.getElementById('btnDrive').style.display = 'none';
-        document.getElementById('btnDisconnect').style.display = '';
+        document.getElementById('driveLabel').textContent = info ? `✓ Connecté (via le dashboard) : ${info.email}` : '✓ Connecté (via le dashboard)';
       });
     }
   }

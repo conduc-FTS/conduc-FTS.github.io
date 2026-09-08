@@ -673,7 +673,8 @@ document.addEventListener('DOMContentLoaded', () => {
       tbody.innerHTML += `
         <tr class="designation-divider">
           <td colspan="6"></td>
-          <td colspan="2" style="background:var(--anthracite,#1E1E1E);color:#FDCA01;font-weight:800;text-align:center;padding:6px;font-size:12px;letter-spacing:0.05em;">Désignation LOC</td>
+          <td style="background:#FDCA01;color:#1E1E1E;font-weight:800;text-align:center;padding:6px;font-size:12px;letter-spacing:0.05em;">Désignation LOC</td>
+          <td style="background:#FDCA01;color:#1E1E1E;font-weight:800;text-align:center;padding:6px;font-size:12px;letter-spacing:0.05em;">Statut</td>
         </tr>`;
       continue;
     }
@@ -1125,21 +1126,19 @@ async function genererPDF() {
   for (let i = 1; i <= N_PIEUX; i++) {
     const ry = y + (i-1)*ROW_H;
 
-    // Ligne 12 : séparation "Désignation LOC" sous Désignation (fond
-    // anthracite, comme au-dessus), et sous Statut un rappel en fond
-    // jaune / texte noir — même style que les en-têtes de colonne.
+    // Ligne 12 : séparation "Désignation LOC" sous Désignation, et "Statut"
+    // sous Statut — les deux en fond jaune / texte noir, comme les en-têtes.
     if (i === 12) {
       doc.setDrawColor(...C_BORD);
       doc.line(colX[0], ry+ROW_H, colX[8], ry+ROW_H);
       colX.forEach(x => doc.line(x, ry, x, ry+ROW_H));
 
-      doc.setFillColor(...C_ANTH);
-      doc.rect(colX[6], ry, cols[6], ROW_H, 'F');
-      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_JAUNE);
-      doc.text('Désignation LOC', colX[6]+cols[6]/2, ry+ROW_H/2+1.2, {align:'center'});
-
       doc.setFillColor(...C_JAUNE);
+      doc.rect(colX[6], ry, cols[6], ROW_H, 'F');
       doc.rect(colX[7], ry, cols[7], ROW_H, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_ANTH);
+      doc.text('Désignation LOC', colX[6]+cols[6]/2, ry+ROW_H/2+1.2, {align:'center'});
+      doc.text('Statut', colX[7]+cols[7]/2, ry+ROW_H/2+1.2, {align:'center'});
 
       doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
       continue;

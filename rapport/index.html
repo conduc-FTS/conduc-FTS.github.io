@@ -1098,7 +1098,7 @@ async function genererPDF() {
   doc.setDrawColor(...C_BORD);
   doc.rect(colX[0], y, cols[0], HDR2, 'FD');
   doc.rect(colX[5], y, cols[5], HDR2, 'FD');
-  doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_WHITE);
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_WHITE);
   doc.text('N° Mpx', colX[0]+cols[0]/2, y+HDR2/2+1.5, {align:'center'});
   doc.text('BARRE',   colX[5]+cols[5]/2, y+HDR2/2+1.5, {align:'center'});
 
@@ -1155,7 +1155,7 @@ async function genererPDF() {
       doc.setFillColor(...C_JAUNE);
       doc.rect(colX[6], ry, cols[6], ROW_H, 'F');
       doc.rect(colX[7], ry, cols[7], ROW_H, 'F');
-      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_ANTH);
+      doc.setFont('helvetica','bold'); doc.setFontSize(6); doc.setTextColor(...C_ANTH);
       doc.text('Désignation LOC', colX[6]+cols[6]/2, ry+ROW_H/2+1.2, {align:'center'});
       doc.text('Statut', colX[7]+cols[7]/2, ry+ROW_H/2+1.2, {align:'center'});
       doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
@@ -1165,7 +1165,7 @@ async function genererPDF() {
       const statut = document.getElementById(`statut_${i}`)?.value || '';
       if (statut) {
         const couleurStatut = { TRAVAIL: [39,174,96], PANNE: [192,57,43], ARRET: [136,136,136], TRANSPORT: [58,134,255] };
-        doc.setFont('helvetica','bold'); doc.setFontSize(6.5);
+        doc.setFont('helvetica','bold'); doc.setFontSize(7);
         doc.setTextColor(...(couleurStatut[statut] || C_TXT));
         doc.text(statut, colX[7] + cols[7]/2, ry+ROW_H/2+1.5, {align:'center'});
         doc.setFont('helvetica','normal'); doc.setFontSize(7);
@@ -1203,7 +1203,7 @@ async function genererPDF() {
 
   doc.setFillColor(...C_ANTH);
   doc.rect(pcols[0], P_START, PW, 5.5, 'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...C_WHITE);
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...C_WHITE);
   doc.text('PERSONNEL', (pcols[0]+pcols[5])/2, P_START+3.5, {align:'center'});
 
   // sous-en-têtes fond jaune
@@ -1221,7 +1221,7 @@ async function genererPDF() {
       doc.setDrawColor(...C_BORD);
       doc.rect(x, ey, pcols[i+1]-x, entryH, 'S');
     });
-    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...C_TXT);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
     const nom = document.getElementById(`nom_${k}`)?.value || '';
     const hr  = document.getElementById(`heure_${k}`)?.value || '';
     if (nom) doc.text(nom, pcols[0]+2, ey+entryH/2+1.5);
@@ -1289,7 +1289,7 @@ async function genererPDF() {
     doc.rect(colX[0], y, colW[0], rowH, 'F');
     doc.rect(colX[1], y, colW[1], rowH, 'F');
     doc.rect(colX[2], y, colW[2], rowH, 'F');
-    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_ANTH);
+    doc.setFont('helvetica','bold'); doc.setFontSize(6); doc.setTextColor(...C_ANTH);
     doc.text('DÉSIGNATION', colX[0]+2, y+4.2);
     doc.text('STATUT', colX[1]+2, y+4.2);
     doc.text('APPARTIENT À', colX[2]+2, y+4.2);
@@ -1303,7 +1303,7 @@ async function genererPDF() {
       colX.forEach((cx, ci) => doc.rect(cx, y, colW[ci], rowH, 'FD'));
 
       // Nom machine
-      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...C_ANTH);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_ANTH);
       doc.text(m.nom.toUpperCase(), colX[0]+2, y+4.5);
 
       // Statut avec couleur

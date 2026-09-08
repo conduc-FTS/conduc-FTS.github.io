@@ -619,25 +619,21 @@ const DROPDOWN = {
   7: ['CUVE GNR'],
   8: ['PAJOT 600','PAJOT 1400'],
   9: ['POMPE MEMBRANE'],
-  // 10, 11, 12 : champ libre, pas de suggestions
-  // 13 : ligne de séparation visuelle "DESIGNATION LOC" (voir tbody.innerHTML plus bas)
-  14: ['BUGGY','TELESCO 6m','TELESCO 7m','TELESCO 9m','TELESCO 10m','TELESCO 12m','TELESCO 17m','TELESCO 21m','GYROSCOPIQUE 17m','GYROSCOPIQUE 21m'],
-  15: ['PELLE 2.7t','PELLE 3.5t','PELLE 5t','PELLE 8t','PELLE 14t','PELLE 20t VOLET VARIABLE'],
-  16: ['COMPRESSEUR 5000L','COMPRESSEUR 7000L','COMPRESSEUR 10000L','COMPRESSEUR 15000L','COMPRESSEUR 20000L'],
-  // 17 et au-delà : champ libre
+  // 10, 11 : champ libre, pas de suggestions (toujours FTS)
+  // 12 : ligne de séparation visuelle "Désignation LOC" (voir tbody.innerHTML plus bas) — pas une ligne de saisie
+  13: ['BUGGY','TELESCO 6m','TELESCO 7m','TELESCO 9m','TELESCO 10m','TELESCO 12m','TELESCO 17m','TELESCO 21m','GYROSCOPIQUE 17m','GYROSCOPIQUE 21m'],
+  14: ['PELLE 2.7t','PELLE 3.5t','PELLE 5t','PELLE 8t','PELLE 14t','PELLE 20t VOLET VARIABLE'],
+  15: ['COMPRESSEUR 5000L','COMPRESSEUR 7000L','COMPRESSEUR 10000L','COMPRESSEUR 15000L','COMPRESSEUR 20000L'],
+  // 16 et au-delà : champ libre
 };
 const N_PIEUX = 26;
 const N_PERS  = 6;
 
-// FTS/LOC déduit automatiquement de la catégorie choisie : lignes 1 à 12
-// (catalogue FTS) → FTS, lignes 14 et au-delà (catalogue LOC) → LOC. Pour
-// les lignes libres (10-12, 17+), une petite case "LOC" permet de corriger
-// l'exception au cas par cas plutôt que d'obliger un choix à chaque ligne.
+// FTS/LOC déduit strictement de la position de la ligne : 1 à 11 → FTS,
+// 13 et au-delà → LOC (la ligne 12 est la séparation visuelle, jamais une
+// ligne de saisie). Plus d'exception manuelle possible, par définition.
 function ftsLocDeduit(i) {
-  const parDefaut = i <= 12 ? 'FTS' : 'LOC';
-  const override = document.getElementById(`loc_override_${i}`);
-  if (override && override.checked) return parDefaut === 'FTS' ? 'LOC' : 'FTS';
-  return parDefaut;
+  return i <= 11 ? 'FTS' : 'LOC';
 }
 
 let sigDrawing = false;
@@ -669,30 +665,25 @@ document.addEventListener('DOMContentLoaded', () => {
   // Tableau pieux
   const tbody = document.getElementById('tbodyPieux');
   for (let i = 1; i <= N_PIEUX; i++) {
-    // Ligne de séparation visuelle entre le catalogue FTS et le catalogue LOC
-    // — purement pour la saisie à l'écran, n'apparaît jamais dans le PDF
-    // (qui n'imprime que les machines réellement renseignées par le chef).
-    // Ne couvre que Désignation + Statut : les 6 colonnes précédentes
-    // (N° Mpx, Longueur, Ø forage, Ø tube, Gainage, Barre) restent vides.
-    if (i === 13) {
+    // Ligne 12 : séparation visuelle entre le catalogue FTS et le catalogue
+    // LOC — une vraie ligne du tableau (même hauteur que les autres), donc
+    // elle apparaît aussi dans le PDF exporté. Ce n'est pas une ligne de
+    // saisie : pas de N° Mpx/mesures/désignation dessus.
+    if (i === 12) {
       tbody.innerHTML += `
         <tr class="designation-divider">
           <td colspan="6"></td>
           <td colspan="2" style="background:var(--anthracite,#1E1E1E);color:#FDCA01;font-weight:800;text-align:center;padding:6px;font-size:12px;letter-spacing:0.05em;">Désignation LOC</td>
         </tr>`;
+      continue;
     }
     // Saisie libre avec suggestions : les modèles courants sont proposés par
     // catégorie, mais on peut taper n'importe quel nom de machine (matériel
-    // nouveau, location ponctuelle, etc.).
-    // FTS/LOC n'est plus un choix manuel systématique : il se déduit de la
-    // catégorie utilisée (lignes 1-12 → FTS, lignes 14 et au-delà → LOC).
-    // Seules les lignes libres (sans catégorie, DROPDOWN[i] absent) montrent
-    // une petite bascule pour corriger ce cas par exception.
-    const estLigneLibre = !DROPDOWN[i];
-    const labelException = i <= 12 ? 'LOC' : 'FTS';
+    // nouveau, location ponctuelle, etc.). FTS/LOC se déduit strictement de
+    // la position de la ligne (voir ftsLocDeduit), aucun choix à faire.
     const dropHtml = DROPDOWN[i]
       ? `<input type="text" id="mat_${i}" list="dl_mat_${i}" autocomplete="off" placeholder="Choisir ou saisir"><datalist id="dl_mat_${i}">${DROPDOWN[i].map(v=>`<option value="${v}">`).join('')}</datalist>`
-      : `<input type="text" id="mat_${i}" placeholder="Choisir ou saisir" style="${estLigneLibre ? 'width:70%;display:inline-block;vertical-align:middle' : ''}">${estLigneLibre ? `<label style="font-size:10px;font-weight:700;color:#555;margin-left:4px;white-space:nowrap"><input type="checkbox" id="loc_override_${i}" style="vertical-align:middle"> ${labelException}</label>` : ''}`;
+      : `<input type="text" id="mat_${i}" placeholder="Choisir ou saisir">`;
     tbody.innerHTML += `
       <tr>
         <td><input type="text" id="pieu_${i}" style="text-align:center"></td>
@@ -1130,6 +1121,21 @@ async function genererPDF() {
   const N_MATERIEL = 16; // au-delà, le bloc PERSONNEL recouvre ces lignes (voir plus bas)
   for (let i = 1; i <= N_PIEUX; i++) {
     const ry = y + (i-1)*ROW_H;
+
+    // Ligne 12 : séparation "Désignation LOC", même ligne que dans le
+    // formulaire à l'écran — ne couvre que Désignation + Statut.
+    if (i === 12) {
+      doc.setDrawColor(...C_BORD);
+      doc.line(colX[0], ry+ROW_H, colX[10], ry+ROW_H);
+      colX.forEach(x => doc.line(x, ry, x, ry+ROW_H));
+      doc.setFillColor(...C_ANTH);
+      doc.rect(colX[6], ry, colX[8]-colX[6], ROW_H, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...C_JAUNE);
+      doc.text('Désignation LOC', (colX[6]+colX[8])/2, ry+ROW_H/2+1.2, {align:'center'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
+      continue;
+    }
+
     // alternance gris très clair / blanc
     if (i % 2 === 0) { doc.setFillColor(...C_GRIS2); doc.rect(colX[0], ry, totalW, ROW_H, 'F'); }
     doc.setDrawColor(...C_BORD);

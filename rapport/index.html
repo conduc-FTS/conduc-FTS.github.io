@@ -1118,8 +1118,10 @@ async function genererPDF() {
     const ry = y + (i-1)*ROW_H;
     const estSeparateur = (i === 12);
 
-    // alternance gris très clair / blanc (pas sur la ligne de séparation)
-    if (!estSeparateur && i % 2 === 0) { doc.setFillColor(...C_GRIS2); doc.rect(colX[0], ry, totalW, ROW_H, 'F'); }
+    // alternance gris très clair / blanc — la ligne 12 suit la même règle
+    // (12 est pair) ; les cellules Désignation/Statut jaunes sont dessinées
+    // par-dessus ensuite, donc ça ne pose pas de conflit visuel.
+    if (i % 2 === 0) { doc.setFillColor(...C_GRIS2); doc.rect(colX[0], ry, totalW, ROW_H, 'F'); }
     doc.setDrawColor(...C_BORD);
     doc.line(colX[0], ry+ROW_H, colX[8], ry+ROW_H);
     colX.forEach(x => doc.line(x, ry, x, ry+ROW_H));

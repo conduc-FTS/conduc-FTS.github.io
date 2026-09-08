@@ -98,6 +98,7 @@ input:focus,textarea:focus{border-bottom-color:var(--jaune);}
 </header>
 
 <div class="chantier-actif-banner" id="chantierBanner" style="margin:12px;padding:10px 14px;border-radius:8px;background:#EAF6EE;border:1px solid #27AE60;font-size:13px;color:#1D6E3E;">Chargement du chantier actif...</div>
+<div id="registreBanner" style="display:none;margin:12px;padding:10px 14px;border-radius:8px;background:#EAF1FE;border:1px solid #2A5DBF;font-size:13px;color:#2A5DBF;">Un registre existe déjà pour ce chantier — les 15 points ci-dessous sont figés (déjà validés), il ne reste plus qu'à ajouter ta signature en bas de page.</div>
 
 <!-- IDENTIFICATION -->
 <div class="section-card">
@@ -424,7 +425,12 @@ input:focus,textarea:focus{border-bottom-color:var(--jaune);}
 <!-- SIGNATURES -->
 <div class="section-card" style="margin-bottom:80px">
   <div class="card-title"><span class="dot"></span>Signatures — Je soussigné(e), reconnais avoir reçu et compris les consignes de sécurité</div>
-  
+
+  <div id="historiqueSignatures" style="display:none;margin-bottom:16px">
+    <div style="font-size:13px;font-weight:700;color:#555;margin-bottom:8px">Personnes déjà accueillies sur ce chantier :</div>
+    <div id="historiqueListe" style="display:flex;flex-direction:column;gap:6px"></div>
+  </div>
+
     <div class="sig-row">
       <div class="sig-cell">
         <div class="sig-label">DATE</div>
@@ -446,6 +452,7 @@ input:focus,textarea:focus{border-bottom-color:var(--jaune);}
         </div>
         <button class="btn-clear-mini" onclick="clearSigRow(1)">✕</button>
       </div>
+
     </div>
     <div class="sig-row">
       <div class="sig-cell">
@@ -727,6 +734,7 @@ function majStatutConnexion(signedIn) {
   if (signedIn) {
     dot.className = 'drive-dot connected';
     label.textContent = '✓ Connecté (via le dashboard)';
+    tenterChargerRegistre();
   } else {
     dot.className = 'drive-dot';
     label.textContent = 'Non connecté — connecte-toi depuis le dashboard';
@@ -746,12 +754,77 @@ function appliquerChantierActif() {
     const spaceIdx = chantierActif.name.search(/\s/);
     const code = spaceIdx > 0 ? chantierActif.name.slice(0, spaceIdx) : chantierActif.name;
     document.getElementById('dossier').value = code;
+    tenterChargerRegistre();
   } else {
     banner.style.background = '#FDECEA';
     banner.style.borderColor = '#C0392B';
     banner.style.color = '#8E2E22';
     banner.innerHTML = 'Aucun chantier actif. <a href="/index.html">Retourner au dashboard pour en choisir un</a>.';
   }
+}
+
+// ─── Registre Sécurité persistant par chantier ─────────────────
+// Un seul fichier JSON par chantier (pas de Sheet) qui accumule les
+// signatures au fil du temps ; les 15 points sont figés une fois
+// remplis pour la première fois. Le PDF est régénéré et REMPLACE le
+// même fichier à chaque nouvelle signature (jamais un fichier par date).
+const NOM_REGISTRE = 'registre_securite.json';
+let registreExistant = null;
+let registreDejaCharge = false;
+
+function tenterChargerRegistre() {
+  if (registreDejaCharge) return;
+  if (!window.FTSAuth || !FTSAuth.isSignedIn() || !chantierActif) return;
+  registreDejaCharge = true;
+  chargerEtAppliquerRegistre();
+}
+
+async function chargerEtAppliquerRegistre() {
+  try {
+    const { id: accueilId } = await FTSDrive.getDossierModuleChantier(chantierActif.name, 'ACCUEIL SECURITE');
+    const fichiers = await FTSDrive.findFilesExact(NOM_REGISTRE, accueilId);
+    if (fichiers.length === 0) return; // premier accueil de ce chantier : formulaire normal
+
+    const texte = await FTSDrive.downloadFileText(fichiers[0].id);
+    const registre = JSON.parse(texte);
+    registreExistant = registre;
+
+    // Fige les 15 points (déjà validés par la première personne)
+    document.getElementById('registreBanner').style.display = 'block';
+    Object.entries(registre.sections || {}).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.type === 'checkbox') el.checked = !!val; else el.value = val || '';
+      el.disabled = true;
+    });
+    if (registre.responsable) {
+      document.getElementById('responsable').value = registre.responsable;
+      document.getElementById('responsable').disabled = true;
+    }
+    updateProgress();
+
+    // Affiche l'historique des signatures déjà enregistrées
+    const signatures = registre.signatures || [];
+    if (signatures.length > 0) {
+      const historique = document.getElementById('historiqueSignatures');
+      const liste = document.getElementById('historiqueListe');
+      historique.style.display = 'block';
+      liste.innerHTML = signatures.map(s => `
+        <div style="display:flex;gap:10px;align-items:center;padding:8px 10px;background:#F8F8F8;border-radius:6px;font-size:13px">
+          <span style="color:#888;min-width:80px">${formatDate(s.date) || ''}</span>
+          <span style="font-weight:700;flex:1">${escapeHtmlSecu(s.nom || '')}</span>
+          <span style="color:#666">${escapeHtmlSecu(s.entreprise || '')}</span>
+        </div>`).join('');
+    }
+  } catch (err) {
+    console.warn('Registre sécurité : lecture impossible, formulaire normal.', err);
+  }
+}
+
+function escapeHtmlSecu(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
 }
 
 function toggleSection(n) {
@@ -851,23 +924,62 @@ function valider() {
 }
 function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
 
+function collecterSectionsActuelles() {
+  const sections = {};
+  document.querySelectorAll('input[type=checkbox][id^="sec_"]').forEach(cb => { sections[cb.id] = cb.checked; });
+  document.querySelectorAll('input[id^="preciser_"]').forEach(inp => { sections[inp.id] = inp.value; });
+  return sections;
+}
+
+function collecterNouvellesSignatures() {
+  const nouvelles = [];
+  for (let i = 1; i <= 8; i++) {
+    const nom = document.getElementById('sig_nom_' + i)?.value?.trim();
+    if (!nom) continue;
+    nouvelles.push({
+      date: document.getElementById('sig_date_' + i)?.value || document.getElementById('date').value,
+      nom,
+      entreprise: document.getElementById('sig_ent_' + i)?.value?.trim() || '',
+      signatureUrl: sigStates[i]?.url || null,
+    });
+  }
+  return nouvelles;
+}
+
 async function confirmerEnvoi() {
   closeModal();
   showToast('⏳ Génération du PDF...', '');
   try {
-    const blob = await genererPDF();
-    const date = document.getElementById('date').value;
     const dossier = document.getElementById('dossier').value.trim().toUpperCase().replace(/\s+/g, '');
-    const fileName = `${date}_ACCUEIL_SECURITE_${dossier}.pdf`;
-    if (driveToken) await uploadToDrive(blob, fileName);
-    else downloadLocal(blob, fileName);
+    const nouvelles = collecterNouvellesSignatures();
+    const signaturesTotal = [...(registreExistant?.signatures || []), ...nouvelles];
+    const sections = registreExistant?.sections || collecterSectionsActuelles();
+    const responsable = registreExistant?.responsable || document.getElementById('responsable').value;
+
+    const blob = await genererPDF(signaturesTotal, sections, responsable);
+    const fileNamePdf = `ACCUEIL_SECURITE_${dossier}.pdf`;
+
+    if (driveToken && chantierActif) {
+      const { id: accueilId } = await FTSDrive.getDossierModuleChantier(chantierActif.name, 'ACCUEIL SECURITE');
+
+      // Sauvegarde le registre (JSON) — remplace toujours le même fichier,
+      // jamais un nouveau par date, pour que l'historique s'accumule.
+      const registreMisAJour = { dossier, chantier: chantierActif.name, responsable, sections, signatures: signaturesTotal };
+      const jsonBlob = new Blob([JSON.stringify(registreMisAJour)], { type: 'application/json' });
+      await FTSDrive.uploadFile(jsonBlob, NOM_REGISTRE, 'application/json', accueilId, { remplacerSiExiste: true });
+
+      await FTSDrive.uploadFile(blob, fileNamePdf, 'application/pdf', accueilId, { remplacerSiExiste: true });
+      showToast('✅ Registre mis à jour sur Drive !', 'success');
+    } else {
+      downloadLocal(blob, fileNamePdf);
+    }
   } catch(err) {
     console.error(err);
     showToast('❌ ' + err.message, 'error');
   }
 }
 
-async function genererPDF() {
+async function genererPDF(signaturesTotal, sectionsSnapshot, responsableSnapshot) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const W=210, H=297, M=10;
@@ -893,7 +1005,7 @@ async function genererPDF() {
     ['DATE', formatDate(document.getElementById('date').value)],
     ['N° DOSSIER', dossierVal],
     ['CHANTIER', chantierSansCode],
-    ['RESPONSABLE', document.getElementById('responsable').value],
+    ['RESPONSABLE', responsableSnapshot || document.getElementById('responsable').value],
   ];
   infos.forEach(([l,v],i) => {
     const ry = y + i*rh;
@@ -931,8 +1043,8 @@ async function genererPDF() {
 
   sectionsData.forEach(s => {
     if (y > H - 30) { doc.addPage(); y = M; }
-    const checked = document.getElementById('sec_' + s.num)?.checked || false;
-    const precVal = s.preciser ? (document.getElementById('preciser_' + s.num)?.value || '') : '';
+    const checked = sectionsSnapshot?.['sec_' + s.num] ?? (document.getElementById('sec_' + s.num)?.checked || false);
+    const precVal = s.preciser ? (sectionsSnapshot?.['preciser_' + s.num] ?? (document.getElementById('preciser_' + s.num)?.value || '')) : '';
 
     // Fond selon état
     doc.setFillColor(...(checked ? [245,168,0] : [248,248,248]));
@@ -997,47 +1109,34 @@ async function genererPDF() {
   y += 7;
 
   const ROW_H = 16;
-  for (let i = 1; i <= 8; i++) {
-    if (y + ROW_H > H - M) { doc.addPage(); y = M; }
-    if (i % 2 === 0) { doc.setFillColor(248,248,248); doc.rect(M, y, W-2*M, ROW_H, 'F'); }
+  const listeSignatures = signaturesTotal && signaturesTotal.length > 0 ? signaturesTotal : [];
+  listeSignatures.forEach((sig, idx) => {
+    if (y + ROW_H > H - M) {
+      doc.addPage(); y = M;
+      // Répète les en-têtes de colonnes en haut de la nouvelle page
+      doc.setFillColor(...C_GRIS); doc.rect(M, y, W-2*M, 6, 'FD');
+      doc.setFont('helvetica','bold'); doc.setFontSize(6); doc.setTextColor(...C_ANTH);
+      sigLabels.forEach((l,i) => doc.text(l, sigX[i]+2, y+4));
+      y += 7;
+    }
+    if (idx % 2 === 1) { doc.setFillColor(248,248,248); doc.rect(M, y, W-2*M, ROW_H, 'F'); }
     doc.setDrawColor(...C_BORD); doc.rect(M, y, W-2*M, ROW_H, 'S');
     sigX.forEach((x,ci) => doc.line(x, y, x, y+ROW_H));
 
     doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...C_TXT);
-    const sigDate = document.getElementById('sig_date_' + i)?.value || '';
-    const sigNom = document.getElementById('sig_nom_' + i)?.value || '';
-    const sigEnt = document.getElementById('sig_ent_' + i)?.value || '';
-    if (sigDate) doc.text(formatDate(sigDate), M+2, y+ROW_H/2+1.5);
-    if (sigNom) doc.text(sigNom, M+30, y+ROW_H/2+1.5);
-    if (sigEnt) doc.text(sigEnt, M+82, y+ROW_H/2+1.5);
-    if (sigStates[i].url) doc.addImage(sigStates[i].url, 'JPEG', M+114, y+1, 74, ROW_H-2);
+    if (sig.date) doc.text(formatDate(sig.date), M+2, y+ROW_H/2+1.5);
+    if (sig.nom) doc.text(sig.nom, M+30, y+ROW_H/2+1.5);
+    if (sig.entreprise) doc.text(sig.entreprise, M+82, y+ROW_H/2+1.5);
+    if (sig.signatureUrl) doc.addImage(sig.signatureUrl, 'JPEG', M+114, y+1, 74, ROW_H-2);
     y += ROW_H;
-  }
+  });
 
   return doc.output('blob');
 }
 
 // ─── Drive ────────────────────────────────────────────────────
-async function uploadToDrive(blob, fileName) {
-  showToast('⏳ Envoi sur Google Drive...', '');
-
-  if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
-    throw new Error('Non connecté — connecte-toi depuis le dashboard.');
-  }
-  if (!chantierActif) {
-    throw new Error('Aucun chantier actif sélectionné depuis le dashboard.');
-  }
-
-  // Le module partagé FTSDrive gère la recherche tolérante aux espaces
-  // et retrouve le sous-dossier SECURITE/ACCUEIL SECURITE du chantier.
-  const { id: accueilId } = await FTSDrive.getDossierModuleChantier(
-    chantierActif.name,
-    'ACCUEIL SECURITE'
-  );
-
-  await FTSDrive.uploadFile(blob, fileName, 'application/pdf', accueilId);
-  showToast('✅ Fiche enregistrée sur Drive !', 'success');
-}
+// (upload géré directement dans confirmerEnvoi, pour écrire le registre
+// JSON et le PDF fixe ensemble)
 
 function downloadLocal(blob, fileName) {
   const url = URL.createObjectURL(blob);

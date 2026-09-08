@@ -442,6 +442,18 @@ const FTSDrive = (() => {
   }
 
   /**
+   * Télécharge le contenu texte d'un fichier Drive (JSON, texte brut...).
+   * Renvoie null si le fichier n'existe pas ou est vide — pratique pour
+   * les petits fichiers de données qu'un module veut faire persister
+   * (ex : le registre Accueil Sécurité) sans passer par Google Sheets.
+   */
+  async function downloadFileText(fileId) {
+    const res = await fetchAvecRetry(`${API_BASE}/files/${fileId}?alt=media`, { headers: authHeader() });
+    if (!res.ok) throw new Error(`Erreur lecture fichier : ${res.status}`);
+    return res.text();
+  }
+
+  /**
    * Envoie un fichier (Blob) dans un dossier Drive donné.
    * Utilisée par tous les modules (rapport, accueils, fiche matériel)
    * pour déposer leur PDF au bon endroit.
@@ -640,6 +652,8 @@ const FTSDrive = (() => {
     archiverChantier,
     desarchiverChantier,
     listChantiersArchives,
+    findFilesExact,
+    downloadFileText,
   };
 })();
 

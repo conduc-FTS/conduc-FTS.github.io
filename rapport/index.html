@@ -459,7 +459,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
           <th colspan="2" class="jaune">FORAGE</th>
           <th colspan="2">TUBE</th>
           <th rowspan="2" style="min-width:52px">BARRE</th>
-          <th colspan="3" class="jaune">MATÉRIEL</th>
+          <th colspan="2" class="jaune">MATÉRIEL</th>
         </tr>
         <tr>
           <th>Longueur (m)</th>
@@ -467,8 +467,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
           <th>Ø tube principale (mm)</th>
           <th>GAINAGE (mm)</th>
           <th style="min-width:180px">Désignation FTS</th>
-          <th style="min-width:100px">Statut</th>
-          <th style="min-width:80px">FTS / LOC</th>
+          <th style="min-width:170px">Statut</th>
         </tr>
       </thead>
       <tbody id="tbodyPieux"></tbody>
@@ -630,6 +629,17 @@ const DROPDOWN = {
 const N_PIEUX = 26;
 const N_PERS  = 6;
 
+// FTS/LOC déduit automatiquement de la catégorie choisie : lignes 1 à 12
+// (catalogue FTS) → FTS, lignes 14 et au-delà (catalogue LOC) → LOC. Pour
+// les lignes libres (10-12, 17+), une petite case "LOC" permet de corriger
+// l'exception au cas par cas plutôt que d'obliger un choix à chaque ligne.
+function ftsLocDeduit(i) {
+  const parDefaut = i <= 12 ? 'FTS' : 'LOC';
+  const override = document.getElementById(`loc_override_${i}`);
+  if (override && override.checked) return parDefaut === 'FTS' ? 'LOC' : 'FTS';
+  return parDefaut;
+}
+
 let sigDrawing = false;
 let sigHasContent = false;
 let sigSavedDataUrl = null;   // ← image sauvegardée après chaque trait
@@ -662,18 +672,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // Ligne de séparation visuelle entre le catalogue FTS et le catalogue LOC
     // — purement pour la saisie à l'écran, n'apparaît jamais dans le PDF
     // (qui n'imprime que les machines réellement renseignées par le chef).
+    // Ne couvre que Désignation + Statut : les 6 colonnes précédentes
+    // (N° Mpx, Longueur, Ø forage, Ø tube, Gainage, Barre) restent vides.
     if (i === 13) {
       tbody.innerHTML += `
         <tr class="designation-divider">
-          <td colspan="10" style="background:var(--anthracite,#1E1E1E);color:#FDCA01;font-weight:800;text-align:center;padding:6px;font-size:12px;letter-spacing:0.05em;">DESIGNATION LOC</td>
+          <td colspan="6"></td>
+          <td colspan="2" style="background:var(--anthracite,#1E1E1E);color:#FDCA01;font-weight:800;text-align:center;padding:6px;font-size:12px;letter-spacing:0.05em;">Désignation LOC</td>
         </tr>`;
     }
     // Saisie libre avec suggestions : les modèles courants sont proposés par
     // catégorie, mais on peut taper n'importe quel nom de machine (matériel
     // nouveau, location ponctuelle, etc.).
+    // FTS/LOC n'est plus un choix manuel systématique : il se déduit de la
+    // catégorie utilisée (lignes 1-12 → FTS, lignes 14 et au-delà → LOC).
+    // Seules les lignes libres (sans catégorie, DROPDOWN[i] absent) montrent
+    // une petite bascule pour corriger ce cas par exception.
+    const estLigneLibre = !DROPDOWN[i];
+    const labelException = i <= 12 ? 'LOC' : 'FTS';
     const dropHtml = DROPDOWN[i]
       ? `<input type="text" id="mat_${i}" list="dl_mat_${i}" autocomplete="off" placeholder="Choisir ou saisir"><datalist id="dl_mat_${i}">${DROPDOWN[i].map(v=>`<option value="${v}">`).join('')}</datalist>`
-      : `<input type="text" id="mat_${i}">`;
+      : `<input type="text" id="mat_${i}" placeholder="Choisir ou saisir" style="${estLigneLibre ? 'width:70%;display:inline-block;vertical-align:middle' : ''}">${estLigneLibre ? `<label style="font-size:10px;font-weight:700;color:#555;margin-left:4px;white-space:nowrap"><input type="checkbox" id="loc_override_${i}" style="vertical-align:middle"> ${labelException}</label>` : ''}`;
     tbody.innerHTML += `
       <tr>
         <td><input type="text" id="pieu_${i}" style="text-align:center"></td>
@@ -690,13 +709,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <option value="PANNE">✗ PANNE</option>
             <option value="ARRET">● ARRÊT</option>
             <option value="TRANSPORT">→ TRANSPORT</option>
-          </select>
-        </td>
-        <td>
-          <select id="fts_loc_${i}" style="font-size:11px;font-weight:700;border:1.5px solid #DDD;border-radius:4px;padding:4px 2px;width:100%;background:#fff;">
-            <option value="">—</option>
-            <option value="FTS">FTS</option>
-            <option value="LOC">LOC</option>
           </select>
         </td>
       </tr>`;
@@ -1115,7 +1127,7 @@ async function genererPDF() {
 
   // ── Lignes pieux ───────────────────────────────────────────────
   doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C_TXT);
-  const N_MATERIEL = 16;
+  const N_MATERIEL = 16; // au-delà, le bloc PERSONNEL recouvre ces lignes (voir plus bas)
   for (let i = 1; i <= N_PIEUX; i++) {
     const ry = y + (i-1)*ROW_H;
     // alternance gris très clair / blanc
@@ -1156,9 +1168,11 @@ async function genererPDF() {
         doc.text(statut, colX[7] + cols[7]/2, ry+ROW_H/2+1.5, {align:'center'});
         doc.setFont('helvetica','normal'); doc.setFontSize(7);
       }
-      const ftsLoc = document.getElementById(`fts_loc_${i}`)?.value || '';
-      if (ftsLoc === 'FTS') drawCoche(doc, colX[8], ry, cols[8], ROW_H, C_NOIR, ROW_H);
-      if (ftsLoc === 'LOC') drawCoche(doc, colX[9], ry, cols[9], ROW_H, C_NOIR, ROW_H);
+      if (mat) {
+        const ftsLoc = ftsLocDeduit(i);
+        if (ftsLoc === 'FTS') drawCoche(doc, colX[8], ry, cols[8], ROW_H, C_NOIR, ROW_H);
+        if (ftsLoc === 'LOC') drawCoche(doc, colX[9], ry, cols[9], ROW_H, C_NOIR, ROW_H);
+      }
     }
     doc.setTextColor(...C_TXT);
   }
@@ -1503,7 +1517,7 @@ async function enregistrerSuiviChantier(chantierName) {
     machines.push({
       nom,
       statut: document.getElementById(`statut_${i}`)?.value || '',
-      ftsLoc: document.getElementById(`fts_loc_${i}`)?.value || '',
+      ftsLoc: ftsLocDeduit(i),
     });
   }
 

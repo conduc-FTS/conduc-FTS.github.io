@@ -429,6 +429,8 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   </button>
 </header>
 
+<div id="modifBanner" hidden style="margin:12px;padding:10px 14px;border-radius:8px;background:#FEF8E4;border:1px solid #E8B923;font-size:13px;color:#8A6D00;">⚠️ Tu modifies un rapport déjà existant pour cette date — en enregistrant, il remplacera entièrement l'ancien (matériel, personnel, pieux).</div>
+
 <!-- SECTION 1 : IDENTIFIANT -->
 <div class="section">
   <div class="section-title"><span class="dot"></span>Identification du rapport</div>
@@ -645,10 +647,18 @@ const sigCtx = document.getElementById('sigCanvas').getContext('2d');
 document.addEventListener('DOMContentLoaded', () => {
   // Date du jour par défaut, en heure LOCALE (surtout pas toISOString/valueAsDate,
   // qui utilisent l'UTC et peuvent afficher la veille en pleine nuit en France l'été).
+  // Sauf si un ?date=AAAA-MM-JJ est fourni (ex : depuis "Modifier ce rapport"
+  // sur la page détail chantier) — dans ce cas on l'utilise à la place.
   {
-    const n = new Date();
-    const isoLocal = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
-    document.getElementById('date').value = isoLocal;
+    const dateParam = new URLSearchParams(window.location.search).get('date');
+    if (dateParam) {
+      document.getElementById('date').value = dateParam;
+      document.getElementById('modifBanner').hidden = false;
+    } else {
+      const n = new Date();
+      const isoLocal = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+      document.getElementById('date').value = isoLocal;
+    }
   }
   document.getElementById('headerLogo').src = LOGO_B64;
 

@@ -631,6 +631,22 @@ const FTSSheets = (() => {
     await FTSDrive.setMetadonneesChantier(chantierFolderId, metaMisAJour);
   }
 
+  /**
+   * Supprime toutes les données d'un jour de rapport (les 4 onglets) pour
+   * un chantier — utilisée quand on supprime un rapport journalier depuis
+   * la Supervision, pour que "Jours"/volumes ne le comptent plus.
+   * `dateAffichage` au format JJ/MM/AAAA (comme stocké dans les Sheets).
+   */
+  async function supprimerRapportDate(chantierFolderId, chantierName, dateAffichage) {
+    const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
+    await Promise.all([
+      supprimerLignesDate(spreadsheetId, ONGLET_MATERIEL, dateAffichage),
+      supprimerLignesDate(spreadsheetId, ONGLET_PERSONNEL, dateAffichage),
+      supprimerLignesDate(spreadsheetId, ONGLET_PRODUCTION, dateAffichage),
+      supprimerLignesDate(spreadsheetId, ONGLET_PIEUX, dateAffichage),
+    ]);
+  }
+
   return {
     getOuCreerClasseurSuivi,
     enregistrerDonneesRapport,
@@ -643,6 +659,7 @@ const FTSSheets = (() => {
     ajouterLignePointage,
     cloturerChantier,
     reouvrirChantier,
+    supprimerRapportDate,
     ONGLET_MATERIEL,
     ONGLET_PERSONNEL,
   };

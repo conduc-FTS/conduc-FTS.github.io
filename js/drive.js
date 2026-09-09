@@ -654,6 +654,7 @@ const FTSDrive = (() => {
     listChantiersArchives,
     findFilesExact,
     downloadFileText,
+    deleteFile,
   };
 })();
 

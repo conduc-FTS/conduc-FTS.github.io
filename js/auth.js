@@ -37,18 +37,21 @@ const FTSAuth = (() => {
   let accessToken = null;
   let onChangeCallbacks = [];
 
-  function loadStoredToken() {
+  function chargerTokenBrut() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (parsed.expiresAt && Date.now() < parsed.expiresAt) {
-        return parsed;
-      }
-      return null;
+      return raw ? JSON.parse(raw) : null;
     } catch (e) {
       return null;
     }
+  }
+
+  function loadStoredToken() {
+    const parsed = chargerTokenBrut();
+    if (parsed && parsed.expiresAt && Date.now() < parsed.expiresAt) {
+      return parsed;
+    }
+    return null;
   }
 
   function storeToken(tokenResponse) {
@@ -99,6 +102,40 @@ const FTSAuth = (() => {
     return cachedUserInfo;
   }
 
+  /**
+   * Google donne un accès valable ~1h, sans renouvellement automatique
+   * intégré. Sans ceci, quiconque revient sur l'appli plus d'une heure
+   * après sa dernière connexion se retrouve déconnecté à chaque fois.
+   * On tente donc un renouvellement silencieux (sans redemander de
+   * cliquer) dès qu'on détecte une session expirée — ça ne marche pas
+   * à 100% du temps (dépend des réglages de cookies du navigateur),
+   * mais ça réduit nettement la fréquence des déconnexions ressenties.
+   */
+  let renouvellementEnCours = false;
+  let verificationPeriodiqueDemarree = false;
+
+  function tenterRenouvellementSilencieux() {
+    if (!tokenClient || renouvellementEnCours) return;
+    renouvellementEnCours = true;
+    tokenClient.requestAccessToken({ prompt: "none" });
+  }
+
+  function demarrerVerificationPeriodique() {
+    if (verificationPeriodiqueDemarree) return;
+    verificationPeriodiqueDemarree = true;
+    // Vérifie chaque minute : utile si la page reste ouverte longtemps
+    // (tablette laissée allumée toute la journée) sans être rechargée.
+    setInterval(() => {
+      const stored = chargerTokenBrut();
+      const expire = !stored || !stored.expiresAt || Date.now() >= stored.expiresAt;
+      if (expire && accessToken) {
+        accessToken = null;
+        notifyChange();
+        tenterRenouvellementSilencieux();
+      }
+    }, 60000);
+  }
+
   function onAuthChange(callback) {
     onChangeCallbacks.push(callback);
   }
@@ -108,6 +145,7 @@ const FTSAuth = (() => {
    * chargé au préalable : https://accounts.google.com/gsi/client)
    */
   function init() {
+    const brutAvantExpiration = chargerTokenBrut(); // pour savoir si une session existait avant, même expirée
     const stored = loadStoredToken();
     if (stored) {
       accessToken = stored.access_token;
@@ -134,11 +172,29 @@ const FTSAuth = (() => {
       client_id: CLIENT_ID,
       scope: SCOPES,
       callback: (tokenResponse) => {
+        renouvellementEnCours = false;
         if (tokenResponse && tokenResponse.access_token) {
           storeToken(tokenResponse);
+        } else {
+          // Le renouvellement silencieux a échoué (pas de session Google
+          // active, cookies tiers bloqués...) : il faudra recliquer sur
+          // "Se connecter" — pas d'erreur bruyante, c'est un cas normal.
+          notifyChange();
         }
       },
+      error_callback: () => {
+        renouvellementEnCours = false;
+        notifyChange();
+      },
     });
+
+    demarrerVerificationPeriodique();
+
+    // Une session existait avant (même expirée maintenant) : on tente de
+    // la renouveler silencieusement plutôt que d'attendre un clic manuel.
+    if (brutAvantExpiration && !accessToken) {
+      tenterRenouvellementSilencieux();
+    }
   }
 
   function signIn() {

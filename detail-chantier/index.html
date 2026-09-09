@@ -43,17 +43,33 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .chantier-statut-badge.termine .dot { background: #9AA0AA; }
 .btn-terminer { background: #C0392B; color: white; border: none; border-radius: 8px; padding: 8px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
 .btn-rouvrir { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+
+/* Cette page a besoin de plus de largeur que les pages tablette (960px
+   partagé par .dashboard) pour ranger Prévisions/Rapports Journaliers
+   côte à côte sans que ce soit à l'étroit. */
+.dashboard-wide { max-width: 1280px; }
+.row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: stretch; }
+.row-2col > .panel { display: flex; flex-direction: column; }
+@media (max-width: 900px) {
+  .row-2col { grid-template-columns: 1fr; }
+}
+
+.rj-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.86rem; flex-wrap: wrap; }
+.rj-row:last-child { border-bottom: none; }
+.rj-row-actions { white-space: nowrap; }
+.rj-row-actions button { font-size: 0.76rem; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: white; cursor: pointer; margin-left: 6px; }
 </style>
 </head>
 <body>
 
 <header class="topbar">
-  <div class="topbar-brand">
+  <a href="../supervision-encadrement/index.html" class="topbar-brand" style="text-decoration:none;cursor:pointer">
+    <img src="../assets/logo-fts.png" alt="FTS" style="height:34px;width:auto;background:white;border-radius:6px;padding:3px 6px;flex-shrink:0">
     <div style="line-height:1.2">
       <div style="font-weight:800;font-size:1.05rem;color:#fff">DÉTAIL CHANTIER</div>
       <div class="brand-sub">Fondations et Travaux Spéciaux</div>
     </div>
-  </div>
+  </a>
   <div class="topbar-actions">
     <div class="user-chip">
       <span class="user-dot" id="userDot"></span>
@@ -62,9 +78,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   </div>
 </header>
 
-<main class="dashboard">
-
-  <a href="../supervision-encadrement/index.html" class="retour-lien">← Retour aux chantiers</a>
+<main class="dashboard dashboard-wide">
 
   <section class="panel">
     <p class="panel-sub" id="chantierCode" style="margin-bottom:2px"></p>
@@ -73,34 +87,43 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
     <div id="chantierStatutBloc" style="margin-top:12px"></div>
   </section>
 
-  <section class="panel">
-    <h2 class="panel-title">Prévisions</h2>
-    <p class="panel-sub">Modifie la durée prévue ou le nombre de micropieux prévus — les barres de progression sur la vignette du chantier se mettront à jour en conséquence.</p>
-    <div class="chantier-form" style="grid-template-columns:1fr">
-      <div class="field">
-        <label for="previsionDuree">Durée de chantier (jours)</label>
-        <input type="number" id="previsionDuree" min="0" placeholder="ex : 15">
+  <div class="row-2col">
+    <section class="panel">
+      <h2 class="panel-title">Prévisions</h2>
+      <p class="panel-sub">Modifie la durée prévue ou le nombre de micropieux prévus — les barres de progression sur la vignette du chantier se mettront à jour en conséquence.</p>
+      <div class="chantier-form" style="grid-template-columns:1fr">
+        <div class="field">
+          <label for="previsionDuree">Durée de chantier (jours)</label>
+          <input type="number" id="previsionDuree" min="0" placeholder="ex : 15">
+        </div>
+        <div class="field">
+          <label for="previsionType">Type de chantier</label>
+          <select id="previsionType">
+            <option value="Micropieux">Micropieux</option>
+            <option value="Battage">Battage</option>
+            <option value="Pieux">Pieux</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="previsionMicropieux">Nombre de micropieux prévus</label>
+          <input type="number" id="previsionMicropieux" min="0" placeholder="ex : 25">
+        </div>
+        <div class="field">
+          <label for="previsionMontant">Montant total vendu (€)</label>
+          <input type="number" id="previsionMontant" min="0" step="0.01" placeholder="ex : 45000">
+        </div>
+        <button type="button" class="btn-primary" id="previsionEnregistrerBtn">Enregistrer</button>
       </div>
-      <div class="field">
-        <label for="previsionType">Type de chantier</label>
-        <select id="previsionType">
-          <option value="Micropieux">Micropieux</option>
-          <option value="Battage">Battage</option>
-          <option value="Pieux">Pieux</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="previsionMicropieux">Nombre de micropieux prévus</label>
-        <input type="number" id="previsionMicropieux" min="0" placeholder="ex : 25">
-      </div>
-      <div class="field">
-        <label for="previsionMontant">Montant total vendu (€)</label>
-        <input type="number" id="previsionMontant" min="0" step="0.01" placeholder="ex : 45000">
-      </div>
-      <button type="button" class="btn-primary" id="previsionEnregistrerBtn">Enregistrer</button>
-    </div>
-    <p class="form-status" id="previsionStatus"></p>
-  </section>
+      <p class="form-status" id="previsionStatus"></p>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">Rapports Journaliers</h2>
+      <p class="panel-sub">Chaque jour de rapport enregistré sur ce chantier.</p>
+      <p class="form-status" id="rapportsListeStatus">Chargement...</p>
+      <div id="rapportsListeWrap" hidden></div>
+    </section>
+  </div>
 
   <section class="panel">
     <h2 class="panel-title">Calendrier matériel</h2>
@@ -119,19 +142,6 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <table class="suivi-production" id="suiviProductionTable"></table>
       </div>
       <p class="form-status" id="suiviCadenceMoyenne" style="font-weight:700"></p>
-    </div>
-  </section>
-
-  <section class="panel">
-    <h2 class="panel-title">Rapports Journaliers</h2>
-    <p class="form-status" id="rapportsListeStatus">Chargement...</p>
-    <div id="rapportsListeWrap" hidden>
-      <table class="suivi-production" id="rapportsListeTable" style="width:100%">
-        <thead>
-          <tr><th style="text-align:left">Date</th><th>Nb pieux</th><th>Longueur (ml)</th><th style="text-align:left">Chef</th><th></th></tr>
-        </thead>
-        <tbody id="rapportsListeBody"></tbody>
-      </table>
     </div>
   </section>
 
@@ -343,7 +353,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function afficherRapportsListe(production) {
     const wrap = document.getElementById("rapportsListeWrap");
     const status = document.getElementById("rapportsListeStatus");
-    const tbody = document.getElementById("rapportsListeBody");
 
     if (production.length === 0) {
       status.textContent = "Aucun rapport journalier enregistré pour l'instant.";
@@ -358,22 +367,19 @@ document.addEventListener("DOMContentLoaded", () => {
       return (db?.getTime() || 0) - (da?.getTime() || 0);
     });
 
-    tbody.innerHTML = lignes.map((l) => `
-      <tr>
-        <td>${escapeHtmlDetail(l.date)}</td>
-        <td style="text-align:center">${l.nbPieux}</td>
-        <td style="text-align:center">${l.longueurTotale.toFixed(2)}</td>
-        <td>${escapeHtmlDetail(l.nomChef || "—")}</td>
-        <td style="white-space:nowrap;text-align:right">
-          <button type="button" class="btn-modifier-rapport" data-date="${l.date}" style="padding:5px 10px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:white;cursor:pointer;margin-right:6px">Modifier</button>
-          <button type="button" class="btn-supprimer-rapport" data-date="${l.date}" data-chef="${escapeHtmlDetail(l.nomChef || '')}" style="padding:5px 10px;font-size:.78rem;border:1px solid #C0392B;border-radius:6px;background:white;color:#C0392B;cursor:pointer">Supprimer</button>
-        </td>
-      </tr>`).join("");
+    wrap.innerHTML = lignes.map((l) => `
+      <div class="rj-row">
+        <span>${escapeHtmlDetail(l.date)} — ${l.nbPieux} pieu${l.nbPieux > 1 ? "x" : ""}, ${l.longueurTotale.toFixed(2)}ml${l.nomChef ? " — " + escapeHtmlDetail(l.nomChef) : ""}</span>
+        <span class="rj-row-actions">
+          <button type="button" class="btn-modifier-rapport" data-date="${l.date}">Modifier</button>
+          <button type="button" class="btn-supprimer-rapport" data-date="${l.date}" data-chef="${escapeHtmlDetail(l.nomChef || '')}">Supprimer</button>
+        </span>
+      </div>`).join("");
 
-    tbody.querySelectorAll(".btn-modifier-rapport").forEach((btn) => {
+    wrap.querySelectorAll(".btn-modifier-rapport").forEach((btn) => {
       btn.addEventListener("click", () => modifierRapport(btn.dataset.date));
     });
-    tbody.querySelectorAll(".btn-supprimer-rapport").forEach((btn) => {
+    wrap.querySelectorAll(".btn-supprimer-rapport").forEach((btn) => {
       btn.addEventListener("click", () => supprimerRapport(btn.dataset.date, btn.dataset.chef));
     });
   }

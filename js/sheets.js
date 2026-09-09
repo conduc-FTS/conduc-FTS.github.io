@@ -111,7 +111,7 @@ const FTSSheets = (() => {
     // En-têtes des onglets
     await ecrireValeurs(spreadsheetId, `${ONGLET_MATERIEL}!A1:D1`, [["Date", "Machine", "Statut", "FTS/LOC"]]);
     await ecrireValeurs(spreadsheetId, `${ONGLET_PERSONNEL}!A1:E1`, [["Date", "Nom", "Type", "GD", "Heures"]]);
-    await ecrireValeurs(spreadsheetId, `${ONGLET_PRODUCTION}!A1:D1`, [["Date", "Nb pieux", "Longueur totale (m)", "Longueur moyenne/jour (m)"]]);
+    await ecrireValeurs(spreadsheetId, `${ONGLET_PRODUCTION}!A1:E1`, [["Date", "Nb pieux", "Longueur totale (m)", "Longueur moyenne/jour (m)", "Nom du chef"]]);
     await ecrireValeurs(spreadsheetId, `${ONGLET_PIEUX}!A1:B1`, [["Date", "N° Pieu"]]);
 
     return spreadsheetId;
@@ -120,7 +120,7 @@ const FTSSheets = (() => {
   const EN_TETES_ONGLETS = {
     [ONGLET_MATERIEL]: ["Date", "Machine", "Statut", "FTS/LOC"],
     [ONGLET_PERSONNEL]: ["Date", "Nom", "Type", "GD", "Heures"],
-    [ONGLET_PRODUCTION]: ["Date", "Nb pieux", "Longueur totale (m)", "Longueur moyenne/jour (m)"],
+    [ONGLET_PRODUCTION]: ["Date", "Nb pieux", "Longueur totale (m)", "Longueur moyenne/jour (m)", "Nom du chef"],
     [ONGLET_PIEUX]: ["Date", "N° Pieu"],
   };
 
@@ -252,7 +252,7 @@ const FTSSheets = (() => {
    * @param {number} opts.longueurTotale
    * @param {string[]} [opts.numerosPieux]  numéros de pieu saisis ce jour
    */
-  async function enregistrerDonneesRapport({ chantierFolderId, chantierName, date, machines, personnel, nbPieux, longueurTotale, numerosPieux }) {
+  async function enregistrerDonneesRapport({ chantierFolderId, chantierName, date, machines, personnel, nbPieux, longueurTotale, numerosPieux, nomChef }) {
     const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
 
     // Un rapport refait le même jour (après correction d'une erreur) doit
@@ -285,10 +285,12 @@ const FTSSheets = (() => {
 
     // Toujours une ligne de production, même à 0 pieu réalisé ce jour-là :
     // nécessaire pour un suivi journalier continu et une cadence moyenne
-    // qui reflète aussi les jours sans production.
+    // qui reflète aussi les jours sans production. Le nom du chef est
+    // gardé ici pour pouvoir retrouver et nettoyer son archive PDF
+    // personnelle (ADMINISTRATIF/{chef}/...) en cas de suppression du rapport.
     const moyenne = nbPieux > 0 ? longueurTotale / nbPieux : 0;
     await ajouterLignes(spreadsheetId, ONGLET_PRODUCTION, [
-      [forcerTexteDate(date), nbPieux, longueurTotale.toFixed(2), moyenne.toFixed(2)],
+      [forcerTexteDate(date), nbPieux, longueurTotale.toFixed(2), moyenne.toFixed(2), nomChef || ""],
     ]);
 
     if (numerosPieux && numerosPieux.length > 0) {
@@ -356,6 +358,7 @@ const FTSSheets = (() => {
         nbPieux: Number(r[1]) || 0,
         longueurTotale: parseFloat(r[2]) || 0,
         longueurMoyenne: parseFloat(r[3]) || 0,
+        nomChef: r[4] || "",
       })),
     };
   }

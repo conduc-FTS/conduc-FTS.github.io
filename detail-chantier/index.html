@@ -128,7 +128,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
     <div id="rapportsListeWrap" hidden>
       <table class="suivi-production" id="rapportsListeTable" style="width:100%">
         <thead>
-          <tr><th style="text-align:left">Date</th><th>Nb pieux</th><th>Longueur (ml)</th><th></th></tr>
+          <tr><th style="text-align:left">Date</th><th>Nb pieux</th><th>Longueur (ml)</th><th style="text-align:left">Chef</th><th></th></tr>
         </thead>
         <tbody id="rapportsListeBody"></tbody>
       </table>
@@ -363,9 +363,10 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${escapeHtmlDetail(l.date)}</td>
         <td style="text-align:center">${l.nbPieux}</td>
         <td style="text-align:center">${l.longueurTotale.toFixed(2)}</td>
+        <td>${escapeHtmlDetail(l.nomChef || "—")}</td>
         <td style="white-space:nowrap;text-align:right">
           <button type="button" class="btn-modifier-rapport" data-date="${l.date}" style="padding:5px 10px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:white;cursor:pointer;margin-right:6px">Modifier</button>
-          <button type="button" class="btn-supprimer-rapport" data-date="${l.date}" style="padding:5px 10px;font-size:.78rem;border:1px solid #C0392B;border-radius:6px;background:white;color:#C0392B;cursor:pointer">Supprimer</button>
+          <button type="button" class="btn-supprimer-rapport" data-date="${l.date}" data-chef="${escapeHtmlDetail(l.nomChef || '')}" style="padding:5px 10px;font-size:.78rem;border:1px solid #C0392B;border-radius:6px;background:white;color:#C0392B;cursor:pointer">Supprimer</button>
         </td>
       </tr>`).join("");
 
@@ -373,7 +374,7 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.addEventListener("click", () => modifierRapport(btn.dataset.date));
     });
     tbody.querySelectorAll(".btn-supprimer-rapport").forEach((btn) => {
-      btn.addEventListener("click", () => supprimerRapport(btn.dataset.date));
+      btn.addEventListener("click", () => supprimerRapport(btn.dataset.date, btn.dataset.chef));
     });
   }
 
@@ -386,18 +387,32 @@ document.addEventListener("DOMContentLoaded", () => {
     window.location.href = `../rapport/index.html?date=${dateISO}`;
   }
 
-  async function supprimerRapport(dateAffichage) {
-    if (!confirm(`Supprimer le rapport du ${dateAffichage} ? Ça supprime aussi le PDF sur Drive et ne peut pas être annulé. Continuer ?`)) return;
+  async function supprimerRapport(dateAffichage, nomChef) {
+    if (!confirm(`Supprimer le rapport du ${dateAffichage} ? Ça supprime aussi le PDF sur Drive (dossier chantier${nomChef ? " et archive personnelle du chef" : ""}) et ne peut pas être annulé. Continuer ?`)) return;
     try {
       await FTSSheets.supprimerRapportDate(chantierId, chantierName, dateAffichage);
 
       const [j, m, a] = dateAffichage.split("/");
       const dateISO = `${a}-${m}-${j}`;
       const code = codeDuChantier();
-      const { id: rapportsFolderId } = await FTSDrive.getDossierModuleChantier(code, "RAPPORT JOURNALIER");
       const nomFichier = `${dateISO}_Rapport journalier_${code}.pdf`;
+
+      const { id: rapportsFolderId } = await FTSDrive.getDossierModuleChantier(code, "RAPPORT JOURNALIER");
       const fichiers = await FTSDrive.findFilesExact(nomFichier, rapportsFolderId);
       if (fichiers.length > 0) await FTSDrive.deleteFile(fichiers[0].id);
+
+      // Nettoie aussi la copie personnelle du chef qui a soumis ce
+      // rapport (ADMINISTRATIF/{chef}/RAPPORT JOURNALIER/RJ {année}) —
+      // son nom est gardé dans le Sheet Production depuis chaque envoi.
+      if (nomChef) {
+        try {
+          const dossierChefId = await FTSDrive.getDossierRapportChef(nomChef, a);
+          const fichiersChef = await FTSDrive.findFilesExact(nomFichier, dossierChefId);
+          if (fichiersChef.length > 0) await FTSDrive.deleteFile(fichiersChef[0].id);
+        } catch (e) {
+          console.warn("Nettoyage archive personnelle du chef non effectué :", e);
+        }
+      }
 
       chargerSuivi();
     } catch (err) {

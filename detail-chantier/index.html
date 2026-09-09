@@ -35,7 +35,10 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   width: 68px; white-space: normal; line-height: 1.25;
 }
 .suivi-production td:nth-child(5) {
-  white-space: normal; max-width: 150px; word-break: break-word; text-align: left;
+  white-space: normal; max-width: 260px; word-break: break-word; text-align: left;
+}
+.suivi-production th:nth-child(6), .suivi-production td:nth-child(6) {
+  width: 175px;
 }
 .suivi-calendrier th, .suivi-production th { background: var(--anthracite); color: white; font-size: 0.72rem; text-transform: uppercase; }
 .suivi-calendrier td:first-child, .suivi-production td:first-child { text-align: left; font-weight: 700; background: #FAFAFA; }

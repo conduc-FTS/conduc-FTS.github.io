@@ -48,7 +48,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
    partagé par .dashboard) pour ranger Prévisions/Rapports Journaliers
    côte à côte sans que ce soit à l'étroit. */
 .dashboard-wide { max-width: 1280px; }
-.row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: stretch; }
+.row-2col { display: grid; grid-template-columns: 2fr 3fr; gap: 24px; align-items: stretch; }
 .row-2col > .panel { display: flex; flex-direction: column; }
 @media (max-width: 900px) {
   .row-2col { grid-template-columns: 1fr; }
@@ -121,7 +121,22 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
       <h2 class="panel-title">Rapports Journaliers</h2>
       <p class="panel-sub">Chaque jour de rapport enregistré sur ce chantier.</p>
       <p class="form-status" id="rapportsListeStatus">Chargement...</p>
-      <div id="rapportsListeWrap" hidden></div>
+      <div id="rapportsListeWrap" hidden>
+        <div class="suivi-calendrier-scroll">
+        <table class="suivi-production" style="width:100%">
+          <thead>
+            <tr>
+              <th style="text-align:left">Date</th>
+              <th>Nb Mpx</th>
+              <th>Longueur (ml)</th>
+              <th style="text-align:left">Chef</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rapportsListeBody"></tbody>
+        </table>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -353,6 +368,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function afficherRapportsListe(production) {
     const wrap = document.getElementById("rapportsListeWrap");
     const status = document.getElementById("rapportsListeStatus");
+    const tbody = document.getElementById("rapportsListeBody");
 
     if (production.length === 0) {
       status.textContent = "Aucun rapport journalier enregistré pour l'instant.";
@@ -367,19 +383,22 @@ document.addEventListener("DOMContentLoaded", () => {
       return (db?.getTime() || 0) - (da?.getTime() || 0);
     });
 
-    wrap.innerHTML = lignes.map((l) => `
-      <div class="rj-row">
-        <span>${escapeHtmlDetail(l.date)} — ${l.nbPieux} pieu${l.nbPieux > 1 ? "x" : ""}, ${l.longueurTotale.toFixed(2)}ml${l.nomChef ? " — " + escapeHtmlDetail(l.nomChef) : ""}</span>
-        <span class="rj-row-actions">
-          <button type="button" class="btn-modifier-rapport" data-date="${l.date}">Modifier</button>
-          <button type="button" class="btn-supprimer-rapport" data-date="${l.date}" data-chef="${escapeHtmlDetail(l.nomChef || '')}">Supprimer</button>
-        </span>
-      </div>`).join("");
+    tbody.innerHTML = lignes.map((l) => `
+      <tr>
+        <td style="text-align:left">${escapeHtmlDetail(l.date)}</td>
+        <td>${l.nbPieux}</td>
+        <td>${l.longueurTotale.toFixed(2)}</td>
+        <td style="text-align:left">${escapeHtmlDetail(l.nomChef || "—")}</td>
+        <td style="white-space:nowrap">
+          <button type="button" class="btn-modifier-rapport" data-date="${l.date}" style="font-size:.76rem;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer;margin-right:6px">Modifier</button>
+          <button type="button" class="btn-supprimer-rapport" data-date="${l.date}" data-chef="${escapeHtmlDetail(l.nomChef || '')}" style="font-size:.76rem;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer">Supprimer</button>
+        </td>
+      </tr>`).join("");
 
-    wrap.querySelectorAll(".btn-modifier-rapport").forEach((btn) => {
+    tbody.querySelectorAll(".btn-modifier-rapport").forEach((btn) => {
       btn.addEventListener("click", () => modifierRapport(btn.dataset.date));
     });
-    wrap.querySelectorAll(".btn-supprimer-rapport").forEach((btn) => {
+    tbody.querySelectorAll(".btn-supprimer-rapport").forEach((btn) => {
       btn.addEventListener("click", () => supprimerRapport(btn.dataset.date, btn.dataset.chef));
     });
   }

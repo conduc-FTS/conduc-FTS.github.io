@@ -48,7 +48,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
    partagé par .dashboard) pour ranger Prévisions/Rapports Journaliers
    côte à côte sans que ce soit à l'étroit. */
 .dashboard-wide { max-width: 1280px; }
-.row-2col { display: grid; grid-template-columns: 2fr 3fr; gap: 24px; align-items: stretch; }
+.row-2col { display: grid; grid-template-columns: 1fr 2fr; gap: 24px; align-items: stretch; }
 .row-2col > .panel { display: flex; flex-direction: column; }
 @media (max-width: 900px) {
   .row-2col { grid-template-columns: 1fr; }
@@ -129,6 +129,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
               <th style="text-align:left">Date</th>
               <th>Nb Mpx</th>
               <th>Longueur (ml)</th>
+              <th>Longueur moy Mpx (ml)</th>
               <th style="text-align:left">Chef</th>
               <th></th>
             </tr>
@@ -136,6 +137,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
           <tbody id="rapportsListeBody"></tbody>
         </table>
         </div>
+        <p class="form-status" id="rapportsCadenceMoyenne" style="font-weight:700;margin-top:10px"></p>
       </div>
     </section>
   </div>
@@ -147,16 +149,6 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
       <div class="suivi-calendrier-scroll">
         <table class="suivi-calendrier" id="suiviCalendrierTable"></table>
       </div>
-    </div>
-  </section>
-
-  <section class="panel">
-    <h2 class="panel-title">Cadence de production</h2>
-    <div id="productionResultats" hidden>
-      <div class="suivi-calendrier-scroll">
-        <table class="suivi-production" id="suiviProductionTable"></table>
-      </div>
-      <p class="form-status" id="suiviCadenceMoyenne" style="font-weight:700"></p>
     </div>
   </section>
 
@@ -336,10 +328,8 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const { materiel, production } = await FTSSheets.lireSuiviComplet(chantierId, chantierName);
       afficherCalendrierMateriel(materiel);
-      afficherProduction(production);
       afficherRapportsListe(production);
       document.getElementById("suiviResultats").hidden = false;
-      document.getElementById("productionResultats").hidden = false;
       suiviStatus.textContent = materiel.length === 0 && production.length === 0
         ? "Aucune donnée pour l'instant — elle apparaîtra après le premier rapport journalier enregistré sur ce chantier."
         : "";
@@ -388,12 +378,17 @@ document.addEventListener("DOMContentLoaded", () => {
         <td style="text-align:left">${escapeHtmlDetail(l.date)}</td>
         <td>${l.nbPieux}</td>
         <td>${l.longueurTotale.toFixed(2)}</td>
+        <td>${l.longueurMoyenne.toFixed(2)}</td>
         <td style="text-align:left">${escapeHtmlDetail(l.nomChef || "—")}</td>
         <td style="white-space:nowrap">
           <button type="button" class="btn-modifier-rapport" data-date="${l.date}" style="font-size:.76rem;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer;margin-right:6px">Modifier</button>
           <button type="button" class="btn-supprimer-rapport" data-date="${l.date}" data-chef="${escapeHtmlDetail(l.nomChef || '')}" style="font-size:.76rem;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer">Supprimer</button>
         </td>
       </tr>`).join("");
+
+    const cadenceMoyenne = lignes.reduce((sum, l) => sum + l.longueurTotale, 0) / lignes.length;
+    document.getElementById("rapportsCadenceMoyenne").textContent =
+      `Cadence moyenne : ${cadenceMoyenne.toFixed(1)} ml/jour sur ${lignes.length} jour${lignes.length > 1 ? "s" : ""} de rapport enregistrés.`;
 
     tbody.querySelectorAll(".btn-modifier-rapport").forEach((btn) => {
       btn.addEventListener("click", () => modifierRapport(btn.dataset.date));
@@ -472,26 +467,6 @@ document.addEventListener("DOMContentLoaded", () => {
       html += "</tr>";
     });
     table.innerHTML = html;
-  }
-
-  function afficherProduction(lignes) {
-    const table = document.getElementById("suiviProductionTable");
-    const moyenneEl = document.getElementById("suiviCadenceMoyenne");
-
-    if (lignes.length === 0) {
-      table.innerHTML = "<tr><td>Aucune donnée de production enregistrée.</td></tr>";
-      moyenneEl.textContent = "";
-      return;
-    }
-
-    let html = "<tr><th>Date</th><th>Nb pieux</th><th>Longueur totale (m)</th><th>Longueur moyenne/pieu (m)</th></tr>";
-    lignes.forEach((l) => {
-      html += `<tr><td>${l.date}</td><td>${l.nbPieux}</td><td>${l.longueurTotale.toFixed(2)}</td><td>${l.longueurMoyenne.toFixed(2)}</td></tr>`;
-    });
-    table.innerHTML = html;
-
-    const cadenceMoyenne = lignes.reduce((sum, l) => sum + l.longueurTotale, 0) / lignes.length;
-    moyenneEl.textContent = `Cadence moyenne : ${cadenceMoyenne.toFixed(1)} ml/jour sur ${lignes.length} jour${lignes.length > 1 ? "s" : ""} de rapport enregistrés.`;
   }
 
   if (window.FTSAuth) {

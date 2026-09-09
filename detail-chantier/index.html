@@ -19,14 +19,20 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .suivi-production th, .suivi-production td {
   border: 1px solid var(--border); padding: 6px 10px; text-align: center; white-space: nowrap;
 }
-/* Rapports Journaliers : colonnes Nb Mpx / Longueur / Longueur moy Mpx
-   n'ont besoin que de peu de place — on la redonne à Chef, qui peut
-   passer sur deux lignes plutôt que de forcer un nom à rester tronqué
-   ou sur une seule ligne (ex : "ROMAIN SEREMPIOUQUE"). */
-.suivi-production th:nth-child(2), .suivi-production td:nth-child(2),
+/* Rapports Journaliers : colonnes Date/Nb Mpx/Longueur/Longueur moy Mpx
+   n'ont besoin que de peu de place (surtout avec des en-têtes sur deux
+   lignes) — on la redonne à Chef, qui peut passer sur plusieurs lignes
+   plutôt que de forcer un nom à rester tronqué ou sur une seule ligne
+   (ex : "ROMAIN SEREMPIOUQUE"). */
+.suivi-production th:first-child, .suivi-production td:first-child {
+  width: 78px;
+}
+.suivi-production th:nth-child(2), .suivi-production td:nth-child(2) {
+  width: 60px;
+}
 .suivi-production th:nth-child(3), .suivi-production td:nth-child(3),
 .suivi-production th:nth-child(4), .suivi-production td:nth-child(4) {
-  width: 85px;
+  width: 68px; white-space: normal; line-height: 1.25;
 }
 .suivi-production td:nth-child(5) {
   white-space: normal; max-width: 150px; word-break: break-word; text-align: left;
@@ -140,8 +146,8 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
             <tr>
               <th style="text-align:left">Date</th>
               <th>Nb Mpx</th>
-              <th>Longueur (ml)</th>
-              <th>Longueur moy Mpx (ml)</th>
+              <th>Longueur<br>(ml)</th>
+              <th>Longueur<br>moy Mpx (ml)</th>
               <th style="text-align:left">Chef</th>
               <th></th>
             </tr>

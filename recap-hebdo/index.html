@@ -54,7 +54,6 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .rh-groupe-label.loc { color: #B8730A; }
 .rh-separateur-loc { border-top: 1px dashed #E7C878; margin: 5px 0 3px 0; }
 .rh-entree-row.rh-loc-row { background: #FFF8EC; margin: 0 -6px; padding: 3px 6px; border-radius: 4px; }
-.rh-loc-tag { background: #E8B923; color: #3A2E00; font-size: 0.58rem; font-weight: 800; padding: 1px 5px; border-radius: 6px; margin-left: 3px; }
 
 .rh-panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .rh-panel-head { background: var(--anthracite); color: white; padding: 12px 16px; }
@@ -346,7 +345,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return `
               <div class="rh-entree-row${estLoc ? " rh-loc-row" : ""}" ${attrs}>
                 <div class="rh-entree-view">
-                  <span class="rh-entree-nom"><span class="rh-entree-dot" style="background:${DOT_COULEUR_STATUT[statut] || "#888"}"></span>${escapeHtmlRH(machine)}${estLoc ? '<span class="rh-loc-tag">LOC</span>' : ""}</span>
+                  <span class="rh-entree-nom"><span class="rh-entree-dot" style="background:${DOT_COULEUR_STATUT[statut] || "#888"}"></span>${escapeHtmlRH(machine)}</span>
                   <span class="rh-entree-val">${escapeHtmlRH(statut)}</span>
                   <span class="rh-entree-actions">
                     <button type="button" class="pc-icon-btn rh-edit-btn" title="Modifier">✏️</button>

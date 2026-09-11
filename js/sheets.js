@@ -650,6 +650,79 @@ const FTSSheets = (() => {
     ]);
   }
 
+  // ─── Adresses Personnel (global, hors chantier) ────────────────
+  // Un seul classeur pour toute l'entreprise, rangé dans ADMINISTRATIF —
+  // sert de base au calcul de distance domicile-chantier. Modifiable
+  // uniquement depuis la Supervision (jamais exposé sur la tablette).
+  const NOM_CLASSEUR_ADRESSES = "Adresses Personnel FTS";
+  const ONGLET_ADRESSES = "Adresses";
+  const EN_TETE_ADRESSES = ["Nom", "Prénom", "Adresse"];
+
+  async function getOuCreerFeuilleAdresses() {
+    if (!window.FTSDrive) throw new Error("FTSDrive indisponible.");
+    const administratifId = await FTSDrive.getRootFolder("ADMINISTRATIF");
+
+    const q = encodeURIComponent(
+      `name = '${NOM_CLASSEUR_ADRESSES}' and mimeType = 'application/vnd.google-apps.spreadsheet' and '${administratifId}' in parents and trashed = false`
+    );
+    const resFind = await fetchAvecRetry(`${DRIVE_API_BASE}/files?q=${q}&fields=files(id,name)&spaces=drive`, { headers: authHeader() });
+    if (!resFind.ok) throw new Error(`Erreur recherche feuille adresses : ${resFind.status}`);
+    const dataFind = await resFind.json();
+    if (dataFind.files && dataFind.files.length > 0) return dataFind.files[0].id;
+
+    const resCreate = await fetchAvecRetry(API_BASE, {
+      method: "POST",
+      headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        properties: { title: NOM_CLASSEUR_ADRESSES },
+        sheets: [{ properties: { title: ONGLET_ADRESSES } }],
+      }),
+    });
+    if (!resCreate.ok) {
+      const err = await resCreate.json().catch(() => ({}));
+      throw new Error(`Erreur création feuille adresses : ${err.error?.message || resCreate.status}`);
+    }
+    const created = await resCreate.json();
+    const spreadsheetId = created.spreadsheetId;
+
+    await fetchAvecRetry(`${DRIVE_API_BASE}/files/${spreadsheetId}?addParents=${administratifId}&removeParents=root&fields=id,parents`, {
+      method: "PATCH", headers: authHeader(),
+    });
+
+    await ecrireValeurs(spreadsheetId, `${ONGLET_ADRESSES}!A1:C1`, [EN_TETE_ADRESSES]);
+    return spreadsheetId;
+  }
+
+  async function listerAdresses() {
+    const spreadsheetId = await getOuCreerFeuilleAdresses();
+    const lignes = await lireOnglet(spreadsheetId, ONGLET_ADRESSES);
+    return {
+      spreadsheetId,
+      adresses: lignes.map((r, idx) => ({ sheetRow: idx + 2, nom: r[0] || "", prenom: r[1] || "", adresse: r[2] || "" })),
+    };
+  }
+
+  async function ajouterAdresse(nom, prenom, adresse) {
+    const spreadsheetId = await getOuCreerFeuilleAdresses();
+    await ajouterLignes(spreadsheetId, ONGLET_ADRESSES, [[nom, prenom, adresse]]);
+  }
+
+  async function modifierAdresse(spreadsheetId, sheetRow, nom, prenom, adresse) {
+    await ecrireValeurs(spreadsheetId, `${ONGLET_ADRESSES}!A${sheetRow}:C${sheetRow}`, [[nom, prenom, adresse]]);
+  }
+
+  async function supprimerAdresse(spreadsheetId, sheetRow) {
+    const sheetId = await getSheetId(spreadsheetId, ONGLET_ADRESSES);
+    if (sheetId == null) return;
+    await fetchAvecRetry(`${API_BASE}/${spreadsheetId}:batchUpdate`, {
+      method: "POST",
+      headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requests: [{ deleteDimension: { range: { sheetId, dimension: "ROWS", startIndex: sheetRow - 1, endIndex: sheetRow } } }],
+      }),
+    });
+  }
+
   return {
     getOuCreerClasseurSuivi,
     enregistrerDonneesRapport,
@@ -665,6 +738,10 @@ const FTSSheets = (() => {
     supprimerRapportDate,
     ONGLET_MATERIEL,
     ONGLET_PERSONNEL,
+    listerAdresses,
+    ajouterAdresse,
+    modifierAdresse,
+    supprimerAdresse,
   };
 })();
 

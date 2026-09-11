@@ -191,6 +191,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
     <a href="../recap-hebdo/index.html?type=materiel">🔧 Pointage Matériel</a>
     <a href="../recap-hebdo/index.html?type=personnel">👷 Pointage Personnel</a>
     <button type="button" class="se-nav-btn" data-view="se-view-stats">📈 Statistiques</button>
+    <button type="button" class="se-nav-btn" data-view="se-view-adresses">🏠 Adresses Personnel</button>
   </div>
   <div class="se-sidebar-footer">
     <span id="userDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#9AA0AA;margin-right:5px"></span>Connexion
@@ -405,6 +406,41 @@ body { margin: 0; display: flex; min-height: 100vh; }
     </div>
   </div>
 
+  <!-- ─── ADRESSES PERSONNEL ─────────────────────────────────── -->
+  <div class="se-view" id="se-view-adresses">
+    <div class="se-page-title">Adresses Personnel</div>
+    <div class="se-page-sub">Sert au calcul de la distance domicile-chantier. Réservé à la Supervision — jamais accessible depuis la tablette.</div>
+
+    <div class="se-panel">
+      <div class="se-panel-head">
+        <h2>Ajouter une personne</h2>
+      </div>
+      <div style="display:flex;gap:10px;padding:16px;flex-wrap:wrap;align-items:flex-end">
+        <div><label style="display:block;font-size:0.8rem;color:var(--text-sub);margin-bottom:4px">Nom</label><input type="text" id="adresseNomInput" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;width:160px"></div>
+        <div><label style="display:block;font-size:0.8rem;color:var(--text-sub);margin-bottom:4px">Prénom</label><input type="text" id="adressePrenomInput" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;width:160px"></div>
+        <div style="flex:1;min-width:220px"><label style="display:block;font-size:0.8rem;color:var(--text-sub);margin-bottom:4px">Adresse</label><input type="text" id="adresseAdresseInput" placeholder="N°, rue, code postal, ville" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;width:100%"></div>
+        <button type="button" id="adresseAjouterBtn" style="padding:9px 16px;background:var(--anthracite);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">+ Ajouter</button>
+      </div>
+      <p class="form-status" id="adresseAjoutStatus" style="padding:0 16px 12px"></p>
+    </div>
+
+    <div class="se-panel">
+      <div class="se-panel-head">
+        <h2>Personnel</h2>
+        <button type="button" class="se-nav-btn" id="refreshAdressesBtn" style="width:auto;background:var(--bg);color:var(--anthracite);border:1px solid var(--border);padding:7px 12px" title="Recharger depuis Google">🔄 Actualiser</button>
+      </div>
+      <div id="adressesTableWrap">
+        <div class="se-table-scroll">
+        <table class="se-table">
+          <thead><tr><th>Nom</th><th>Prénom</th><th>Adresse</th><th></th></tr></thead>
+          <tbody id="adressesTbody"></tbody>
+        </table>
+        </div>
+        <div class="se-empty-state" id="adressesEmpty" hidden></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ─── ARCHIVES ────────────────────────────────────────── -->
   <div class="se-view" id="se-view-archives">
     <div class="se-page-title">Archives</div>
@@ -463,6 +499,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById(btn.dataset.view).classList.add("active");
       if (btn.dataset.view === "se-view-archives") chargerArchives();
       if (btn.dataset.view === "se-view-stats") chargerStatsAvancement();
+      if (btn.dataset.view === "se-view-adresses") chargerAdresses();
       sidebarNav.classList.remove("open");
     });
   });
@@ -885,6 +922,126 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   /* fin chargerArchives */
   document.getElementById("refreshArchivesBtn").addEventListener("click", () => chargerArchives(true));
+
+  // --- Adresses Personnel ---
+  let cacheAdresses = null;
+  let adressesChargeesA = 0;
+
+  async function chargerAdresses(forcer = false) {
+    const wrap = document.getElementById("adressesTableWrap");
+    const empty = document.getElementById("adressesEmpty");
+    if (!window.FTSSheets) return;
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { empty.hidden = false; empty.textContent = "Connecte-toi d'abord."; return; }
+
+    if (!forcer && cacheAdresses && (Date.now() - adressesChargeesA) < CACHE_TTL_MS) {
+      afficherAdressesTable(cacheAdresses);
+      return;
+    }
+
+    empty.hidden = false;
+    empty.textContent = "Chargement...";
+    try {
+      const { spreadsheetId, adresses } = await FTSSheets.listerAdresses();
+      cacheAdresses = { spreadsheetId, adresses };
+      adressesChargeesA = Date.now();
+      afficherAdressesTable(cacheAdresses);
+    } catch (err) {
+      console.error("Erreur chargement adresses :", err);
+      empty.hidden = false;
+      empty.textContent = `Erreur : ${err.message}`;
+    }
+  }
+
+  function afficherAdressesTable({ spreadsheetId, adresses }) {
+    const empty = document.getElementById("adressesEmpty");
+    const tbody = document.getElementById("adressesTbody");
+
+    if (adresses.length === 0) {
+      empty.hidden = false;
+      empty.textContent = "Aucune adresse enregistrée pour l'instant.";
+      tbody.innerHTML = "";
+      return;
+    }
+    empty.hidden = true;
+
+    tbody.innerHTML = adresses.map((a) => `
+      <tr data-row="${a.sheetRow}">
+        <td class="se-view-cell">${escapeHtmlSE(a.nom)}</td>
+        <td class="se-view-cell">${escapeHtmlSE(a.prenom)}</td>
+        <td class="se-view-cell">${escapeHtmlSE(a.adresse)}</td>
+        <td class="se-view-cell" style="white-space:nowrap">
+          <button type="button" class="adresse-modifier-btn" style="padding:5px 10px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:white;cursor:pointer;margin-right:6px">Modifier</button>
+          <button type="button" class="adresse-supprimer-btn" style="padding:5px 10px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:white;cursor:pointer">Supprimer</button>
+        </td>
+        <td class="se-edit-cell" hidden><input type="text" class="edit-nom" value="${escapeHtmlSE(a.nom)}" style="width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px"></td>
+        <td class="se-edit-cell" hidden><input type="text" class="edit-prenom" value="${escapeHtmlSE(a.prenom)}" style="width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px"></td>
+        <td class="se-edit-cell" hidden><input type="text" class="edit-adresse" value="${escapeHtmlSE(a.adresse)}" style="width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px"></td>
+        <td class="se-edit-cell" hidden style="white-space:nowrap">
+          <button type="button" class="adresse-enregistrer-btn" style="padding:5px 10px;font-size:.78rem;border:none;border-radius:6px;background:var(--anthracite);color:#fff;cursor:pointer;margin-right:6px">✅</button>
+          <button type="button" class="adresse-annuler-btn" style="padding:5px 10px;font-size:.78rem;border:1px solid var(--border);border-radius:6px;background:white;cursor:pointer">✖️</button>
+        </td>
+      </tr>`).join("");
+
+    tbody.querySelectorAll("tr").forEach((tr) => {
+      const sheetRow = Number(tr.dataset.row);
+      const vueCells = tr.querySelectorAll(".se-view-cell");
+      const editCells = tr.querySelectorAll(".se-edit-cell");
+      const toggle = (editing) => {
+        vueCells.forEach((c) => c.hidden = editing);
+        editCells.forEach((c) => c.hidden = !editing);
+      };
+      tr.querySelector(".adresse-modifier-btn").addEventListener("click", () => toggle(true));
+      tr.querySelector(".adresse-annuler-btn").addEventListener("click", () => toggle(false));
+      tr.querySelector(".adresse-enregistrer-btn").addEventListener("click", async (e) => {
+        const btn = e.target;
+        btn.disabled = true;
+        try {
+          const nom = tr.querySelector(".edit-nom").value.trim();
+          const prenom = tr.querySelector(".edit-prenom").value.trim();
+          const adresse = tr.querySelector(".edit-adresse").value.trim();
+          await FTSSheets.modifierAdresse(spreadsheetId, sheetRow, nom, prenom, adresse);
+          chargerAdresses(true);
+        } catch (err) {
+          alert(`Erreur : ${err.message}`);
+          btn.disabled = false;
+        }
+      });
+      tr.querySelector(".adresse-supprimer-btn").addEventListener("click", async () => {
+        if (!confirm("Supprimer cette personne de la liste des adresses ?")) return;
+        try {
+          await FTSSheets.supprimerAdresse(spreadsheetId, sheetRow);
+          chargerAdresses(true);
+        } catch (err) {
+          alert(`Erreur : ${err.message}`);
+        }
+      });
+    });
+  }
+
+  document.getElementById("refreshAdressesBtn").addEventListener("click", () => chargerAdresses(true));
+
+  document.getElementById("adresseAjouterBtn").addEventListener("click", async () => {
+    const nomInput = document.getElementById("adresseNomInput");
+    const prenomInput = document.getElementById("adressePrenomInput");
+    const adresseInput = document.getElementById("adresseAdresseInput");
+    const status = document.getElementById("adresseAjoutStatus");
+    const nom = nomInput.value.trim();
+    const prenom = prenomInput.value.trim();
+    const adresse = adresseInput.value.trim();
+    if (!nom || !adresse) {
+      status.textContent = "Le nom et l'adresse sont nécessaires.";
+      return;
+    }
+    status.textContent = "Ajout en cours...";
+    try {
+      await FTSSheets.ajouterAdresse(nom, prenom, adresse);
+      nomInput.value = ""; prenomInput.value = ""; adresseInput.value = "";
+      status.textContent = "";
+      chargerAdresses(true);
+    } catch (err) {
+      status.textContent = `Erreur : ${err.message}`;
+    }
+  });
 
   // --- Statistiques : sous-onglets ---
   document.querySelectorAll(".se-subtab").forEach((tab) => {

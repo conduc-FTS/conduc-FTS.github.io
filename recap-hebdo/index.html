@@ -54,22 +54,20 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .rh-separateur-loc { border-top: 1px dashed #E7C878; margin: 5px 0 3px 0; }
 .rh-entree-row.rh-loc-row { background: #FFF8EC; margin: 0 -6px; padding: 3px 6px; border-radius: 4px; }
 
-.rh-recapp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
-.rh-recapp-bloc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
-.rh-recapp-bloc.interim { background: #FFF8EC; border-color: #F0DDAE; }
-.rh-recapp-nom { font-weight: 800; font-size: 0.9rem; margin-bottom: 8px; }
-.rh-recapp-interim-tag { background: #E8B923; color: #3A2E00; font-size: 0.6rem; font-weight: 800; padding: 1px 6px; border-radius: 6px; margin-left: 6px; vertical-align: middle; }
-.rh-recapp-ligne { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; font-size: 0.82rem; gap: 8px; }
-.rh-recapp-chantier { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
-.rh-recapp-chantier .code { font-size: 0.66rem; color: var(--text-sub); font-weight: 700; }
-.rh-recapp-chantier .nom { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rh-recapp-valeurs { text-align: right; white-space: nowrap; font-weight: 700; flex-shrink: 0; }
-.rh-recapp-valeurs .gd { font-size: 0.68rem; color: var(--text-sub); font-weight: 600; margin-left: 6px; }
-.rh-recapp-total { display: flex; justify-content: space-between; border-top: 1px dashed var(--border); margin-top: 6px; padding-top: 6px; font-size: 0.82rem; font-weight: 800; }
-.rh-recapp-separateur {
-  grid-column: 1 / -1; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
-  padding: 8px 10px; border-radius: 6px; background: #3A2E00; color: var(--fts-yellow); text-align: center; margin: 4px 0 0 0;
+.rh-recapp-table { border-collapse: collapse; width: 100%; font-size: 0.84rem; }
+.rh-recapp-table th, .rh-recapp-table td { border: 1px solid var(--border); padding: 8px 12px; text-align: center; }
+.rh-recapp-table th { background: var(--anthracite); color: white; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.rh-recapp-table td:first-child { text-align: left; font-weight: 700; background: #FAFAFA; vertical-align: middle; }
+.rh-recapp-table td.chantier { text-align: left; }
+.rh-recapp-table td.chantier .code { display: block; font-size: 0.68rem; color: var(--text-sub); font-weight: 700; }
+.rh-recapp-table td.chantier .nom { font-weight: 600; }
+.rh-recapp-total-row td { background: #F5F6F8; font-weight: 800; }
+.rh-recapp-total-row td:first-child { text-align: right; font-weight: 800; color: var(--text-sub); font-size: 0.76rem; }
+.rh-recapp-separateur td {
+  background: #3A2E00; color: var(--fts-yellow); font-weight: 800; text-align: center;
+  font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase;
 }
+.rh-recapp-table tr.interim td:first-child, .rh-recapp-table tr.interim td { background: #FFF8EC; }
 
 @media (max-width: 1000px) {
   .rh-semaine-grid { grid-template-columns: repeat(3, 1fr); }
@@ -148,7 +146,12 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 
   <div id="recapPersonnelSection" style="display:none">
     <div class="rh-section-title">Récapitulatif personnel</div>
-    <div class="rh-recapp-grid" id="recapPersonnelWrap"></div>
+    <div style="overflow-x:auto">
+      <table class="rh-recapp-table" style="max-width:900px">
+        <thead><tr><th style="text-align:left">Nom</th><th style="text-align:left">Chantier</th><th>Heures</th><th>GD</th></tr></thead>
+        <tbody id="recapPersonnelWrap"></tbody>
+      </table>
+    </div>
   </div>
 
   <p class="form-status" id="rhStatus"></p>
@@ -372,7 +375,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!wrap) return;
 
     if (entrees.length === 0) {
-      wrap.innerHTML = '<p class="form-status">Aucune donnée sur cette période.</p>';
+      wrap.innerHTML = '<tr><td colspan="4" class="form-status">Aucune donnée sur cette période.</td></tr>';
       return;
     }
 
@@ -390,39 +393,42 @@ document.addEventListener("DOMContentLoaded", () => {
       if (gd === "GD") c.gd += 1;
     });
 
-    const rendreBloc = (p, estInterim) => {
+    const rendreLignes = (p, estInterim) => {
       const chantiers = Object.entries(p.parChantier);
       const totalHeures = chantiers.reduce((s, [, c]) => s + c.heures, 0);
       const totalGD = chantiers.reduce((s, [, c]) => s + c.gd, 0);
-      const lignesChantier = chantiers.map(([nomChantier, c]) => {
+      const classeInterim = estInterim ? " class=\"interim\"" : "";
+      const nbLignes = chantiers.length + (chantiers.length > 1 ? 1 : 0);
+
+      const lignesChantier = chantiers.map(([nomChantier, c], idx) => {
         const spaceIdx = nomChantier.search(/\s/);
         const code = spaceIdx > 0 ? nomChantier.slice(0, spaceIdx) : nomChantier;
         const nom = spaceIdx > 0 ? nomChantier.slice(spaceIdx + 1) : nomChantier;
+        const celluleNom = idx === 0 ? `<td rowspan="${nbLignes}">${escapeHtmlRH(p.nom)}</td>` : "";
         return `
-          <div class="rh-recapp-ligne">
-            <span class="rh-recapp-chantier"><span class="code">${escapeHtmlRH(code)}</span><span class="nom">${escapeHtmlRH(nom)}</span></span>
-            <span class="rh-recapp-valeurs">${c.heures.toFixed(1)}h <span class="gd">${c.gd}j GD</span></span>
-          </div>`;
+          <tr${classeInterim}>
+            ${celluleNom}
+            <td class="chantier"><span class="code">${escapeHtmlRH(code)}</span><span class="nom">${escapeHtmlRH(nom)}</span></td>
+            <td>${c.heures.toFixed(1)}h</td>
+            <td>${c.gd}j</td>
+          </tr>`;
       }).join("");
-      const total = chantiers.length > 1
-        ? `<div class="rh-recapp-total"><span>Total semaine</span><span>${totalHeures.toFixed(1)}h · ${totalGD}j GD</span></div>`
+
+      const ligneTotal = chantiers.length > 1
+        ? `<tr${classeInterim} class="${estInterim ? "interim " : ""}rh-recapp-total-row"><td>Total semaine</td><td>${totalHeures.toFixed(1)}h</td><td>${totalGD}j</td></tr>`
         : "";
-      return `
-        <div class="rh-recapp-bloc${estInterim ? " interim" : ""}">
-          <div class="rh-recapp-nom">${escapeHtmlRH(p.nom)}${estInterim ? '<span class="rh-recapp-interim-tag">INTÉRIM</span>' : ""}</div>
-          ${lignesChantier}
-          ${total}
-        </div>`;
+
+      return lignesChantier + ligneTotal;
     };
 
     const personnes = Object.values(parPersonne).sort((a, b) => a.nom.localeCompare(b.nom));
     const fts = personnes.filter((p) => p.type !== "Intérim");
     const interim = personnes.filter((p) => p.type === "Intérim");
 
-    let html = fts.map((p) => rendreBloc(p, false)).join("");
+    let html = fts.map((p) => rendreLignes(p, false)).join("");
     if (interim.length > 0) {
-      html += '<div class="rh-recapp-separateur">Personnel Intérim</div>';
-      html += interim.map((p) => rendreBloc(p, true)).join("");
+      html += '<tr class="rh-recapp-separateur"><td colspan="4">Personnel Intérim</td></tr>';
+      html += interim.map((p) => rendreLignes(p, true)).join("");
     }
     wrap.innerHTML = html;
   }

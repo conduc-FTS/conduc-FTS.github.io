@@ -42,6 +42,9 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 }
 .suivi-calendrier th, .suivi-production th { background: var(--anthracite); color: white; font-size: 0.72rem; text-transform: uppercase; }
 .suivi-calendrier td:first-child, .suivi-production td:first-child { text-align: left; font-weight: 700; background: #FAFAFA; }
+.ligne-separateur-loc td { background: #3A2E00 !important; color: var(--fts-yellow, #FDCA01); font-weight: 800; text-align: center !important; font-size: 0.7rem; letter-spacing: 0.04em; }
+tr.ligne-loc td:first-child { background: #FFF8EC !important; }
+tr.ligne-loc td { background: #FFFCF5; }
 .statut-badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; color: white; }
 .statut-TRAVAIL { background: #27AE60; }
 .statut-PANNE { background: #C0392B; }
@@ -474,19 +477,30 @@ document.addEventListener("DOMContentLoaded", () => {
     const parCase = {};
     lignes.forEach((l) => { parCase[`${l.machine}||${l.date}`] = l; });
 
-    let html = "<tr><th>Machine</th>" + dates.map((d) => `<th>${d}</th>`).join("") + "</tr>";
-    machines.forEach((m) => {
-      html += `<tr><td>${escapeHtmlSuivi(m)}</td>`;
+    // Une machine est "LOC" si elle a été marquée ainsi au moins une fois ;
+    // sinon elle reste dans le groupe FTS par défaut (y compris les
+    // anciennes entrées où ce champ n'était pas encore renseigné).
+    const estLoc = (m) => lignes.some((l) => l.machine === m && (l.ftsLoc || "").toUpperCase() === "LOC");
+    const machinesFTS = machines.filter((m) => !estLoc(m));
+    const machinesLOC = machines.filter((m) => estLoc(m));
+
+    const ligneMachine = (m, classeLigne) => {
+      let html = `<tr${classeLigne ? ` class="${classeLigne}"` : ""}><td>${escapeHtmlSuivi(m)}</td>`;
       dates.forEach((d) => {
         const l = parCase[`${m}||${d}`];
-        if (l) {
-          html += `<td><span class="statut-badge statut-${l.statut}">${l.statut}${l.ftsLoc ? " · " + l.ftsLoc : ""}</span></td>`;
-        } else {
-          html += "<td>—</td>";
-        }
+        html += l
+          ? `<td><span class="statut-badge statut-${l.statut}">${l.statut}</span></td>`
+          : "<td>—</td>";
       });
-      html += "</tr>";
-    });
+      return html + "</tr>";
+    };
+
+    let html = "<tr><th>Machine</th>" + dates.map((d) => `<th>${d}</th>`).join("") + "</tr>";
+    machinesFTS.forEach((m) => { html += ligneMachine(m); });
+    if (machinesLOC.length > 0) {
+      html += `<tr class="ligne-separateur-loc"><td colspan="${dates.length + 1}">MATÉRIEL LOCATION</td></tr>`;
+      machinesLOC.forEach((m) => { html += ligneMachine(m, "ligne-loc"); });
+    }
     table.innerHTML = html;
   }
 

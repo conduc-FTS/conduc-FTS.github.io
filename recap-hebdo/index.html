@@ -14,7 +14,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 .rh-topbar-right { display: flex; align-items: center; gap: 14px; }
-.rh-body { max-width: 1600px; margin: 24px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 18px; }
+.rh-body { max-width: 1800px; margin: 24px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 18px; }
 
 .rh-nav-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: space-between; }
 .rh-nav-left { display: flex; align-items: center; gap: 12px; }
@@ -53,6 +53,23 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .rh-groupe-label.loc { color: #B8730A; }
 .rh-separateur-loc { border-top: 1px dashed #E7C878; margin: 5px 0 3px 0; }
 .rh-entree-row.rh-loc-row { background: #FFF8EC; margin: 0 -6px; padding: 3px 6px; border-radius: 4px; }
+
+.rh-recapp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.rh-recapp-bloc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.rh-recapp-bloc.interim { background: #FFF8EC; border-color: #F0DDAE; }
+.rh-recapp-nom { font-weight: 800; font-size: 0.9rem; margin-bottom: 8px; }
+.rh-recapp-interim-tag { background: #E8B923; color: #3A2E00; font-size: 0.6rem; font-weight: 800; padding: 1px 6px; border-radius: 6px; margin-left: 6px; vertical-align: middle; }
+.rh-recapp-ligne { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; font-size: 0.82rem; gap: 8px; }
+.rh-recapp-chantier { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.rh-recapp-chantier .code { font-size: 0.66rem; color: var(--text-sub); font-weight: 700; }
+.rh-recapp-chantier .nom { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rh-recapp-valeurs { text-align: right; white-space: nowrap; font-weight: 700; flex-shrink: 0; }
+.rh-recapp-valeurs .gd { font-size: 0.68rem; color: var(--text-sub); font-weight: 600; margin-left: 6px; }
+.rh-recapp-total { display: flex; justify-content: space-between; border-top: 1px dashed var(--border); margin-top: 6px; padding-top: 6px; font-size: 0.82rem; font-weight: 800; }
+.rh-recapp-separateur {
+  grid-column: 1 / -1; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 8px 10px; border-radius: 6px; background: #3A2E00; color: var(--fts-yellow); text-align: center; margin: 4px 0 0 0;
+}
 
 @media (max-width: 1000px) {
   .rh-semaine-grid { grid-template-columns: repeat(3, 1fr); }
@@ -129,6 +146,11 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   <div class="rh-section-title">Calendrier de la semaine</div>
   <div class="rh-semaine-grid" id="semaineGrid"></div>
 
+  <div id="recapPersonnelSection" style="display:none">
+    <div class="rh-section-title">Récapitulatif personnel</div>
+    <div class="rh-recapp-grid" id="recapPersonnelWrap"></div>
+  </div>
+
   <p class="form-status" id="rhStatus"></p>
 
 </main>
@@ -144,6 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const type = params.get("type") === "materiel" ? "materiel" : "personnel";
   const onglet = type === "materiel" ? "Materiel" : "Personnel";
   const estMateriel = type === "materiel";
+  if (!estMateriel) document.getElementById("recapPersonnelSection").style.display = "";
 
   document.title = estMateriel ? "FTS — Récapitulatif Hebdomadaire Matériel" : "FTS — Récapitulatif Hebdomadaire Personnel";
   document.getElementById("rhSousTitre").textContent = estMateriel
@@ -337,10 +360,71 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>`;
     }).join("");
 
-    // Récapitulatif (par personne ou par machine)
-    // Récapitulatif matériel/personnel et Chantiers actifs cette semaine
-    // ont été retirés : le calendrier de la semaine (ci-dessus) et l'export
-    // Excel couvrent déjà ce besoin sans dupliquer l'info.
+    // Récapitulatif matériel/Chantiers actifs cette semaine ont été
+    // retirés : le calendrier ci-dessus et l'export Excel couvrent déjà
+    // ce besoin. Le Récapitulatif personnel, lui, reste utile (heures/GD
+    // par personne, y compris sur plusieurs chantiers dans la semaine).
+    if (!estMateriel) afficherRecapPersonnel(entrees);
+  }
+
+  function afficherRecapPersonnel(entrees) {
+    const wrap = document.getElementById("recapPersonnelWrap");
+    if (!wrap) return;
+
+    if (entrees.length === 0) {
+      wrap.innerHTML = '<p class="form-status">Aucune donnée sur cette période.</p>';
+      return;
+    }
+
+    // Regroupe par personne, puis par chantier au sein de chaque personne
+    const parPersonne = {};
+    entrees.forEach((e) => {
+      const [, nom, type, gd] = e.cols;
+      if (!parPersonne[nom]) parPersonne[nom] = { nom, type, parChantier: {} };
+      if (type === "Intérim") parPersonne[nom].type = "Intérim"; // un intérim reste intérim même si mal saisi ailleurs
+      if (!parPersonne[nom].parChantier[e.chantierName]) {
+        parPersonne[nom].parChantier[e.chantierName] = { heures: 0, gd: 0 };
+      }
+      const c = parPersonne[nom].parChantier[e.chantierName];
+      c.heures += parseFloat((e.cols[4] || "").replace(",", ".")) || 0;
+      if (gd === "GD") c.gd += 1;
+    });
+
+    const rendreBloc = (p, estInterim) => {
+      const chantiers = Object.entries(p.parChantier);
+      const totalHeures = chantiers.reduce((s, [, c]) => s + c.heures, 0);
+      const totalGD = chantiers.reduce((s, [, c]) => s + c.gd, 0);
+      const lignesChantier = chantiers.map(([nomChantier, c]) => {
+        const spaceIdx = nomChantier.search(/\s/);
+        const code = spaceIdx > 0 ? nomChantier.slice(0, spaceIdx) : nomChantier;
+        const nom = spaceIdx > 0 ? nomChantier.slice(spaceIdx + 1) : nomChantier;
+        return `
+          <div class="rh-recapp-ligne">
+            <span class="rh-recapp-chantier"><span class="code">${escapeHtmlRH(code)}</span><span class="nom">${escapeHtmlRH(nom)}</span></span>
+            <span class="rh-recapp-valeurs">${c.heures.toFixed(1)}h <span class="gd">${c.gd}j GD</span></span>
+          </div>`;
+      }).join("");
+      const total = chantiers.length > 1
+        ? `<div class="rh-recapp-total"><span>Total semaine</span><span>${totalHeures.toFixed(1)}h · ${totalGD}j GD</span></div>`
+        : "";
+      return `
+        <div class="rh-recapp-bloc${estInterim ? " interim" : ""}">
+          <div class="rh-recapp-nom">${escapeHtmlRH(p.nom)}${estInterim ? '<span class="rh-recapp-interim-tag">INTÉRIM</span>' : ""}</div>
+          ${lignesChantier}
+          ${total}
+        </div>`;
+    };
+
+    const personnes = Object.values(parPersonne).sort((a, b) => a.nom.localeCompare(b.nom));
+    const fts = personnes.filter((p) => p.type !== "Intérim");
+    const interim = personnes.filter((p) => p.type === "Intérim");
+
+    let html = fts.map((p) => rendreBloc(p, false)).join("");
+    if (interim.length > 0) {
+      html += '<div class="rh-recapp-separateur">Personnel Intérim</div>';
+      html += interim.map((p) => rendreBloc(p, true)).join("");
+    }
+    wrap.innerHTML = html;
   }
 
   const DOT_COULEUR_STATUT = { TRAVAIL: "#3FAE63", PANNE: "#E24C4C", ARRET: "#9AA0AA", TRANSPORT: "#4C82F0" };

@@ -92,12 +92,13 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <body>
 
 <header class="topbar">
-  <div class="topbar-brand">
+  <a href="../supervision-encadrement/index.html" class="topbar-brand" style="text-decoration:none;cursor:pointer">
+    <img src="../assets/logo-fts.png" alt="FTS" style="height:34px;width:auto;background:white;border-radius:6px;padding:3px 6px;flex-shrink:0">
     <div style="line-height:1.2">
       <div style="font-weight:800;font-size:1.05rem;color:#fff" id="rhTitre">Récapitulatif Hebdomadaire</div>
       <div class="brand-sub" id="rhSousTitre">Pointage FTS · Heures &amp; Grand Déplacement</div>
     </div>
-  </div>
+  </a>
   <div class="rh-topbar-right">
     <div class="user-chip"><span class="user-dot" id="userDot"></span><span id="adminAccountInfo">Non connecté</span></div>
     <button type="button" class="rh-btn-actuelle" id="exportTopBtn" style="background:var(--fts-yellow);border-color:var(--fts-yellow)">⬇️ Exporter Excel</button>
@@ -105,8 +106,6 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 </header>
 
 <main class="rh-body">
-
-  <a href="../supervision-encadrement/index.html" class="retour-lien" style="color:var(--text-sub);font-size:0.85rem;text-decoration:none">← Retour au dashboard</a>
 
   <div class="rh-nav-row">
     <div class="rh-nav-left">

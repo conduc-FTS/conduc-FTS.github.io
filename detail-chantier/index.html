@@ -391,7 +391,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const lignes = [...production].sort((a, b) => {
       const da = parseDateFRDetail(a.date), db = parseDateFRDetail(b.date);
-      return (db?.getTime() || 0) - (da?.getTime() || 0);
+      return (da?.getTime() || 0) - (db?.getTime() || 0);
     });
 
     tbody.innerHTML = lignes.map((l) => `

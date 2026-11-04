@@ -27,6 +27,11 @@ const FTSSheets = (() => {
   const ONGLET_PERSONNEL = "Personnel";
   const ONGLET_PRODUCTION = "Production";
   const ONGLET_PIEUX = "Pieux";
+  // Ajoutés avec le rapport journalier v2 (créés automatiquement dans les
+  // classeurs existants au premier rapport enregistré, via assurerOngletsPresents)
+  const ONGLET_HORAIRES = "Horaires";
+  const ONGLET_PANNES = "Pannes";
+  const ONGLET_ARRETS = "Arrets";
 
   /**
    * Remplace fetch() pour tous les appels Sheets/Drive de ce module.
@@ -109,19 +114,24 @@ const FTSSheets = (() => {
     });
 
     // En-têtes des onglets
-    await ecrireValeurs(spreadsheetId, `${ONGLET_MATERIEL}!A1:D1`, [["Date", "Machine", "Statut", "FTS/LOC"]]);
+    await ecrireValeurs(spreadsheetId, `${ONGLET_MATERIEL}!A1:E1`, [["Date", "Machine", "Statut", "FTS/LOC", "N° machine"]]);
     await ecrireValeurs(spreadsheetId, `${ONGLET_PERSONNEL}!A1:E1`, [["Date", "Nom", "Type", "GD", "Heures"]]);
     await ecrireValeurs(spreadsheetId, `${ONGLET_PRODUCTION}!A1:E1`, [["Date", "Nb pieux", "Longueur totale (m)", "Longueur moyenne/jour (m)", "Nom du chef"]]);
     await ecrireValeurs(spreadsheetId, `${ONGLET_PIEUX}!A1:B1`, [["Date", "N° Pieu"]]);
+    // Onglets Horaires / Pannes / Arrets (avec leurs en-têtes)
+    await assurerOngletsPresents(spreadsheetId);
 
     return spreadsheetId;
   }
 
   const EN_TETES_ONGLETS = {
-    [ONGLET_MATERIEL]: ["Date", "Machine", "Statut", "FTS/LOC"],
+    [ONGLET_MATERIEL]: ["Date", "Machine", "Statut", "FTS/LOC", "N° machine"],
     [ONGLET_PERSONNEL]: ["Date", "Nom", "Type", "GD", "Heures"],
     [ONGLET_PRODUCTION]: ["Date", "Nb pieux", "Longueur totale (m)", "Longueur moyenne/jour (m)", "Nom du chef"],
     [ONGLET_PIEUX]: ["Date", "N° Pieu"],
+    [ONGLET_HORAIRES]: ["Date", "Aller depuis", "Départ aller", "Arrivée chantier", "Route aller (h)", "Départ chantier", "Retour vers", "Arrivée retour", "Route retour (h)"],
+    [ONGLET_PANNES]: ["Date", "Machine", "Durée (h)", "Observations"],
+    [ONGLET_ARRETS]: ["Date", "Motif", "Durée (h)", "Observations"],
   };
 
   /**
@@ -252,7 +262,7 @@ const FTSSheets = (() => {
    * @param {number} opts.longueurTotale
    * @param {string[]} [opts.numerosPieux]  numéros de pieu saisis ce jour
    */
-  async function enregistrerDonneesRapport({ chantierFolderId, chantierName, date, machines, personnel, nbPieux, longueurTotale, numerosPieux, nomChef }) {
+  async function enregistrerDonneesRapport({ chantierFolderId, chantierName, date, machines, personnel, nbPieux, longueurTotale, numerosPieux, nomChef, horaires, pannes, arrets }) {
     const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
 
     // Un rapport refait le même jour (après correction d'une erreur) doit
@@ -263,13 +273,19 @@ const FTSSheets = (() => {
       supprimerLignesDate(spreadsheetId, ONGLET_PERSONNEL, date),
       supprimerLignesDate(spreadsheetId, ONGLET_PRODUCTION, date),
       supprimerLignesDate(spreadsheetId, ONGLET_PIEUX, date),
+      supprimerLignesDate(spreadsheetId, ONGLET_HORAIRES, date),
+      supprimerLignesDate(spreadsheetId, ONGLET_PANNES, date),
+      supprimerLignesDate(spreadsheetId, ONGLET_ARRETS, date),
     ]);
 
     if (machines && machines.length > 0) {
       const lignesMateriel = machines
         .filter((m) => m.nom)
-        .map((m) => [forcerTexteDate(date), m.nom, m.statut || "", m.ftsLoc || ""]);
+        .map((m) => [forcerTexteDate(date), m.nom, m.statut || "", m.ftsLoc || "", m.numero || ""]);
       if (lignesMateriel.length > 0) {
+        // Colonne E « N° machine » (référentiel Parc matériel) : en-tête
+        // ajouté aux classeurs créés avant le référentiel.
+        await ecrireValeurs(spreadsheetId, `${ONGLET_MATERIEL}!E1`, [["N° machine"]]);
         await ajouterLignes(spreadsheetId, ONGLET_MATERIEL, lignesMateriel);
       }
     }
@@ -295,6 +311,26 @@ const FTSSheets = (() => {
 
     if (numerosPieux && numerosPieux.length > 0) {
       await ajouterLignes(spreadsheetId, ONGLET_PIEUX, numerosPieux.map((n) => [forcerTexteDate(date), n]));
+    }
+
+    // Durées en heures décimales (1 h 30 → 1.5) pour pouvoir les additionner
+    // dans le Sheet ; heures saisies gardées en texte (« 06:15 », pas une date).
+    const enHeures = (min) => (min == null ? "" : Math.round((min / 60) * 100) / 100);
+    const texte = (v) => (v ? `'${v}` : "");
+    if (horaires && (horaires.aller.depart || horaires.aller.arrivee || horaires.retour.depart || horaires.retour.arrivee)) {
+      await ajouterLignes(spreadsheetId, ONGLET_HORAIRES, [[
+        forcerTexteDate(date),
+        horaires.aller.lieu || "", texte(horaires.aller.depart), texte(horaires.aller.arrivee), enHeures(horaires.aller.route),
+        texte(horaires.retour.depart), horaires.retour.lieu || "", texte(horaires.retour.arrivee), enHeures(horaires.retour.route),
+      ]]);
+    }
+    if (pannes && pannes.length > 0) {
+      await ajouterLignes(spreadsheetId, ONGLET_PANNES,
+        pannes.map((p) => [forcerTexteDate(date), p.machine || "", enHeures(p.minutes), p.obs || ""]));
+    }
+    if (arrets && arrets.length > 0) {
+      await ajouterLignes(spreadsheetId, ONGLET_ARRETS,
+        arrets.map((a) => [forcerTexteDate(date), a.motif || "", enHeures(a.minutes), a.obs || ""]));
     }
 
     return spreadsheetId;
@@ -647,6 +683,9 @@ const FTSSheets = (() => {
       supprimerLignesDate(spreadsheetId, ONGLET_PERSONNEL, dateAffichage),
       supprimerLignesDate(spreadsheetId, ONGLET_PRODUCTION, dateAffichage),
       supprimerLignesDate(spreadsheetId, ONGLET_PIEUX, dateAffichage),
+      supprimerLignesDate(spreadsheetId, ONGLET_HORAIRES, dateAffichage),
+      supprimerLignesDate(spreadsheetId, ONGLET_PANNES, dateAffichage),
+      supprimerLignesDate(spreadsheetId, ONGLET_ARRETS, dateAffichage),
     ]);
   }
 

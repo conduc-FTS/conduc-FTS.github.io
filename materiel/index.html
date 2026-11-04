@@ -208,6 +208,7 @@ canvas.sig-canvas{display:block;width:100%;height:120px;cursor:crosshair;touch-a
 <script src="/js/auth.js"></script>
 <script src="/js/drive.js"></script>
 <script src="/js/gmail.js"></script>
+<script src="/js/parc-materiel.js"></script>
 <script>
 
 const EMAIL_TO = ['m.delarche@fts-btp.fr', 'd.dias@fts-btp.fr'];
@@ -231,7 +232,42 @@ document.addEventListener('DOMContentLoaded', () => {
   appliquerChantierActif();
   chargerLogoPourPdf();
   ajouterMachine(); // une machine par défaut
+  // Liste des machines = référentiel Parc matériel FTS (même désignation
+  // partout : rapport journalier, pointage, fiche matériel)
+  FTSParc.charger().catch(() => {}).then(() => {
+    document.querySelectorAll('select.mach-select').forEach((sel) => remplirSelectMachine(sel));
+  });
 });
+
+// Liste déroulante : machines FTS en service par catégorie, puis location,
+// puis « autre » (saisie libre, considérée comme de la location).
+function remplirSelectMachine(sel) {
+  const val = sel.value;
+  const dispo = FTSParc.disponibles();
+  let html = '<option value="">— Choisir la machine —</option>';
+  FTSParc.CATEGORIES.forEach((c) => {
+    const items = dispo.filter((m) => m.categorie === c).sort((x, y) => x.nom.localeCompare(y.nom, 'fr', { numeric: true }));
+    if (!items.length) return;
+    html += `<optgroup label="${c}">` + items.map((m) => `<option value="${m.numero}">${m.nom}</option>`).join('') + '</optgroup>';
+  });
+  const loc = FTSParc.location();
+  if (loc.length) html += '<optgroup label="LOCATION">' + loc.map((l) => `<option value="LOC:${l}">${l} (LOC)</option>`).join('') + '</optgroup>';
+  html += '<option value="__AUTRE__">Autre (saisie libre)…</option>';
+  sel.innerHTML = html;
+  if (val && [...sel.options].some((o) => o.value === val)) sel.value = val;
+}
+
+function lireMachineChoisie(id) {
+  const v = document.getElementById('mach_nom_' + id)?.value || '';
+  if (!v) return { numero: '', nom: '', libelle: '' };
+  if (v === '__AUTRE__') {
+    const libre = (document.getElementById('mach_libre_' + id)?.value || '').trim().toUpperCase();
+    return { numero: '', nom: libre, libelle: libre ? libre + ' (LOC)' : '' };
+  }
+  if (v.startsWith('LOC:')) { const n = v.slice(4); return { numero: '', nom: n, libelle: n + ' (LOC)' }; }
+  const m = FTSParc.parNumero(v);
+  return m ? { numero: m.numero, nom: m.nom, libelle: FTSParc.libelleComplet(m) } : { numero: '', nom: v, libelle: v };
+}
 
 let LOGO_B64 = null;
 async function chargerLogoPourPdf() {
@@ -309,8 +345,9 @@ function ajouterMachine() {
     <div class="machine-body">
       <div class="machine-row">
         <div>
-          <div class="m-label">Nom / Désignation de la machine</div>
-          <input type="text" id="mach_nom_${id}" placeholder="Ex : FUTURO n°1, MIXO n°2..." style="text-transform:uppercase">
+          <div class="m-label">Machine</div>
+          <select id="mach_nom_${id}" class="mach-select"></select>
+          <input type="text" id="mach_libre_${id}" placeholder="Nom de la machine (location)" style="text-transform:uppercase;margin-top:6px" hidden>
         </div>
         <div>
           <div class="m-label">Heures</div>
@@ -361,6 +398,9 @@ function ajouterMachine() {
       </div>
     </div>`;
   document.getElementById('machinesContainer').appendChild(div);
+  const sel = document.getElementById('mach_nom_' + id);
+  remplirSelectMachine(sel);
+  sel.addEventListener('change', () => { document.getElementById('mach_libre_' + id).hidden = sel.value !== '__AUTRE__'; });
 }
 
 function supprimerMachine(id) {
@@ -388,7 +428,7 @@ function getMachines() {
   document.querySelectorAll('.machine-card').forEach(card => {
     const id = card.id.replace('machine_','');
     machines.push({
-      nom:   document.getElementById('mach_nom_' + id)?.value || '',
+      ...lireMachineChoisie(id),
       h:     document.getElementById('mach_h_' + id)?.value   || '',
       etat:  document.getElementById('mach_etat_' + id)?.value || '',
       obs:   document.getElementById('mach_obs_' + id)?.value  || '',
@@ -529,7 +569,7 @@ async function genererPDF() {
     // Header machine (nom + heures + statut, tout dans le même bandeau)
     doc.setFillColor(...C_ANTH); doc.rect(M,y,W-2*M,7,'F');
     doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...C_WHITE);
-    doc.text(m.nom.toUpperCase(),M+3,y+4.8);
+    doc.text(doc.splitTextToSize((m.libelle || m.nom).toUpperCase(), (W-2*M)/2 - 8)[0],M+3,y+4.8);
     doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
     doc.text(`${m.h ? m.h + ' h' : '— h'}`,W/2,y+4.8,{align:'center'});
     // Badge état
@@ -626,7 +666,7 @@ async function envoyerEmail(blob, fileName) {
   const lignesMachines = machines.map(m => {
     const etatLabel = m.etat === 'bon' ? '✓ BON' : m.etat === 'panne' ? '⚠ EN PANNE' : m.etat === 'surveiller' ? '→ À SURVEILLER' : 'Non renseigné';
     const entretien = [m.net === 'oui' ? 'Nettoyage ✓' : m.net === 'non' ? 'Nettoyage ✗' : '', m.grs === 'oui' ? 'Graissage ✓' : m.grs === 'non' ? 'Graissage ✗' : '', m.dec === 'oui' ? 'Décoffrant ✓' : m.dec === 'non' ? 'Décoffrant ✗' : ''].filter(Boolean).join(' | ');
-    let ligne = `  • ${m.nom.toUpperCase()} (${m.h ? m.h + 'h' : 'h non renseignées'}) — ${etatLabel}`;
+    let ligne = `  • ${(m.libelle || m.nom).toUpperCase()} (${m.h ? m.h + 'h' : 'h non renseignées'}) — ${etatLabel}`;
     if (m.obs) ligne += `\n    Obs. : ${m.obs}`;
     if (entretien) ligne += `\n    Entretien : ${entretien}`;
     return ligne;
@@ -668,9 +708,12 @@ async function archiverSurDrive(blob, fileName) {
   }
   const machines = getMachines();
   const dys = machines.find(m => m.obs.trim() || m.etat === 'panne' || m.etat === 'surveiller');
-  const machineRef = dys?.nom || machines[0]?.nom || 'DIVERS';
+  const ref = dys || machines[0] || {};
+  const machineRef = ref.nom || 'DIVERS';
 
-  const folderId = await FTSDrive.getDossierMachineFicheMateriel(machineRef);
+  // Dossier par machine, retrouvé par son N° machine (stable même si le
+  // nom chantier change), ex : « GE60-HUGO - GROUPE ÉLECTROGÈNE HUGO »
+  const folderId = await FTSDrive.getDossierMachineFicheMateriel(machineRef, ref.numero);
   await FTSDrive.uploadFile(blob, fileName, 'application/pdf', folderId);
   return machineRef;
 }

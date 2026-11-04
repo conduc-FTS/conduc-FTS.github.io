@@ -162,6 +162,29 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <script src="../js/drive.js"></script>
 <script src="../js/sheets.js"></script>
 <script src="../js/calendar.js"></script>
+<script src="../js/parc-materiel.js"></script>
+<datalist id="dl_parc_machines"></datalist>
+<script>
+// Référentiel Parc matériel : suggestions + nom normalisé + N° machine
+// pour que les corrections de pointage gardent la même désignation que
+// le rapport journalier.
+function remplirListeParc() {
+  const dl = document.getElementById("dl_parc_machines");
+  if (!dl || typeof FTSParc === 'undefined') return;
+  dl.innerHTML = FTSParc.disponibles().map((m) => `<option value="${m.nom}">`).join("") +
+    FTSParc.location().map((l) => `<option value="${l}">`).join("");
+}
+function machinePointage(saisie, ftsLocSaisi) {
+  const nom = (saisie || "").trim().toUpperCase();
+  const m = (typeof FTSParc !== 'undefined') ? FTSParc.parNom(nom) || FTSParc.parNumero(nom) : null;
+  if (m) return { nom: m.nom, ftsLoc: "FTS", numero: m.numero };
+  return { nom, ftsLoc: (ftsLocSaisi || "").trim().toUpperCase() || "LOC", numero: "" };
+}
+document.addEventListener("DOMContentLoaded", () => {
+  remplirListeParc();
+  if (typeof FTSParc !== 'undefined') FTSParc.charger().catch(() => {}).then(remplirListeParc);
+});
+</script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -302,7 +325,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   </span>
                 </div>
                 <div class="rh-entree-edit">
-                  <input type="text" class="ri-machine" value="${escapeHtmlRH(machine)}" style="width:70px">
+                  <input type="text" class="ri-machine" list="dl_parc_machines" value="${escapeHtmlRH(machine)}" style="width:170px">
                   <select class="ri-statut">${optionsStatut}</select>
                   <input type="text" class="ri-ftsloc" value="${escapeHtmlRH(ftsLoc)}" placeholder="FTS/LOC" style="width:55px">
                   <button type="button" class="pc-icon-btn rh-save-btn" title="Enregistrer">✅</button>
@@ -461,7 +484,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const date = entree ? entree.cols[0] : "";
         try {
           const valeurs = estMateriel
-            ? [date, row.querySelector(".ri-machine").value.trim(), row.querySelector(".ri-statut").value, row.querySelector(".ri-ftsloc").value.trim()]
+            ? (() => { const mp = machinePointage(row.querySelector(".ri-machine").value, row.querySelector(".ri-ftsloc").value); return [date, mp.nom, row.querySelector(".ri-statut").value, mp.ftsLoc, mp.numero]; })()
             : [date, row.querySelector(".ri-nom").value.trim(), row.querySelector(".ri-type").value, row.querySelector(".ri-gd").checked ? "GD" : "", row.querySelector(".ri-heures").value.trim()];
           await FTSSheets.modifierLignePointage(spreadsheetId, onglet, sheetRow, valeurs);
           document.getElementById("rhStatus").textContent = "Modification enregistrée.";
@@ -512,9 +535,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const champsSpecifiques = estMateriel
       ? `
-        <div class="field"><label>Machine</label><input type="text" id="ajoutChamp2" placeholder="ex : FUTURO 1"></div>
+        <div class="field"><label>Machine</label><input type="text" id="ajoutChamp2" list="dl_parc_machines" placeholder="ex : FUTURO N°1" autocomplete="off"></div>
         <div class="field"><label>Statut</label><select id="ajoutChamp3">${STATUTS_MACHINE.map((s) => `<option value="${s}">${s}</option>`).join("")}</select></div>
-        <div class="field"><label>FTS / LOC</label><input type="text" id="ajoutChamp4" placeholder="FTS"></div>`
+        <div class="field"><label>FTS / LOC</label><input type="text" id="ajoutChamp4" placeholder="auto"></div>`
       : `
         <div class="field"><label>Nom</label><input type="text" id="ajoutChamp2" placeholder="ex : Jean Dupont"></div>
         <div class="field"><label>Type</label><select id="ajoutChamp3"><option value="FTS">FTS</option><option value="Intérim">Intérim</option></select></div>
@@ -551,7 +574,8 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.disabled = true;
       document.getElementById("rhStatus").textContent = "Ajout en cours...";
       try {
-        const valeurs = estMateriel ? [dateAffichage, champ2, champ3, champ4] : [dateAffichage, champ2, champ3, champ4, champ5];
+        const mp = estMateriel ? machinePointage(champ2, champ4) : null;
+        const valeurs = estMateriel ? [dateAffichage, mp.nom, champ3, mp.ftsLoc, mp.numero] : [dateAffichage, champ2, champ3, champ4, champ5];
         await FTSSheets.ajouterLignePointage(chantierId, chantierName, onglet, valeurs);
         document.getElementById("rhStatus").textContent = "Entrée ajoutée.";
         ajoutForm.hidden = true;

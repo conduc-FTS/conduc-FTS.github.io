@@ -192,6 +192,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
     <a href="../recap-hebdo/index.html?type=personnel">👷 Pointage Personnel</a>
     <button type="button" class="se-nav-btn" data-view="se-view-stats">📈 Statistiques</button>
     <button type="button" class="se-nav-btn" data-view="se-view-adresses">🏠 Adresses Personnel</button>
+    <button type="button" class="se-nav-btn" data-view="se-view-parc">🚜 Parc matériel</button>
   </div>
   <div class="se-sidebar-footer">
     <span id="userDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#9AA0AA;margin-right:5px"></span>Connexion
@@ -441,6 +442,67 @@ body { margin: 0; display: flex; min-height: 100vh; }
     </div>
   </div>
 
+  <!-- ─── PARC MATÉRIEL ─────────────────────────────────────── -->
+  <div class="se-view" id="se-view-parc">
+    <div class="se-page-title">Parc matériel</div>
+    <div class="se-page-sub">Liste officielle des machines FTS. C'est elle que les chefs voient dans le rapport journalier, la fiche matériel et le pointage : une seule façon d'écrire chaque machine. Le N° machine sert d'identifiant et ne se modifie pas ; le nom chantier et tout le reste se modifient.</div>
+
+    <div class="se-panel" id="parcCreerPanel" hidden>
+      <div class="se-panel-head"><h2>Le parc matériel n'existe pas encore</h2></div>
+      <div style="padding:16px;font-size:0.88rem;line-height:1.6">
+        Il sera créé dans le dossier <b>REFERENTIEL</b> de ce Drive, à partir de la liste du service matériel (<span id="parcNbDefaut"></span> machines, vérifiée avec Clément).
+        Ensuite, partage le dossier <b>REFERENTIEL</b> <u>en lecture seule</u> avec les chefs : ils verront la liste sur la tablette sans pouvoir la modifier.
+        <div style="margin-top:12px"><button type="button" class="se-export-btn" id="parcCreerBtn">Créer le parc matériel</button></div>
+        <p class="form-status" id="parcCreerStatus"></p>
+      </div>
+    </div>
+
+    <div class="se-panel" id="parcAjoutPanel">
+      <div class="se-panel-head"><h2>Ajouter une machine</h2></div>
+      <div class="pm-form">
+        <div><label>N° machine</label><input type="text" id="pmNum" placeholder="ex : 03FUTURO" style="width:130px"></div>
+        <div><label>Nom chantier (court)</label><input type="text" id="pmNom" placeholder="ex : FUTURO N°3" style="width:190px"></div>
+        <div style="flex:1;min-width:200px"><label>Désignation complète</label><input type="text" id="pmDes" placeholder="ex : FUTURO N°3" style="width:100%"></div>
+        <div><label>Catégorie</label><select id="pmCat"></select></div>
+        <div><label>Chef attitré</label><select id="pmChef"></select></div>
+        <button type="button" id="pmAjouterBtn" class="pm-btn">+ Ajouter</button>
+      </div>
+      <p class="form-status" id="pmAjoutStatus" style="padding:0 16px 12px"></p>
+    </div>
+
+    <div class="se-panel">
+      <div class="se-panel-head">
+        <h2>Machines du parc</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="pm-cnt" id="pmCompteur"></span>
+          <button type="button" class="se-nav-btn" id="refreshParcBtn" style="width:auto;background:var(--bg);color:var(--anthracite);border:1px solid var(--border);padding:7px 12px" title="Recharger depuis Google">🔄 Actualiser</button>
+        </div>
+      </div>
+      <div class="pm-filtres">
+        <div id="pmCats" class="pm-chips"></div>
+        <input type="text" id="pmRecherche" placeholder="🔍 Rechercher…">
+        <label class="pm-check"><input type="checkbox" id="pmInactifs"> Afficher vendues / hors service</label>
+      </div>
+      <p class="form-status" id="pmStatus" style="padding:0 16px"></p>
+      <div class="se-table-scroll">
+        <table class="se-table pm-table">
+          <thead><tr><th>N° machine</th><th>Nom chantier<br><span class="pm-sub">rapport, pointage</span></th><th>Désignation complète<br><span class="pm-sub">service matériel</span></th><th>Catégorie</th><th>Chef attitré</th><th>Statut</th><th></th></tr></thead>
+          <tbody id="pmTbody"></tbody>
+        </table>
+      </div>
+      <div class="se-empty-state" id="pmEmpty" hidden></div>
+    </div>
+
+    <div class="se-panel">
+      <div class="se-panel-head"><h2>Matériel de location (types proposés aux chefs)</h2></div>
+      <div style="padding:14px 16px">
+        <div id="pmLoc" class="pm-chips"></div>
+        <div class="pm-form" style="padding:12px 0 0"><input type="text" id="pmLocNouveau" placeholder="ex : TELESCO 14M" style="width:240px"><button type="button" id="pmLocAjouterBtn" class="pm-btn">+ Ajouter un type</button></div>
+        <p class="se-page-sub" style="margin:8px 0 0">Le chef peut aussi taper un nom libre : il sera marqué LOC.</p>
+      </div>
+    </div>
+  </div>
+
   <!-- ─── ARCHIVES ────────────────────────────────────────── -->
   <div class="se-view" id="se-view-archives">
     <div class="se-page-title">Archives</div>
@@ -466,6 +528,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
 <script src="../js/drive.js"></script>
 <script src="../js/sheets.js"></script>
 <script src="../js/calendar.js"></script>
+<script src="../js/parc-materiel.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -1351,6 +1414,166 @@ document.addEventListener("DOMContentLoaded", () => {
   if (window.FTSAuth && FTSAuth.isSignedIn()) {
     chargerVueEnsemble();
   }
+});
+</script>
+
+<!-- ─── Parc matériel (référentiel unique des machines) ─────────── -->
+<style>
+.pm-form { display: flex; gap: 10px; padding: 16px; flex-wrap: wrap; align-items: flex-end; }
+.pm-form label { display: block; font-size: 0.78rem; color: var(--text-sub); margin-bottom: 4px; }
+.pm-form input, .pm-form select, .pm-table input, .pm-table select, .pm-filtres input[type=text] { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem; background: #fff; text-transform: uppercase; }
+.pm-btn { padding: 9px 16px; background: var(--anthracite); color: #fff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
+.pm-filtres { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.pm-chips { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.pm-chip { font-size: 0.75rem; font-weight: 700; padding: 6px 10px; border-radius: 20px; background: var(--bg); color: var(--text-sub); border: 1px solid var(--border); cursor: pointer; }
+.pm-chip.on { background: var(--anthracite); color: #fff; border-color: var(--anthracite); }
+.pm-chip .x { margin-left: 6px; color: #999; }
+.pm-check { font-size: 0.8rem; color: var(--text-sub); display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+.pm-cnt { font-size: 0.8rem; color: var(--text-sub); }
+.pm-sub { text-transform: none; font-weight: 600; letter-spacing: 0; }
+.pm-table td { padding: 9px 14px; }
+.pm-table tbody tr { cursor: default; }
+.pm-num { font-family: ui-monospace, Menlo, monospace; font-weight: 700; font-size: 0.78rem; }
+.pm-tag { display: inline-block; font-size: 0.68rem; font-weight: 800; padding: 3px 7px; border-radius: 4px; background: var(--bg); color: var(--anthracite); white-space: nowrap; }
+.pm-st { display: inline-block; font-size: 0.68rem; font-weight: 800; padding: 3px 7px; border-radius: 4px; white-space: nowrap; }
+.pm-st.EN-SERVICE { background: #E8F5EC; color: #27AE60; }
+.pm-st.HORS-SERVICE { background: #FEF3E2; color: #B26A00; }
+.pm-st.VENDUE { background: #EEE; color: #777; }
+.pm-act { white-space: nowrap; text-align: right; }
+.pm-act button { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 9px; font-size: 0.78rem; cursor: pointer; margin-left: 4px; }
+.pm-act button.ok { background: var(--anthracite); color: #fff; border-color: var(--anthracite); }
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const CHEFS = ["HAMID ABBOUCHE", "CÉDRIC BERGADIEU", "FRÉDÉRIC BOURBON", "JEFF CORBELLA", "DAVID DIAS", "BRUNO LABARTHE", "HUGO LAJUS", "ROGER RAIDI", "ROMAIN SEREMPIOUQUE"];
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const maj = (s) => FTSParc.majuscules(s);
+  let machines = [], location = [], filtreCat = "TOUTES", enEdition = null, chargeA = 0, modifiable = false;
+
+  // Majuscules forcées à la saisie
+  document.querySelectorAll("#se-view-parc input[type=text]").forEach((el) => el.addEventListener("input", () => {
+    const pos = el.selectionStart; el.value = el.value.toUpperCase(); try { el.setSelectionRange(pos, pos); } catch (e) {}
+  }));
+
+  function optionsCategories(sel) { return FTSParc.CATEGORIES.map((c) => `<option ${c === sel ? "selected" : ""}>${esc(c)}</option>`).join(""); }
+  function listeChefs() { return [...new Set(CHEFS.concat(machines.map((m) => m.chef).filter(Boolean)))].sort(); }
+  function optionsChefs(sel) { return `<option value="">— AUCUN —</option>` + listeChefs().map((c) => `<option ${c === sel ? "selected" : ""}>${esc(c)}</option>`).join(""); }
+  function optionsStatuts(sel) { return FTSParc.STATUTS.map((s) => `<option ${s === sel ? "selected" : ""}>${s}</option>`).join(""); }
+
+  async function charger(forcer = false) {
+    const empty = $("pmEmpty");
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { empty.hidden = false; empty.textContent = "Connecte-toi d'abord."; $("pmTbody").innerHTML = ""; return; }
+    if (!forcer && machines.length && Date.now() - chargeA < 120000) { afficher(); return; }
+    empty.hidden = false; empty.textContent = "Chargement...";
+    try {
+      const r = await FTSParc.charger();
+      modifiable = r.source === "sheet" && r.modifiable !== false;
+      $("parcCreerPanel").hidden = r.existe !== false;
+      $("parcNbDefaut").textContent = FTSParc.DEFAUT.length;
+      $("parcAjoutPanel").hidden = !modifiable;
+      machines = FTSParc.toutes(); location = FTSParc.location(); chargeA = Date.now();
+      $("pmStatus").textContent = modifiable ? "" : (r.existe === false ? "Aperçu de la liste de départ : crée le parc pour pouvoir la modifier." : "Lecture seule : ce compte ne peut pas modifier le parc.");
+      afficher();
+    } catch (e) {
+      empty.hidden = false; empty.textContent = `Erreur : ${e.message}`;
+    }
+  }
+
+  function afficher() {
+    $("pmCat").innerHTML = optionsCategories("FOREUSES MICROPIEUX");
+    $("pmChef").innerHTML = optionsChefs("");
+    const inactifs = $("pmInactifs").checked;
+    const q = maj($("pmRecherche").value).normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const visibles = machines.filter((m) => inactifs || m.statut === "EN SERVICE");
+    const cats = FTSParc.CATEGORIES.filter((c) => visibles.some((m) => m.categorie === c));
+    $("pmCats").innerHTML = ["TOUTES", ...cats].map((c) => `<span class="pm-chip ${c === filtreCat ? "on" : ""}" data-c="${esc(c)}">${esc(c)}${c === "TOUTES" ? "" : " (" + visibles.filter((m) => m.categorie === c).length + ")"}</span>`).join("");
+    $("pmCats").querySelectorAll(".pm-chip").forEach((el) => el.addEventListener("click", () => { filtreCat = el.dataset.c; afficher(); }));
+    const liste = visibles.filter((m) => (filtreCat === "TOUTES" || m.categorie === filtreCat) &&
+      (!q || `${m.numero} ${m.nom} ${m.designation} ${m.chef}`.normalize("NFD").replace(/[̀-ͯ]/g, "").includes(q)));
+    $("pmCompteur").textContent = `${liste.length} affichée(s) · ${machines.filter((m) => m.statut === "EN SERVICE").length} en service`;
+    $("pmEmpty").hidden = liste.length > 0;
+    if (!liste.length) $("pmEmpty").textContent = "Aucune machine ne correspond.";
+    $("pmTbody").innerHTML = liste.map((m) => enEdition === m.numero ? ligneEdition(m) : ligneVue(m)).join("");
+    $("pmTbody").querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => { enEdition = b.dataset.edit; afficher(); }));
+    $("pmTbody").querySelectorAll("[data-annuler]").forEach((b) => b.addEventListener("click", () => { enEdition = null; afficher(); }));
+    $("pmTbody").querySelectorAll("[data-ok]").forEach((b) => b.addEventListener("click", () => enregistrerLigne(b.dataset.ok)));
+    $("pmTbody").querySelectorAll("input[type=text]").forEach((el) => el.addEventListener("input", () => { const p = el.selectionStart; el.value = el.value.toUpperCase(); try { el.setSelectionRange(p, p); } catch (e) {} }));
+    $("pmLoc").innerHTML = location.map((l, i) => `<span class="pm-chip">${esc(l)}${modifiable ? `<span class="x" data-del="${i}" title="Retirer">✕</span>` : ""}</span>`).join("") || '<span class="pm-cnt">Aucun type.</span>';
+    $("pmLoc").querySelectorAll("[data-del]").forEach((x) => x.addEventListener("click", () => {
+      const l = location.filter((_, i) => i !== Number(x.dataset.del));
+      sauver(machines, l, `Type « ${location[Number(x.dataset.del)]} » retiré.`);
+    }));
+  }
+
+  function ligneVue(m) {
+    return `<tr>
+      <td class="pm-num">${esc(m.numero)}</td><td><b>${esc(m.nom)}</b></td><td style="color:var(--text-sub)">${esc(m.designation)}</td>
+      <td><span class="pm-tag">${esc(m.categorie)}</span></td><td>${esc(m.chef) || '<span style="color:#bbb">—</span>'}</td>
+      <td><span class="pm-st ${m.statut.replace(" ", "-")}">${esc(m.statut)}</span></td>
+      <td class="pm-act">${modifiable ? `<button type="button" data-edit="${esc(m.numero)}">✏️ Modifier</button>` : ""}</td></tr>`;
+  }
+  function ligneEdition(m) {
+    return `<tr data-ligne="${esc(m.numero)}">
+      <td class="pm-num">${esc(m.numero)}</td>
+      <td><input type="text" class="e-nom" value="${esc(m.nom)}" style="width:170px"></td>
+      <td><input type="text" class="e-des" value="${esc(m.designation)}" style="width:100%;min-width:200px"></td>
+      <td><select class="e-cat">${optionsCategories(m.categorie)}</select></td>
+      <td><select class="e-chef">${optionsChefs(m.chef)}</select></td>
+      <td><select class="e-st">${optionsStatuts(m.statut)}</select></td>
+      <td class="pm-act"><button type="button" data-annuler>Annuler</button><button type="button" class="ok" data-ok="${esc(m.numero)}">Enregistrer</button></td></tr>`;
+  }
+
+  async function sauver(nouvelles, nouvLoc, message) {
+    const erreurs = FTSParc.verifier(nouvelles.map((m) => ({ ...m, numero: maj(m.numero), nom: maj(m.nom) })));
+    if (erreurs.length) { $("pmStatus").textContent = "⚠️ " + erreurs.join(" "); return false; }
+    $("pmStatus").textContent = "Enregistrement...";
+    try {
+      await FTSParc.enregistrer(nouvelles, nouvLoc);
+      machines = FTSParc.toutes(); location = FTSParc.location(); enEdition = null;
+      $("pmStatus").textContent = "✅ " + message;
+      afficher();
+      return true;
+    } catch (e) {
+      $("pmStatus").textContent = "❌ " + e.message;
+      return false;
+    }
+  }
+
+  function enregistrerLigne(numero) {
+    const tr = $("pmTbody").querySelector(`tr[data-ligne="${CSS.escape(numero)}"]`);
+    const v = (c) => tr.querySelector(c).value;
+    const nouvelles = machines.map((m) => m.numero !== numero ? m : {
+      ...m, nom: maj(v(".e-nom")), designation: maj(v(".e-des")), categorie: v(".e-cat"), chef: v(".e-chef"), statut: v(".e-st"),
+    });
+    sauver(nouvelles, location, `${numero} modifiée.`);
+  }
+
+  $("pmAjouterBtn").addEventListener("click", async () => {
+    const m = { numero: maj($("pmNum").value), nom: maj($("pmNom").value), designation: maj($("pmDes").value) || maj($("pmNom").value),
+      categorie: $("pmCat").value, chef: $("pmChef").value, statut: "EN SERVICE" };
+    if (!m.numero || !m.nom) { $("pmAjoutStatus").textContent = "⚠️ N° machine et nom chantier obligatoires."; return; }
+    $("pmAjoutStatus").textContent = "";
+    if (await sauver(machines.concat([m]), location, `${m.numero} ajoutée.`)) { ["pmNum", "pmNom", "pmDes"].forEach((id) => { $(id).value = ""; }); }
+  });
+  $("pmLocAjouterBtn").addEventListener("click", () => {
+    const l = maj($("pmLocNouveau").value);
+    if (!l) return;
+    if (FTSParc.parNom(l)) { $("pmStatus").textContent = `⚠️ « ${l} » est déjà le nom d'une machine du parc FTS.`; return; }
+    sauver(machines, location.concat([l]), `Type « ${l} » ajouté.`).then((ok) => { if (ok) $("pmLocNouveau").value = ""; });
+  });
+  $("parcCreerBtn").addEventListener("click", async () => {
+    $("parcCreerStatus").textContent = "Création en cours...";
+    try {
+      await FTSParc.creerDepuisListeDeDepart();
+      $("parcCreerStatus").textContent = "✅ Parc créé dans REFERENTIEL. Pense à partager ce dossier en lecture seule avec les chefs.";
+      await charger(true);
+    } catch (e) { $("parcCreerStatus").textContent = "❌ " + e.message; }
+  });
+  $("pmRecherche").addEventListener("input", afficher);
+  $("pmInactifs").addEventListener("change", afficher);
+  $("refreshParcBtn").addEventListener("click", () => charger(true));
+  document.querySelector('.se-nav-btn[data-view="se-view-parc"]').addEventListener("click", () => charger());
 });
 </script>
 </body>

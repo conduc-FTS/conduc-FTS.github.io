@@ -14,7 +14,7 @@
  * toujours prendre la version la plus fraîche sans avoir à changer
  * ce numéro.
  */
-const CACHE_NAME = "fts-dashboard-v3";
+const CACHE_NAME = "fts-dashboard-v4";
 const ASSETS = [
   "/",
   "/index.html",
@@ -24,6 +24,7 @@ const ASSETS = [
   "/js/notifications.js",
   "/js/calendar.js",
   "/js/dashboard.js",
+  "/js/parc-materiel.js",
   "/manifest_dashboard.json",
   "/icon-dashboard-192.png",
   "/icon-dashboard-512.png",

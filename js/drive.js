@@ -389,12 +389,22 @@ const FTSDrive = (() => {
    *
    * @param {string} nomMachine  ex: "FUTURO N°1"
    */
-  async function getDossierMachineFicheMateriel(nomMachine) {
+  async function getDossierMachineFicheMateriel(nomMachine, numeroMachine) {
     if (!nomMachine || !nomMachine.trim()) {
       throw new Error("Nom de machine requis pour archiver la fiche matériel.");
     }
     const rootId = await getRootFolder(ROOT_FICHE_MATERIEL);
-    return findOrCreateFolder(nomMachine.trim().toUpperCase(), rootId);
+    const nom = nomMachine.trim().toUpperCase();
+    // Machine du Parc matériel : dossier « {N°} - {nom chantier} », retrouvé
+    // par son N° (le nom chantier peut être renommé sans créer de doublon).
+    if (numeroMachine && numeroMachine.trim()) {
+      const num = numeroMachine.trim().toUpperCase();
+      const dossiers = await listSubfolders(rootId);
+      const existant = dossiers.find((f) => f.name.trim().toUpperCase().startsWith(num + " "));
+      if (existant) return existant.id;
+      return createFolder(`${num} - ${nom}`, rootId);
+    }
+    return findOrCreateFolder(nom, rootId);
   }
 
   /**

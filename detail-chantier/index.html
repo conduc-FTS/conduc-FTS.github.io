@@ -403,47 +403,60 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${l.nbPieux}</td>
         <td>${l.longueurTotale.toFixed(2)}</td>
         <td>${l.longueurMoyenne.toFixed(2)}</td>
-        <td style="text-align:left">${escapeHtmlDetail(l.nomChef || "—")}</td>
+        <td style="text-align:left">${escapeHtmlDetail(l.nomChef || "—")}${/#\s*\d+$/.test(l.atelier || "") ? ` <span style="font-size:.72rem;color:var(--text-sub)">(atelier ${escapeHtmlDetail(l.atelier.match(/(\d+)$/)[1])})</span>` : ""}</td>
         <td style="white-space:nowrap">
-          <button type="button" class="btn-modifier-rapport" data-date="${l.date}" style="font-size:.76rem;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer;margin-right:6px">Modifier</button>
-          <button type="button" class="btn-supprimer-rapport" data-date="${l.date}" data-chef="${escapeHtmlDetail(l.nomChef || '')}" style="font-size:.76rem;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer">Supprimer</button>
+          <button type="button" class="btn-modifier-rapport" data-date="${l.date}" data-chef="${escapeHtmlDetail(l.nomChef || '')}" data-atelier="${escapeHtmlDetail(l.atelier || '')}" style="font-size:.76rem;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer;margin-right:6px">Modifier</button>
+          <button type="button" class="btn-supprimer-rapport" data-date="${l.date}" data-chef="${escapeHtmlDetail(l.nomChef || '')}" data-atelier="${escapeHtmlDetail(l.atelier || '')}" style="font-size:.76rem;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer">Supprimer</button>
         </td>
       </tr>`).join("");
 
-    const cadenceMoyenne = lignes.reduce((sum, l) => sum + l.longueurTotale, 0) / lignes.length;
+    // Deux ateliers le même jour = un seul jour de chantier (mètres additionnés)
+    const nbJours = new Set(lignes.map((l) => l.date)).size;
+    const cadenceMoyenne = lignes.reduce((sum, l) => sum + l.longueurTotale, 0) / nbJours;
     document.getElementById("rapportsCadenceMoyenne").textContent =
-      `Cadence moyenne : ${cadenceMoyenne.toFixed(1)} ml/jour sur ${lignes.length} jour${lignes.length > 1 ? "s" : ""} de rapport enregistrés.`;
+      `Cadence moyenne : ${cadenceMoyenne.toFixed(1)} ml/jour sur ${nbJours} jour${nbJours > 1 ? "s" : ""} de rapport enregistrés${lignes.length > nbJours ? ` (${lignes.length} rapports, plusieurs ateliers certains jours)` : ""}.`;
 
     tbody.querySelectorAll(".btn-modifier-rapport").forEach((btn) => {
-      btn.addEventListener("click", () => modifierRapport(btn.dataset.date));
+      btn.addEventListener("click", () => modifierRapport(btn.dataset.date, btn.dataset.chef, btn.dataset.atelier));
     });
     tbody.querySelectorAll(".btn-supprimer-rapport").forEach((btn) => {
-      btn.addEventListener("click", () => supprimerRapport(btn.dataset.date, btn.dataset.chef));
+      btn.addEventListener("click", () => supprimerRapport(btn.dataset.date, btn.dataset.chef, btn.dataset.atelier));
     });
   }
 
-  function modifierRapport(dateAffichage) {
+  function modifierRapport(dateAffichage, nomChef, atelier) {
     const [j, m, a] = dateAffichage.split("/");
     const dateISO = `${a}-${m}-${j}`;
     // Fixe ce chantier comme actif, pour que le Rapport Journalier s'ouvre
     // directement dessus (même mécanisme que le dashboard tablette).
     localStorage.setItem("fts_chantier_actif", JSON.stringify({ id: chantierId, name: chantierName }));
-    window.location.href = `../rapport/index.html?date=${dateISO}`;
+    const n = (String(atelier || "").match(/#\s*(\d+)$/) || [])[1];
+    window.location.href = `../rapport/index.html?date=${dateISO}` +
+      (nomChef ? `&chef=${encodeURIComponent(nomChef)}` : "") + (n ? `&atelier=${n}` : "");
   }
 
-  async function supprimerRapport(dateAffichage, nomChef) {
+  async function supprimerRapport(dateAffichage, nomChef, atelier) {
     if (!confirm(`Supprimer le rapport du ${dateAffichage} ? Ça supprime aussi le PDF sur Drive (dossier chantier${nomChef ? " et archive personnelle du chef" : ""}) et ne peut pas être annulé. Continuer ?`)) return;
     try {
-      await FTSSheets.supprimerRapportDate(chantierId, chantierName, dateAffichage);
+      // Seul le rapport de CET atelier est supprimé (un autre atelier le
+      // même jour reste intact). Rapport ancien (sans atelier) : atelier "".
+      await FTSSheets.supprimerRapportDate(chantierId, chantierName, dateAffichage, atelier || "");
 
       const [j, m, a] = dateAffichage.split("/");
       const dateISO = `${a}-${m}-${j}`;
       const code = codeDuChantier();
-      const nomFichier = `${dateISO}_Rapport journalier_${code}.pdf`;
+      // PDF au nouveau format (avec l'atelier) ou à l'ancien (sans chef)
+      const nomsPossibles = [...new Set([
+        FTSSheets.nomFichierRapport(dateISO, code, atelier || ""),
+        `${dateISO}_Rapport journalier_${code}.pdf`,
+      ])];
+      const nomFichier = nomsPossibles[0];
 
       const { id: rapportsFolderId } = await FTSDrive.getDossierModuleChantier(code, "RAPPORT JOURNALIER");
-      const fichiers = await FTSDrive.findFilesExact(nomFichier, rapportsFolderId);
-      if (fichiers.length > 0) await FTSDrive.deleteFile(fichiers[0].id);
+      for (const nf of (atelier ? nomsPossibles.slice(0, 1) : nomsPossibles)) {
+        const fichiers = await FTSDrive.findFilesExact(nf, rapportsFolderId);
+        if (fichiers.length > 0) await FTSDrive.deleteFile(fichiers[0].id);
+      }
 
       // Nettoie aussi la copie personnelle du chef qui a soumis ce
       // rapport (ADMINISTRATIF/{chef}/RAPPORT JOURNALIER/RJ {année}) —

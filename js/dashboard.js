@@ -68,6 +68,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Bannière date (mise à jour une fois, la page reste ouverte en session courte) ---
   renderDateBanner();
 
+  // Lien « Choisis ton chantier » du rapport journalier : ouvre directement
+  // l'onglet CHANTIERS (/index.html#chantiers)
+  if (window.location.hash === "#chantiers") {
+    setTimeout(() => document.getElementById("tabChantiers").click(), 0);
+  }
+
   // --- Init auth ---
   if (window.FTSAuth) {
     FTSAuth.init();

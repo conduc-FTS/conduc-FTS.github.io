@@ -626,11 +626,11 @@ const FTSDrive = (() => {
     const administratifId = await getRootFolder(ROOT_ADMINISTRATIF);
     const dossiersChef = await listSubfolders(administratifId);
 
-    // Comparaison tolérante à l'ordre des mots (espaces normalisés, mots triés)
-    const motsCibles = nomChef.trim().toUpperCase().split(/\s+/).sort().join(" ");
-    const existant = dossiersChef.find(
-      (f) => f.name.trim().toUpperCase().split(/\s+/).sort().join(" ") === motsCibles
-    );
+    // Comparaison tolérante à l'ordre des mots ET aux accents
+    // (« FRÉDÉRIC BOURBON » retrouve le dossier « BOURBON FREDERIC »)
+    const normaliser = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase().split(/\s+/).sort().join(" ");
+    const motsCibles = normaliser(nomChef);
+    const existant = dossiersChef.find((f) => normaliser(f.name) === motsCibles);
 
     const chefId = existant
       ? existant.id

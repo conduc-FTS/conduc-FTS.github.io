@@ -191,7 +191,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
     <a href="../recap-hebdo/index.html?type=materiel">🔧 Pointage Matériel</a>
     <a href="../recap-hebdo/index.html?type=personnel">👷 Pointage Personnel</a>
     <button type="button" class="se-nav-btn" data-view="se-view-stats">📈 Statistiques</button>
-    <button type="button" class="se-nav-btn" data-view="se-view-adresses">🏠 Adresses Personnel</button>
+    <button type="button" class="se-nav-btn" data-view="se-view-personnel">👥 Personnel FTS</button>
     <button type="button" class="se-nav-btn" data-view="se-view-parc">🚜 Parc matériel</button>
   </div>
   <div class="se-sidebar-footer">
@@ -442,6 +442,59 @@ body { margin: 0; display: flex; min-height: 100vh; }
     </div>
   </div>
 
+  <!-- ─── PERSONNEL FTS (remplace Adresses Personnel) ────────────── -->
+  <div class="se-view" id="se-view-personnel">
+    <div class="se-page-title">Personnel FTS</div>
+    <div class="se-page-sub">Base unique de tout le personnel FTS. Nom, prénom, catégorie, poste et e-mail sont lus par les tablettes : noms proposés dans le rapport, et chef reconnu grâce à l'e-mail du compte Google de sa tablette. L'adresse 🔒 reste dans un fichier séparé, réservé à la Supervision.</div>
+
+    <div class="se-panel" id="psCreerPanel" hidden>
+      <div class="se-panel-head"><h2>La base personnel n'existe pas encore</h2></div>
+      <div style="padding:16px;font-size:0.88rem;line-height:1.6">
+        Elle sera créée dans le dossier <b>REFERENTIEL</b> (déjà partagé en lecture seule avec les chefs), avec les chefs de chantier connus et les personnes déjà saisies dans Adresses Personnel. Les adresses ne sont pas copiées : elles restent dans leur fichier.
+        <div style="margin-top:12px"><button type="button" class="se-export-btn" id="psCreerBtn">Créer la base personnel</button></div>
+        <p class="form-status" id="psCreerStatus"></p>
+      </div>
+    </div>
+
+    <div class="se-panel" id="psAjoutPanel">
+      <div class="se-panel-head"><h2>Ajouter une personne</h2></div>
+      <div class="pm-form">
+        <div><label>Nom</label><input type="text" id="psNom" style="width:150px"></div>
+        <div><label>Prénom</label><input type="text" id="psPrenom" style="width:140px"></div>
+        <div><label>Catégorie</label><select id="psCat"></select></div>
+        <div><label>Poste habituel</label><select id="psPoste"></select></div>
+        <div><label>E-mail (compte tablette pour un chef)</label><input type="email" id="psMail" style="width:220px;text-transform:none"></div>
+        <div style="flex:1;min-width:220px"><label>Adresse 🔒</label><input type="text" id="psAdr" placeholder="N°, rue, code postal, ville" style="width:100%;text-transform:none"></div>
+        <button type="button" id="psAjouterBtn" class="pm-btn">+ Ajouter</button>
+      </div>
+      <p class="form-status" id="psAjoutStatus" style="padding:0 16px 12px"></p>
+    </div>
+
+    <div class="se-panel">
+      <div class="se-panel-head">
+        <h2>Personnel</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="pm-cnt" id="psCompteur"></span>
+          <button type="button" class="se-nav-btn" id="refreshPersonnelBtn" style="width:auto;background:var(--bg);color:var(--anthracite);border:1px solid var(--border);padding:7px 12px" title="Recharger depuis Google">🔄 Actualiser</button>
+        </div>
+      </div>
+      <div class="pm-filtres">
+        <div id="psCats" class="pm-chips" style="flex:none"></div>
+        <div id="psPostes" class="pm-chips"></div>
+        <input type="text" id="psRecherche" placeholder="🔍 Rechercher…">
+        <label class="pm-check"><input type="checkbox" id="psPartis"> Afficher les personnes parties</label>
+      </div>
+      <p class="form-status" id="psStatus" style="padding:0 16px"></p>
+      <div class="se-table-scroll">
+        <table class="se-table pm-table">
+          <thead><tr><th>Nom</th><th>Prénom</th><th>Catégorie</th><th>Poste habituel</th><th>E-mail</th><th>Adresse 🔒</th><th>Statut</th><th></th></tr></thead>
+          <tbody id="psTbody"></tbody>
+        </table>
+      </div>
+      <div class="se-empty-state" id="psEmpty" hidden></div>
+    </div>
+  </div>
+
   <!-- ─── PARC MATÉRIEL ─────────────────────────────────────── -->
   <div class="se-view" id="se-view-parc">
     <div class="se-page-title">Parc matériel</div>
@@ -529,6 +582,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
 <script src="../js/sheets.js"></script>
 <script src="../js/calendar.js"></script>
 <script src="../js/parc-materiel.js"></script>
+<script src="../js/personnel.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -1235,7 +1289,8 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       const totalMl = production.reduce((s, p) => s + p.longueurTotale, 0);
-      const nbJours = production.length;
+      // Deux ateliers le même jour = un seul jour de chantier
+      const nbJours = new Set(production.map((p) => p.date)).size;
       const cadence = nbJours > 0 ? totalMl / nbJours : 0;
       const prevu = meta.micropieuxPrevus || null;
       const totalPieux = production.reduce((s, p) => s + p.nbPieux, 0);
@@ -1574,6 +1629,156 @@ document.addEventListener("DOMContentLoaded", () => {
   $("pmInactifs").addEventListener("change", afficher);
   $("refreshParcBtn").addEventListener("click", () => charger(true));
   document.querySelector('.se-nav-btn[data-view="se-view-parc"]').addEventListener("click", () => charger());
+});
+</script>
+
+<!-- ─── Personnel FTS : base unique (personnel.js) + adresses (Supervision seule) ─── -->
+<style>
+.ps-cat { display: inline-block; font-size: 0.68rem; font-weight: 800; padding: 3px 7px; border-radius: 4px; white-space: nowrap; }
+.ps-cat.MICROPIEUX { background: #E8F0FF; color: #2155C4; }
+.ps-cat.PIEUX { background: #F3E8FF; color: #7A2EC2; }
+.ps-cat.LES-DEUX { background: #E8F5EC; color: #27AE60; }
+.ps-poste { display: inline-block; font-size: 0.68rem; font-weight: 800; padding: 3px 7px; border-radius: 4px; background: var(--bg); white-space: nowrap; }
+.ps-poste.chef { background: var(--fts-yellow); }
+.ps-mail { color: var(--text-sub); font-size: 0.8rem; }
+.ps-adr { font-size: 0.8rem; max-width: 260px; }
+.pm-table input[type=email], #se-view-personnel .ps-adr-in { text-transform: none; }
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const maj = (s) => FTSPersonnel.majuscules(s);
+  let personnes = [], adresses = { spreadsheetId: null, liste: [] }, modifiable = false, chargeA = 0;
+  let filtreCat = "TOUTES", filtrePoste = "TOUS POSTES", enEdition = null;
+
+  ["psNom", "psPrenom"].forEach((id) => $(id).addEventListener("input", () => { const el = $(id); const p = el.selectionStart; el.value = el.value.toUpperCase(); try { el.setSelectionRange(p, p); } catch (e) {} }));
+  const opts = (liste, sel, vide) => (vide ? `<option value="">${vide}</option>` : "") + liste.map((v) => `<option ${v === sel ? "selected" : ""}>${esc(v)}</option>`).join("");
+  $("psCat").innerHTML = opts(FTSPersonnel.CATEGORIES, "MICROPIEUX");
+  $("psPoste").innerHTML = opts(FTSPersonnel.POSTES, "", "— Aucun —");
+
+  const cleP = (p) => FTSPersonnel.cle(`${p.prenom} ${p.nom}`);
+  function adresseDe(p) { return adresses.liste.find((a) => FTSPersonnel.cle(`${a.prenom} ${a.nom}`) === cleP(p)) || null; }
+
+  async function charger(forcer = false) {
+    const empty = $("psEmpty");
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { empty.hidden = false; empty.textContent = "Connecte-toi d'abord."; $("psTbody").innerHTML = ""; return; }
+    if (!forcer && personnes.length && Date.now() - chargeA < 120000) { afficher(); return; }
+    empty.hidden = false; empty.textContent = "Chargement...";
+    try {
+      const [r, adr] = await Promise.all([FTSPersonnel.charger(), FTSSheets.listerAdresses().catch((e) => { console.warn(e); return null; })]);
+      if (adr) adresses = { spreadsheetId: adr.spreadsheetId, liste: adr.adresses };
+      modifiable = r.source === "sheet" && r.modifiable !== false;
+      $("psCreerPanel").hidden = r.existe !== false;
+      $("psAjoutPanel").hidden = !modifiable;
+      personnes = FTSPersonnel.toutes(); chargeA = Date.now();
+      $("psStatus").textContent = modifiable ? "" : (r.existe === false ? "Aperçu : crée la base pour pouvoir la modifier." : "Lecture seule : ce compte ne peut pas modifier la base.");
+      afficher();
+    } catch (e) { empty.hidden = false; empty.textContent = `Erreur : ${e.message}`; }
+  }
+
+  function afficher() {
+    const partis = $("psPartis").checked;
+    const q = maj($("psRecherche").value).normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const visibles = personnes.filter((p) => partis || p.statut === "ACTIF");
+    $("psCats").innerHTML = ["TOUTES", ...FTSPersonnel.CATEGORIES].map((c) => `<span class="pm-chip ${c === filtreCat ? "on" : ""}" data-c="${esc(c)}">${esc(c)}</span>`).join("");
+    $("psPostes").innerHTML = ["TOUS POSTES", ...FTSPersonnel.POSTES].map((c) => `<span class="pm-chip ${c === filtrePoste ? "on" : ""}" data-p="${esc(c)}">${esc(c)}</span>`).join("");
+    $("psCats").querySelectorAll(".pm-chip").forEach((el) => el.addEventListener("click", () => { filtreCat = el.dataset.c; afficher(); }));
+    $("psPostes").querySelectorAll(".pm-chip").forEach((el) => el.addEventListener("click", () => { filtrePoste = el.dataset.p; afficher(); }));
+    const liste = visibles.filter((p) =>
+      (filtreCat === "TOUTES" || p.categorie === filtreCat || (p.categorie === "LES DEUX" && filtreCat !== "LES DEUX")) &&
+      (filtrePoste === "TOUS POSTES" || p.poste === filtrePoste) &&
+      (!q || `${p.nom} ${p.prenom} ${p.email}`.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().includes(q)));
+    $("psCompteur").textContent = `${liste.length} affichée(s) · ${personnes.filter((p) => p.statut === "ACTIF").length} actives`;
+    $("psEmpty").hidden = liste.length > 0;
+    if (!liste.length) $("psEmpty").textContent = "Personne ne correspond.";
+    $("psTbody").innerHTML = liste.map((p) => (enEdition === cleP(p) ? ligneEdition(p) : ligneVue(p))).join("");
+    $("psTbody").querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => { enEdition = b.dataset.edit; afficher(); }));
+    $("psTbody").querySelectorAll("[data-annuler]").forEach((b) => b.addEventListener("click", () => { enEdition = null; afficher(); }));
+    $("psTbody").querySelectorAll("[data-ok]").forEach((b) => b.addEventListener("click", () => enregistrerLigne(b.dataset.ok)));
+    $("psTbody").querySelectorAll("input.e-nom, input.e-prenom").forEach((el) => el.addEventListener("input", () => { const p = el.selectionStart; el.value = el.value.toUpperCase(); try { el.setSelectionRange(p, p); } catch (e) {} }));
+  }
+
+  function ligneVue(p) {
+    const a = adresseDe(p);
+    return `<tr>
+      <td><b>${esc(p.nom)}</b></td><td>${esc(p.prenom)}</td>
+      <td><span class="ps-cat ${p.categorie.replace(" ", "-")}">${esc(p.categorie)}</span></td>
+      <td>${p.poste ? `<span class="ps-poste ${p.poste === "CHEF DE CHANTIER" ? "chef" : ""}">${esc(p.poste)}</span>` : '<span style="color:#bbb">—</span>'}</td>
+      <td class="ps-mail">${esc(p.email) || '<span style="color:#bbb">—</span>'}</td>
+      <td class="ps-adr">${a && a.adresse ? esc(a.adresse) : '<span style="color:#bbb">—</span>'}</td>
+      <td><span class="pm-st ${p.statut === "ACTIF" ? "EN-SERVICE" : "VENDUE"}">${esc(p.statut)}</span></td>
+      <td class="pm-act">${modifiable ? `<button type="button" data-edit="${esc(cleP(p))}">✏️ Modifier</button>` : ""}</td></tr>`;
+  }
+  function ligneEdition(p) {
+    const a = adresseDe(p);
+    return `<tr data-ligne="${esc(cleP(p))}">
+      <td><input type="text" class="e-nom" value="${esc(p.nom)}" style="width:120px"></td>
+      <td><input type="text" class="e-prenom" value="${esc(p.prenom)}" style="width:110px"></td>
+      <td><select class="e-cat">${opts(FTSPersonnel.CATEGORIES, p.categorie)}</select></td>
+      <td><select class="e-poste">${opts(FTSPersonnel.POSTES, p.poste, "— Aucun —")}</select></td>
+      <td><input type="email" class="e-mail" value="${esc(p.email)}" style="width:190px"></td>
+      <td><input type="text" class="e-adr ps-adr-in" value="${esc(a ? a.adresse : "")}" style="width:220px"></td>
+      <td><select class="e-st">${opts(FTSPersonnel.STATUTS, p.statut)}</select></td>
+      <td class="pm-act"><button type="button" data-annuler>Annuler</button><button type="button" class="ok" data-ok="${esc(cleP(p))}">Enregistrer</button></td></tr>`;
+  }
+
+  // Adresse : fichier séparé (Adresses Personnel FTS), réservé à la Supervision
+  async function enregistrerAdresse(ancienne, p, adresse) {
+    const a = ancienne ? adresseDe(ancienne) : null;
+    if (a) {
+      if (a.adresse !== adresse || a.nom !== p.nom || a.prenom !== p.prenom) await FTSSheets.modifierAdresse(adresses.spreadsheetId, a.sheetRow, p.nom, p.prenom, adresse);
+    } else if (adresse) {
+      await FTSSheets.ajouterAdresse(p.nom, p.prenom, adresse);
+    }
+  }
+
+  async function sauver(nouvelles, message, adresseAction) {
+    const erreurs = FTSPersonnel.verifier(nouvelles.map((p) => ({ ...p, nom: maj(p.nom), prenom: maj(p.prenom), email: String(p.email || "").trim().toLowerCase() })));
+    if (erreurs.length) { $("psStatus").textContent = "⚠️ " + erreurs.join(" "); return false; }
+    $("psStatus").textContent = "Enregistrement...";
+    try {
+      await FTSPersonnel.enregistrer(nouvelles);
+      if (adresseAction) await adresseAction();
+      const adr = await FTSSheets.listerAdresses().catch(() => null);
+      if (adr) adresses = { spreadsheetId: adr.spreadsheetId, liste: adr.adresses };
+      personnes = FTSPersonnel.toutes(); enEdition = null;
+      $("psStatus").textContent = "✅ " + message;
+      afficher();
+      return true;
+    } catch (e) { $("psStatus").textContent = "❌ " + e.message; return false; }
+  }
+
+  function enregistrerLigne(k) {
+    const tr = $("psTbody").querySelector(`tr[data-ligne="${CSS.escape(k)}"]`);
+    const v = (c) => tr.querySelector(c).value;
+    const ancienne = personnes.find((p) => cleP(p) === k);
+    const nouvelle = { nom: maj(v(".e-nom")), prenom: maj(v(".e-prenom")), categorie: v(".e-cat"), poste: v(".e-poste"), email: v(".e-mail"), statut: v(".e-st") };
+    const adr = v(".e-adr").trim();
+    sauver(personnes.map((p) => (cleP(p) === k ? nouvelle : p)), `${nouvelle.prenom} ${nouvelle.nom} modifié(e).`, () => enregistrerAdresse(ancienne, nouvelle, adr));
+  }
+
+  $("psAjouterBtn").addEventListener("click", async () => {
+    const p = { nom: maj($("psNom").value), prenom: maj($("psPrenom").value), categorie: $("psCat").value, poste: $("psPoste").value, email: $("psMail").value, statut: "ACTIF" };
+    if (!p.nom || !p.prenom) { $("psAjoutStatus").textContent = "⚠️ Nom et prénom obligatoires."; return; }
+    $("psAjoutStatus").textContent = "";
+    const adr = $("psAdr").value.trim();
+    if (await sauver(personnes.concat([p]), `${p.prenom} ${p.nom} ajouté(e).`, () => enregistrerAdresse(null, p, adr))) {
+      ["psNom", "psPrenom", "psMail", "psAdr"].forEach((id) => { $(id).value = ""; });
+    }
+  });
+  $("psCreerBtn").addEventListener("click", async () => {
+    $("psCreerStatus").textContent = "Création en cours...";
+    try {
+      await FTSPersonnel.creer(adresses.liste);
+      $("psCreerStatus").textContent = "✅ Base créée dans REFERENTIEL. Complète la catégorie, le poste et l'e-mail (compte tablette) des chefs.";
+      await charger(true);
+    } catch (e) { $("psCreerStatus").textContent = "❌ " + e.message; }
+  });
+  $("psRecherche").addEventListener("input", afficher);
+  $("psPartis").addEventListener("change", afficher);
+  $("refreshPersonnelBtn").addEventListener("click", () => charger(true));
+  document.querySelector('.se-nav-btn[data-view="se-view-personnel"]').addEventListener("click", () => charger());
 });
 </script>
 </body>

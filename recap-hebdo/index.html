@@ -615,10 +615,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const listeGroupes = Object.values(groupes);
       for (const g of listeGroupes) {
         if (estMateriel) {
-          const machines = g.items.map((cols) => ({ nom: cols[1], statut: cols[2], ftsLoc: cols[3] }));
+          const machines = g.items.map((cols) => ({ nom: cols[1], statut: cols[2], ftsLoc: cols[3], atelier: cols[5] || "" }));
           await FTSCalendar.enregistrerPointageMachine(g.chantierName, g.dateISO, machines);
         } else {
-          const personnel = g.items.map((cols) => ({ nom: cols[1], type: cols[2], gd: cols[3] === "GD", heures: cols[4] }));
+          const personnel = g.items.map((cols) => ({ nom: cols[1], type: cols[2], gd: cols[3] === "GD", heures: cols[4], atelier: cols[5] || "" }));
           await FTSCalendar.enregistrerPointagePersonnel(g.chantierName, g.dateISO, personnel);
         }
       }

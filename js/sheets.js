@@ -125,14 +125,52 @@ const FTSSheets = (() => {
   }
 
   const EN_TETES_ONGLETS = {
-    [ONGLET_MATERIEL]: ["Date", "Machine", "Statut", "FTS/LOC", "N° machine"],
-    [ONGLET_PERSONNEL]: ["Date", "Nom", "Type", "GD", "Heures"],
-    [ONGLET_PRODUCTION]: ["Date", "Nb pieux", "Longueur totale (m)", "Longueur moyenne/jour (m)", "Nom du chef"],
-    [ONGLET_PIEUX]: ["Date", "N° Pieu"],
-    [ONGLET_HORAIRES]: ["Date", "Aller depuis", "Départ aller", "Arrivée chantier", "Route aller (h)", "Départ chantier", "Retour vers", "Arrivée retour", "Route retour (h)"],
-    [ONGLET_PANNES]: ["Date", "Machine", "Durée (h)", "Observations"],
-    [ONGLET_ARRETS]: ["Date", "Motif", "Durée (h)", "Observations"],
+    [ONGLET_MATERIEL]: ["Date", "Machine", "Statut", "FTS/LOC", "N° machine", "Atelier"],
+    [ONGLET_PERSONNEL]: ["Date", "Nom", "Type", "GD", "Heures", "Atelier"],
+    [ONGLET_PRODUCTION]: ["Date", "Nb pieux", "Longueur totale (m)", "Longueur moyenne/jour (m)", "Nom du chef", "Atelier"],
+    [ONGLET_PIEUX]: ["Date", "N° Pieu", "Atelier"],
+    [ONGLET_HORAIRES]: ["Date", "Aller depuis", "Départ aller", "Arrivée chantier", "Route aller (h)", "Départ chantier", "Retour vers", "Arrivée retour", "Route retour (h)", "Atelier"],
+    [ONGLET_PANNES]: ["Date", "Machine", "Durée (h)", "Observations", "Atelier"],
+    [ONGLET_ARRETS]: ["Date", "Motif", "Durée (h)", "Observations", "Atelier"],
   };
+
+  // ── Ateliers ─────────────────────────────────────────────────────
+  // Plusieurs ateliers peuvent travailler le même jour sur un chantier :
+  // chaque rapport est identifié par son atelier (le chef, + « #2 » si un
+  // même chef gère deux ateliers). Un rapport refait ne remplace que les
+  // lignes de SON atelier. Les lignes d'avant cette colonne (vides) sont
+  // traitées comme l'atelier du rapport qui les remplace.
+  function cleAtelier(s) {
+    return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()
+      .replace(/\s+/g, " ").trim().split(" ").sort().join(" ");
+  }
+  /**
+   * Nom du PDF d'un rapport : un fichier par chantier, par jour ET par
+   * atelier (deux ateliers le même jour ne s'écrasent plus).
+   * ex : 2026-11-04_Rapport journalier_26FTS099_HUGO LAJUS.pdf
+   *      2026-11-04_Rapport journalier_26FTS099_HUGO LAJUS ATELIER 2.pdf
+   * Sans chef : ancien format (2026-11-04_Rapport journalier_26FTS099.pdf).
+   */
+  function nomFichierRapport(dateISO, codeDossier, atelier) {
+    const base = `${dateISO}_Rapport journalier_${String(codeDossier || "").trim().toUpperCase()}`;
+    const a = String(atelier || "").trim().toUpperCase().replace(/\s*#\s*(\d+)$/, " ATELIER $1");
+    return a ? `${base}_${a}.pdf` : `${base}.pdf`;
+  }
+  function colonneAtelier(onglet) { return EN_TETES_ONGLETS[onglet].indexOf("Atelier"); }
+  function lettreColonne(i) { return String.fromCharCode("A".charCodeAt(0) + i); }
+
+  // En-têtes « N° machine » / « Atelier » ajoutés aux classeurs existants (un seul appel)
+  async function assurerEntetesAtelier(spreadsheetId) {
+    const data = Object.keys(EN_TETES_ONGLETS).map((onglet) => ({
+      range: `${onglet}!${lettreColonne(colonneAtelier(onglet))}1`, values: [["Atelier"]],
+    }));
+    data.push({ range: `${ONGLET_MATERIEL}!E1`, values: [["N° machine"]] });
+    await fetchAvecRetry(`${API_BASE}/${spreadsheetId}/values:batchUpdate`, {
+      method: "POST",
+      headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({ valueInputOption: "RAW", data }),
+    });
+  }
 
   /**
    * Retrofit : les classeurs de suivi créés avant l'ajout d'un onglet
@@ -197,14 +235,20 @@ const FTSSheets = (() => {
    * refait le même jour (après correction d'une erreur) REMPLACE les
    * données déjà enregistrées plutôt que de s'y ajouter en double.
    */
-  async function supprimerLignesDate(spreadsheetId, onglet, date) {
+  async function supprimerLignesDate(spreadsheetId, onglet, date, atelier) {
     const sheetId = await getSheetId(spreadsheetId, onglet);
     if (sheetId == null) return;
 
     const lignes = await lireOnglet(spreadsheetId, onglet);
+    // atelier fourni : on ne supprime que les lignes de cet atelier (ou
+    // sans atelier, enregistrées avant la colonne) ; sinon toute la date.
+    const col = atelier !== undefined && EN_TETES_ONGLETS[onglet] ? colonneAtelier(onglet) : -1;
+    const cle = cleAtelier(atelier);
     const indices = [];
     lignes.forEach((l, idx) => {
-      if (l[0] === date) indices.push(idx + 1); // +1 : la lecture démarre à la ligne 2 (index de grille 1)
+      if (l[0] !== date) return;
+      if (col >= 0 && l[col] && cleAtelier(l[col]) !== cle) return; // autre atelier : on garde
+      indices.push(idx + 1); // +1 : la lecture démarre à la ligne 2 (index de grille 1)
     });
     if (indices.length === 0) return;
 
@@ -262,30 +306,23 @@ const FTSSheets = (() => {
    * @param {number} opts.longueurTotale
    * @param {string[]} [opts.numerosPieux]  numéros de pieu saisis ce jour
    */
-  async function enregistrerDonneesRapport({ chantierFolderId, chantierName, date, machines, personnel, nbPieux, longueurTotale, numerosPieux, nomChef, horaires, pannes, arrets }) {
+  async function enregistrerDonneesRapport({ chantierFolderId, chantierName, date, machines, personnel, nbPieux, longueurTotale, numerosPieux, nomChef, horaires, pannes, arrets, atelier }) {
     const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
+    const at = atelier || nomChef || "";
 
     // Un rapport refait le même jour (après correction d'une erreur) doit
-    // REMPLACER les données déjà enregistrées pour cette date, pas s'y
-    // ajouter en double.
+    // REMPLACER les données déjà enregistrées pour cette date ET cet
+    // atelier, sans toucher à un autre atelier du même chantier ce jour-là.
+    await assurerEntetesAtelier(spreadsheetId);
     await Promise.all([
-      supprimerLignesDate(spreadsheetId, ONGLET_MATERIEL, date),
-      supprimerLignesDate(spreadsheetId, ONGLET_PERSONNEL, date),
-      supprimerLignesDate(spreadsheetId, ONGLET_PRODUCTION, date),
-      supprimerLignesDate(spreadsheetId, ONGLET_PIEUX, date),
-      supprimerLignesDate(spreadsheetId, ONGLET_HORAIRES, date),
-      supprimerLignesDate(spreadsheetId, ONGLET_PANNES, date),
-      supprimerLignesDate(spreadsheetId, ONGLET_ARRETS, date),
-    ]);
+      ONGLET_MATERIEL, ONGLET_PERSONNEL, ONGLET_PRODUCTION, ONGLET_PIEUX, ONGLET_HORAIRES, ONGLET_PANNES, ONGLET_ARRETS,
+    ].map((onglet) => supprimerLignesDate(spreadsheetId, onglet, date, at)));
 
     if (machines && machines.length > 0) {
       const lignesMateriel = machines
         .filter((m) => m.nom)
-        .map((m) => [forcerTexteDate(date), m.nom, m.statut || "", m.ftsLoc || "", m.numero || ""]);
+        .map((m) => [forcerTexteDate(date), m.nom, m.statut || "", m.ftsLoc || "", m.numero || "", at]);
       if (lignesMateriel.length > 0) {
-        // Colonne E « N° machine » (référentiel Parc matériel) : en-tête
-        // ajouté aux classeurs créés avant le référentiel.
-        await ecrireValeurs(spreadsheetId, `${ONGLET_MATERIEL}!E1`, [["N° machine"]]);
         await ajouterLignes(spreadsheetId, ONGLET_MATERIEL, lignesMateriel);
       }
     }
@@ -293,7 +330,7 @@ const FTSSheets = (() => {
     if (personnel && personnel.length > 0) {
       const lignesPersonnel = personnel
         .filter((p) => p.nom)
-        .map((p) => [forcerTexteDate(date), p.nom, p.type || "FTS", p.gd ? "GD" : "", p.heures || ""]);
+        .map((p) => [forcerTexteDate(date), p.nom, p.type || "FTS", p.gd ? "GD" : "", p.heures || "", at]);
       if (lignesPersonnel.length > 0) {
         await ajouterLignes(spreadsheetId, ONGLET_PERSONNEL, lignesPersonnel);
       }
@@ -306,11 +343,11 @@ const FTSSheets = (() => {
     // personnelle (ADMINISTRATIF/{chef}/...) en cas de suppression du rapport.
     const moyenne = nbPieux > 0 ? longueurTotale / nbPieux : 0;
     await ajouterLignes(spreadsheetId, ONGLET_PRODUCTION, [
-      [forcerTexteDate(date), nbPieux, longueurTotale.toFixed(2), moyenne.toFixed(2), nomChef || ""],
+      [forcerTexteDate(date), nbPieux, longueurTotale.toFixed(2), moyenne.toFixed(2), nomChef || "", at],
     ]);
 
     if (numerosPieux && numerosPieux.length > 0) {
-      await ajouterLignes(spreadsheetId, ONGLET_PIEUX, numerosPieux.map((n) => [forcerTexteDate(date), n]));
+      await ajouterLignes(spreadsheetId, ONGLET_PIEUX, numerosPieux.map((n) => [forcerTexteDate(date), n, at]));
     }
 
     // Durées en heures décimales (1 h 30 → 1.5) pour pouvoir les additionner
@@ -321,16 +358,16 @@ const FTSSheets = (() => {
       await ajouterLignes(spreadsheetId, ONGLET_HORAIRES, [[
         forcerTexteDate(date),
         horaires.aller.lieu || "", texte(horaires.aller.depart), texte(horaires.aller.arrivee), enHeures(horaires.aller.route),
-        texte(horaires.retour.depart), horaires.retour.lieu || "", texte(horaires.retour.arrivee), enHeures(horaires.retour.route),
+        texte(horaires.retour.depart), horaires.retour.lieu || "", texte(horaires.retour.arrivee), enHeures(horaires.retour.route), at,
       ]]);
     }
     if (pannes && pannes.length > 0) {
       await ajouterLignes(spreadsheetId, ONGLET_PANNES,
-        pannes.map((p) => [forcerTexteDate(date), p.machine || "", enHeures(p.minutes), p.obs || ""]));
+        pannes.map((p) => [forcerTexteDate(date), p.machine || "", enHeures(p.minutes), p.obs || "", at]));
     }
     if (arrets && arrets.length > 0) {
       await ajouterLignes(spreadsheetId, ONGLET_ARRETS,
-        arrets.map((a) => [forcerTexteDate(date), a.motif || "", enHeures(a.minutes), a.obs || ""]));
+        arrets.map((a) => [forcerTexteDate(date), a.motif || "", enHeures(a.minutes), a.obs || "", at]));
     }
 
     return spreadsheetId;
@@ -347,7 +384,7 @@ const FTSSheets = (() => {
    * @param {string} dateDuJour       date du jour en cours, format JJ/MM/AAAA
    * @returns {Promise<Array<{numero:string, date:string}>>}
    */
-  async function verifierPieuxDejaRealises(chantierFolderId, chantierName, numerosPieux, dateDuJour) {
+  async function verifierPieuxDejaRealises(chantierFolderId, chantierName, numerosPieux, dateDuJour, atelier) {
     if (!numerosPieux || numerosPieux.length === 0) return [];
 
     const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
@@ -357,11 +394,16 @@ const FTSSheets = (() => {
     numerosPieux.forEach((numero) => {
       const normalise = String(numero).trim().toUpperCase();
       if (!normalise) return;
-      const trouve = lignes.find(
-        (l) => String(l[1] || "").trim().toUpperCase() === normalise && l[0] !== dateDuJour
-      );
+      // Conflit : même numéro un autre jour, ou le même jour par un AUTRE
+      // atelier (deux ateliers sur le chantier qui se marchent dessus).
+      const cle = cleAtelier(atelier);
+      const trouve = lignes.find((l) => {
+        if (String(l[1] || "").trim().toUpperCase() !== normalise) return false;
+        if (l[0] !== dateDuJour) return true;
+        return atelier !== undefined && !!l[2] && cleAtelier(l[2]) !== cle;
+      });
       if (trouve) {
-        conflits.push({ numero, date: trouve[0] });
+        conflits.push({ numero, date: trouve[0], atelier: trouve[0] === dateDuJour ? trouve[2] : "" });
       }
     });
     return conflits;
@@ -395,6 +437,7 @@ const FTSSheets = (() => {
         longueurTotale: parseFloat(r[2]) || 0,
         longueurMoyenne: parseFloat(r[3]) || 0,
         nomChef: r[4] || "",
+        atelier: r[5] || "",
       })),
     };
   }
@@ -676,17 +719,13 @@ const FTSSheets = (() => {
    * la Supervision, pour que "Jours"/volumes ne le comptent plus.
    * `dateAffichage` au format JJ/MM/AAAA (comme stocké dans les Sheets).
    */
-  async function supprimerRapportDate(chantierFolderId, chantierName, dateAffichage) {
+  // atelier (facultatif) : ne supprime que le rapport de cet atelier ;
+  // sans atelier, supprime tous les rapports de la date (ancien comportement).
+  async function supprimerRapportDate(chantierFolderId, chantierName, dateAffichage, atelier) {
     const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
     await Promise.all([
-      supprimerLignesDate(spreadsheetId, ONGLET_MATERIEL, dateAffichage),
-      supprimerLignesDate(spreadsheetId, ONGLET_PERSONNEL, dateAffichage),
-      supprimerLignesDate(spreadsheetId, ONGLET_PRODUCTION, dateAffichage),
-      supprimerLignesDate(spreadsheetId, ONGLET_PIEUX, dateAffichage),
-      supprimerLignesDate(spreadsheetId, ONGLET_HORAIRES, dateAffichage),
-      supprimerLignesDate(spreadsheetId, ONGLET_PANNES, dateAffichage),
-      supprimerLignesDate(spreadsheetId, ONGLET_ARRETS, dateAffichage),
-    ]);
+      ONGLET_MATERIEL, ONGLET_PERSONNEL, ONGLET_PRODUCTION, ONGLET_PIEUX, ONGLET_HORAIRES, ONGLET_PANNES, ONGLET_ARRETS,
+    ].map((onglet) => supprimerLignesDate(spreadsheetId, onglet, dateAffichage, atelier)));
   }
 
   // ─── Adresses Personnel (global, hors chantier) ────────────────
@@ -775,6 +814,8 @@ const FTSSheets = (() => {
     cloturerChantier,
     reouvrirChantier,
     supprimerRapportDate,
+    cleAtelier,
+    nomFichierRapport,
     ONGLET_MATERIEL,
     ONGLET_PERSONNEL,
     listerAdresses,

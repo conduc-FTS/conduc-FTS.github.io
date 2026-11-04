@@ -69,7 +69,20 @@ const FTSCalendar = (() => {
    * permet de remplacer proprement les événements d'un chantier précis
    * sans toucher aux événements des AUTRES chantiers ce même jour.
    */
-  async function supprimerEvenementsJour(calendarId, dateISO, prefixeTitre) {
+  // Atelier noté dans la description des événements (« Atelier : HUGO LAJUS »)
+  // pour qu'un 2e atelier du même chantier n'efface pas le pointage du 1er.
+  const MARQUE_ATELIER = "Atelier : ";
+  function cleAtelier(s) {
+    return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()
+      .replace(/\s+/g, " ").trim().split(" ").sort().join(" ");
+  }
+  function atelierEvenement(e) {
+    const d = e.description || "";
+    const i = d.indexOf(MARQUE_ATELIER);
+    return i >= 0 ? d.slice(i + MARQUE_ATELIER.length).split("\n")[0].trim() : "";
+  }
+
+  async function supprimerEvenementsJour(calendarId, dateISO, prefixeTitre, atelier) {
     const timeMin = `${dateISO}T00:00:00Z`;
     const timeMax = `${dateISO}T23:59:59Z`;
     const res = await fetch(
@@ -78,7 +91,13 @@ const FTSCalendar = (() => {
     );
     if (!res.ok) return;
     const data = await res.json();
-    const aSupprimer = (data.items || []).filter((e) => (e.summary || "").startsWith(prefixeTitre));
+    const cle = cleAtelier(atelier);
+    const aSupprimer = (data.items || []).filter((e) => {
+      if (!(e.summary || "").startsWith(prefixeTitre)) return false;
+      if (atelier === undefined) return true; // resynchro complète du chantier
+      const a = atelierEvenement(e);
+      return !a || cleAtelier(a) === cle;      // cet atelier (ou ancien événement sans atelier)
+    });
     for (const e of aSupprimer) {
       await fetch(`${API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${e.id}`, {
         method: "DELETE",
@@ -115,17 +134,18 @@ const FTSCalendar = (() => {
    * @param {string} dateISO        format AAAA-MM-JJ
    * @param {Array<{nom:string, statut:string}>} machines
    */
-  async function enregistrerPointageMachine(chantierName, dateISO, machines) {
+  async function enregistrerPointageMachine(chantierName, dateISO, machines, atelier) {
     const calendarId = await getOuCreerAgenda(NOM_CAL_MACHINE);
     const prefixe = `[${chantierName}]`;
-    await supprimerEvenementsJour(calendarId, dateISO, prefixe);
+    await supprimerEvenementsJour(calendarId, dateISO, prefixe, atelier);
 
     const couleurs = { TRAVAIL: COULEUR_TRAVAIL, PANNE: COULEUR_PANNE, ARRET: COULEUR_ARRET, TRANSPORT: COULEUR_TRANSPORT };
     for (const m of machines) {
       if (!m.nom) continue;
       const suffixeLoc = m.ftsLoc ? ` (${m.ftsLoc})` : "";
       const titre = `${prefixe} ${m.nom} — ${m.statut || "?"}${suffixeLoc}`;
-      await creerEvenementJournee(calendarId, dateISO, titre, couleurs[m.statut] || undefined);
+      const at = m.atelier || atelier || "";
+      await creerEvenementJournee(calendarId, dateISO, titre, couleurs[m.statut] || undefined, at ? MARQUE_ATELIER + at : undefined);
     }
   }
 
@@ -137,10 +157,10 @@ const FTSCalendar = (() => {
    * @param {string} dateISO
    * @param {Array<{nom:string, type:string, gd:boolean, heures?:string}>} personnel  type: "FTS"|"Intérim"
    */
-  async function enregistrerPointagePersonnel(chantierName, dateISO, personnel) {
+  async function enregistrerPointagePersonnel(chantierName, dateISO, personnel, atelier) {
     const calendarId = await getOuCreerAgenda(NOM_CAL_PERSONNEL);
     const prefixe = `[${chantierName}]`;
-    await supprimerEvenementsJour(calendarId, dateISO, prefixe);
+    await supprimerEvenementsJour(calendarId, dateISO, prefixe, atelier);
 
     for (const p of personnel) {
       if (!p.nom) continue;
@@ -148,7 +168,8 @@ const FTSCalendar = (() => {
       const suffixeHeures = p.heures ? ` — ${p.heures}h` : "";
       const titre = `${prefixe} ${p.nom}${suffixeHeures} (${p.type}${suffixeGD})`;
       const couleur = p.type === "Intérim" ? COULEUR_INTERIM : COULEUR_FTS;
-      await creerEvenementJournee(calendarId, dateISO, titre, couleur);
+      const at = p.atelier || atelier || "";
+      await creerEvenementJournee(calendarId, dateISO, titre, couleur, at ? MARQUE_ATELIER + at : undefined);
     }
   }
 

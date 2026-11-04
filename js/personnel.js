@@ -87,7 +87,7 @@ const FTSPersonnel = (() => {
       const lignes = (await res.json()).values || [];
       etat = {
         personnes: lignes.filter((r) => r[0] || r[1]).map((r) => ({
-          nom: majuscules(r[0]), prenom: majuscules(r[1]), categorie: majuscules(r[2]) || "MICROPIEUX",
+          nom: majuscules(r[0]), prenom: majuscules(r[1]), categorie: majuscules(r[2]),
           poste: majuscules(r[3]), email: String(r[4] || "").trim().toLowerCase(), statut: majuscules(r[5]) || "ACTIF",
         })),
         source: "sheet", spreadsheetId: f.id,
@@ -114,7 +114,7 @@ const FTSPersonnel = (() => {
         if (mails.has(p.email)) erreurs.push(`L'e-mail ${p.email} est utilisé par ${mails.get(p.email)} et ${nomComplet(p)}.`);
         mails.set(p.email, nomComplet(p));
       }
-      if (!CATEGORIES.includes(p.categorie)) erreurs.push(`${nomComplet(p)} : catégorie inconnue.`);
+      if (p.categorie && !CATEGORIES.includes(p.categorie)) erreurs.push(`${nomComplet(p)} : catégorie inconnue.`);
       if (p.poste && !POSTES.includes(p.poste)) erreurs.push(`${nomComplet(p)} : poste inconnu.`);
       if (!STATUTS.includes(p.statut)) erreurs.push(`${nomComplet(p)} : statut inconnu.`);
     });
@@ -123,7 +123,7 @@ const FTSPersonnel = (() => {
 
   function nettoyer(p) {
     return {
-      nom: majuscules(p.nom), prenom: majuscules(p.prenom), categorie: majuscules(p.categorie) || "MICROPIEUX",
+      nom: majuscules(p.nom), prenom: majuscules(p.prenom), categorie: majuscules(p.categorie),
       poste: majuscules(p.poste), email: String(p.email || "").trim().toLowerCase(), statut: majuscules(p.statut) || "ACTIF",
     };
   }
@@ -166,12 +166,28 @@ const FTSPersonnel = (() => {
     await fetchAvecRetry(`${DRIVE_API}/files/${spreadsheetId}?addParents=${dossierId}&removeParents=root&fields=id`, { method: "PATCH", headers: authHeader() });
     const liste = DEFAUT.slice();
     (depuisAdresses || []).forEach((a) => {
-      const p = nettoyer({ nom: a.nom, prenom: a.prenom, categorie: "MICROPIEUX", poste: "", statut: "ACTIF" });
+      const p = nettoyer({ nom: a.nom, prenom: a.prenom, categorie: "", poste: "", statut: "ACTIF" });
       if (p.nom && p.prenom && !liste.some((x) => cle(nomComplet(x)) === cle(nomComplet(p)))) liste.push(p);
     });
     etat = { personnes: [], source: "sheet", spreadsheetId, modifiable: true };
     await enregistrer(liste);
     return spreadsheetId;
+  }
+
+  /**
+   * Personnes de la liste d'adresses absentes de la base (comparaison
+   * sans accents et sans tenir compte de l'ordre nom/prénom).
+   */
+  function manquantesDepuisAdresses(adresses) {
+    const presents = new Set(etat.personnes.map((p) => cle(nomComplet(p))));
+    const vus = new Set();
+    return (adresses || []).map((a) => nettoyer({ nom: a.nom, prenom: a.prenom, categorie: "", poste: "", statut: "ACTIF" }))
+      .filter((p) => {
+        const k = cle(nomComplet(p));
+        if (!p.nom || !p.prenom || presents.has(k) || vus.has(k)) return false;
+        vus.add(k);
+        return true;
+      });
   }
 
   // ── Lecture pour les modules ────────────────────────────────────
@@ -189,7 +205,7 @@ const FTSPersonnel = (() => {
 
   return {
     CATEGORIES, POSTES, STATUTS, DEFAUT, NOM_CLASSEUR,
-    charger, creer, enregistrer, verifier, toutes, actifs, chefs, parEmail, parNom, nomComplet, cle, majuscules,
+    charger, creer, enregistrer, verifier, manquantesDepuisAdresses, toutes, actifs, chefs, parEmail, parNom, nomComplet, cle, majuscules,
     source: () => etat.source,
   };
 })();

@@ -479,10 +479,13 @@ body { margin: 0; display: flex; min-height: 100vh; }
         </div>
       </div>
       <div class="pm-filtres">
-        <div id="psCats" class="pm-chips" style="flex:none"></div>
-        <div id="psPostes" class="pm-chips"></div>
+        <div id="psCats" class="pm-chips"></div>
         <input type="text" id="psRecherche" placeholder="🔍 Rechercher…">
         <label class="pm-check"><input type="checkbox" id="psPartis"> Afficher les personnes parties</label>
+      </div>
+      <div id="psManquants" style="margin:12px 16px 0;padding:10px 14px;border-radius:8px;background:#FFF8E1;border:1px solid #FFE082;font-size:0.85rem;display:none;gap:12px;align-items:center;flex-wrap:wrap">
+        <span id="psManquantsTxt"></span>
+        <button type="button" class="pm-btn" id="psReprendreBtn">Ajouter ces personnes à la base</button>
       </div>
       <p class="form-status" id="psStatus" style="padding:0 16px"></p>
       <div class="se-table-scroll">
@@ -1650,7 +1653,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const maj = (s) => FTSPersonnel.majuscules(s);
   let personnes = [], adresses = { spreadsheetId: null, liste: [] }, modifiable = false, chargeA = 0;
-  let filtreCat = "TOUTES", filtrePoste = "TOUS POSTES", enEdition = null;
+  let filtreCat = "TOUTES", enEdition = null;
 
   ["psNom", "psPrenom"].forEach((id) => $(id).addEventListener("input", () => { const el = $(id); const p = el.selectionStart; el.value = el.value.toUpperCase(); try { el.setSelectionRange(p, p); } catch (e) {} }));
   const opts = (liste, sel, vide) => (vide ? `<option value="">${vide}</option>` : "") + liste.map((v) => `<option ${v === sel ? "selected" : ""}>${esc(v)}</option>`).join("");
@@ -1681,15 +1684,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const partis = $("psPartis").checked;
     const q = maj($("psRecherche").value).normalize("NFD").replace(/[̀-ͯ]/g, "");
     const visibles = personnes.filter((p) => partis || p.statut === "ACTIF");
-    $("psCats").innerHTML = ["TOUTES", ...FTSPersonnel.CATEGORIES].map((c) => `<span class="pm-chip ${c === filtreCat ? "on" : ""}" data-c="${esc(c)}">${esc(c)}</span>`).join("");
-    $("psPostes").innerHTML = ["TOUS POSTES", ...FTSPersonnel.POSTES].map((c) => `<span class="pm-chip ${c === filtrePoste ? "on" : ""}" data-p="${esc(c)}">${esc(c)}</span>`).join("");
+    // Filtre simple : TOUTES / MICROPIEUX / PIEUX (une personne « LES DEUX »
+    // apparaît dans les deux)
+    $("psCats").innerHTML = ["TOUTES", "MICROPIEUX", "PIEUX"].map((c) => `<span class="pm-chip ${c === filtreCat ? "on" : ""}" data-c="${esc(c)}">${esc(c)}</span>`).join("");
     $("psCats").querySelectorAll(".pm-chip").forEach((el) => el.addEventListener("click", () => { filtreCat = el.dataset.c; afficher(); }));
-    $("psPostes").querySelectorAll(".pm-chip").forEach((el) => el.addEventListener("click", () => { filtrePoste = el.dataset.p; afficher(); }));
     const liste = visibles.filter((p) =>
-      (filtreCat === "TOUTES" || p.categorie === filtreCat || (p.categorie === "LES DEUX" && filtreCat !== "LES DEUX")) &&
-      (filtrePoste === "TOUS POSTES" || p.poste === filtrePoste) &&
+      (filtreCat === "TOUTES" || p.categorie === filtreCat || p.categorie === "LES DEUX") &&
       (!q || `${p.nom} ${p.prenom} ${p.email}`.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().includes(q)));
     $("psCompteur").textContent = `${liste.length} affichée(s) · ${personnes.filter((p) => p.statut === "ACTIF").length} actives`;
+    // Personnes de la liste d'adresses pas encore dans la base
+    const manquantes = modifiable ? FTSPersonnel.manquantesDepuisAdresses(adresses.liste) : [];
+    $("psManquants").style.display = manquantes.length ? "flex" : "none";
+    $("psManquantsTxt").innerHTML = manquantes.length
+      ? `⚠️ <b>${manquantes.length} personne(s)</b> de la liste d'adresses ne sont pas dans la base : ${manquantes.map((p) => esc(`${p.prenom} ${p.nom}`)).join(", ")}.` : "";
     $("psEmpty").hidden = liste.length > 0;
     if (!liste.length) $("psEmpty").textContent = "Personne ne correspond.";
     $("psTbody").innerHTML = liste.map((p) => (enEdition === cleP(p) ? ligneEdition(p) : ligneVue(p))).join("");
@@ -1703,7 +1710,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const a = adresseDe(p);
     return `<tr>
       <td><b>${esc(p.nom)}</b></td><td>${esc(p.prenom)}</td>
-      <td><span class="ps-cat ${p.categorie.replace(" ", "-")}">${esc(p.categorie)}</span></td>
+      <td>${p.categorie ? `<span class="ps-cat ${p.categorie.replace(" ", "-")}">${esc(p.categorie)}</span>` : '<span class="ps-cat" style="background:#FEF3E2;color:#B26A00">À COMPLÉTER</span>'}</td>
       <td>${p.poste ? `<span class="ps-poste ${p.poste === "CHEF DE CHANTIER" ? "chef" : ""}">${esc(p.poste)}</span>` : '<span style="color:#bbb">—</span>'}</td>
       <td class="ps-mail">${esc(p.email) || '<span style="color:#bbb">—</span>'}</td>
       <td class="ps-adr">${a && a.adresse ? esc(a.adresse) : '<span style="color:#bbb">—</span>'}</td>
@@ -1715,7 +1722,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return `<tr data-ligne="${esc(cleP(p))}">
       <td><input type="text" class="e-nom" value="${esc(p.nom)}" style="width:120px"></td>
       <td><input type="text" class="e-prenom" value="${esc(p.prenom)}" style="width:110px"></td>
-      <td><select class="e-cat">${opts(FTSPersonnel.CATEGORIES, p.categorie)}</select></td>
+      <td><select class="e-cat">${opts(FTSPersonnel.CATEGORIES, p.categorie, "— À compléter —")}</select></td>
       <td><select class="e-poste">${opts(FTSPersonnel.POSTES, p.poste, "— Aucun —")}</select></td>
       <td><input type="email" class="e-mail" value="${esc(p.email)}" style="width:190px"></td>
       <td><input type="text" class="e-adr ps-adr-in" value="${esc(a ? a.adresse : "")}" style="width:220px"></td>
@@ -1774,6 +1781,11 @@ document.addEventListener("DOMContentLoaded", () => {
       $("psCreerStatus").textContent = "✅ Base créée dans REFERENTIEL. Complète la catégorie, le poste et l'e-mail (compte tablette) des chefs.";
       await charger(true);
     } catch (e) { $("psCreerStatus").textContent = "❌ " + e.message; }
+  });
+  $("psReprendreBtn").addEventListener("click", () => {
+    const manquantes = FTSPersonnel.manquantesDepuisAdresses(adresses.liste);
+    if (!manquantes.length) return;
+    sauver(personnes.concat(manquantes), `${manquantes.length} personne(s) ajoutée(s). Complète leur catégorie et leur poste.`);
   });
   $("psRecherche").addEventListener("input", afficher);
   $("psPartis").addEventListener("change", afficher);

@@ -107,6 +107,20 @@ const FTSDrive = (() => {
     // seulement partagé), il peut apparaître ailleurs dans son Drive.
     // On cherche donc par nom sur tout ce qui est accessible au compte
     // (possédé ou partagé avec lui), sans restriction de parent.
+    // Dossier racine : on cherche d'abord à la racine du Drive connecté.
+    // Indispensable quand un sous-dossier porte le même nom (ex : un dossier
+    // « ADMINISTRATIF » rangé dans le dossier d'un chef) : sans ça, on
+    // pouvait tomber sur le mauvais et ne pas y trouver les classeurs.
+    if (!parentId) {
+      const qRacine = encodeURIComponent(
+        `name = '${escapeForQuery(name)}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false and 'root' in parents`
+      );
+      const resRacine = await fetchAvecRetry(`${API_BASE}/files?q=${qRacine}&fields=files(id,name)&spaces=drive`, { headers: authHeader() });
+      if (resRacine.ok) {
+        const d = await resRacine.json();
+        if (d.files && d.files.length > 0) return d.files[0].id;
+      }
+    }
     const parentClause = parentId ? ` and '${parentId}' in parents` : "";
     const q = encodeURIComponent(
       `name = '${escapeForQuery(name)}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false${parentClause}`

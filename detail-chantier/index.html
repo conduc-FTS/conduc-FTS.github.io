@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#3A3A3A">
 <link rel="manifest" href="../manifest_conducteur.json">
 <link rel="icon" type="image/png" sizes="192x192" href="../icon-dashboard-192.png">
@@ -11,544 +11,850 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 </script>
 <title>FTS — Détail chantier</title>
 <link rel="stylesheet" href="../css/dashboard.css">
+<link rel="stylesheet" href="../css/supervision.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
-.suivi-calendrier-scroll { overflow-x: auto; margin-top: 8px; }
-.suivi-calendrier, .suivi-production { border-collapse: collapse; width: 100%; font-size: 0.8rem; }
-.suivi-calendrier th, .suivi-calendrier td,
-.suivi-production th, .suivi-production td {
-  border: 1px solid var(--border); padding: 6px 10px; text-align: center; white-space: nowrap;
-}
-/* Rapports Journaliers : colonnes Date/Nb Mpx/Longueur/Longueur moy Mpx
-   n'ont besoin que de peu de place (surtout avec des en-têtes sur deux
-   lignes) — on la redonne à Chef, qui peut passer sur plusieurs lignes
-   plutôt que de forcer un nom à rester tronqué ou sur une seule ligne
-   (ex : "ROMAIN SEREMPIOUQUE"). */
-.suivi-production th:first-child, .suivi-production td:first-child {
-  width: 78px;
-}
-.suivi-production th:nth-child(2), .suivi-production td:nth-child(2) {
-  width: 60px;
-}
-.suivi-production th:nth-child(3), .suivi-production td:nth-child(3),
-.suivi-production th:nth-child(4), .suivi-production td:nth-child(4) {
-  width: 68px; white-space: normal; line-height: 1.25;
-}
-.suivi-production td:nth-child(5) {
-  white-space: normal; max-width: 260px; word-break: break-word; text-align: left;
-}
-.suivi-production th:nth-child(6), .suivi-production td:nth-child(6) {
-  width: 175px;
-}
-.suivi-calendrier th, .suivi-production th { background: var(--anthracite); color: white; font-size: 0.72rem; text-transform: uppercase; }
-.suivi-calendrier td:first-child, .suivi-production td:first-child { text-align: left; font-weight: 700; background: #FAFAFA; }
-.ligne-separateur-loc td { background: #3A2E00 !important; color: var(--fts-yellow, #FDCA01); font-weight: 800; text-align: center !important; font-size: 0.7rem; letter-spacing: 0.04em; }
-tr.ligne-loc td:first-child { background: #FFF8EC !important; }
-tr.ligne-loc td { background: #FFFCF5; }
-.statut-badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 700; color: white; }
-.statut-TRAVAIL { background: #27AE60; }
-.statut-PANNE { background: #C0392B; }
-.statut-ARRET { background: #888888; }
-.statut-TRANSPORT { background: #3A86FF; }
-.retour-lien { display: inline-block; margin-bottom: 4px; color: var(--text-sub); font-size: 0.85rem; text-decoration: none; }
-.retour-lien:hover { text-decoration: underline; }
-.chantier-jours-badge {
-  display: inline-block; background: var(--anthracite); color: var(--fts-yellow);
-  font-weight: 800; font-size: 0.8rem; padding: 6px 14px; border-radius: 20px; margin-top: 4px;
-}
-.chantier-statut-badge {
-  display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 0.82rem;
-  padding: 6px 14px; border-radius: 20px; margin-right: 10px;
-}
-.chantier-statut-badge.en-cours { background: #EAF6EE; color: #1D6E3E; }
-.chantier-statut-badge.termine { background: #F0F1F3; color: #5B6270; }
-.chantier-statut-badge .dot { width: 7px; height: 7px; border-radius: 50%; }
-.chantier-statut-badge.en-cours .dot { background: #27AE60; }
-.chantier-statut-badge.termine .dot { background: #9AA0AA; }
-.btn-terminer { background: #C0392B; color: white; border: none; border-radius: 8px; padding: 8px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
-.btn-rouvrir { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+.dt-meta { display: flex; gap: 8px 26px; flex-wrap: wrap; font-size: 0.84rem; color: var(--text-sub); margin-bottom: 16px; align-items: center; }
+.dt-meta b { color: var(--text-main); }
+.sv-kpis.dt { --nk: 6; }
+.sv-kpi .v small { font-size: 0.85rem; color: var(--text-sub); font-weight: 700; }
+.sv-kpi.warn { border-color: #F3D9A4; background: #FFFCF3; }
+.sv-kpi.warn .v { color: #A15C00; }
+.sv-kpi .bar { height: 6px; background: #EEF0F2; border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.sv-kpi .bar div { height: 100%; background: var(--fts-yellow); }
+.sv-kpi .bar div.r { background: #C0392B; }
+.dt-kpi-body { min-width: 0; flex: 1; }
+.dt-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.dt-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.dt-col .sv-card + .sv-card { margin-top: 0; }
+.dt-tag { font-size: 0.64rem; font-weight: 800; padding: 2px 7px; border-radius: 5px; background: #FFF3DC; color: #A15C00; margin-right: 6px; white-space: nowrap; }
+.dt-tag.base { background: var(--bg); color: var(--text-sub); }
+.dt-analyse { padding: 14px 18px; display: flex; flex-direction: column; gap: 11px; }
+.dt-pt { display: flex; gap: 10px; font-size: 0.86rem; line-height: 1.45; }
+.dt-pt .i { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; font-size: 0.9rem; }
+.dt-pt .i.ok { background: #EAF6EE; } .dt-pt .i.w { background: #FFF3DC; } .dt-pt .i.r { background: #FDECEA; } .dt-pt .i.b { background: #EAF1FE; }
+.dt-note { font-size: 0.72rem; color: var(--text-sub); padding: 0 18px 14px; }
+.dt-chart { padding: 12px 16px 10px; }
+.dt-legend { display: flex; gap: 16px; font-size: 0.74rem; color: var(--text-sub); margin-top: 4px; flex-wrap: wrap; }
+.dt-legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.dt-loss { padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+.dt-lrow { display: grid; grid-template-columns: 170px 1fr 54px; gap: 10px; align-items: center; font-size: 0.84rem; }
+.dt-lbar { height: 10px; border-radius: 5px; background: #EEF0F2; overflow: hidden; }
+.dt-lbar div { height: 100%; }
+.dt-team { display: flex; flex-wrap: wrap; gap: 2px; }
+.dt-cal { overflow-x: auto; }
+.dt-cal table { border-collapse: collapse; width: 100%; }
+.dt-cal th, .dt-cal td { padding: 7px 4px; text-align: center; font-size: 0.72rem; border-bottom: 1px solid var(--border); }
+.dt-cal th { color: var(--text-sub); font-weight: 700; background: #FBFBFC; white-space: nowrap; }
+.dt-cal td:first-child, .dt-cal th:first-child { text-align: left; padding-left: 18px; white-space: nowrap; font-weight: 700; font-size: 0.82rem; position: sticky; left: 0; background: #fff; }
+.dt-cal th:first-child { background: #FBFBFC; }
+.dt-c { width: 24px; height: 20px; border-radius: 5px; display: inline-block; }
+.dt-c.TRAVAIL { background: #27AE60; } .dt-c.PANNE { background: #C0392B; } .dt-c.ARRET { background: #F59E0B; } .dt-c.TRANSPORT { background: #4C82F0; } .dt-c.v { background: #F2F3F5; }
+.dt-cal tr.sep td { background: var(--anthracite); color: var(--fts-yellow); font-size: 0.62rem; letter-spacing: 0.08em; font-weight: 800; text-align: left; padding: 5px 18px; }
+.dt-legende { display: flex; gap: 12px; font-size: 0.74rem; color: var(--text-sub); align-items: center; }
+.dt-legende .dt-c { width: 12px; height: 12px; vertical-align: -2px; margin-right: 3px; }
+.dt-preview { grid-column: 1 / -1; background: #FFFBEA; border: 1px solid #F5E3A0; border-radius: 9px; padding: 10px 12px; font-size: 0.84rem; }
+.sv-mb.trois { grid-template-columns: 1fr 1fr 1fr; }
+.dt-techs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.dt-techs label { border: 1.5px solid var(--border); border-radius: 10px; padding: 10px; font-weight: 700; font-size: 0.86rem; cursor: pointer; color: var(--text-sub); display: flex; align-items: center; gap: 8px; }
+.dt-techs input { width: 18px; height: 18px; accent-color: var(--anthracite); margin: 0; }
+.dt-techs label:has(input:checked) { border-color: var(--anthracite); color: var(--anthracite); background: #FFFBEA; }
+.dt-statut-txt { font-size: 0.8rem; color: var(--text-sub); }
 
-/* Cette page a besoin de plus de largeur que les pages tablette (960px
-   partagé par .dashboard) pour ranger Prévisions/Rapports Journaliers
-   côte à côte sans que ce soit à l'étroit. */
-.dashboard-wide { max-width: 1280px; }
-.row-2col { display: grid; grid-template-columns: 1fr 2fr; gap: 24px; align-items: stretch; }
-.row-2col > .panel { display: flex; flex-direction: column; }
-@media (max-width: 900px) {
-  .row-2col { grid-template-columns: 1fr; }
+@media (max-width: 1250px) { .sv-kpis.dt { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 1000px) { .dt-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .sv-kpis.dt { grid-template-columns: 1fr 1fr; }
+  .sv-kpis.dt .sv-kpi:first-child { grid-column: auto; }
+  .dt-meta { gap: 6px 14px; font-size: 0.78rem; }
+  .sv-tabs { margin: 0 -12px 14px; padding: 0 12px; }
+  .sv-tabs button { padding: 10px 12px; font-size: 0.85rem; }
+  .sv-ch .sv-btn.pri { width: 100%; }
+  .dt-lrow { grid-template-columns: 110px 1fr 44px; font-size: 0.78rem; }
+  .dt-marche td .sous-note { display: none; }
+  .dt-marche .dt-tag.base { display: none; }
+  .sv-mb.trois { grid-template-columns: 1fr 1fr; }
+  .dt-techs { grid-template-columns: 1fr; }
+  /* Rapports en cartes */
+  #tabRapports table, #tabRapports tbody, #tabRapports td { display: block; }
+  #tabRapports thead { display: none; }
+  #tabRapports tr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  #tabRapports td { border: none; padding: 0 !important; text-align: left !important; }
+  #tabRapports td.c-date { flex: 1 0 auto; font-size: 0.95rem; }
+  #tabRapports td.c-mpx::after { content: " Mpx"; font-weight: 700; }
+  #tabRapports td.c-ml, #tabRapports td.c-h { font-size: 0.78rem; color: var(--text-sub); }
+  #tabRapports td.c-moy { display: none; }
+  #tabRapports td.c-eq { flex-basis: 100%; order: 2; }
+  #tabRapports td.c-ev { flex: 1; order: 3; }
+  #tabRapports td.c-act { order: 4; }
+  #tabRapports tr.tot td.c-eq { flex-basis: auto; order: 0; }
+  /* Version allégée : fiche en lecture seule */
+  #dcTabs, #tabRapports, #tabMateriel, #tabPannes, .dt-marche, #ajoutAvenantBtn, #chartCard, #lossCard { display: none !important; }
+  #tabSynthese { display: block !important; }
+  .sv-kpis.dt .sv-kpi:nth-child(4), .sv-kpis.dt .sv-kpi:nth-child(5) { display: none; }
 }
-
-.rj-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.86rem; flex-wrap: wrap; }
-.rj-row:last-child { border-bottom: none; }
-.rj-row-actions { white-space: nowrap; }
-.rj-row-actions button { font-size: 0.76rem; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: white; cursor: pointer; margin-left: 6px; }
+.dt-mk { display: flex; justify-content: space-around; padding: 12px 8px; text-align: center; }
+.dt-mk div { font-size: 0.7rem; color: var(--text-sub); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.dt-mk b { display: block; font-size: 1.1rem; color: var(--text-main); letter-spacing: 0; margin-top: 2px; }
+.dt-mk-note { font-size: 0.72rem; color: var(--text-sub); padding: 0 14px 12px; text-align: center; }
+.dt-rj { padding: 11px 14px; border-bottom: 1px solid var(--border); }
+.dt-rj:last-child { border-bottom: none; }
+.dt-rj .h { display: flex; align-items: center; gap: 10px; }
+.dt-rj .h b { flex: 1; font-size: 0.92rem; } .dt-rj .h span { font-size: 0.8rem; color: var(--text-sub); }
+.dt-more { display: block; text-align: center; padding: 12px; font-size: 0.82rem; color: var(--text-sub); font-weight: 700; }
 </style>
 </head>
 <body>
 
-<header class="topbar">
-  <a href="../supervision-encadrement/index.html" class="topbar-brand" style="text-decoration:none;cursor:pointer">
-    <img src="../assets/logo-fts.png" alt="FTS" style="height:34px;width:auto;background:white;border-radius:6px;padding:3px 6px;flex-shrink:0">
-    <div style="line-height:1.2">
-      <div style="font-weight:800;font-size:1.05rem;color:#fff">DÉTAIL CHANTIER</div>
-      <div class="brand-sub">Fondations et Travaux Spéciaux</div>
-    </div>
-  </a>
-  <div class="topbar-actions">
-    <div class="user-chip">
-      <span class="user-dot" id="userDot"></span>
-      <span id="adminAccountInfo">Non connecté</span>
+<div id="svPage">
+  <div class="dt-meta" id="dcMeta"></div>
+  <div class="sv-kpis dt" id="dcKpis"></div>
+
+  <div class="sv-tabs" id="dcTabs">
+    <button type="button" class="on" data-t="Synthese">Synthèse</button>
+    <button type="button" data-t="Rapports">Rapports journaliers <span class="n" id="nRapports">0</span></button>
+    <button type="button" data-t="Materiel">Matériel</button>
+    <button type="button" data-t="Pannes">Pannes &amp; arrêts <span class="n" id="nPannes">0</span></button>
+  </div>
+  <p class="sv-status" id="dcStatus">Chargement…</p>
+
+  <div class="sv-tab on" id="tabSynthese">
+    <div class="dt-grid">
+      <div class="dt-col">
+        <section class="sv-card">
+          <div class="sv-ch"><h2>Marché</h2><span class="s">principal + avenants / TS validés</span><span class="sv-sp"></span><button type="button" class="sv-btn pri" id="ajoutAvenantBtn">+ Ajouter un avenant / TS</button></div>
+          <div class="tel-only" id="marcheResume"></div>
+          <table class="sv-tbl dt-marche"><thead><tr><th>Désignation</th><th class="r" id="thUnite">Micropieux</th><th class="r">Durée</th><th class="r">Montant HT</th><th></th></tr></thead><tbody id="marcheBody"></tbody></table>
+        </section>
+        <section class="sv-card" id="chartCard">
+          <div class="sv-ch"><h2>Avancement jour par jour</h2><span class="s" id="chartSub">cumulé, réalisé et objectif</span></div>
+          <div class="dt-chart" id="dcChart"></div>
+        </section>
+      </div>
+      <div class="dt-col">
+        <section class="sv-card">
+          <div class="sv-ch"><h2>Analyse du chantier</h2><span class="s">calculée sur les rapports</span></div>
+          <div class="dt-analyse" id="dcAnalyse"></div>
+          <div class="dt-note">Analyse automatique, calculée à partir des chiffres des rapports (production, pannes, arrêts, équipe).</div>
+        </section>
+        <section class="sv-card tel-only" id="telRapports">
+          <div class="sv-ch"><h2>Derniers rapports</h2></div>
+          <div id="telRapportsBody"></div>
+        </section>
+        <section class="sv-card" id="lossCard">
+          <div class="sv-ch"><h2>Temps perdu par cause</h2><span class="s" id="lossSub"></span></div>
+          <div class="dt-loss" id="dcLoss"></div>
+        </section>
+      </div>
     </div>
   </div>
-</header>
 
-<main class="dashboard dashboard-wide">
-
-  <section class="panel">
-    <p class="panel-sub" id="chantierCode" style="margin-bottom:2px"></p>
-    <h2 class="panel-title" id="chantierNom">Chargement…</h2>
-    <div id="chantierJours"></div>
-    <div id="chantierStatutBloc" style="margin-top:12px"></div>
-  </section>
-
-  <div class="row-2col">
-    <section class="panel">
-      <h2 class="panel-title">Prévisions</h2>
-      <p class="panel-sub">Modifie la durée prévue ou le nombre de micropieux prévus — les barres de progression sur la vignette du chantier se mettront à jour en conséquence.</p>
-      <div class="chantier-form" style="grid-template-columns:1fr">
-        <div class="field">
-          <label for="previsionDuree">Durée de chantier (jours)</label>
-          <input type="number" id="previsionDuree" min="0" placeholder="ex : 15">
-        </div>
-        <div class="field">
-          <label for="previsionType">Type de chantier</label>
-          <select id="previsionType">
-            <option value="Micropieux">Micropieux</option>
-            <option value="Battage">Battage</option>
-            <option value="Pieux">Pieux</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="previsionMicropieux">Nombre de micropieux prévus</label>
-          <input type="number" id="previsionMicropieux" min="0" placeholder="ex : 25">
-        </div>
-        <div class="field">
-          <label for="previsionMontant">Montant total vendu (€)</label>
-          <input type="number" id="previsionMontant" min="0" step="0.01" placeholder="ex : 45000">
-        </div>
-        <button type="button" class="btn-primary" id="previsionEnregistrerBtn">Enregistrer</button>
-      </div>
-      <p class="form-status" id="previsionStatus"></p>
-    </section>
-
-    <section class="panel">
-      <h2 class="panel-title">Rapports Journaliers</h2>
-      <p class="panel-sub">Chaque jour de rapport enregistré sur ce chantier.</p>
-      <p class="form-status" id="rapportsListeStatus">Chargement...</p>
-      <div id="rapportsListeWrap" hidden>
-        <div class="suivi-calendrier-scroll">
-        <table class="suivi-production" style="width:100%">
-          <thead>
-            <tr>
-              <th style="text-align:left">Date</th>
-              <th>Nb Mpx</th>
-              <th>Longueur<br>(ml)</th>
-              <th>Longueur<br>moy Mpx (ml)</th>
-              <th style="text-align:left">Chef</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="rapportsListeBody"></tbody>
-        </table>
-        </div>
-        <p class="form-status" id="rapportsCadenceMoyenne" style="font-weight:700;margin-top:10px"></p>
-      </div>
+  <div class="sv-tab" id="tabRapports">
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Rapports journaliers</h2><span class="s">du plus récent au plus ancien</span></div>
+      <table class="sv-tbl"><thead><tr><th>Date</th><th>Équipe</th><th class="r" id="thUnite2">Mpx</th><th class="r">Longueur</th><th class="r">Moy. / pieu</th><th class="r">Heures</th><th>Pannes / arrêts</th><th class="r">Rapport</th></tr></thead><tbody id="rapportsBody"></tbody></table>
     </section>
   </div>
 
-  <section class="panel">
-    <h2 class="panel-title">Calendrier matériel</h2>
-    <p class="form-status" id="suiviStatus">Chargement du suivi...</p>
-    <div id="suiviResultats" hidden>
-      <div class="suivi-calendrier-scroll">
-        <table class="suivi-calendrier" id="suiviCalendrierTable"></table>
-      </div>
-    </div>
-  </section>
+  <div class="sv-tab" id="tabMateriel">
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Jours par machine</h2><span class="s">depuis le début du chantier</span></div>
+      <table class="sv-tbl"><thead><tr><th>Machine</th><th class="r">Travail</th><th class="r">Panne</th><th class="r">Arrêt</th><th class="r">Transport</th><th class="r">Total</th><th class="r" style="width:210px">Répartition</th></tr></thead><tbody id="recapMatBody"></tbody></table>
+    </section>
+    <section class="sv-card dt-cal">
+      <div class="sv-ch"><h2>Calendrier matériel</h2><span class="s">statut de chaque machine, jour par jour</span><span class="sv-sp"></span>
+        <span class="dt-legende"><span><span class="dt-c TRAVAIL"></span>Travail</span><span><span class="dt-c PANNE"></span>Panne</span><span><span class="dt-c ARRET"></span>Arrêt</span><span><span class="dt-c TRANSPORT"></span>Transport</span></span></div>
+      <div id="dcCal"></div>
+    </section>
+  </div>
 
-</main>
+  <div class="sv-tab" id="tabPannes">
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Pannes &amp; arrêts</h2><span class="s">saisis par le chef dans le rapport journalier</span></div>
+      <table class="sv-tbl"><thead><tr><th>Date</th><th>Type</th><th>Machine / motif</th><th class="r">Durée</th><th>Observation du chef</th></tr></thead><tbody id="pannesBody"></tbody></table>
+    </section>
+  </div>
+</div>
 
 <script src="../js/auth.js"></script>
 <script src="../js/drive.js"></script>
 <script src="../js/sheets.js"></script>
+<script src="../js/parc-materiel.js"></script>
+<script src="../js/personnel.js"></script>
+<script src="../js/ateliers.js"></script>
+<script src="../js/supervision-shell.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-
   const params = new URLSearchParams(window.location.search);
   const chantierId = params.get("id");
   const chantierName = params.get("name") || "";
-
   const spaceIdx = chantierName.search(/\s/);
   const code = spaceIdx > 0 ? chantierName.slice(0, spaceIdx) : chantierName;
-  const nom = spaceIdx > 0 ? chantierName.slice(spaceIdx + 1) : "";
-  document.getElementById("chantierCode").textContent = code;
-  document.getElementById("chantierNom").textContent = nom || chantierName || "Chantier";
+  const nom = spaceIdx > 0 ? chantierName.slice(spaceIdx + 1) : chantierName;
   document.title = `FTS — ${chantierName || "Détail chantier"}`;
 
-  const suiviStatus = document.getElementById("suiviStatus");
-  const adminAccountInfo = document.getElementById("adminAccountInfo");
-  const userDot = document.getElementById("userDot");
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => FTSShell.esc(s);
+  const nb = (v) => parseFloat(String(v == null ? "" : v).replace(",", ".")) || 0;
+  const fmt = (n, d = 0) => Number(n).toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const euros = (n) => fmt(n, 0) + " €";
+  const parseFR = (s) => { const [j, m, a] = String(s || "").split("/"); return j && m && a ? new Date(+a, +m - 1, +j) : null; };
+  const jourCourt = (d) => d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "") + ". " + String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0");
+  const cleNom = (s) => (window.FTSPersonnel ? FTSPersonnel.cle(s) : String(s || "").toUpperCase());
 
-  function escapeHtmlSuivi(str) {
-    const div = document.createElement("div");
-    div.textContent = str || "";
-    return div.innerHTML;
+  let donnees = null; // { meta, suivi }
+  let chargementEnCours = null;
+
+  FTSShell.monter({
+    actif: "se-view-overview",
+    crumb: `<a href="../supervision-encadrement/index.html">← Vue d'ensemble</a> &nbsp;›&nbsp; ${esc(code)}`,
+    titre: `<span class="code">${esc(code)}</span>${esc(nom)}<span id="titreBadges"></span>`,
+    titreMobile: esc(nom),
+    sousTitreMobile: `<span id="mSous">${esc(code)}</span>`,
+    retour: "../supervision-encadrement/index.html",
+    actions: `<a class="sv-btn" id="driveBtn" href="https://drive.google.com/drive/folders/${encodeURIComponent(chantierId || "")}" target="_blank" rel="noopener" style="text-decoration:none">📁 Dossier Drive</a>
+      <button type="button" class="sv-btn" id="modifierInfosBtn">✏️ Modifier les infos</button>
+      <span id="statutActions"></span>`,
+    menuMobile: [
+      { label: "📁 Ouvrir le dossier Drive", action: () => window.open(`https://drive.google.com/drive/folders/${encodeURIComponent(chantierId || "")}`, "_blank") },
+      { label: "🔄 Actualiser", action: () => charger() },
+    ],
+    onSession: (c) => { if (c) charger(); else if (!donnees) $("dcStatus").textContent = "Connecte-toi pour afficher le chantier."; },
+  });
+
+  // ─── Chargement ────────────────────────────────────────────────
+  async function charger() {
+    if (!chantierId) { $("dcStatus").textContent = "Chantier introuvable (lien invalide)."; return; }
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) return;
+    if (chargementEnCours) return chargementEnCours;
+    $("dcStatus").textContent = donnees ? "Actualisation…" : "Chargement…";
+    $("dcStatus").classList.remove("err");
+    chargementEnCours = (async () => {
+      try {
+        const [meta, suivi] = await Promise.all([
+          FTSDrive.getMetadonneesChantier(chantierId),
+          FTSSheets.lireSuiviDetail(chantierId, chantierName),
+          window.FTSParc ? FTSParc.charger().catch(() => {}) : null,
+          window.FTSPersonnel ? FTSPersonnel.charger().catch(() => {}) : null,
+        ]);
+        donnees = { meta, suivi };
+        afficherTout();
+        $("dcStatus").textContent = "";
+      } catch (err) {
+        console.error("Détail chantier :", err);
+        $("dcStatus").textContent = `Erreur : ${err.message}`;
+        $("dcStatus").classList.add("err");
+      } finally {
+        chargementEnCours = null;
+      }
+    })();
+    return chargementEnCours;
   }
 
-  async function afficherJoursDepuisOuverture() {
-    if (!chantierId || !window.FTSSheets) return;
-    try {
-      const resume = await FTSSheets.resumeChantier(chantierId, chantierName);
-      if (!resume.joursRapportes) return;
-      const jours = resume.joursRapportes;
-      document.getElementById("chantierJours").innerHTML =
-        `<span class="chantier-jours-badge">${jours} jour${jours > 1 ? "s" : ""} de rapport</span>`;
-    } catch (e) {
-      // silencieux : l'info jours est secondaire
+  // ─── Calculs ───────────────────────────────────────────────────
+  function calculer() {
+    const { meta, suivi } = donnees;
+    const tech = FTSDrive.techniquesChantier(meta);
+    const aMpx = tech.includes("Micropieux") || tech.includes("Battage");
+    const unite = aMpx ? "Mpx" : "Pieux";
+    const prod = suivi.production.filter((r) => parseFR(r[0]));
+    const dates = [...new Set(prod.map((r) => r[0]))].sort((a, b) => parseFR(a) - parseFR(b));
+    const jours = dates.length;
+    const realise = prod.reduce((s, r) => s + nb(r[1]), 0);
+    const ml = prod.reduce((s, r) => s + nb(r[2]), 0);
+
+    let prevuPrincipal;
+    if (aMpx) {
+      prevuPrincipal = (tech.includes("Micropieux") ? Number(meta.micropieuxPrevus) || 0 : 0)
+        + (tech.includes("Battage") ? Number(meta.battagePrevus || (!tech.includes("Micropieux") ? meta.micropieuxPrevus : 0)) || 0 : 0);
+    } else {
+      prevuPrincipal = Number(meta.pieuxPrevus || meta.micropieuxPrevus) || 0;
     }
+    const avenants = Array.isArray(meta.avenants) ? meta.avenants : [];
+    const totalPrevu = prevuPrincipal + avenants.reduce((s, a) => s + (Number(a.mpx) || 0), 0);
+    const dureePrincipale = Number(meta.dureeChantier) || 0;
+    const totalJours = dureePrincipale + avenants.reduce((s, a) => s + (Number(a.jours) || 0), 0);
+    const montantPrincipal = Number(meta.montantVendu) || 0;
+    const totalMontant = montantPrincipal + avenants.reduce((s, a) => s + (Number(a.montant) || 0), 0);
+
+    const heures = suivi.personnel.reduce((s, r) => s + nb(r[4]), 0);
+    const heuresInterim = suivi.personnel.filter((r) => r[2] === "Intérim").reduce((s, r) => s + nb(r[4]), 0);
+    const hPannes = suivi.pannes.reduce((s, r) => s + nb(r[2]), 0);
+    const hArrets = suivi.arrets.reduce((s, r) => s + nb(r[2]), 0);
+
+    // Cumul jour par jour (plusieurs ateliers le même jour = un seul jour)
+    const parDate = {};
+    prod.forEach((r) => { parDate[r[0]] = (parDate[r[0]] || 0) + nb(r[1]); });
+    let cumul = 0;
+    const serie = dates.map((d) => (cumul += parDate[d]));
+
+    const dernier = dates.length ? parseFR(dates[dates.length - 1]) : null;
+    const premier = dates.length ? parseFR(dates[0]) : null;
+    let chefDernier = "";
+    prod.forEach((r) => { if (r[0] === dates[dates.length - 1] && r[4]) chefDernier = r[4]; });
+
+    return { meta, suivi, tech, aMpx, unite, prod, dates, jours, realise, ml, prevuPrincipal, avenants, totalPrevu,
+      dureePrincipale, totalJours, montantPrincipal, totalMontant, heures, heuresInterim, hPannes, hArrets, serie,
+      dernier, premier, chefDernier };
   }
 
-  async function chargerPrevisions() {
-    if (!chantierId || !window.FTSDrive) return;
-    try {
-      const meta = await FTSDrive.getMetadonneesChantier(chantierId);
-      if (meta.dureeChantier) document.getElementById("previsionDuree").value = meta.dureeChantier;
-      document.getElementById("previsionType").value = meta.typeChantier || "Micropieux";
-      if (meta.micropieuxPrevus) document.getElementById("previsionMicropieux").value = meta.micropieuxPrevus;
-      if (meta.montantVendu) document.getElementById("previsionMontant").value = meta.montantVendu;
-      afficherStatutChantier(meta);
-    } catch (e) {
-      console.warn("Erreur chargement prévisions :", e);
+  // ─── Affichage ─────────────────────────────────────────────────
+  function afficherTout() {
+    const c = calculer();
+    afficherEntete(c);
+    afficherKpis(c);
+    afficherMarche(c);
+    afficherGraphique(c);
+    afficherAnalyse(c);
+    afficherTempsPerdu(c);
+    afficherRapports(c);
+    afficherMateriel(c);
+    afficherPannes(c);
+    afficherTelephone(c);
+  }
+
+  // ─── Téléphone : marché résumé + 5 derniers rapports (lecture seule) ─
+  function afficherTelephone(c) {
+    const nbAv = c.avenants.length;
+    const avM = c.avenants.reduce((s, a) => s + (Number(a.mpx) || 0), 0), avJ = c.avenants.reduce((s, a) => s + (Number(a.jours) || 0), 0), avE = c.avenants.reduce((s, a) => s + (Number(a.montant) || 0), 0);
+    $("marcheResume").innerHTML = `<div class="dt-mk"><div>${c.aMpx ? "Micropieux" : "Pieux"}<b>${c.totalPrevu ? fmt(c.totalPrevu) : "—"}</b></div><div>Durée<b>${c.totalJours ? c.totalJours + " j" : "—"}</b></div><div>Montant HT<b>${c.totalMontant ? euros(c.totalMontant) : "—"}</b></div></div>`
+      + (nbAv ? `<div class="dt-mk-note">dont ${nbAv} avenant${nbAv > 1 ? "s" : ""} / TS validé${nbAv > 1 ? "s" : ""} (${avM ? "+" + fmt(avM) + " " + c.unite + " · " : ""}${avJ ? "+" + avJ + " j · " : ""}+${euros(avE)})</div>` : "");
+    const memeAtelier = (a, b) => !a || !b || cleNom(a) === cleNom(b);
+    const lignes = [...c.prod].sort((a, b) => parseFR(b[0]) - parseFR(a[0]));
+    $("telRapportsBody").innerHTML = lignes.length ? lignes.slice(0, 5).map((r) => {
+      const [date, nbP, lg, , chef, atelier] = r;
+      const kChef = cleNom(chef);
+      const pers = c.suivi.personnel.filter((p) => p[0] === date && memeAtelier(p[5], atelier))
+        .sort((a, b) => (cleNom(b[1]) === kChef) - (cleNom(a[1]) === kChef) || (a[2] === "Intérim") - (b[2] === "Intérim"));
+      const equipe = pers.map((p) => {
+        if (cleNom(p[1]) === kChef) return `<span class="sv-p chef">${esc(p[1])}</span>`;
+        if (p[2] === "Intérim") return `<span class="sv-p int">${esc(p[1])} · intérim</span>`;
+        const f = window.FTSPersonnel && FTSPersonnel.parNom(p[1]);
+        return `<span class="sv-p">${esc(p[1])}${f && f.poste && f.poste !== "CHEF DE CHANTIER" ? " · " + esc(f.poste.toLowerCase()) : ""}</span>`;
+      }).join("") || (chef ? `<span class="sv-p chef">${esc(chef)}</span>` : "");
+      const evts = [...c.suivi.pannes.filter((p) => p[0] === date && memeAtelier(p[4], atelier)).map((p) => `<span class="sv-evt pa">Panne ${esc(p[1] || "")} · ${fmt(nb(p[2]), 1)} h</span>`),
+        ...c.suivi.arrets.filter((p) => p[0] === date && memeAtelier(p[4], atelier)).map((p) => `<span class="sv-evt ar">${esc(p[1] || "Arrêt")} · ${fmt(nb(p[2]), 1)} h</span>`)].join("");
+      return `<div class="dt-rj"><div class="h"><b>${jourCourt(parseFR(date))}</b><strong>${fmt(nb(nbP))} ${c.unite}</strong><span>${fmt(nb(lg), 1)} m</span><button type="button" class="sv-ib" data-act="pdf" data-date="${esc(date)}" data-atelier="${esc(atelier || "")}" title="Ouvrir le PDF">📄</button></div>
+        ${equipe ? `<div class="dt-team" style="margin-top:6px">${equipe}</div>` : ""}${evts ? `<div style="margin-top:6px">${evts}</div>` : ""}</div>`;
+    }).join("") + (lignes.length > 5 ? `<span class="dt-more">+ ${lignes.length - 5} rapport${lignes.length - 5 > 1 ? "s" : ""} plus ancien${lignes.length - 5 > 1 ? "s" : ""} · détail complet sur ordinateur</span>` : "")
+      : `<div style="padding:18px 14px;color:var(--text-sub);font-size:.86rem">Aucun rapport journalier pour l'instant.</div>`;
+  }
+
+  function badgesTech(tech) {
+    return tech.map((t) => `<span class="sv-badge sv-b-${esc(t)}">${esc(t)}</span>`).join(" ");
+  }
+
+  function afficherEntete(c) {
+    const m = c.meta;
+    const statut = m.archive ? `<span class="sv-st"><i></i>Archivé${m.dateArchivage ? " le " + esc(m.dateArchivage) : ""}</span>`
+      : m.statutChantier === "Termine" ? `<span class="sv-st"><i></i>Terminé${m.dateFinChantier ? " le " + esc(m.dateFinChantier) : ""}</span>`
+      : `<span class="sv-st TRAVAIL"><i></i>En cours</span>`;
+    $("titreBadges").innerHTML = " " + badgesTech(c.tech) + " " + statut;
+    $("mSous").textContent = `${code} · ${c.tech.join(" + ")} · ${m.archive ? "Archivé" : m.statutChantier === "Termine" ? "Terminé" : "En cours"}`;
+
+    const derniereMachine = FTSSheets.calculerResume(c.suivi.materiel, c.suivi.production).derniereMachine;
+    const ecart = c.dernier ? Math.round((new Date().setHours(0, 0, 0, 0) - c.dernier.getTime()) / 86400000) : null;
+    const rel = ecart === null ? "" : ecart <= 0 ? "aujourd'hui" : ecart === 1 ? "hier" : `il y a ${ecart} j`;
+    const lieu = m.adresse || m.gps || "";
+    $("dcMeta").innerHTML = [
+      lieu ? `<span>📍 <b>${esc(lieu)}</b></span>` : `<span>📍 <i>adresse non renseignée</i></span>`,
+      c.chefDernier ? `<span>👷 Chef : <b>${esc(c.chefDernier)}</b></span>` : "",
+      c.premier ? `<span>🗓️ Démarrage : <b>${c.premier.toLocaleDateString("fr-FR")}</b> · dernier rapport <b>${rel}</b></span>` : `<span>🗓️ Aucun rapport pour l'instant</span>`,
+      derniereMachine ? `<span>🔩 Foreuse : <b>${esc(derniereMachine.nom)}</b> <span class="sv-st ${esc((derniereMachine.statut || "").toUpperCase())}"><i></i>${esc(derniereMachine.statut || "")}</span></span>` : "",
+    ].filter(Boolean).join("");
+
+    // Boutons de statut (barre du haut)
+    const z = $("statutActions");
+    if (m.archive) z.innerHTML = `<button type="button" class="sv-btn" id="desarchiverBtn">Désarchiver</button>`;
+    else if (m.statutChantier === "Termine") z.innerHTML = `<button type="button" class="sv-btn" id="rouvrirBtn">Rouvrir</button> <button type="button" class="sv-btn" id="archiverBtn">🗄️ Archiver le dossier</button>`;
+    else z.innerHTML = `<button type="button" class="sv-btn" id="terminerBtn" style="color:#C0392B;border-color:#F2C4BE">Marquer terminé</button>`;
+    brancherStatut();
+  }
+
+  function kpi(label, valeur, sous, barre, classe) {
+    return `<div class="sv-kpi ${classe || ""}"><div class="dt-kpi-body"><div class="l">${label}</div><div class="v">${valeur}</div>${barre || ""}<div class="s">${sous || "&nbsp;"}</div></div></div>`;
+  }
+  const barre = (pct, rouge) => `<div class="bar"><div class="${rouge ? "r" : ""}" style="width:${Math.max(0, Math.min(100, pct))}%"></div></div>`;
+
+  function afficherKpis(c) {
+    const pct = c.totalPrevu ? Math.round(c.realise / c.totalPrevu * 100) : null;
+    const nbAvMpx = c.avenants.reduce((s, a) => s + (Number(a.mpx) || 0), 0);
+    const nbAvJ = c.avenants.reduce((s, a) => s + (Number(a.jours) || 0), 0);
+    const retard = c.totalJours && c.jours > c.totalJours;
+    const cadence = c.jours ? c.realise / c.jours : 0;
+    const objectif = c.totalPrevu && c.totalJours ? c.totalPrevu / c.totalJours : 0;
+    $("dcKpis").innerHTML = [
+      kpi(`Avancement ${c.unite}`, `${fmt(c.realise)}${c.totalPrevu ? ` <small>/ ${fmt(c.totalPrevu)}</small>` : ""}`,
+        c.totalPrevu ? `${pct} %${nbAvMpx ? ` · dont ${nbAvMpx} en avenant` : ""}` : "nombre prévu non renseigné", c.totalPrevu ? barre(pct) : ""),
+      kpi("Délai", `${c.jours}${c.totalJours ? ` <small>/ ${c.totalJours} j</small>` : " <small>j</small>"}`,
+        c.totalJours ? (retard ? `+${c.jours - c.totalJours} j de dépassement` : `${c.dureePrincipale} j marché${nbAvJ ? ` + ${nbAvJ} j avenant` : ""}`) : "durée non renseignée",
+        c.totalJours ? barre(c.jours / c.totalJours * 100, retard) : "", retard ? "alert" : ""),
+      kpi("Cadence moyenne", `${fmt(cadence, 1)} <small>${c.unite}/j</small>`, objectif ? `objectif : ${fmt(objectif, 1)} ${c.unite}/j` : ""),
+      kpi("Mètres forés", `${fmt(c.ml)} <small>ml</small>`, c.realise ? `${fmt(c.ml / c.realise, 1)} ml par ${c.aMpx ? "Mpx" : "pieu"}` : ""),
+      kpi("Heures personnel", `${fmt(c.heures)} <small>h</small>`, c.heuresInterim ? `dont ${fmt(c.heuresInterim)} h intérim` : ""),
+      kpi("Temps perdu", `${fmt(c.hPannes + c.hArrets, 1)} <small>h</small>`, `pannes ${fmt(c.hPannes, 1)} h · arrêts ${fmt(c.hArrets, 1)} h`, "", (c.hPannes + c.hArrets) > 0 ? "warn" : ""),
+    ].join("");
+    $("thUnite").textContent = c.aMpx ? "Micropieux" : "Pieux";
+    $("thUnite2").textContent = c.unite;
+  }
+
+  function afficherMarche(c) {
+    const lignes = [`<tr><td><span class="dt-tag base">MARCHÉ</span>Marché principal</td>
+      <td class="r">${c.prevuPrincipal ? fmt(c.prevuPrincipal) : "—"}</td><td class="r">${c.dureePrincipale ? c.dureePrincipale + " j" : "—"}</td>
+      <td class="r">${c.montantPrincipal ? euros(c.montantPrincipal) : "—"}</td><td class="r"><button type="button" class="sv-ib" data-act="infos" title="Modifier le marché">✏️</button></td></tr>`];
+    c.avenants.forEach((a, i) => {
+      lignes.push(`<tr><td><span class="dt-tag">TS ${i + 1}</span>${esc(a.designation || "Avenant")} <span class="sous-note" style="color:var(--text-sub);font-size:.76rem">· validé le ${esc(a.date || "")}${a.ref ? " · " + esc(a.ref) : ""}</span></td>
+        <td class="r">${a.mpx ? "+" + fmt(a.mpx) : "—"}</td><td class="r">${a.jours ? "+" + a.jours + " j" : "—"}</td><td class="r">${a.montant ? "+" + euros(a.montant) : "—"}</td>
+        <td class="r" style="white-space:nowrap"><button type="button" class="sv-ib" data-act="edit-av" data-i="${i}" title="Modifier">✏️</button><button type="button" class="sv-ib" data-act="del-av" data-i="${i}" title="Supprimer">🗑️</button></td></tr>`);
+    });
+    lignes.push(`<tr class="tot"><td>Total chantier</td><td class="r">${c.totalPrevu ? fmt(c.totalPrevu) : "—"}</td><td class="r">${c.totalJours ? c.totalJours + " j" : "—"}</td><td class="r">${c.totalMontant ? euros(c.totalMontant) : "—"}</td><td></td></tr>`);
+    $("marcheBody").innerHTML = lignes.join("");
+  }
+
+  function afficherGraphique(c) {
+    const W = 640, H = 200, X0 = 40, X1 = 625, Y0 = 172, Y1 = 22;
+    if (!c.jours) { $("dcChart").innerHTML = `<div class="sv-empty" style="padding:30px 10px">Le graphique apparaîtra après le premier rapport journalier.</div>`; return; }
+    const cadence = c.realise / c.jours;
+    const reste = Math.max(0, c.totalPrevu - c.realise);
+    const joursEstimes = c.totalPrevu && cadence > 0 ? c.jours + Math.ceil(reste / cadence) : c.jours;
+    const nJ = Math.max(c.jours, c.totalJours || 0, joursEstimes, 2);
+    const vMax = Math.max(c.totalPrevu || 0, c.realise, 1);
+    const x = (j) => X0 + (X1 - X0) * (j - 1) / (nJ - 1);
+    const y = (v) => Y0 - (Y0 - Y1) * v / vMax;
+    const pts = c.serie.map((v, i) => `${x(i + 1).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="Avancement cumulé">`;
+    [0, 0.5, 1].forEach((f) => { const yy = Y0 - (Y0 - Y1) * f; svg += `<line x1="${X0}" y1="${yy}" x2="${X1}" y2="${yy}" stroke="#EEF0F2"/><text x="${X0 - 6}" y="${yy + 4}" font-size="11" fill="#6B7280" text-anchor="end">${fmt(vMax * f)}</text>`; });
+    const pas = Math.max(1, Math.ceil(nJ / 8));
+    for (let j = 1; j <= nJ; j += pas) svg += `<text x="${x(j)}" y="${H - 6}" font-size="11" fill="#6B7280" text-anchor="middle">J${j}</text>`;
+    if (c.totalPrevu && c.totalJours) {
+      svg += `<polyline fill="none" stroke="#C5C9D0" stroke-width="2" stroke-dasharray="5 4" points="${x(1)},${y(c.totalPrevu / c.totalJours)} ${x(c.totalJours)},${y(c.totalPrevu)}"/>`;
+      svg += `<line x1="${x(c.totalJours)}" y1="${Y1}" x2="${x(c.totalJours)}" y2="${Y0}" stroke="#C5C9D0" stroke-dasharray="3 3"/><text x="${x(c.totalJours) - 4}" y="${Y1 - 6}" font-size="11" fill="#6B7280" text-anchor="end">fin prévue J${c.totalJours}</text>`;
     }
+    if (c.totalPrevu && reste > 0 && cadence > 0) {
+      svg += `<polyline fill="none" stroke="#FDCA01" stroke-width="2" stroke-dasharray="2 4" points="${x(c.jours)},${y(c.realise)} ${x(joursEstimes)},${y(c.totalPrevu)}"/>`;
+      if (joursEstimes !== c.totalJours) svg += `<line x1="${x(joursEstimes)}" y1="${Y1}" x2="${x(joursEstimes)}" y2="${Y0}" stroke="#A15C00" stroke-dasharray="3 3"/><text x="${x(joursEstimes) - 4}" y="${Y1 + 8}" font-size="11" fill="#A15C00" font-weight="700" text-anchor="end">estimée J${joursEstimes}</text>`;
+    }
+    svg += `<polyline fill="none" stroke="#FDCA01" stroke-width="3" points="${c.jours === 1 ? `${x(1) - 1},${y(c.serie[0])} ` : ""}${pts}"/>`;
+    svg += `<circle cx="${x(c.jours)}" cy="${y(c.realise)}" r="5" fill="#FDCA01" stroke="#fff" stroke-width="2"/><text x="${x(c.jours) + 8}" y="${y(c.realise) + 16}" font-size="12" font-weight="700" fill="#1F2328">${fmt(c.realise)} ${c.unite}</text>`;
+    svg += `</svg>`;
+    $("dcChart").innerHTML = svg + `<div class="dt-legend"><span><i style="background:#FDCA01"></i>Réalisé</span>${c.totalPrevu && c.totalJours ? `<span><i style="background:#C5C9D0"></i>Objectif (${fmt(c.totalPrevu)} ${c.unite} en ${c.totalJours} j)</span>` : ""}${c.totalPrevu && reste > 0 ? `<span><i style="background:#FDCA01;opacity:.55"></i>Projection au rythme actuel</span>` : ""}</div>`;
+    $("chartSub").textContent = `${c.unite} cumulés, réalisé et objectif`;
   }
 
-  function afficherStatutChantier(meta) {
-    const bloc = document.getElementById("chantierStatutBloc");
-    const termine = meta.statutChantier === "Termine";
-    const archive = meta.archive === true;
-
-    if (archive) {
-      bloc.innerHTML = `
-        <span class="chantier-statut-badge termine"><span class="dot"></span>Archivé le ${escapeHtmlSuivi(meta.dateArchivage || "")}</span>
-        <button type="button" class="btn-rouvrir" id="desarchiverBtn">Désarchiver ce chantier</button>
-        <p class="panel-sub" style="margin:8px 0 0 0;font-size:0.78rem">Un chantier archivé n'apparaît plus dans "Chantier actif" ni dans le Rapport Journalier — désarchive-le d'abord si le client rappelle pour de nouveaux travaux.</p>`;
-      document.getElementById("desarchiverBtn").addEventListener("click", async () => {
-        if (!confirm("Désarchiver ce chantier ? Il redeviendra sélectionnable normalement (Chantier actif, Rapport Journalier).")) return;
-        const btn = document.getElementById("desarchiverBtn");
-        btn.disabled = true;
-        try {
-          await FTSDrive.desarchiverChantier(chantierId);
-          chargerPrevisions();
-        } catch (err) {
-          alert(`Erreur : ${err.message}`);
-          btn.disabled = false;
-        }
-      });
+  function afficherAnalyse(c) {
+    const pts = [];
+    const pt = (cls, ic, html) => pts.push(`<div class="dt-pt"><span class="i ${cls}">${ic}</span><div>${html}</div></div>`);
+    if (!c.jours) {
+      $("dcAnalyse").innerHTML = `<div class="dt-pt"><span class="i b">ℹ️</span><div>Pas encore de rapport journalier : l'analyse apparaîtra au premier rapport.</div></div>`;
       return;
     }
-
-    if (termine) {
-      bloc.innerHTML = `
-        <span class="chantier-statut-badge termine"><span class="dot"></span>Terminé le ${escapeHtmlSuivi(meta.dateFinChantier || "")}</span>
-        <button type="button" class="btn-rouvrir" id="rouvrirBtn">Rouvrir ce chantier</button>
-        <button type="button" class="btn-terminer" id="archiverBtn" style="background:var(--anthracite)">Archiver le dossier Drive</button>`;
-      document.getElementById("rouvrirBtn").addEventListener("click", async () => {
-        if (!confirm("Rouvrir ce chantier ? Il réapparaîtra comme actif dans la supervision.")) return;
-        try {
-          await FTSSheets.reouvrirChantier(chantierId);
-          chargerPrevisions();
-        } catch (err) {
-          alert(`Erreur : ${err.message}`);
-        }
-      });
-      document.getElementById("archiverBtn").addEventListener("click", async () => {
-        if (!confirm(`Archiver le dossier Drive de "${chantierName}" ? Il sera déplacé hors de "DOSSIER CHANTIER", vers "ARCHIVES". Réversible à tout moment via "Désarchiver".`)) return;
-        const btn = document.getElementById("archiverBtn");
-        btn.disabled = true;
-        btn.textContent = "Archivage en cours...";
-        try {
-          await FTSDrive.archiverChantier(chantierId);
-          chargerPrevisions();
-        } catch (err) {
-          alert(`Erreur : ${err.message}`);
-          btn.disabled = false;
-          btn.textContent = "Archiver le dossier Drive";
-        }
-      });
+    // 1. Rythme et fin estimée
+    const cadence = c.realise / c.jours;
+    if (c.totalPrevu && c.totalJours) {
+      const objectif = c.totalPrevu / c.totalJours;
+      const reste = Math.max(0, c.totalPrevu - c.realise);
+      if (reste === 0) pt("ok", "✅", `<b>Objectif atteint :</b> ${fmt(c.realise)} ${c.unite} réalisés sur ${fmt(c.totalPrevu)} prévus, en ${c.jours} jour${c.jours > 1 ? "s" : ""}.`);
+      else if (cadence <= 0) pt("w", "⏱️", `<b>Aucune production enregistrée</b> sur ${c.jours} jour${c.jours > 1 ? "s" : ""} de rapport.`);
+      else {
+        const jr = Math.ceil(reste / cadence), fin = c.jours + jr;
+        const ecart = fin - c.totalJours;
+        const cls = ecart > 0 ? (ecart > 2 ? "r" : "w") : "ok";
+        const titre = ecart > 0 ? (cadence < objectif ? "Retard sur l'objectif." : "Délai dépassé.") : "Dans les temps.";
+        pt(cls, "⏱️", `<b>${titre}</b> ${fmt(cadence, 1)} ${c.unite}/j au lieu de ${fmt(objectif, 1)}. Au rythme actuel, il reste ${fmt(reste)} ${c.unite}, soit environ <b>${jr} jour${jr > 1 ? "s" : ""}</b> : fin estimée au jour ${fin} sur ${c.totalJours} prévus.`);
+      }
     } else {
-      bloc.innerHTML = `
-        <span class="chantier-statut-badge en-cours"><span class="dot"></span>En cours</span>
-        <button type="button" class="btn-terminer" id="terminerBtn">Marquer ce chantier comme terminé</button>`;
-      document.getElementById("terminerBtn").addEventListener("click", async () => {
-        if (!confirm(`Marquer "${chantierName}" comme terminé ? Un instantané de ses chiffres sera enregistré dans l'Historique Chantiers, et il n'apparaîtra plus comme actif dans la supervision.`)) return;
-        const btn = document.getElementById("terminerBtn");
-        btn.disabled = true;
-        btn.textContent = "Clôture en cours...";
-        try {
-          await FTSSheets.cloturerChantier(chantierId, chantierName);
-          chargerPrevisions();
-        } catch (err) {
-          alert(`Erreur : ${err.message}`);
-          btn.disabled = false;
-          btn.textContent = "Marquer ce chantier comme terminé";
-        }
-      });
+      pt("b", "⏱️", `<b>Cadence :</b> ${fmt(cadence, 1)} ${c.unite}/j sur ${c.jours} jour${c.jours > 1 ? "s" : ""}. Renseigne le nombre prévu et la durée pour avoir une fin estimée.`);
     }
+    // 2. Pannes par machine
+    const parMachine = {};
+    c.suivi.pannes.forEach((r) => { const k = r[1] || "—"; (parMachine[k] = parMachine[k] || { n: 0, h: 0, dates: [] }); parMachine[k].n++; parMachine[k].h += nb(r[2]); parMachine[k].dates.push(r[0]); });
+    const top = Object.entries(parMachine).sort((a, b) => b[1].h - a[1].h)[0];
+    const perdu = c.hPannes + c.hArrets;
+    if (top) {
+      const part = perdu ? Math.round(top[1].h / perdu * 100) : 0;
+      pt(top[1].n > 1 ? "r" : "w", "🔧", `<b>${esc(top[0])} : ${top[1].n} panne${top[1].n > 1 ? "s" : ""} en ${c.jours} jours</b> (${fmt(top[1].h, 1)} h au total). C'est ${part} % du temps perdu sur le chantier.`);
+    } else {
+      pt("ok", "🔧", `<b>Aucune panne</b> déclarée sur ce chantier.`);
+    }
+    // 3. Arrêts
+    if (c.suivi.arrets.length) {
+      const parMotif = {};
+      c.suivi.arrets.forEach((r) => { const k = r[1] || "Arrêt"; parMotif[k] = (parMotif[k] || 0) + nb(r[2]); });
+      const liste = Object.entries(parMotif).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([m, h]) => `${fmt(h, 1)} h ${esc(m.toLowerCase())}`).join(", ");
+      pt("b", "⏸️", `<b>Arrêts :</b> ${liste}${Object.keys(parMotif).length > 3 ? "…" : ""}.`);
+    }
+    // 4. Régularité des longueurs
+    const moy = c.prod.filter((r) => nb(r[1]) > 0).map((r) => nb(r[2]) / nb(r[1]));
+    if (moy.length >= 2) {
+      const m = moy.reduce((a, b) => a + b, 0) / moy.length, mn = Math.min(...moy), mx = Math.max(...moy);
+      const regulier = (mx - mn) / m < 0.2;
+      pt(regulier ? "ok" : "w", regulier ? "✅" : "📏", `<b>Longueurs ${regulier ? "régulières" : "variables"} :</b> ${fmt(m, 1)} ml par ${c.aMpx ? "Mpx" : "pieu"} en moyenne (de ${fmt(mn, 1)} à ${fmt(mx, 1)} selon les jours).`);
+    }
+    // 5. Équipe
+    const parPers = {};
+    c.suivi.personnel.forEach((r) => { if (!r[1]) return; const k = cleNom(r[1]); (parPers[k] = parPers[k] || { nom: r[1], type: r[2], dates: new Set() }).dates.add(r[0]); });
+    const chefs = [...new Set(c.prod.map((r) => r[4]).filter(Boolean))];
+    const stables = Object.values(parPers).filter((p) => p.type !== "Intérim" && p.dates.size >= Math.ceil(c.jours * 0.8));
+    const joursInterim = new Set(c.suivi.personnel.filter((r) => r[2] === "Intérim").map((r) => r[0])).size;
+    if (Object.keys(parPers).length) {
+      const noms = stables.slice(0, 3).map((p) => { const f = window.FTSPersonnel && FTSPersonnel.parNom(p.nom); return esc(p.nom) + (f && f.poste && f.poste !== "CHEF DE CHANTIER" ? ` (${esc(f.poste.toLowerCase())})` : ""); });
+      const txt = chefs.length > 1 ? `<b>${chefs.length} chefs se sont succédé</b> (${chefs.map(esc).join(", ")}).` : `<b>Équipe ${stables.length >= 2 ? "stable" : "variable"} :</b> ${noms.length ? noms.join(" + ") + " presque tous les jours" : "peu de personnes présentes tous les jours"}.`;
+      pt("b", "👷", `${txt}${joursInterim ? ` Intérim ${joursInterim} jour${joursInterim > 1 ? "s" : ""} sur ${c.jours}.` : ""}`);
+    }
+    $("dcAnalyse").innerHTML = pts.join("");
   }
 
-  document.getElementById("previsionEnregistrerBtn").addEventListener("click", async () => {
-    const btn = document.getElementById("previsionEnregistrerBtn");
-    const previsionStatus = document.getElementById("previsionStatus");
-    if (!chantierId || !window.FTSDrive) { previsionStatus.textContent = "Erreur : module Drive non chargé."; return; }
-    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { previsionStatus.textContent = "Connecte-toi d'abord."; return; }
+  function afficherTempsPerdu(c) {
+    const causes = {};
+    c.suivi.pannes.forEach((r) => { const k = "🔧 Panne " + (r[1] || ""); causes[k] = (causes[k] || 0) + nb(r[2]); });
+    c.suivi.arrets.forEach((r) => { const k = "⏸️ " + (r[1] || "Arrêt"); causes[k] = (causes[k] || 0) + nb(r[2]); });
+    const liste = Object.entries(causes).sort((a, b) => b[1] - a[1]);
+    const total = liste.reduce((s, [, h]) => s + h, 0);
+    $("lossSub").textContent = total ? `${fmt(total, 1)} h sur ${c.jours} jour${c.jours > 1 ? "s" : ""}` : "";
+    const couleurs = ["#C0392B", "#4C82F0", "#9AA0AA", "#F59E0B", "#8B5CF6"];
+    $("dcLoss").innerHTML = liste.length ? liste.slice(0, 6).map(([k, h], i) => `<div class="dt-lrow"><span>${esc(k)}</span><div class="dt-lbar"><div style="width:${h / liste[0][1] * 100}%;background:${k.startsWith("🔧") ? "#C0392B" : couleurs[(i % 4) + 1]}"></div></div><b>${fmt(h, 1)} h</b></div>`).join("")
+      : `<div style="font-size:.86rem;color:var(--text-sub)">Aucune panne ni aucun arrêt déclaré.</div>`;
+  }
 
-    const duree = document.getElementById("previsionDuree").value.trim();
-    const micropieux = document.getElementById("previsionMicropieux").value.trim();
-    const montant = document.getElementById("previsionMontant").value.trim();
-    const typeChantier = document.getElementById("previsionType").value;
+  // ─── Rapports journaliers ──────────────────────────────────────
+  function afficherRapports(c) {
+    $("nRapports").textContent = c.prod.length;
+    if (!c.prod.length) { $("rapportsBody").innerHTML = `<tr><td colspan="8" style="color:var(--text-sub);padding:24px 18px">Aucun rapport journalier enregistré pour l'instant.</td></tr>`; return; }
+    const memeAtelier = (a, b) => !a || !b || cleNom(a) === cleNom(b);
+    const lignes = [...c.prod].sort((a, b) => parseFR(b[0]) - parseFR(a[0]));
+    const html = lignes.map((r) => {
+      const [date, nbP, lg, , chef, atelier] = r;
+      const pers = c.suivi.personnel.filter((p) => p[0] === date && memeAtelier(p[5], atelier));
+      const kChef = cleNom(chef);
+      const tri = [...pers].sort((a, b) => (cleNom(b[1]) === kChef) - (cleNom(a[1]) === kChef) || (a[2] === "Intérim") - (b[2] === "Intérim"));
+      const equipe = tri.map((p) => {
+        if (cleNom(p[1]) === kChef) return `<span class="sv-p chef">${esc(p[1])}</span>`;
+        if (p[2] === "Intérim") return `<span class="sv-p int">${esc(p[1])} · intérim</span>`;
+        const f = window.FTSPersonnel && FTSPersonnel.parNom(p[1]);
+        const poste = f && f.poste && f.poste !== "CHEF DE CHANTIER" ? " · " + f.poste.toLowerCase() : "";
+        return `<span class="sv-p">${esc(p[1])}${esc(poste)}</span>`;
+      }).join("") || (chef ? `<span class="sv-p chef">${esc(chef)}</span>` : "—");
+      const h = pers.reduce((s, p) => s + nb(p[4]), 0);
+      const evts = [...c.suivi.pannes.filter((p) => p[0] === date && memeAtelier(p[4], atelier)).map((p) => `<span class="sv-evt pa">Panne ${esc(p[1] || "")} ${fmt(nb(p[2]), 1)} h</span>`),
+        ...c.suivi.arrets.filter((p) => p[0] === date && memeAtelier(p[4], atelier)).map((p) => `<span class="sv-evt ar">${esc(p[1] || "Arrêt")} ${fmt(nb(p[2]), 1)} h</span>`)].join("") || "—";
+      const d = parseFR(date);
+      const n = nb(nbP);
+      const nAt = (String(atelier || "").match(/#\s*(\d+)$/) || [])[1];
+      return `<tr>
+        <td class="c-date"><b>${jourCourt(d)}</b>${nAt ? `<span class="sub">atelier ${nAt}</span>` : ""}</td>
+        <td class="c-eq"><div class="dt-team">${equipe}</div></td>
+        <td class="r c-mpx"><b>${fmt(n)}</b></td><td class="r c-ml">${fmt(nb(lg), 1)} m</td><td class="r c-moy">${n ? fmt(nb(lg) / n, 1) + " m" : "—"}</td>
+        <td class="r c-h">${h ? fmt(h) + " h" : "—"}</td><td class="c-ev">${evts}</td>
+        <td class="r c-act" style="white-space:nowrap"><button type="button" class="sv-ib" data-act="pdf" data-date="${esc(date)}" data-atelier="${esc(atelier || "")}" title="Ouvrir le PDF">📄</button><button type="button" class="sv-ib" data-act="modif" data-date="${esc(date)}" data-chef="${esc(chef || "")}" data-atelier="${esc(atelier || "")}" title="Modifier">✏️</button><button type="button" class="sv-ib" data-act="suppr" data-date="${esc(date)}" data-chef="${esc(chef || "")}" data-atelier="${esc(atelier || "")}" title="Supprimer">🗑️</button></td>
+      </tr>`;
+    }).join("");
+    const perdu = c.hPannes + c.hArrets;
+    $("rapportsBody").innerHTML = html + `<tr class="tot"><td class="c-date">Total</td><td class="c-eq">${c.jours} jour${c.jours > 1 ? "s" : ""} de rapport${c.prod.length > c.jours ? ` · ${c.prod.length} rapports` : ""}</td><td class="r c-mpx">${fmt(c.realise)}</td><td class="r c-ml">${fmt(c.ml, 1)} m</td><td class="r c-moy">${c.realise ? fmt(c.ml / c.realise, 1) + " m" : "—"}</td><td class="r c-h">${fmt(c.heures)} h</td><td class="c-ev">${perdu ? fmt(perdu, 1) + " h perdues" : "—"}</td><td></td></tr>`;
+  }
 
+  async function ouvrirPdf(btn) {
+    const { date, atelier } = btn.dataset;
+    const [j, m, a] = date.split("/");
+    const iso = `${a}-${m}-${j}`;
+    const fen = window.open("", "_blank");
     btn.disabled = true;
-    previsionStatus.textContent = "Enregistrement...";
     try {
-      const metaExistante = await FTSDrive.getMetadonneesChantier(chantierId);
-      const metaMisAJour = { ...metaExistante };
-      if (duree) metaMisAJour.dureeChantier = Number(duree); else delete metaMisAJour.dureeChantier;
-      if (micropieux) metaMisAJour.micropieuxPrevus = Number(micropieux); else delete metaMisAJour.micropieuxPrevus;
-      if (montant) metaMisAJour.montantVendu = Number(montant); else delete metaMisAJour.montantVendu;
-      // Type changé ici : la liste des techniques (cochées à la création)
-      // n'est plus à jour, on la remplace par ce type pour rester cohérent
-      // avec la Supervision.
-      if (metaExistante.typeChantier !== typeChantier && Array.isArray(metaMisAJour.techniques)) {
-        metaMisAJour.techniques = [typeChantier];
+      const { id: dossier } = await FTSDrive.getDossierModuleChantier(code, "RAPPORT JOURNALIER");
+      const noms = [...new Set([FTSSheets.nomFichierRapport(iso, code, atelier || ""), `${iso}_Rapport journalier_${code}.pdf`])];
+      let f = null;
+      for (const n of noms) { const r = await FTSDrive.findFilesExact(n, dossier); if (r.length) { f = r[0]; break; } }
+      if (!f) {
+        const tous = await FTSDrive.listFilesInFolder(dossier);
+        f = tous.find((x) => x.name.startsWith(`${iso}_Rapport journalier_${code}`)) || null;
       }
-      metaMisAJour.typeChantier = typeChantier;
-      await FTSDrive.setMetadonneesChantier(chantierId, metaMisAJour);
-      previsionStatus.textContent = "Prévisions enregistrées.";
+      if (!f) { if (fen) fen.close(); FTSShell.toast("PDF introuvable dans le dossier RAPPORT JOURNALIER."); return; }
+      const url = f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`;
+      if (fen) fen.location.href = url; else window.open(url, "_blank");
     } catch (err) {
-      console.error(err);
-      previsionStatus.textContent = `Erreur : ${err.message}`;
+      if (fen) fen.close();
+      FTSShell.toast(`Erreur : ${err.message}`);
     } finally {
       btn.disabled = false;
     }
-  });
-
-  async function chargerSuivi() {
-    if (!chantierId) {
-      suiviStatus.textContent = "Chantier introuvable (lien invalide).";
-      return;
-    }
-    if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
-      suiviStatus.textContent = "Connecte-toi depuis le dashboard principal, puis reviens sur cette page.";
-      return;
-    }
-    if (!window.FTSSheets) { suiviStatus.textContent = "Erreur : module Sheets non chargé."; return; }
-
-    suiviStatus.textContent = "Chargement du suivi...";
-
-    try {
-      const { materiel, production } = await FTSSheets.lireSuiviComplet(chantierId, chantierName);
-      afficherCalendrierMateriel(materiel);
-      afficherRapportsListe(production);
-      document.getElementById("suiviResultats").hidden = false;
-      suiviStatus.textContent = materiel.length === 0 && production.length === 0
-        ? "Aucune donnée pour l'instant — elle apparaîtra après le premier rapport journalier enregistré sur ce chantier."
-        : "";
-    } catch (err) {
-      console.error("Erreur chargement suivi :", err);
-      suiviStatus.textContent = `Erreur : ${err.message}`;
-    }
-  }
-
-  function parseDateFRDetail(s) {
-    const [j, m, a] = (s || "").split("/");
-    return j && m && a ? new Date(Number(a), Number(m) - 1, Number(j)) : null;
-  }
-
-  function escapeHtmlDetail(str) {
-    const div = document.createElement("div");
-    div.textContent = str || "";
-    return div.innerHTML;
-  }
-
-  function codeDuChantier() {
-    const idx = chantierName.search(/\s/);
-    return idx > 0 ? chantierName.slice(0, idx) : chantierName;
-  }
-
-  function afficherRapportsListe(production) {
-    const wrap = document.getElementById("rapportsListeWrap");
-    const status = document.getElementById("rapportsListeStatus");
-    const tbody = document.getElementById("rapportsListeBody");
-
-    if (production.length === 0) {
-      status.textContent = "Aucun rapport journalier enregistré pour l'instant.";
-      wrap.hidden = true;
-      return;
-    }
-    status.textContent = "";
-    wrap.hidden = false;
-
-    const lignes = [...production].sort((a, b) => {
-      const da = parseDateFRDetail(a.date), db = parseDateFRDetail(b.date);
-      return (da?.getTime() || 0) - (db?.getTime() || 0);
-    });
-
-    tbody.innerHTML = lignes.map((l) => `
-      <tr>
-        <td style="text-align:left">${escapeHtmlDetail(l.date)}</td>
-        <td>${l.nbPieux}</td>
-        <td>${l.longueurTotale.toFixed(2)}</td>
-        <td>${l.longueurMoyenne.toFixed(2)}</td>
-        <td style="text-align:left">${escapeHtmlDetail(l.nomChef || "—")}${/#\s*\d+$/.test(l.atelier || "") ? ` <span style="font-size:.72rem;color:var(--text-sub)">(atelier ${escapeHtmlDetail(l.atelier.match(/(\d+)$/)[1])})</span>` : ""}</td>
-        <td style="white-space:nowrap">
-          <button type="button" class="btn-modifier-rapport" data-date="${l.date}" data-chef="${escapeHtmlDetail(l.nomChef || '')}" data-atelier="${escapeHtmlDetail(l.atelier || '')}" style="font-size:.76rem;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer;margin-right:6px">Modifier</button>
-          <button type="button" class="btn-supprimer-rapport" data-date="${l.date}" data-chef="${escapeHtmlDetail(l.nomChef || '')}" data-atelier="${escapeHtmlDetail(l.atelier || '')}" style="font-size:.76rem;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer">Supprimer</button>
-        </td>
-      </tr>`).join("");
-
-    // Deux ateliers le même jour = un seul jour de chantier (mètres additionnés)
-    const nbJours = new Set(lignes.map((l) => l.date)).size;
-    const cadenceMoyenne = lignes.reduce((sum, l) => sum + l.longueurTotale, 0) / nbJours;
-    document.getElementById("rapportsCadenceMoyenne").textContent =
-      `Cadence moyenne : ${cadenceMoyenne.toFixed(1)} ml/jour sur ${nbJours} jour${nbJours > 1 ? "s" : ""} de rapport enregistrés${lignes.length > nbJours ? ` (${lignes.length} rapports, plusieurs ateliers certains jours)` : ""}.`;
-
-    tbody.querySelectorAll(".btn-modifier-rapport").forEach((btn) => {
-      btn.addEventListener("click", () => modifierRapport(btn.dataset.date, btn.dataset.chef, btn.dataset.atelier));
-    });
-    tbody.querySelectorAll(".btn-supprimer-rapport").forEach((btn) => {
-      btn.addEventListener("click", () => supprimerRapport(btn.dataset.date, btn.dataset.chef, btn.dataset.atelier));
-    });
   }
 
   function modifierRapport(dateAffichage, nomChef, atelier) {
     const [j, m, a] = dateAffichage.split("/");
-    const dateISO = `${a}-${m}-${j}`;
-    // Fixe ce chantier comme actif, pour que le Rapport Journalier s'ouvre
-    // directement dessus (même mécanisme que le dashboard tablette).
     localStorage.setItem("fts_chantier_actif", JSON.stringify({ id: chantierId, name: chantierName }));
     const n = (String(atelier || "").match(/#\s*(\d+)$/) || [])[1];
-    window.location.href = `../rapport/index.html?date=${dateISO}` +
-      (nomChef ? `&chef=${encodeURIComponent(nomChef)}` : "") + (n ? `&atelier=${n}` : "");
+    window.location.href = `../rapport/index.html?date=${a}-${m}-${j}` + (nomChef ? `&chef=${encodeURIComponent(nomChef)}` : "") + (n ? `&atelier=${n}` : "");
   }
 
   async function supprimerRapport(dateAffichage, nomChef, atelier) {
     if (!confirm(`Supprimer le rapport du ${dateAffichage} ? Ça supprime aussi le PDF sur Drive (dossier chantier${nomChef ? " et archive personnelle du chef" : ""}) et ne peut pas être annulé. Continuer ?`)) return;
     try {
-      // Seul le rapport de CET atelier est supprimé (un autre atelier le
-      // même jour reste intact). Rapport ancien (sans atelier) : atelier "".
       await FTSSheets.supprimerRapportDate(chantierId, chantierName, dateAffichage, atelier || "");
-
       const [j, m, a] = dateAffichage.split("/");
       const dateISO = `${a}-${m}-${j}`;
-      const code = codeDuChantier();
-      // PDF au nouveau format (avec l'atelier) ou à l'ancien (sans chef)
-      const nomsPossibles = [...new Set([
-        FTSSheets.nomFichierRapport(dateISO, code, atelier || ""),
-        `${dateISO}_Rapport journalier_${code}.pdf`,
-      ])];
-      const nomFichier = nomsPossibles[0];
-
+      const nomsPossibles = [...new Set([FTSSheets.nomFichierRapport(dateISO, code, atelier || ""), `${dateISO}_Rapport journalier_${code}.pdf`])];
       const { id: rapportsFolderId } = await FTSDrive.getDossierModuleChantier(code, "RAPPORT JOURNALIER");
       for (const nf of (atelier ? nomsPossibles.slice(0, 1) : nomsPossibles)) {
         const fichiers = await FTSDrive.findFilesExact(nf, rapportsFolderId);
         if (fichiers.length > 0) await FTSDrive.deleteFile(fichiers[0].id);
       }
-
-      // Nettoie aussi la copie personnelle du chef qui a soumis ce
-      // rapport (ADMINISTRATIF/{chef}/RAPPORT JOURNALIER/RJ {année}) —
-      // son nom est gardé dans le Sheet Production depuis chaque envoi.
       if (nomChef) {
         try {
           const dossierChefId = await FTSDrive.getDossierRapportChef(nomChef, a);
-          const fichiersChef = await FTSDrive.findFilesExact(nomFichier, dossierChefId);
+          const fichiersChef = await FTSDrive.findFilesExact(nomsPossibles[0], dossierChefId);
           if (fichiersChef.length > 0) await FTSDrive.deleteFile(fichiersChef[0].id);
-        } catch (e) {
-          console.warn("Nettoyage archive personnelle du chef non effectué :", e);
-        }
+        } catch (e) { console.warn("Nettoyage archive personnelle du chef non effectué :", e); }
       }
-
-      chargerSuivi();
+      FTSShell.toast("Rapport supprimé.");
+      charger();
     } catch (err) {
       alert(`Erreur : ${err.message}`);
     }
   }
 
-  function afficherCalendrierMateriel(lignes) {
-    const table = document.getElementById("suiviCalendrierTable");
-    if (lignes.length === 0) {
-      table.innerHTML = "<tr><td>Aucune donnée matériel enregistrée.</td></tr>";
-      return;
-    }
+  $("telRapportsBody").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-act=pdf]");
+    if (b) ouvrirPdf(b);
+  });
+  $("rapportsBody").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-act]");
+    if (!b) return;
+    if (b.dataset.act === "pdf") ouvrirPdf(b);
+    if (b.dataset.act === "modif") modifierRapport(b.dataset.date, b.dataset.chef, b.dataset.atelier);
+    if (b.dataset.act === "suppr") supprimerRapport(b.dataset.date, b.dataset.chef, b.dataset.atelier);
+  });
 
-    const dates = [...new Set(lignes.map((l) => l.date))];
-    const machines = [...new Set(lignes.map((l) => l.machine))];
-
-    const parCase = {};
-    lignes.forEach((l) => { parCase[`${l.machine}||${l.date}`] = l; });
-
-    // Une machine est "LOC" si elle a été marquée ainsi au moins une fois ;
-    // sinon elle reste dans le groupe FTS par défaut (y compris les
-    // anciennes entrées où ce champ n'était pas encore renseigné).
-    const estLoc = (m) => lignes.some((l) => l.machine === m && (l.ftsLoc || "").toUpperCase() === "LOC");
-    const machinesFTS = machines.filter((m) => !estLoc(m));
-    const machinesLOC = machines.filter((m) => estLoc(m));
-
-    const ligneMachine = (m, classeLigne) => {
-      let html = `<tr${classeLigne ? ` class="${classeLigne}"` : ""}><td>${escapeHtmlSuivi(m)}</td>`;
-      dates.forEach((d) => {
-        const l = parCase[`${m}||${d}`];
-        html += l
-          ? `<td><span class="statut-badge statut-${l.statut}">${l.statut}</span></td>`
-          : "<td>—</td>";
-      });
-      return html + "</tr>";
-    };
-
-    let html = "<tr><th>Machine</th>" + dates.map((d) => `<th>${d}</th>`).join("") + "</tr>";
-    machinesFTS.forEach((m) => { html += ligneMachine(m); });
-    if (machinesLOC.length > 0) {
-      html += `<tr class="ligne-separateur-loc"><td colspan="${dates.length + 1}">MATÉRIEL LOCATION</td></tr>`;
-      machinesLOC.forEach((m) => { html += ligneMachine(m, "ligne-loc"); });
-    }
-    table.innerHTML = html;
+  // ─── Matériel : récap + calendrier ─────────────────────────────
+  function groupesMateriel(c) {
+    const chefDuJour = {};
+    c.prod.forEach((r) => { if (r[4]) chefDuJour[r[0]] = r[4]; });
+    const groupes = new Map();
+    c.suivi.materiel.forEach((r) => {
+      const [date, machine, statut, ftsLoc, numero] = r;
+      if (!date || !machine) return;
+      const g = FTSAteliers.groupeDePointage(machine, numero, ftsLoc, chefDuJour[date]);
+      if (!groupes.has(g.cle)) groupes.set(g.cle, { ...g, parDate: {} });
+      (groupes.get(g.cle).parDate[date] = groupes.get(g.cle).parDate[date] || []).push(statut);
+    });
+    const ordre = (id) => FTSAteliers.SECTIONS.findIndex((s) => s.id === id);
+    return [...groupes.values()].sort((a, b) => (ordre(a.section) - ordre(b.section)) || a.libelle.localeCompare(b.libelle, "fr", { numeric: true }));
   }
 
-  if (window.FTSAuth) {
-    FTSAuth.onAuthChange(async (signedIn) => {
-      if (signedIn) {
-        const info = await FTSAuth.getUserInfo();
-        adminAccountInfo.textContent = info ? info.email : "Connecté";
-        userDot.classList.add("online");
-        afficherJoursDepuisOuverture();
-        chargerPrevisions();
-        chargerSuivi();
-      } else {
-        adminAccountInfo.textContent = "Non connecté";
-        userDot.classList.remove("online");
+  function afficherMateriel(c) {
+    const groupes = groupesMateriel(c);
+    if (!groupes.length) {
+      $("recapMatBody").innerHTML = `<tr><td colspan="7" style="color:var(--text-sub);padding:24px 18px">Aucune donnée matériel : elle apparaîtra après le premier rapport journalier.</td></tr>`;
+      $("dcCal").innerHTML = "";
+      return;
+    }
+    const cell = (v, k) => `<td class="r"><span class="sv-n ${v ? k : "z"}">${v ? v + " j" : "—"}</span></td>`;
+    let html = "", locFait = false;
+    groupes.forEach((g) => {
+      const n = { TRAVAIL: 0, PANNE: 0, ARRET: 0, TRANSPORT: 0 };
+      Object.values(g.parDate).forEach((s) => { const st = FTSAteliers.statutDuJour(s); if (n[st] !== undefined) n[st]++; });
+      const tot = n.TRAVAIL + n.PANNE + n.ARRET + n.TRANSPORT || 1;
+      if (g.section === "loc" && !locFait) { html += `<tr class="sep"><td colspan="7">MATÉRIEL LOCATION</td></tr>`; locFait = true; }
+      html += `<tr class="${g.section === "loc" ? "loc" : ""}"><td><b>${esc(g.libelle)}</b>${g.sous ? `<span class="sub">${esc(g.sous)}</span>` : ""}</td>
+        ${cell(n.TRAVAIL, "t")}${cell(n.PANNE, "p")}${cell(n.ARRET, "a")}${cell(n.TRANSPORT, "tr")}<td class="r"><b>${n.TRAVAIL + n.PANNE + n.ARRET + n.TRANSPORT} j</b></td>
+        <td class="r"><div class="sv-stack"><div style="width:${n.TRAVAIL / tot * 100}%;background:#27AE60"></div><div style="width:${n.PANNE / tot * 100}%;background:#C0392B"></div><div style="width:${n.ARRET / tot * 100}%;background:#F59E0B"></div><div style="width:${n.TRANSPORT / tot * 100}%;background:#4C82F0"></div></div></td></tr>`;
+    });
+    $("recapMatBody").innerHTML = html;
+
+    // Calendrier : toutes les dates avec un pointage matériel
+    const dates = [...new Set(c.suivi.materiel.map((r) => r[0]).filter((d) => parseFR(d)))].sort((a, b) => parseFR(a) - parseFR(b));
+    let cal = `<table><thead><tr><th>Machine</th>${dates.map((d) => { const x = parseFR(d); return `<th>${x.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}<br>${String(x.getDate()).padStart(2, "0")}/${String(x.getMonth() + 1).padStart(2, "0")}</th>`; }).join("")}<th>Jours</th></tr></thead><tbody>`;
+    locFait = false;
+    groupes.forEach((g) => {
+      if (g.section === "loc" && !locFait) { cal += `<tr class="sep"><td colspan="${dates.length + 2}">MATÉRIEL LOCATION</td></tr>`; locFait = true; }
+      cal += `<tr><td>${esc(g.libelle)}</td>${dates.map((d) => { const s = g.parDate[d]; const st = s ? FTSAteliers.statutDuJour(s) : ""; return `<td>${st ? `<span class="dt-c ${esc(st)}" title="${esc(st)}"></span>` : `<span class="dt-c v"></span>`}</td>`; }).join("")}<td><b>${Object.keys(g.parDate).length}</b></td></tr>`;
+    });
+    $("dcCal").innerHTML = cal + `</tbody></table>`;
+  }
+
+  function afficherPannes(c) {
+    const lignes = [...c.suivi.pannes.map((r) => ({ d: r[0], t: "pa", type: "Panne", quoi: r[1], h: nb(r[2]), obs: r[3] })),
+      ...c.suivi.arrets.map((r) => ({ d: r[0], t: "ar", type: "Arrêt", quoi: r[1], h: nb(r[2]), obs: r[3] }))]
+      .filter((l) => parseFR(l.d)).sort((a, b) => parseFR(b.d) - parseFR(a.d));
+    $("nPannes").textContent = lignes.length;
+    if (!lignes.length) { $("pannesBody").innerHTML = `<tr><td colspan="5" style="color:var(--text-sub);padding:24px 18px">Aucune panne ni aucun arrêt déclaré sur ce chantier.</td></tr>`; return; }
+    $("pannesBody").innerHTML = lignes.map((l) => `<tr><td>${esc(l.d.slice(0, 5))}</td><td><span class="sv-evt ${l.t}">${l.type}</span></td><td>${esc(l.quoi || "—")}</td><td class="r">${fmt(l.h, 1)} h</td><td>${esc(l.obs || "")}</td></tr>`).join("")
+      + `<tr class="tot"><td colspan="3">Total</td><td class="r">${fmt(lignes.reduce((s, l) => s + l.h, 0), 1)} h</td><td></td></tr>`;
+  }
+
+  // ─── Onglets ───────────────────────────────────────────────────
+  document.querySelectorAll("#dcTabs button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("#dcTabs button").forEach((x) => x.classList.toggle("on", x === b));
+    document.querySelectorAll(".sv-tab").forEach((t) => t.classList.toggle("on", t.id === "tab" + b.dataset.t));
+    try { history.replaceState(null, "", "#" + b.dataset.t.toLowerCase()); } catch (e) {}
+  }));
+  const ongletInitial = (location.hash || "").slice(1);
+  const bInit = [...document.querySelectorAll("#dcTabs button")].find((b) => b.dataset.t.toLowerCase() === ongletInitial);
+  if (bInit) bInit.click();
+
+  // ─── Enregistrement des métadonnées ───────────────────────────
+  // Relit toujours la version Drive avant d'écrire, pour ne pas écraser
+  // une modification faite entre-temps (statut, archive…).
+  async function majMeta(modif) {
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) throw new Error("Session Google expirée : clique sur « Reprendre la session ».");
+    const meta = await FTSDrive.getMetadonneesChantier(chantierId);
+    const nouv = modif({ ...meta });
+    // La description d'un dossier Drive est limitée en taille
+    if (JSON.stringify(nouv).length > 3800) throw new Error("Trop d'informations pour ce chantier (limite Drive atteinte) : regroupe des avenants.");
+    await FTSDrive.setMetadonneesChantier(chantierId, nouv);
+    donnees.meta = nouv;
+    afficherTout();
+  }
+
+  // ─── Avenants / TS ─────────────────────────────────────────────
+  function ouvrirAvenant(index) {
+    if (!donnees) return;
+    const c = calculer();
+    const a = index != null ? c.avenants[index] : null;
+    const aujourdhui = new Date().toISOString().slice(0, 10);
+    const versISO = (fr) => { const d = parseFR(fr); return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` : aujourdhui; };
+    const m = FTSShell.modale({
+      titre: a ? "Modifier l'avenant / TS" : "Ajouter un avenant / TS validé",
+      corps: `<div class="sv-f full"><label>Désignation</label><input type="text" id="avDes" placeholder="ex : 4 micropieux de grue" value="${esc(a ? a.designation : "")}"></div>
+        <div class="sv-f"><label>${c.unite} en plus</label><input type="number" id="avMpx" min="0" value="${a && a.mpx ? a.mpx : ""}" placeholder="ex : 4"></div>
+        <div class="sv-f"><label>Jours en plus</label><input type="number" id="avJ" min="0" value="${a && a.jours ? a.jours : ""}" placeholder="ex : 1"></div>
+        <div class="sv-f"><label>Montant HT (€)</label><input type="number" id="avMt" min="0" step="0.01" value="${a && a.montant ? a.montant : ""}" placeholder="ex : 9000"></div>
+        <div class="sv-f"><label>Validé par le client le</label><input type="date" id="avDate" value="${a ? versISO(a.date) : aujourdhui}"></div>
+        <div class="sv-f"><label>Réf. devis <i>(optionnel)</i></label><input type="text" id="avRef" value="${esc(a ? a.ref || "" : "")}" placeholder="ex : D26-118"></div>
+        <div class="dt-preview" id="avPrev"></div>
+        <p class="sv-mstatus" id="avStatus"></p>`,
+      pied: `<button type="button" class="sv-btn" data-x>Annuler</button><button type="button" class="sv-btn pri" id="avOk">${a ? "Enregistrer" : "Ajouter"}</button>`,
+    });
+    m.el.querySelector(".sv-mb").classList.add("trois");
+    const v = (id) => m.el.querySelector("#" + id).value.trim();
+    const prev = () => {
+      const base = { mpx: c.totalPrevu - (a ? Number(a.mpx) || 0 : 0), j: c.totalJours - (a ? Number(a.jours) || 0 : 0), mt: c.totalMontant - (a ? Number(a.montant) || 0 : 0) };
+      m.el.querySelector("#avPrev").innerHTML = `Nouveau total du chantier : <b>${fmt(base.mpx + nb(v("avMpx")))} ${c.unite} · ${base.j + nb(v("avJ"))} jours · ${euros(base.mt + nb(v("avMt")))} HT</b>`;
+    };
+    ["avMpx", "avJ", "avMt"].forEach((id) => m.el.querySelector("#" + id).addEventListener("input", prev));
+    prev();
+    m.el.querySelector("[data-x]").addEventListener("click", m.fermer);
+    m.el.querySelector("#avOk").addEventListener("click", async (e) => {
+      const st = m.el.querySelector("#avStatus");
+      if (!v("avDes")) { st.textContent = "Indique une désignation."; st.className = "sv-mstatus err"; return; }
+      const [y, mo, d] = (v("avDate") || aujourdhui).split("-");
+      const av = { id: a ? a.id : Date.now().toString(36), designation: v("avDes").toUpperCase(), mpx: nb(v("avMpx")), jours: nb(v("avJ")), montant: nb(v("avMt")), date: `${d}/${mo}/${y}`, ref: v("avRef").toUpperCase() };
+      e.target.disabled = true; st.textContent = "Enregistrement…"; st.className = "sv-mstatus";
+      try {
+        await majMeta((meta) => {
+          const liste = Array.isArray(meta.avenants) ? meta.avenants.slice() : [];
+          const i = a ? liste.findIndex((x) => x.id === a.id) : -1;
+          if (i >= 0) liste[i] = av; else liste.push(av);
+          meta.avenants = liste;
+          return meta;
+        });
+        m.fermer();
+        FTSShell.toast(a ? "Avenant modifié." : "Avenant ajouté au marché.");
+      } catch (err) {
+        st.textContent = `Erreur : ${err.message}`; st.className = "sv-mstatus err"; e.target.disabled = false;
       }
     });
-    FTSAuth.init();
-    if (FTSAuth.isSignedIn()) {
-      FTSAuth.getUserInfo().then((info) => {
-        adminAccountInfo.textContent = info ? info.email : "Connecté";
-        userDot.classList.add("online");
-      });
-      afficherJoursDepuisOuverture();
-      chargerPrevisions();
-      chargerSuivi();
-    } else {
-      suiviStatus.textContent = "Connecte-toi depuis le dashboard principal, puis reviens sur cette page.";
-    }
+  }
+
+  async function supprimerAvenant(index) {
+    const a = calculer().avenants[index];
+    if (!a || !confirm(`Supprimer l'avenant « ${a.designation} » ? Le total du marché sera recalculé.`)) return;
+    try {
+      await majMeta((meta) => { meta.avenants = (meta.avenants || []).filter((x) => x.id !== a.id); return meta; });
+      FTSShell.toast("Avenant supprimé.");
+    } catch (err) { alert(`Erreur : ${err.message}`); }
+  }
+
+  $("ajoutAvenantBtn").addEventListener("click", () => ouvrirAvenant(null));
+  $("marcheBody").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-act]");
+    if (!b) return;
+    if (b.dataset.act === "infos") ouvrirInfos();
+    if (b.dataset.act === "edit-av") ouvrirAvenant(Number(b.dataset.i));
+    if (b.dataset.act === "del-av") supprimerAvenant(Number(b.dataset.i));
+  });
+
+  // ─── Modifier les infos (marché principal, techniques, adresse) ─
+  function ouvrirInfos() {
+    if (!donnees) return;
+    const meta = donnees.meta;
+    const tech = FTSDrive.techniquesChantier(meta);
+    const chk = (t) => tech.includes(t) ? "checked" : "";
+    const m = FTSShell.modale({
+      titre: "Modifier les infos du chantier",
+      corps: `<div class="sv-f full"><label>Technique(s)</label><div class="dt-techs">
+          <label><input type="checkbox" name="tech" value="Micropieux" ${chk("Micropieux")}>🔩 Micropieux</label>
+          <label><input type="checkbox" name="tech" value="Pieux" ${chk("Pieux")}>🏛️ Pieux</label>
+          <label><input type="checkbox" name="tech" value="Battage" ${chk("Battage")}>🔨 Battage</label></div></div>
+        <div class="sv-f"><label>Adresse / commune</label><input type="text" id="inAdr" value="${esc(meta.adresse || "")}"></div>
+        <div class="sv-f"><label>GPS</label><input type="text" id="inGps" value="${esc(meta.gps || "")}" placeholder="ex : 44.833328, -0.577580"></div>
+        <div class="sv-sep">MARCHÉ PRINCIPAL <i>(les avenants / TS s'ajoutent à part)</i></div>
+        <div class="sv-f" data-tech="Micropieux"><label>Micropieux prévus</label><input type="number" id="inMpx" min="0" value="${meta.micropieuxPrevus || ""}"></div>
+        <div class="sv-f" data-tech="Pieux"><label>Pieux prévus</label><input type="number" id="inPx" min="0" value="${meta.pieuxPrevus || ""}"></div>
+        <div class="sv-f" data-tech="Battage"><label>Battage prévus</label><input type="number" id="inBat" min="0" value="${meta.battagePrevus || ""}"></div>
+        <div class="sv-f"><label>Durée (jours)</label><input type="number" id="inDuree" min="0" value="${meta.dureeChantier || ""}"></div>
+        <div class="sv-f"><label>Montant vendu HT (€)</label><input type="number" id="inMontant" min="0" step="0.01" value="${meta.montantVendu || ""}"></div>
+        <p class="sv-mstatus" id="inStatus"></p>`,
+      pied: `<button type="button" class="sv-btn" data-x>Annuler</button><button type="button" class="sv-btn pri" id="inOk">Enregistrer</button>`,
+    });
+    const majChamps = () => {
+      const t = [...m.el.querySelectorAll("input[name=tech]:checked")].map((i) => i.value);
+      m.el.querySelectorAll(".sv-f[data-tech]").forEach((f) => { f.hidden = !t.includes(f.dataset.tech); });
+    };
+    m.el.querySelectorAll("input[name=tech]").forEach((i) => i.addEventListener("change", majChamps));
+    majChamps();
+    ["inAdr"].forEach((id) => { const el = m.el.querySelector("#" + id); el.addEventListener("input", () => { const p = el.selectionStart; el.value = el.value.toUpperCase(); el.setSelectionRange(p, p); }); });
+    m.el.querySelector("[data-x]").addEventListener("click", m.fermer);
+    m.el.querySelector("#inOk").addEventListener("click", async (e) => {
+      const st = m.el.querySelector("#inStatus");
+      const t = [...m.el.querySelectorAll("input[name=tech]:checked")].map((i) => i.value);
+      if (!t.length) { st.textContent = "Coche au moins une technique."; st.className = "sv-mstatus err"; return; }
+      const v = (id) => m.el.querySelector("#" + id).value.trim();
+      e.target.disabled = true; st.textContent = "Enregistrement…"; st.className = "sv-mstatus";
+      try {
+        await majMeta((meta) => {
+          meta.techniques = t;
+          meta.typeChantier = t.includes("Micropieux") ? "Micropieux" : t.includes("Battage") ? "Battage" : "Pieux";
+          const set = (k, val) => { if (val) meta[k] = val; else delete meta[k]; };
+          set("adresse", v("inAdr"));
+          set("gps", v("inGps"));
+          set("micropieuxPrevus", t.includes("Micropieux") && v("inMpx") ? Number(v("inMpx")) : 0);
+          set("pieuxPrevus", t.includes("Pieux") && v("inPx") ? Number(v("inPx")) : 0);
+          set("battagePrevus", t.includes("Battage") && v("inBat") ? Number(v("inBat")) : 0);
+          set("dureeChantier", v("inDuree") ? Number(v("inDuree")) : 0);
+          set("montantVendu", v("inMontant") ? Number(v("inMontant")) : 0);
+          return meta;
+        });
+        m.fermer();
+        FTSShell.toast("Infos du chantier enregistrées.");
+      } catch (err) {
+        st.textContent = `Erreur : ${err.message}`; st.className = "sv-mstatus err"; e.target.disabled = false;
+      }
+    });
+  }
+  $("modifierInfosBtn").addEventListener("click", ouvrirInfos);
+
+  // ─── Statut : terminé / rouvrir / archiver / désarchiver ───────
+  function brancherStatut() {
+    const on = (id, f) => { const b = $(id); if (b) b.addEventListener("click", () => f(b)); };
+    on("terminerBtn", async (b) => {
+      if (!confirm(`Marquer "${chantierName}" comme terminé ? Un instantané de ses chiffres sera enregistré dans l'Historique Chantiers, et il n'apparaîtra plus comme actif dans la supervision.`)) return;
+      b.disabled = true; b.textContent = "Clôture en cours…";
+      try { await FTSSheets.cloturerChantier(chantierId, chantierName); FTSShell.toast("Chantier marqué terminé."); charger(); }
+      catch (err) { alert(`Erreur : ${err.message}`); b.disabled = false; b.textContent = "Marquer terminé"; }
+    });
+    on("rouvrirBtn", async () => {
+      if (!confirm("Rouvrir ce chantier ? Il réapparaîtra comme actif dans la supervision.")) return;
+      try { await FTSSheets.reouvrirChantier(chantierId); charger(); } catch (err) { alert(`Erreur : ${err.message}`); }
+    });
+    on("archiverBtn", async (b) => {
+      if (!confirm(`Archiver le dossier Drive de "${chantierName}" ? Il sera déplacé hors de "DOSSIER CHANTIER", vers "ARCHIVES". Réversible à tout moment via "Désarchiver".`)) return;
+      b.disabled = true; b.textContent = "Archivage…";
+      try { await FTSDrive.archiverChantier(chantierId); charger(); } catch (err) { alert(`Erreur : ${err.message}`); b.disabled = false; b.textContent = "🗄️ Archiver le dossier"; }
+    });
+    on("desarchiverBtn", async (b) => {
+      if (!confirm("Désarchiver ce chantier ? Il redeviendra sélectionnable normalement (Chantier actif, Rapport Journalier).")) return;
+      b.disabled = true;
+      try { await FTSDrive.desarchiverChantier(chantierId); charger(); } catch (err) { alert(`Erreur : ${err.message}`); b.disabled = false; }
+    });
   }
 });
 </script>

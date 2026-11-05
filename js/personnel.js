@@ -242,3 +242,5 @@ const FTSPersonnel = (() => {
     source: () => etat.source,
   };
 })();
+
+window.FTSPersonnel = FTSPersonnel;

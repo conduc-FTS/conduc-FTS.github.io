@@ -443,6 +443,25 @@ const FTSSheets = (() => {
   }
 
   /**
+   * Tout le suivi d'un chantier pour la page Détail chantier, en une seule
+   * lecture groupée : Matériel, Production, Personnel, Pannes, Arrêts
+   * (lignes brutes, dans l'ordre des colonnes des onglets).
+   */
+  async function lireSuiviDetail(chantierFolderId, chantierName) {
+    const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
+    const onglets = [ONGLET_MATERIEL, ONGLET_PRODUCTION, ONGLET_PERSONNEL, ONGLET_PANNES, ONGLET_ARRETS];
+    const ranges = onglets.map((o) => "ranges=" + encodeURIComponent(`${o}!A2:Z`)).join("&");
+    const res = await fetchAvecRetry(`${API_BASE}/${spreadsheetId}/values:batchGet?${ranges}`, { headers: authHeader() });
+    let v;
+    if (res.ok) {
+      v = ((await res.json()).valueRanges || []).map((r) => r.values || []);
+    } else {
+      v = await Promise.all(onglets.map((o) => lireOnglet(spreadsheetId, o).catch(() => [])));
+    }
+    return { spreadsheetId, materiel: v[0] || [], production: v[1] || [], personnel: v[2] || [], pannes: v[3] || [], arrets: v[4] || [] };
+  }
+
+  /**
    * Résumé condensé d'un chantier pour affichage sur une vignette :
    * la première machine du rapport le plus récent (avec son statut),
    * et le total de micropieux réalisés depuis le début du chantier.
@@ -910,6 +929,7 @@ const FTSSheets = (() => {
     getOuCreerClasseurSuivi,
     enregistrerDonneesRapport,
     lireSuiviComplet,
+    lireSuiviDetail,
     resumeChantier,
     calculerResume,
     chargerDonneesSupervision,

@@ -2,699 +2,768 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#3A3A3A">
 <link rel="manifest" href="../manifest_conducteur.json">
 <link rel="icon" type="image/png" sizes="192x192" href="../icon-dashboard-192.png">
 <script>
 if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashboard.js").catch(() => {}); }
 </script>
-<title>FTS — Récapitulatif Hebdomadaire</title>
+<title>FTS — Pointage</title>
 <link rel="stylesheet" href="../css/dashboard.css">
+<link rel="stylesheet" href="../css/supervision.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
-.rh-topbar-right { display: flex; align-items: center; gap: 14px; }
-.rh-body { max-width: 1800px; margin: 24px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 18px; }
+.pt-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.pt-seg { display: flex; background: #E9EBEE; border-radius: 9px; padding: 3px; gap: 2px; }
+.pt-seg[hidden] { display: none !important; }
+.pt-seg button { border: none; background: none; padding: 8px 13px; border-radius: 7px; font-weight: 700; font-size: 0.82rem; color: var(--text-sub); cursor: pointer; white-space: nowrap; }
+.pt-seg button.on { background: #fff; color: var(--anthracite); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+.pt-seg.fam button.on { background: var(--anthracite); color: #fff; }
+.pt-wnav { display: flex; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.pt-wnav button { border: none; background: none; width: 40px; height: 40px; font-size: 1.2rem; cursor: pointer; color: var(--text-sub); }
+.pt-wnav .lbl { padding: 0 12px; font-weight: 800; font-size: 0.92rem; white-space: nowrap; text-align: center; }
+.pt-wnav .lbl small { font-weight: 600; color: var(--text-sub); margin-left: 6px; }
+.pt-fld { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--border); border-radius: 9px; padding: 0 12px; height: 40px; font-size: 0.86rem; }
+.pt-fld label { color: var(--text-sub); font-weight: 700; font-size: 0.72rem; white-space: nowrap; }
+.pt-fld input, .pt-fld select { border: none; outline: none; font: inherit; background: none; }
+.pt-maj { font-size: 0.76rem; color: var(--text-sub); white-space: nowrap; }
+.pt-leg { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.78rem; color: var(--text-sub); }
+.pt-leg i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 
-.rh-nav-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: space-between; }
-.rh-nav-left { display: flex; align-items: center; gap: 12px; }
-.rh-nav-btn {
-  width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border); background: white;
-  cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center;
-}
-.rh-nav-title { font-weight: 800; font-size: 1.15rem; }
-.rh-nav-sub { font-size: 0.82rem; color: var(--text-sub); }
-.rh-btn-actuelle {
-  background: white; border: 1px solid var(--fts-yellow); color: var(--anthracite); font-weight: 700;
-  border-radius: 8px; padding: 8px 14px; cursor: pointer; font-size: 0.82rem;
-}
-.rh-legende { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.78rem; color: var(--text-sub); align-items: center; }
-.rh-legende .item { display: flex; align-items: center; gap: 5px; }
-.rh-legende .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+/* Grille (personnel + planning matériel) */
+.pt-scroll { overflow-x: auto; }
+table.pt-grid { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; }
+.pt-grid th { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-sub); font-weight: 700; padding: 6px 2px; background: #FBFBFC; border-bottom: 1px solid var(--border); text-align: center; }
+.pt-grid th b { display: block; font-size: 0.95rem; color: var(--text-main); letter-spacing: 0; }
+.pt-grid thead tr.wk th { background: #F1F3F6; color: var(--text-main); font-size: 0.72rem; padding: 5px; border-left: 2px solid #fff; }
+.pt-grid th.lab, .pt-grid td.lab { width: 270px; text-align: left; padding-left: 16px; position: sticky; left: 0; background: #fff; z-index: 2; border-right: 1px solid var(--border); }
+.pt-grid th.lab { background: #FBFBFC; }
+.pt-grid th.we, .pt-grid td.we { width: 20px; background: #E3E5E9 !important; padding: 0; }
+.pt-grid th.we b { font-size: 0.6rem; }
+.pt-grid th.today { background: #FFF6CC; color: var(--anthracite); box-shadow: inset 0 -3px 0 var(--fts-yellow); }
+.pt-grid td { height: 54px; border-bottom: 1px solid var(--border); padding: 4px 3px; vertical-align: middle; text-align: center; cursor: pointer; }
+.pt-grid td.today { background: #FFFDF2; }
+.pt-grid tr:hover td { background: #FAFBFC; } .pt-grid tr:hover td.today { background: #FFFBEA; }
+.pt-grid td.tot { font-weight: 800; background: #FBFBFC; cursor: default; font-size: 0.9rem; }
+.pt-grid th.tot { width: 84px; }
+.pt-grid tr.sec td { background: var(--anthracite) !important; color: var(--fts-yellow); font-size: 0.64rem; letter-spacing: 0.08em; font-weight: 800; height: auto; padding: 6px 16px; text-align: left; cursor: default; }
+.pt-grid tr.sec.repli td { background: #3A3A3A !important; cursor: pointer; }
+.pt-grid tr.sec.repli td .info { color: #B8BAC0; font-weight: 600; letter-spacing: 0; font-size: 0.72rem; }
+.pt-grid tr.loc td { background: #FFFCF0; }
+.lab .m { font-weight: 800; font-size: 0.86rem; display: block; }
+.lab .c { font-size: 0.7rem; color: var(--text-sub); font-weight: 600; display: block; line-height: 1.3; }
+.pt-add { display: none; width: 100%; height: 44px; border: 1.5px dashed #D5D8DE; border-radius: 7px; color: #9AA0AA; font-size: 1rem; align-items: center; justify-content: center; }
+.pt-grid td.vide:hover .pt-add { display: flex; }
+.pt-blk { border-radius: 7px; padding: 5px 8px; font-size: 0.72rem; line-height: 1.2; height: 44px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; border-left: 4px solid var(--cc); background: var(--cb); text-align: left; }
+.pt-blk b { font-size: 0.74rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pt-blk span { color: #4B5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pt-blk.TRANSPORT, .pt-blk.ARRET, .pt-blk.PANNE { align-items: center; text-align: center; font-weight: 800; font-size: 0.7rem; letter-spacing: 0.04em; }
+.pt-blk.TRANSPORT { background: #EAF1FE; border-left-color: #4C82F0; color: #2A5DBF; }
+.pt-blk.ARRET { background: #FFEDD5; border-left-color: #F59E0B; color: #B45309; }
+.pt-blk.PANNE { background: #FDECEA; border-left-color: #C0392B; color: #C0392B; }
+.pt-blk.TRANSPORT span, .pt-blk.ARRET span, .pt-blk.PANNE span { color: inherit; font-weight: 600; letter-spacing: 0; font-size: 0.64rem; }
+.pt-plus { font-size: 0.6rem; font-weight: 800; color: var(--text-sub); }
+.pt-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.pt-h { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 8px; border-radius: 7px; min-width: 70px; background: var(--bg); border-left: 3px solid var(--cc); margin: 1px; }
+.pt-h b { font-size: 0.86rem; } .pt-h small { font-size: 0.64rem; color: var(--text-sub); font-weight: 700; }
+.pt-empty { color: #C5C9D0; }
+.pt-foot { padding: 10px 18px; font-size: 0.78rem; color: var(--text-sub); display: flex; justify-content: space-between; background: #FBFBFC; border-top: 1px solid var(--border); gap: 10px; flex-wrap: wrap; }
 
-.rh-section-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-sub); font-weight: 700; margin-bottom: 10px; }
+/* Récap par chantier */
+.pt-rc .sv-ch { border-left: 5px solid var(--cc); }
+.pt-rc .k { display: flex; gap: 16px; font-size: 0.8rem; color: var(--text-sub); flex-wrap: wrap; }
+.pt-rc .k b { color: var(--text-main); }
 
-.rh-semaine-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
-.rh-jour-col { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 10px; min-height: 140px; }
-.rh-jour-col.aujourdhui { border-color: var(--fts-yellow); border-width: 2px; box-shadow: 0 0 0 1px var(--fts-yellow); }
-.rh-jour-nom { font-size: 0.68rem; text-transform: uppercase; color: var(--text-sub); font-weight: 700; }
-.rh-jour-num { font-size: 1.2rem; font-weight: 800; color: var(--anthracite); margin-bottom: 8px; }
-.rh-jour-col.aujourdhui .rh-jour-num { display: inline-block; background: var(--fts-yellow); border-radius: 50%; width: 26px; height: 26px; line-height: 26px; text-align: center; font-size: 0.95rem; }
-.rh-jour-vide { font-size: 0.76rem; color: var(--text-sub); margin-top: 6px; }
+/* Fenêtre d'édition d'une case */
+.pt-ent { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.pt-ent:last-child { border-bottom: none; }
+.pt-ent .q { font-size: 0.86rem; font-weight: 700; }
+.pt-ent .q small { display: block; font-size: 0.72rem; color: var(--text-sub); font-weight: 600; }
+.pt-ent .ed { grid-column: 1 / -1; display: none; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pt-ent.editing .ed { display: flex; }
+.pt-ent .ed input, .pt-ent .ed select { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 0.86rem; }
 
-.rh-chantier-bloc { border-left: 3px solid #999; border-radius: 8px; background: var(--bg); padding: 7px 9px; margin-bottom: 8px; }
-.rh-chantier-nom { font-size: 0.68rem; font-weight: 800; color: var(--anthracite); line-height: 1.2; margin-bottom: 4px; }
-.rh-entree-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 0.74rem; padding: 2px 0; }
-.rh-entree-nom { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rh-entree-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.rh-entree-val { font-weight: 700; color: var(--text-sub); white-space: nowrap; flex-shrink: 0; }
-.rh-gd-tag { background: var(--anthracite); color: var(--fts-yellow); font-size: 0.6rem; font-weight: 800; padding: 1px 5px; border-radius: 6px; margin-left: 3px; }
-.rh-groupe-label { font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-sub); margin: 5px 0 2px 0; }
-.rh-groupe-label.loc { color: #B8730A; }
-.rh-separateur-loc { border-top: 1px dashed #E7C878; margin: 5px 0 3px 0; }
-.rh-entree-row.rh-loc-row { background: #FFF8EC; margin: 0 -6px; padding: 3px 6px; border-radius: 4px; }
-
-.rh-recapp-table { border-collapse: collapse; width: 100%; font-size: 0.84rem; }
-.rh-recapp-table th, .rh-recapp-table td { border: 1px solid var(--border); padding: 8px 12px; text-align: center; }
-.rh-recapp-table th { background: var(--anthracite); color: white; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; }
-.rh-recapp-table td:first-child { text-align: left; font-weight: 700; background: #FAFAFA; vertical-align: middle; }
-.rh-recapp-table td.chantier { text-align: left; }
-.rh-recapp-table td.chantier .code { display: block; font-size: 0.68rem; color: var(--text-sub); font-weight: 700; }
-.rh-recapp-table td.chantier .nom { font-weight: 600; }
-.rh-recapp-total-row td { background: #F5F6F8; font-weight: 800; }
-.rh-recapp-total-row td:first-child { text-align: right; font-weight: 800; color: var(--text-sub); font-size: 0.76rem; }
-.rh-recapp-separateur td {
-  background: #3A2E00; color: var(--fts-yellow); font-weight: 800; text-align: center;
-  font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase;
+/* Téléphone */
+.pt-tel { margin: 30px 4px; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 26px 20px; text-align: center; }
+.pt-tel[hidden] { display: none; }
+.pt-tel .ic { font-size: 2.4rem; }
+.pt-tel h2 { font-size: 1.1rem; margin: 10px 0 6px; }
+.pt-tel p { font-size: 0.88rem; color: var(--text-sub); line-height: 1.5; margin: 0 0 18px; }
+.pt-tel .sv-btn { display: block; width: 100%; padding: 12px; margin-top: 8px; text-decoration: none; text-align: center; }
+body.pt-bloque #svPage > :not(#ptTel) { display: none !important; }
+.pt-mob { display: none; }
+@media (max-width: 760px) {
+  .pt-dsk { display: none !important; }
+  .pt-mob { display: block; }
+  .pt-bar { gap: 8px; }
+  .pt-wnav { width: 100%; justify-content: space-between; }
+  .pt-wnav .lbl small { display: block; margin: 0; }
+  .pt-seg { width: 100%; } .pt-seg button { flex: 1; padding: 8px 4px; }
+  .pt-fld { width: 100%; }
+  .pt-day { background: #fff; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+  .pt-day.today { border-color: var(--fts-yellow); box-shadow: 0 0 0 1px var(--fts-yellow); }
+  .pt-day .dh { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-weight: 800; font-size: 0.9rem; }
+  .pt-day .dh small { color: var(--text-sub); font-weight: 600; margin-left: auto; font-size: 0.76rem; }
+  .pt-day .dh .pill { background: var(--fts-yellow); border-radius: 10px; padding: 1px 8px; font-size: 0.7rem; }
+  .pt-day.vide { border-style: dashed; background: transparent; }
+  .pt-day.vide .dh { color: var(--text-sub); font-weight: 700; }
+  .pt-mblk { border-top: 1px solid var(--border); padding: 8px 14px 10px; border-left: 4px solid var(--cc); }
+  .pt-mblk .t { font-size: 0.72rem; font-weight: 800; color: var(--text-sub); margin-bottom: 4px; }
+  .pt-ln { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 0.88rem; cursor: pointer; }
+  .pt-ln .n { flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pt-mh { font-size: 0.68rem; letter-spacing: 0.08em; font-weight: 800; color: var(--text-sub); margin: 16px 2px 8px; }
+  .pt-at { background: #fff; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px; padding: 12px 14px; }
+  .pt-at .m { font-weight: 800; font-size: 0.92rem; } .pt-at .c { font-size: 0.74rem; color: var(--text-sub); font-weight: 600; }
+  .pt-at .now { margin-top: 8px; } .pt-at .now .pt-blk { height: auto; padding: 8px 10px; }
+  .pt-strip { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 8px; }
+  .pt-strip div { text-align: center; font-size: 0.6rem; color: var(--text-sub); font-weight: 700; cursor: pointer; }
+  .pt-strip i { display: block; height: 8px; border-radius: 3px; margin-top: 3px; background: #EEF0F2; }
+  .pt-strip .t { color: var(--anthracite); }
+  .pt-libre { border: 1.5px dashed #D5D8DE; border-radius: 12px; padding: 10px 14px; font-size: 0.82rem; font-weight: 700; color: var(--text-sub); margin-bottom: 10px; cursor: pointer; }
+  .pt-rp { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--border); font-size: 0.86rem; }
+  .pt-rp .n { flex: 1; font-weight: 700; } .pt-rp .n small { display: block; font-weight: 600; color: var(--text-sub); font-size: 0.72rem; }
+  .pt-rp .hh { font-weight: 800; font-size: 1rem; }
+  .pt-rp .gdn { font-size: 0.72rem; color: var(--text-sub); min-width: 44px; text-align: right; }
+  .pt-rc .sv-tbl .c-rep { display: none; }
 }
-.rh-recapp-table tr.interim td:first-child, .rh-recapp-table tr.interim td { background: #FFF8EC; }
-
-@media (max-width: 1000px) {
-  .rh-semaine-grid { grid-template-columns: repeat(3, 1fr); }
-}
-@media (max-width: 640px) {
-  .rh-semaine-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
-.rh-controls-row { display: flex; gap: 10px; flex-wrap: wrap; }
-
-.pointage-ajout-form {
-  background: var(--bg); border: 1px dashed var(--border); border-radius: 12px;
-  padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: end;
-}
-.pointage-ajout-form .field { min-width: 140px; }
-.pointage-ajout-form select, .pointage-ajout-form input[type="text"], .pointage-ajout-form input[type="date"] {
-  padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem; width: 100%;
-}
-.pc-edit-gd-label { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: var(--text-sub); }
-
-.pc-icon-btn {
-  background: white; border: 1px solid var(--border); border-radius: 6px;
-  width: 22px; height: 22px; cursor: pointer; font-size: 0.68rem; line-height: 1;
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 0;
-}
-.rh-entree-actions { display: flex; gap: 3px; flex-shrink: 0; }
-.rh-entree-edit { display: none; flex-wrap: wrap; gap: 5px; align-items: center; margin: 4px 0; width: 100%; }
-.rh-entree-edit input[type="text"], .rh-entree-edit select {
-  padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.72rem; min-width: 60px;
-}
-.rh-entree-row.editing .rh-entree-view { display: none; }
-.rh-entree-row.editing .rh-entree-edit { display: flex; }
-.rh-entree-row { flex-wrap: wrap; }
-.rh-entree-view { display: flex; justify-content: space-between; align-items: center; flex: 1; gap: 6px; min-width: 0; }
 </style>
 </head>
 <body>
 
-<header class="topbar">
-  <a href="../supervision-encadrement/index.html" class="topbar-brand" style="text-decoration:none;cursor:pointer">
-    <img src="../assets/logo-fts.png" alt="FTS" style="height:34px;width:auto;background:white;border-radius:6px;padding:3px 6px;flex-shrink:0">
-    <div style="line-height:1.2">
-      <div style="font-weight:800;font-size:1.05rem;color:#fff" id="rhTitre">Récapitulatif Hebdomadaire</div>
-      <div class="brand-sub" id="rhSousTitre">Pointage FTS · Heures &amp; Grand Déplacement</div>
-    </div>
-  </a>
-  <div class="rh-topbar-right">
-    <div class="user-chip"><span class="user-dot" id="userDot"></span><span id="adminAccountInfo">Non connecté</span></div>
-    <button type="button" class="rh-btn-actuelle" id="exportTopBtn" style="background:var(--fts-yellow);border-color:var(--fts-yellow)">⬇️ Exporter Excel</button>
+<div id="svPage">
+  <div class="pt-tel" id="ptTel" hidden>
+    <div class="ic">🖥️</div><h2>Le pointage se consulte sur ordinateur</h2>
+    <p>Sur téléphone, la Supervision est en version allégée : vue d'ensemble et fiche des chantiers.</p>
+    <a class="sv-btn pri" href="../supervision-encadrement/index.html">← Retour à la vue d'ensemble</a>
+    <button type="button" class="sv-btn" id="ptForcer">Afficher quand même</button>
   </div>
-</header>
-
-<main class="rh-body">
-
-  <div class="rh-nav-row">
-    <div class="rh-nav-left">
-      <button type="button" class="rh-nav-btn" id="semainePrecBtn">‹</button>
-      <button type="button" class="rh-nav-btn" id="semaineSuivBtn">›</button>
-      <div>
-        <div class="rh-nav-title" id="semaineTitre">Semaine —</div>
-        <div class="rh-nav-sub" id="semaineSous">—</div>
-      </div>
-      <button type="button" class="rh-btn-actuelle" id="semaineActuelleBtn">Semaine actuelle</button>
-    </div>
-    <div class="rh-legende" id="legendeChantiers"></div>
+  <div class="pt-bar">
+    <div class="pt-seg" id="vueSeg" hidden><button type="button" data-v="planning" class="on">📅 Planning par machine</button><button type="button" data-v="recap">🏗️ Récap par chantier</button></div>
+    <div class="pt-seg fam" id="famSeg"><button type="button" data-f="tous" class="on">Tous</button><button type="button" data-f="mp">Micropieux</button><button type="button" data-f="px">Pieux</button></div>
+    <span class="sv-sp pt-dsk"></span>
+    <span class="pt-maj pt-dsk" id="majTxt"></span>
+    <span class="pt-only-planning" style="display:contents">
+      <div class="pt-wnav"><button type="button" id="precBtn" aria-label="Période précédente">‹</button><span class="lbl" id="periodeLbl">—</span><button type="button" id="suivBtn" aria-label="Période suivante">›</button></div>
+      <div class="pt-seg pt-dsk" id="dureeSeg" hidden><button type="button" data-n="1">1 sem.</button><button type="button" data-n="2" class="on">2 sem.</button><button type="button" data-n="4">4 sem.</button></div>
+      <button type="button" class="sv-btn pt-dsk" id="auj">Aujourd'hui</button>
+    </span>
+    <span class="pt-only-recap" style="display:none">
+      <div class="pt-fld" style="min-width:260px">🔍<input type="text" id="recherche" placeholder="Rechercher un chantier…" style="width:100%"></div>
+      <div class="pt-fld"><label>PÉRIODE</label><select id="periodeSel">
+        <option value="debut">Depuis le début du chantier</option><option value="mois">Ce mois</option><option value="moisPrec">Le mois dernier</option>
+        <option value="semaine">Cette semaine</option><option value="perso">Du … au …</option></select></div>
+      <span id="persoDates" style="display:none;gap:6px;align-items:center"><input type="date" id="du" class="pt-fld" style="height:40px"><input type="date" id="au" class="pt-fld" style="height:40px"></span>
+    </span>
   </div>
+  <p class="sv-status" id="ptStatus"></p>
+  <div id="ptDesk" class="pt-dsk"></div>
+  <div id="ptMob" class="pt-mob"></div>
+</div>
 
-  <div class="rh-controls-row">
-    <button type="button" class="rh-btn-actuelle" id="ajouterBtn">➕ Ajouter une entrée</button>
-    <button type="button" class="rh-btn-actuelle" id="syncBtn">📅 Synchroniser vers Google Agenda</button>
-  </div>
-  <div class="pointage-ajout-form" id="ajoutForm" hidden></div>
-
-  <div class="rh-section-title">Calendrier de la semaine</div>
-  <div class="rh-semaine-grid" id="semaineGrid"></div>
-
-  <div id="recapPersonnelSection" style="display:none">
-    <div class="rh-section-title">Récapitulatif personnel</div>
-    <div style="overflow-x:auto">
-      <table class="rh-recapp-table" style="max-width:900px">
-        <thead><tr><th style="text-align:left">Nom</th><th style="text-align:left">Chantier</th><th>Heures</th><th>GD</th></tr></thead>
-        <tbody id="recapPersonnelWrap"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <p class="form-status" id="rhStatus"></p>
-
-</main>
+<datalist id="dlMachines"></datalist>
+<datalist id="dlNoms"></datalist>
 
 <script src="../js/auth.js"></script>
 <script src="../js/drive.js"></script>
 <script src="../js/sheets.js"></script>
 <script src="../js/calendar.js"></script>
 <script src="../js/parc-materiel.js"></script>
-<datalist id="dl_parc_machines"></datalist>
-<script>
-// Référentiel Parc matériel : suggestions + nom normalisé + N° machine
-// pour que les corrections de pointage gardent la même désignation que
-// le rapport journalier.
-function remplirListeParc() {
-  const dl = document.getElementById("dl_parc_machines");
-  if (!dl || typeof FTSParc === 'undefined') return;
-  dl.innerHTML = FTSParc.disponibles().map((m) => `<option value="${m.nom}">`).join("") +
-    FTSParc.location().map((l) => `<option value="${l}">`).join("");
-}
-function machinePointage(saisie, ftsLocSaisi) {
-  const nom = (saisie || "").trim().toUpperCase();
-  const m = (typeof FTSParc !== 'undefined') ? FTSParc.parNom(nom) || FTSParc.parNumero(nom) : null;
-  if (m) return { nom: m.nom, ftsLoc: "FTS", numero: m.numero };
-  return { nom, ftsLoc: (ftsLocSaisi || "").trim().toUpperCase() || "LOC", numero: "" };
-}
-document.addEventListener("DOMContentLoaded", () => {
-  remplirListeParc();
-  if (typeof FTSParc !== 'undefined') FTSParc.charger().catch(() => {}).then(remplirListeParc);
-});
-</script>
+<script src="../js/personnel.js"></script>
+<script src="../js/ateliers.js"></script>
+<script src="../js/supervision-shell.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+  const params = new URLSearchParams(location.search);
+  const estMateriel = params.get("type") === "materiel";
+  const onglet = estMateriel ? "Materiel" : "Personnel";
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => FTSShell.esc(s);
+  const nb = (v) => parseFloat(String(v == null ? "" : v).replace(",", ".")) || 0;
+  const fmt = (n, d = 0) => Number(n).toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const parseFR = (s) => { const [j, m, a] = String(s || "").split("/"); return j && m && a ? new Date(+a, +m - 1, +j) : null; };
+  const frDate = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  const isoDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const jour0 = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const ajoute = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const lundi = (d) => { const x = jour0(d); const j = x.getDay(); x.setDate(x.getDate() + (j === 0 ? -6 : 1 - j)); return x; };
+  const numSemaine = (d) => { const t = jour0(d); t.setDate(t.getDate() + 3 - ((t.getDay() + 6) % 7)); const s = new Date(t.getFullYear(), 0, 4); return 1 + Math.round(((t - s) / 86400000 - 3 + ((s.getDay() + 6) % 7)) / 7); };
+  const cleNom = (s) => (window.FTSPersonnel ? FTSPersonnel.cle(s) : String(s || "").toUpperCase().trim());
+  const STATUTS = ["TRAVAIL", "PANNE", "ARRET", "TRANSPORT"];
+  const LIB_ST = { TRAVAIL: "Travail", PANNE: "Panne", ARRET: "Arrêt", TRANSPORT: "Transport" };
+  const pref = (k, def) => { try { return localStorage.getItem("fts_pt_" + k) || def; } catch (e) { return def; } };
+  const setPref = (k, v) => { try { localStorage.setItem("fts_pt_" + k, v); } catch (e) {} };
 
-  const params = new URLSearchParams(window.location.search);
-  const type = params.get("type") === "materiel" ? "materiel" : "personnel";
-  const onglet = type === "materiel" ? "Materiel" : "Personnel";
-  const estMateriel = type === "materiel";
-  if (!estMateriel) document.getElementById("recapPersonnelSection").style.display = "";
+  document.title = estMateriel ? "FTS — Pointage matériel" : "FTS — Pointage personnel";
+  // ─── État ──────────────────────────────────────────────────────
+  const CLE_CACHE = "fts_supervision_cache_v1"; // même lecture groupée que la Vue d'ensemble
+  let donnees = null;
+  let fraiches = false;
+  let enCours = null;
+  let vue = estMateriel ? pref("vue", "planning") : "planning";
+  let famille = pref("fam", "tous");
+  let nbSemaines = estMateriel ? Number(pref("sem", "2")) : 1;
+  let debut = lundi(new Date());
+  if (estMateriel && nbSemaines === 2) debut = ajoute(lundi(new Date()), -7); // semaine passée + semaine en cours
+  let autresOuverts = pref("autres", "0") === "1";
 
-  document.title = estMateriel ? "FTS — Récapitulatif Hebdomadaire Matériel" : "FTS — Récapitulatif Hebdomadaire Personnel";
-  document.getElementById("rhSousTitre").textContent = estMateriel
-    ? "Pointage Matériel FTS · Statuts machines"
-    : "Pointage personnel FTS · Heures & Grand Déplacement";
+  try { const c = JSON.parse(localStorage.getItem(CLE_CACHE)); if (c && Array.isArray(c.chantiers)) donnees = c; } catch (e) {}
 
-  const PALETTE = ["#4C82F0", "#EE7C93", "#3FAE63", "#E8B923", "#9B6FD8", "#3A86FF", "#E24C4C", "#26A69A"];
-  const couleurParChantier = {};
-  function couleurChantier(nom) {
-    if (!couleurParChantier[nom]) {
-      const i = Object.keys(couleurParChantier).length % PALETTE.length;
-      couleurParChantier[nom] = PALETTE[i];
-    }
-    return couleurParChantier[nom];
+  async function charger(forcer = false) {
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { afficher(); return; }
+    if (enCours) return enCours;
+    if (!forcer && fraiches && donnees && Date.now() - donnees.savedAt < 60000) { afficher(); return; }
+    $("ptStatus").textContent = donnees ? "" : "Chargement…";
+    $("majTxt").textContent = "Actualisation…";
+    afficher();
+    enCours = (async () => {
+      try {
+        const [chantiers] = await Promise.all([
+          FTSDrive.listChantiersAvecMeta(),
+          window.FTSParc ? FTSParc.charger().catch(() => {}) : null,
+          window.FTSPersonnel ? FTSPersonnel.charger().catch(() => {}) : null,
+        ]);
+        const suivis = await FTSSheets.chargerDonneesSupervision(chantiers);
+        donnees = { savedAt: Date.now(), chantiers, suivis };
+        fraiches = true;
+        try { localStorage.setItem(CLE_CACHE, JSON.stringify(donnees)); } catch (e) {}
+        $("ptStatus").textContent = "";
+        $("ptStatus").classList.remove("err");
+      } catch (err) {
+        console.error("Pointage :", err);
+        $("ptStatus").textContent = `Erreur : ${err.message}`;
+        $("ptStatus").classList.add("err");
+      } finally {
+        enCours = null;
+        remplirListes();
+        afficher();
+      }
+    })();
+    return enCours;
   }
 
-  const JOURS = ["LUNDI", "MARDI", "MERCREDI", "JEUDI", "VENDREDI", "SAMEDI"];
+  function majTexte() {
+    if (enCours) return;
+    if (!donnees) { $("majTxt").textContent = ""; return; }
+    const min = Math.floor((Date.now() - donnees.savedAt) / 60000);
+    $("majTxt").innerHTML = `${min < 1 ? "Mis à jour à l'instant" : min < 60 ? `Mis à jour il y a ${min} min` : "Mis à jour le " + new Date(donnees.savedAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} · <a href="#" id="refreshLnk">🔄 Actualiser</a>`;
+    const l = $("refreshLnk"); if (l) l.onclick = (e) => { e.preventDefault(); charger(true); };
+  }
+  setInterval(majTexte, 30000);
 
-  function lundiDeLaSemaine(d) {
-    const date = new Date(d);
-    const jour = date.getDay(); // 0 = dimanche
-    const diff = jour === 0 ? -6 : 1 - jour;
-    date.setDate(date.getDate() + diff);
-    date.setHours(0, 0, 0, 0);
-    return date;
+  function remplirListes() {
+    if (window.FTSParc) $("dlMachines").innerHTML = FTSParc.disponibles().map((m) => `<option value="${esc(m.nom)}">`).join("") + FTSParc.location().map((l) => `<option value="${esc(l)}">`).join("");
+    if (window.FTSPersonnel) $("dlNoms").innerHTML = FTSPersonnel.actifs().map((p) => `<option value="${esc(FTSPersonnel.nomComplet(p))}">`).join("");
   }
 
-  function isoDate(d) {
-    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-  }
-  function frDate(d) { const [a, m, j] = isoDate(d).split("-"); return `${j}/${m}/${a}`; }
-  function numeroSemaine(d) {
-    const t = new Date(d);
-    t.setHours(0, 0, 0, 0);
-    t.setDate(t.getDate() + 3 - ((t.getDay() + 6) % 7));
-    const s = new Date(t.getFullYear(), 0, 4);
-    return 1 + Math.round(((t - s) / 86400000 - 3 + ((s.getDay() + 6) % 7)) / 7);
-  }
+  // ─── Données mises à plat ─────────────────────────────────────
+  const famChantier = (meta) => { const t = FTSDrive.techniquesChantier(meta || {}); return { mp: t.includes("Micropieux") || t.includes("Battage"), px: t.includes("Pieux") }; };
+  const dansFamille = (f) => famille === "tous" || (famille === "mp" ? f.mp : f.px);
+  const PALETTE = [["#8B5CF6", "#F3EEFF"], ["#0EA5E9", "#E7F6FD"], ["#22A06B", "#E7F6EE"], ["#F59E0B", "#FEF5E3"], ["#6366F1", "#EEEFFE"], ["#E2557A", "#FDECF1"], ["#14B8A6", "#E3F7F5"], ["#A16207", "#FBF3E1"]];
+  let couleurs = {};
+  const couleur = (nomCh) => { if (!couleurs[nomCh]) couleurs[nomCh] = PALETTE[Object.keys(couleurs).length % PALETTE.length]; return couleurs[nomCh]; };
+  const codeDe = (n) => String(n).split(/\s+/)[0];
+  const villeDe = (n) => String(n).split(/\s+/).slice(1, 2).join(" ");
+  const resteDe = (n) => String(n).split(/\s+/).slice(2).join(" ").toLowerCase().replace(/^./, (c) => c.toUpperCase());
 
-  const STATUTS_MACHINE = ["TRAVAIL", "PANNE", "ARRET", "TRANSPORT"];
-  let dernieresEntrees = [];
-  let derniersJours = [];
-  let chantiersCache = null;
-
-  let lundiCourant = lundiDeLaSemaine(new Date());
-
-  async function chargerSemaine() {
-    const status = document.getElementById("rhStatus");
-    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { status.textContent = "Connecte-toi d'abord."; return; }
-    if (!window.FTSSheets) { status.textContent = "Erreur : module Sheets non chargé."; return; }
-
-    const jours = [];
-    for (let i = 0; i < 6; i++) {
-      const d = new Date(lundiCourant);
-      d.setDate(d.getDate() + i);
-      jours.push(d);
-    }
-    const samedi = jours[5];
-
-    document.getElementById("semaineTitre").textContent = `Semaine ${numeroSemaine(lundiCourant)} — ${lundiCourant.getFullYear()}`;
-    document.getElementById("semaineSous").textContent =
-      `Du lundi ${lundiCourant.getDate()} ${lundiCourant.toLocaleDateString("fr-FR", { month: "long" })} au samedi ${samedi.getDate()} ${samedi.toLocaleDateString("fr-FR", { month: "long" })} ${samedi.getFullYear()}`;
-
-    status.textContent = "Chargement...";
-    try {
-      const entrees = await FTSSheets.listerPointageToutesChantiers(onglet, isoDate(lundiCourant), isoDate(samedi));
-      status.textContent = "";
-      dernieresEntrees = entrees;
-      derniersJours = jours;
-      afficherSemaine(jours, entrees);
-      attacherActionsEntrees();
-    } catch (err) {
-      console.error(err);
-      status.textContent = `Erreur : ${err.message}`;
-    }
-  }
-
-  function afficherSemaine(jours, entrees) {
-    // Reset palette pour une correspondance stable chantier -> couleur sur la semaine affichée
-    Object.keys(couleurParChantier).forEach((k) => delete couleurParChantier[k]);
-
-    const parJourFR = {};
-    jours.forEach((d) => { parJourFR[frDate(d)] = []; });
-    entrees.forEach((e) => {
-      const dFR = e.cols[0];
-      if (parJourFR[dFR]) parJourFR[dFR].push(e);
-    });
-
-    // Légende chantiers actifs cette semaine
-    const chantiersSemaine = [...new Set(entrees.map((e) => e.chantierName))];
-    chantiersSemaine.forEach((c) => couleurChantier(c)); // fige l'ordre de couleur
-    const legende = document.getElementById("legendeChantiers");
-    legende.innerHTML = chantiersSemaine.map((c) => {
-      const code = c.split(/\s+/)[0];
-      const nom = c.slice(code.length).trim();
-      return `<span class="item"><span class="dot" style="background:${couleurChantier(c)}"></span>${escapeHtmlRH(code)} ${escapeHtmlRH(nom.split(" ").slice(0, 2).join(" "))}</span>`;
-    }).join("");
-
-    // Grille calendrier
-    const aujourdhuiFR = frDate(new Date());
-    const grid = document.getElementById("semaineGrid");
-    grid.innerHTML = jours.map((d, i) => {
-      const dFR = frDate(d);
-      const estAuj = dFR === aujourdhuiFR;
-      const entreesJour = parJourFR[dFR] || [];
-      const parChantier = {};
-      entreesJour.forEach((e) => {
-        if (!parChantier[e.chantierName]) parChantier[e.chantierName] = [];
-        parChantier[e.chantierName].push(e);
+  function entrees() {
+    if (!donnees) return [];
+    const out = [];
+    donnees.chantiers.forEach((c, i) => {
+      const s = donnees.suivis[i];
+      if (!s || !s.spreadsheetId) return;
+      const f = famChantier(c.meta);
+      const chefDuJour = {};
+      (s.production || []).forEach((r) => { if (r[4]) chefDuJour[r[0]] = r[4]; });
+      (estMateriel ? s.materiel : s.personnel).forEach((r, idx) => {
+        const d = parseFR(r[0]);
+        if (!d) return;
+        out.push({ chantierId: c.id, chantierName: c.name, spreadsheetId: s.spreadsheetId, sheetRow: idx + 2, cols: r, date: d, fr: r[0], fam: f, chef: chefDuJour[r[0]] || "" });
       });
-
-      const blocs = Object.keys(parChantier).map((nomChantier) => {
-        const code = nomChantier.split(/\s+/)[0];
-        const nom = nomChantier.slice(code.length).trim();
-        const couleur = couleurChantier(nomChantier);
-        let lignes;
-        if (estMateriel) {
-          const rendreLigneMateriel = (e, estLoc) => {
-            const attrs = `data-spreadsheet="${e.spreadsheetId}" data-row="${e.sheetRow}"`;
-            const [, machine, statut, ftsLoc] = e.cols;
-            const optionsStatut = STATUTS_MACHINE.map((s) => `<option value="${s}" ${s === statut ? "selected" : ""}>${s}</option>`).join("");
-            return `
-              <div class="rh-entree-row${estLoc ? " rh-loc-row" : ""}" ${attrs}>
-                <div class="rh-entree-view">
-                  <span class="rh-entree-nom"><span class="rh-entree-dot" style="background:${DOT_COULEUR_STATUT[statut] || "#888"}"></span>${escapeHtmlRH(machine)}</span>
-                  <span class="rh-entree-val">${escapeHtmlRH(statut)}</span>
-                  <span class="rh-entree-actions">
-                    <button type="button" class="pc-icon-btn rh-edit-btn" title="Modifier">✏️</button>
-                    <button type="button" class="pc-icon-btn rh-delete-btn" title="Supprimer">🗑️</button>
-                  </span>
-                </div>
-                <div class="rh-entree-edit">
-                  <input type="text" class="ri-machine" list="dl_parc_machines" value="${escapeHtmlRH(machine)}" style="width:170px">
-                  <select class="ri-statut">${optionsStatut}</select>
-                  <input type="text" class="ri-ftsloc" value="${escapeHtmlRH(ftsLoc)}" placeholder="FTS/LOC" style="width:55px">
-                  <button type="button" class="pc-icon-btn rh-save-btn" title="Enregistrer">✅</button>
-                  <button type="button" class="pc-icon-btn rh-cancel-btn" title="Annuler">✖️</button>
-                </div>
-              </div>`;
-          };
-          // Matériel FTS d'abord, matériel de location en dessous (y compris
-          // les entrées sans FTS/LOC renseigné, classées FTS par défaut).
-          const estLocEntree = (e) => (e.cols[3] || "").toUpperCase() === "LOC";
-          const entreesFTS = parChantier[nomChantier].filter((e) => !estLocEntree(e));
-          const entreesLOC = parChantier[nomChantier].filter((e) => estLocEntree(e));
-          lignes = entreesFTS.map((e) => rendreLigneMateriel(e, false)).join("");
-          if (entreesLOC.length > 0) {
-            lignes += '<div class="rh-separateur-loc"></div><div class="rh-groupe-label loc">Matériel Location</div>';
-            lignes += entreesLOC.map((e) => rendreLigneMateriel(e, true)).join("");
-          }
-        } else {
-          lignes = parChantier[nomChantier].map((e) => {
-          const attrs = `data-spreadsheet="${e.spreadsheetId}" data-row="${e.sheetRow}"`;
-          const [, nomP, type, gd, heures] = e.cols;
-          return `
-            <div class="rh-entree-row" ${attrs}>
-              <div class="rh-entree-view">
-                <span class="rh-entree-nom">${escapeHtmlRH(nomP)}${gd === "GD" ? '<span class="rh-gd-tag">GD</span>' : ""}</span>
-                <span class="rh-entree-val">${heures ? escapeHtmlRH(heures) + "h" : ""}</span>
-                <span class="rh-entree-actions">
-                  <button type="button" class="pc-icon-btn rh-edit-btn" title="Modifier">✏️</button>
-                  <button type="button" class="pc-icon-btn rh-delete-btn" title="Supprimer">🗑️</button>
-                </span>
-              </div>
-              <div class="rh-entree-edit">
-                <input type="text" class="ri-nom" value="${escapeHtmlRH(nomP)}" style="width:80px">
-                <select class="ri-type">
-                  <option value="FTS" ${type === "FTS" ? "selected" : ""}>FTS</option>
-                  <option value="Intérim" ${type === "Intérim" ? "selected" : ""}>Intérim</option>
-                </select>
-                <input type="text" class="ri-heures" value="${escapeHtmlRH(heures)}" placeholder="h" style="width:36px">
-                <label class="pc-edit-gd-label"><input type="checkbox" class="ri-gd" ${gd === "GD" ? "checked" : ""}> GD</label>
-                <button type="button" class="pc-icon-btn rh-save-btn" title="Enregistrer">✅</button>
-                <button type="button" class="pc-icon-btn rh-cancel-btn" title="Annuler">✖️</button>
-              </div>
-            </div>`;
-          }).join("");
-        }
-        return `
-          <div class="rh-chantier-bloc" style="border-left-color:${couleur}">
-            <div class="rh-chantier-nom">${escapeHtmlRH(code)}<br>${escapeHtmlRH(nom)}</div>
-            ${lignes}
-          </div>`;
-      }).join("");
-
-      return `
-        <div class="rh-jour-col ${estAuj ? "aujourdhui" : ""}">
-          <div class="rh-jour-nom">${JOURS[i]}</div>
-          <div class="rh-jour-num">${d.getDate().toString().padStart(2, "0")}</div>
-          ${blocs || '<div class="rh-jour-vide">Aucune activité</div>'}
-        </div>`;
-    }).join("");
-
-    // Récapitulatif matériel/Chantiers actifs cette semaine ont été
-    // retirés : le calendrier ci-dessus et l'export Excel couvrent déjà
-    // ce besoin. Le Récapitulatif personnel, lui, reste utile (heures/GD
-    // par personne, y compris sur plusieurs chantiers dans la semaine).
-    if (!estMateriel) afficherRecapPersonnel(entrees);
+    });
+    return out;
   }
 
-  function afficherRecapPersonnel(entrees) {
-    const wrap = document.getElementById("recapPersonnelWrap");
-    if (!wrap) return;
+  function joursPeriode() {
+    const n = estMateriel ? nbSemaines * 7 : 6;
+    return Array.from({ length: n }, (_, i) => ajoute(debut, i)).filter((d) => estMateriel || d.getDay() !== 0);
+  }
 
-    if (entrees.length === 0) {
-      wrap.innerHTML = '<tr><td colspan="4" class="form-status">Aucune donnée sur cette période.</td></tr>';
+  // ─── Affichage principal ──────────────────────────────────────
+  function afficher() {
+    couleurs = {};
+    majTexte();
+    $("vueSeg").hidden = !estMateriel;
+    $("dureeSeg").hidden = !estMateriel;
+    document.querySelectorAll("#vueSeg button").forEach((b) => b.classList.toggle("on", b.dataset.v === vue));
+    document.querySelectorAll("#famSeg button").forEach((b) => b.classList.toggle("on", b.dataset.f === famille));
+    document.querySelectorAll("#dureeSeg button").forEach((b) => b.classList.toggle("on", Number(b.dataset.n) === nbSemaines));
+    document.querySelector(".pt-only-planning").style.display = vue === "planning" ? "contents" : "none";
+    document.querySelector(".pt-only-recap").style.display = vue === "recap" ? "contents" : "none";
+    const jours = joursPeriode();
+    const fin = jours[jours.length - 1];
+    const s1 = numSemaine(debut), s2 = numSemaine(fin);
+    $("periodeLbl").innerHTML = `Semaine${s1 !== s2 ? "s" : ""} ${s1}${s1 !== s2 ? " – " + s2 : ""}<small>${debut.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} → ${fin.toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}</small>`;
+
+    if (!donnees) {
+      const connecte = window.FTSAuth && FTSAuth.isSignedIn();
+      $("ptDesk").innerHTML = $("ptMob").innerHTML = `<div class="sv-vide">${connecte ? "Chargement des pointages…" : "Connecte-toi pour afficher les pointages."}</div>`;
       return;
     }
+    const toutes = entrees().filter((e) => dansFamille(e.fam));
+    if (!estMateriel) return afficherPersonnel(toutes, jours);
+    if (vue === "recap") return afficherRecap(toutes);
+    afficherPlanning(toutes, jours);
+  }
 
-    // Regroupe par personne, puis par chantier au sein de chaque personne
-    const parPersonne = {};
-    entrees.forEach((e) => {
-      const [, nom, type, gd] = e.cols;
-      if (!parPersonne[nom]) parPersonne[nom] = { nom, type, parChantier: {} };
-      if (type === "Intérim") parPersonne[nom].type = "Intérim"; // un intérim reste intérim même si mal saisi ailleurs
-      if (!parPersonne[nom].parChantier[e.chantierName]) {
-        parPersonne[nom].parChantier[e.chantierName] = { heures: 0, gd: 0 };
-      }
-      const c = parPersonne[nom].parChantier[e.chantierName];
-      c.heures += parseFloat((e.cols[4] || "").replace(",", ".")) || 0;
-      if (gd === "GD") c.gd += 1;
-    });
-
-    const rendreLignes = (p, estInterim) => {
-      const chantiers = Object.entries(p.parChantier);
-      const totalHeures = chantiers.reduce((s, [, c]) => s + c.heures, 0);
-      const totalGD = chantiers.reduce((s, [, c]) => s + c.gd, 0);
-      const classeInterim = estInterim ? " class=\"interim\"" : "";
-      const nbLignes = chantiers.length + (chantiers.length > 1 ? 1 : 0);
-
-      const lignesChantier = chantiers.map(([nomChantier, c], idx) => {
-        const spaceIdx = nomChantier.search(/\s/);
-        const code = spaceIdx > 0 ? nomChantier.slice(0, spaceIdx) : nomChantier;
-        const nom = spaceIdx > 0 ? nomChantier.slice(spaceIdx + 1) : nomChantier;
-        const celluleNom = idx === 0 ? `<td rowspan="${nbLignes}">${escapeHtmlRH(p.nom)}</td>` : "";
-        return `
-          <tr${classeInterim}>
-            ${celluleNom}
-            <td class="chantier"><span class="code">${escapeHtmlRH(code)}</span><span class="nom">${escapeHtmlRH(nom)}</span></td>
-            <td>${c.heures.toFixed(1)}h</td>
-            <td>${c.gd}j</td>
-          </tr>`;
-      }).join("");
-
-      const ligneTotal = chantiers.length > 1
-        ? `<tr${classeInterim} class="${estInterim ? "interim " : ""}rh-recapp-total-row"><td>Total semaine</td><td>${totalHeures.toFixed(1)}h</td><td>${totalGD}j</td></tr>`
-        : "";
-
-      return lignesChantier + ligneTotal;
-    };
-
-    const personnes = Object.values(parPersonne).sort((a, b) => a.nom.localeCompare(b.nom));
-    const fts = personnes.filter((p) => p.type !== "Intérim");
-    const interim = personnes.filter((p) => p.type === "Intérim");
-
-    let html = fts.map((p) => rendreLignes(p, false)).join("");
-    if (interim.length > 0) {
-      html += '<tr class="rh-recapp-separateur"><td colspan="4">Personnel Intérim</td></tr>';
-      html += interim.map((p) => rendreLignes(p, true)).join("");
+  // ═══ PERSONNEL ════════════════════════════════════════════════
+  function afficherPersonnel(toutes, jours) {
+    const frs = new Set(jours.map(frDate));
+    const sem = toutes.filter((e) => frs.has(e.fr));
+    if (famille === "px" && !sem.length) {
+      $("ptDesk").innerHTML = $("ptMob").innerHTML = `<div class="sv-vide">🏛️ Aucune heure sur un chantier pieux sur cette période — elles apparaîtront ici dès que le rapport journalier pieux sera en place.</div>`;
+      return;
     }
-    wrap.innerHTML = html;
-  }
-
-  const DOT_COULEUR_STATUT = { TRAVAIL: "#3FAE63", PANNE: "#E24C4C", ARRET: "#9AA0AA", TRANSPORT: "#4C82F0" };
-
-  function escapeHtmlRH(str) {
-    const div = document.createElement("div");
-    div.textContent = str || "";
-    return div.innerHTML;
-  }
-
-  function attacherActionsEntrees() {
-    document.querySelectorAll(".rh-entree-row").forEach((row) => {
-      const editBtn = row.querySelector(".rh-edit-btn");
-      const cancelBtn = row.querySelector(".rh-cancel-btn");
-      const saveBtn = row.querySelector(".rh-save-btn");
-      const deleteBtn = row.querySelector(".rh-delete-btn");
-      if (!editBtn) return;
-
-      editBtn.addEventListener("click", () => row.classList.add("editing"));
-      cancelBtn.addEventListener("click", () => row.classList.remove("editing"));
-
-      saveBtn.addEventListener("click", async () => {
-        saveBtn.disabled = true;
-        const spreadsheetId = row.dataset.spreadsheet;
-        const sheetRow = Number(row.dataset.row);
-        // On retrouve la date d'origine via dernieresEntrees (non affichée dans la ligne compacte)
-        const entree = dernieresEntrees.find((e) => e.spreadsheetId === spreadsheetId && e.sheetRow === sheetRow);
-        const date = entree ? entree.cols[0] : "";
-        try {
-          const valeurs = estMateriel
-            ? (() => { const mp = machinePointage(row.querySelector(".ri-machine").value, row.querySelector(".ri-ftsloc").value); return [date, mp.nom, row.querySelector(".ri-statut").value, mp.ftsLoc, mp.numero]; })()
-            : [date, row.querySelector(".ri-nom").value.trim(), row.querySelector(".ri-type").value, row.querySelector(".ri-gd").checked ? "GD" : "", row.querySelector(".ri-heures").value.trim()];
-          await FTSSheets.modifierLignePointage(spreadsheetId, onglet, sheetRow, valeurs);
-          document.getElementById("rhStatus").textContent = "Modification enregistrée.";
-          chargerSemaine();
-        } catch (err) {
-          console.error(err);
-          document.getElementById("rhStatus").textContent = `Erreur : ${err.message}`;
-          saveBtn.disabled = false;
-        }
-      });
-
-      deleteBtn.addEventListener("click", async () => {
-        if (!confirm("Supprimer cette ligne ?")) return;
-        deleteBtn.disabled = true;
-        try {
-          await FTSSheets.supprimerLignePointage(row.dataset.spreadsheet, onglet, Number(row.dataset.row));
-          document.getElementById("rhStatus").textContent = "Ligne supprimée.";
-          chargerSemaine();
-        } catch (err) {
-          console.error(err);
-          document.getElementById("rhStatus").textContent = `Erreur : ${err.message}`;
-          deleteBtn.disabled = false;
-        }
-      });
+    // Personnes : nom saisi par le chef, rapproché sans casse / accents / ordre
+    const pers = new Map();
+    sem.forEach((e) => {
+      const k = cleNom(e.cols[1]);
+      if (!k) return;
+      if (!pers.has(k)) pers.set(k, { k, nom: String(e.cols[1]).toUpperCase(), interim: false, parJour: {} });
+      const p = pers.get(k);
+      if (e.cols[2] === "Intérim") p.interim = true;
+      (p.parJour[e.fr] = p.parJour[e.fr] || []).push(e);
     });
+    const liste = [...pers.values()].sort((a, b) => a.nom.localeCompare(b.nom));
+    const fts = liste.filter((p) => !p.interim), it = liste.filter((p) => p.interim);
+    const aujFR = frDate(new Date());
+    [...new Set(sem.map((e) => e.chantierName))].sort().forEach(couleur);
+
+    // Ordinateur : grille
+    const tete = `<tr><th class="lab">Personne</th>${jours.map((d) => `<th class="${frDate(d) === aujFR ? "today" : ""}">${d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}<b>${String(d.getDate()).padStart(2, "0")}</b></th>`).join("")}<th class="tot">Heures</th><th class="tot" style="width:60px">GD</th></tr>`;
+    const ligne = (p) => {
+      let h = 0, gd = 0;
+      const cells = jours.map((d) => {
+        const fr = frDate(d), l = p.parJour[fr] || [];
+        l.forEach((e) => { h += nb(e.cols[4]); });
+        if (l.some((e) => e.cols[3] === "GD")) gd++;
+        const contenu = l.length ? l.map((e) => `<span class="pt-h" style="--cc:${couleur(e.chantierName)[0]}"><b>${e.cols[4] ? fmt(nb(e.cols[4]), 1).replace(",0", "") + " h" : "—"}${e.cols[3] === "GD" ? '<span class="sv-gd">GD</span>' : ""}</b><small>${esc(codeDe(e.chantierName))}</small></span>`).join("") : `<div class="pt-add">+</div>`;
+        return `<td class="${l.length ? "" : "vide"} ${fr === aujFR ? "today" : ""}" data-p="${esc(p.k)}" data-d="${fr}">${contenu}</td>`;
+      }).join("");
+      return `<tr><td class="lab"><span class="m">${esc(p.nom)}${p.interim ? '<span class="sv-int">INTÉRIM</span>' : ""}</span></td>${cells}<td class="tot">${fmt(h, 1).replace(",0", "")} h</td><td class="tot">${gd || "—"}</td></tr>`;
+    };
+    let corps = fts.map(ligne).join("");
+    if (it.length) corps += `<tr class="sec"><td class="lab">PERSONNEL INTÉRIM</td><td colspan="${jours.length + 2}"></td></tr>` + it.map(ligne).join("");
+    if (!liste.length) corps = `<tr><td colspan="${jours.length + 3}" style="padding:30px;color:var(--text-sub);cursor:default">Aucun pointage personnel sur cette semaine.</td></tr>`;
+    const leg = [...new Set(sem.map((e) => e.chantierName))].map((n) => `<span><i style="background:${couleur(n)[0]}"></i>${esc(codeDe(n))} ${esc(villeDe(n))}</span>`).join("");
+    $("ptDesk").innerHTML = `<section class="sv-card"><div class="pt-scroll"><table class="pt-grid"><thead>${tete}</thead><tbody>${corps}</tbody></table></div>
+      <div class="pt-foot"><span>Total de la semaine par personne à droite (heures et jours de GD) · clic sur une case pour modifier</span><span class="pt-leg">${leg}</span></div></section>`;
+    $("ptDesk").querySelectorAll("td[data-d]").forEach((td) => td.addEventListener("click", () => {
+      const p = pers.get(td.dataset.p);
+      const l = (p && p.parJour[td.dataset.d]) || [];
+      if (l.length) ouvrirEdition(l, `${p.nom} — ${td.dataset.d}`, { nom: p.nom, date: td.dataset.d });
+      else ouvrirAjout({ nom: p ? p.nom : "", date: td.dataset.d });
+    }));
+
+    // Téléphone : un bloc par jour + récap de la semaine
+    let m = "";
+    jours.forEach((d) => {
+      const fr = frDate(d), l = sem.filter((e) => e.fr === fr);
+      const tag = fr === aujFR ? `<span class="pill">Aujourd'hui</span>` : "";
+      const lib = d.toLocaleDateString("fr-FR", { weekday: "long" });
+      if (!l.length) { m += `<div class="pt-day vide ${fr === aujFR ? "today" : ""}"><div class="dh">${lib.charAt(0).toUpperCase() + lib.slice(1, 3)}. ${String(d.getDate()).padStart(2, "0")} ${tag}<small>aucune activité</small></div></div>`; return; }
+      const parCh = {};
+      l.forEach((e) => (parCh[e.chantierName] = parCh[e.chantierName] || []).push(e));
+      m += `<div class="pt-day ${fr === aujFR ? "today" : ""}"><div class="dh">${lib.charAt(0).toUpperCase() + lib.slice(1)} ${String(d.getDate()).padStart(2, "0")} ${tag}<small>${l.length} personne${l.length > 1 ? "s" : ""}</small></div>` +
+        Object.entries(parCh).map(([n, es]) => `<div class="pt-mblk" style="--cc:${couleur(n)[0]}"><div class="t">${esc(n)}</div>${es.map((e) => `<div class="pt-ln" data-k="${e.spreadsheetId}|${e.sheetRow}"><span class="n">${esc(e.cols[1])}${e.cols[2] === "Intérim" ? ' <span class="sv-int">INT</span>' : ""}</span>${e.cols[3] === "GD" ? '<span class="sv-gd">GD</span>' : ""}<b>${e.cols[4] ? fmt(nb(e.cols[4]), 1).replace(",0", "") + " h" : "—"}</b></div>`).join("")}</div>`).join("") + `</div>`;
+    });
+    if (liste.length) {
+      m += `<div class="sv-card" style="margin-top:16px"><div class="sv-ch"><h2>Récapitulatif de la semaine</h2></div>` + liste.map((p) => {
+        const es = Object.values(p.parJour).flat();
+        const h = es.reduce((s, e) => s + nb(e.cols[4]), 0), gd = Object.values(p.parJour).filter((l) => l.some((e) => e.cols[3] === "GD")).length;
+        return `<div class="pt-rp"><span class="n">${esc(p.nom)}${p.interim ? ' <span class="sv-int">INT</span>' : ""}<small>${[...new Set(es.map((e) => codeDe(e.chantierName)))].join(" · ")}</small></span><span class="gdn">${gd ? gd + " GD" : ""}</span><span class="hh">${fmt(h, 1).replace(",0", "")} h</span></div>`;
+      }).join("") + `</div>`;
+    }
+    $("ptMob").innerHTML = m;
+    $("ptMob").querySelectorAll(".pt-ln[data-k]").forEach((el) => el.addEventListener("click", () => {
+      const e = sem.find((x) => `${x.spreadsheetId}|${x.sheetRow}` === el.dataset.k);
+      if (e) ouvrirEdition([e], `${e.cols[1]} — ${e.fr}`, {});
+    }));
   }
 
-  async function ouvrirFormulaireAjout() {
-    const ajoutForm = document.getElementById("ajoutForm");
-    if (ajoutForm.hidden === false) { ajoutForm.hidden = true; return; }
+  // ═══ MATÉRIEL : planning par machine ══════════════════════════
+  function lignesPlanning(toutes) {
+    const lignes = new Map();
+    FTSAteliers.lignesDuParc().forEach((g) => lignes.set(g.cle, { ...g, parJour: {}, chantiersLoc: new Set() }));
+    toutes.forEach((e) => {
+      const g = FTSAteliers.groupeDePointage(e.cols[1], e.cols[4], e.cols[3], e.chef);
+      if (!lignes.has(g.cle)) lignes.set(g.cle, { ...g, parJour: {}, chantiersLoc: new Set() });
+      const L = lignes.get(g.cle);
+      (L.parJour[e.fr] = L.parJour[e.fr] || []).push(e);
+      if (g.section === "loc") L.chantiersLoc.add(e.chantierName);
+    });
+    return lignes;
+  }
 
-    const ajouterBtn = document.getElementById("ajouterBtn");
-    if (!chantiersCache) {
-      if (!window.FTSDrive) { document.getElementById("rhStatus").textContent = "Erreur : module Drive non chargé."; return; }
-      ajouterBtn.disabled = true;
-      try {
-        chantiersCache = await FTSDrive.listChantiers();
-      } catch (err) {
-        document.getElementById("rhStatus").textContent = `Erreur : ${err.message}`;
-        ajouterBtn.disabled = false;
+  // Ce que fait une ligne un jour donné : statut combiné + chantier principal
+  function etatDuJour(l) {
+    if (!l || !l.length) return null;
+    const st = FTSAteliers.statutDuJour(l.map((e) => e.cols[2]));
+    const parCh = {};
+    l.forEach((e) => { parCh[e.chantierName] = (parCh[e.chantierName] || 0) + (String(e.cols[2]).toUpperCase() === st ? 2 : 1); });
+    const chantiers = Object.keys(parCh).sort((a, b) => parCh[b] - parCh[a]);
+    return { st, ch: chantiers[0], autres: chantiers.length - 1 };
+  }
+
+  function bloc(et, span) {
+    const [cc, cb] = couleur(et.ch);
+    const plus = et.autres ? ` <span class="pt-plus">+${et.autres}</span>` : "";
+    if (et.st === "TRAVAIL" || !et.st) return `<div class="pt-blk" style="--cc:${cc};--cb:${cb}"><b>${esc(codeDe(et.ch))} ${esc(villeDe(et.ch))}${plus}</b><span>${esc(resteDe(et.ch))}${span > 1 ? ` · ${span} j` : ""}</span></div>`;
+    return `<div class="pt-blk ${esc(et.st)}">${LIB_ST[et.st] ? LIB_ST[et.st].toUpperCase() : esc(et.st)}<span>${et.st === "TRANSPORT" ? "→ " : ""}${esc(codeDe(et.ch))} ${esc(villeDe(et.ch))}${plus}</span></div>`;
+  }
+
+  function afficherPlanning(toutes, jours) {
+    const frs = new Set(jours.map(frDate));
+    const periode = toutes.filter((e) => frs.has(e.fr));
+    const lignes = lignesPlanning(periode);
+    [...new Set(periode.map((e) => e.chantierName))].sort().forEach(couleur);
+    const aujFR = frDate(new Date());
+    const sectionsVisibles = FTSAteliers.SECTIONS.filter((s) => famille === "tous" || s.fam === "tous" || s.fam === famille);
+    const enTetes = (() => {
+      let wk = `<tr class="wk"><th class="lab"></th>`, j = `<tr><th class="lab">Machine</th>`;
+      for (let i = 0; i < jours.length; i += 7) {
+        const ouvres = jours.slice(i, i + 7).filter((d) => d.getDay() !== 0 && d.getDay() !== 6).length;
+        wk += `<th colspan="${ouvres}">SEMAINE ${numSemaine(jours[i])}</th><th class="we"></th><th class="we"></th>`;
+      }
+      jours.forEach((d) => {
+        const we = d.getDay() === 0 || d.getDay() === 6;
+        j += we ? `<th class="we">${d.getDay() === 6 ? "S" : "D"}<b>${d.getDate()}</b></th>` : `<th class="${frDate(d) === aujFR ? "today" : ""}">${d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}<b>${d.getDate()}</b></th>`;
+      });
+      return wk + `</tr>` + j + `</tr>`;
+    })();
+    const ligneHtml = (L) => {
+      const sous = L.section === "loc" ? `Loué pour ${[...L.chantiersLoc].map((n) => `<b>${esc(codeDe(n))} ${esc(villeDe(n))}</b>`).join(", ")}` : esc(L.sous || "");
+      let h = `<tr class="${L.section === "loc" ? "loc" : ""}"><td class="lab"><span class="m">${esc(L.libelle)}</span>${sous ? `<span class="c">${sous}</span>` : ""}</td>`;
+      for (let i = 0; i < jours.length; i++) {
+        const d = jours[i], fr = frDate(d), we = d.getDay() === 0 || d.getDay() === 6;
+        const et = etatDuJour(L.parJour[fr]);
+        if (we) { h += `<td class="we" data-l="${esc(L.cle)}" data-d="${fr}" title="${et ? esc(LIB_ST[et.st] + " — " + et.ch) : ""}">${et ? `<span class="pt-dot" style="background:${et.st === "TRAVAIL" ? couleur(et.ch)[0] : et.st === "PANNE" ? "#C0392B" : et.st === "ARRET" ? "#F59E0B" : "#4C82F0"}"></span>` : ""}</td>`; continue; }
+        if (!et) { h += `<td class="vide ${fr === aujFR ? "today" : ""}" data-l="${esc(L.cle)}" data-d="${fr}"><div class="pt-add">+</div></td>`; continue; }
+        let span = 1;
+        if (et.st === "TRAVAIL" && !et.autres) {
+          while (i + span < jours.length) {
+            const d2 = jours[i + span];
+            if (d2.getDay() === 0 || d2.getDay() === 6) break;
+            const e2 = etatDuJour(L.parJour[frDate(d2)]);
+            if (!e2 || e2.st !== "TRAVAIL" || e2.ch !== et.ch || e2.autres) break;
+            span++;
+          }
+        }
+        const tod = jours.slice(i, i + span).some((x) => frDate(x) === aujFR) ? "today" : "";
+        h += `<td colspan="${span}" class="${tod}" data-l="${esc(L.cle)}" data-d="${fr}" data-span="${span}">${bloc(et, span)}</td>`;
+        i += span - 1;
+      }
+      return h + `</tr>`;
+    };
+    let corps = "";
+    sectionsVisibles.forEach((s) => {
+      const ls = [...lignes.values()].filter((L) => L.section === s.id);
+      if (s.id === "loc" && !ls.length) return;
+      if (s.repliable) {
+        const actives = ls.filter((L) => Object.keys(L.parJour).length).length;
+        corps += `<tr class="sec repli" data-sec="autre"><td class="lab">${autresOuverts ? "▾" : "▸"} ${s.titre} · ${ls.length}</td><td colspan="${jours.length}"><span class="info">${autresOuverts ? "clic pour replier" : `compresseur, pelles, Pajot, pompes, dessableur… — clic pour déplier · ${actives} en activité sur la période`}</span></td></tr>`;
+        if (autresOuverts) corps += ls.map(ligneHtml).join("");
         return;
       }
-      ajouterBtn.disabled = false;
-    }
+      corps += `<tr class="sec"><td class="lab">${s.titre}${s.id === "pieux" ? " · RAPPORT PIEUX À VENIR" : ""}</td><td colspan="${jours.length}"></td></tr>` + ls.map(ligneHtml).join("");
+    });
+    const largeur = 270 + jours.filter((d) => d.getDay() % 6 !== 0).length * (nbSemaines >= 4 ? 64 : 96) + jours.filter((d) => d.getDay() % 6 === 0).length * 20;
+    $("ptDesk").innerHTML = `<section class="sv-card"><div class="pt-scroll"><table class="pt-grid" style="min-width:${largeur}px"><thead>${enTetes}</thead><tbody>${corps}</tbody></table></div>
+      <div class="pt-foot"><span class="pt-leg"><span><i style="background:#E8F0FF;border-left:3px solid #4C82F0"></i>Sur chantier (couleur = chantier)</span><span><i style="background:#EAF1FE"></i>Transport</span><span><i style="background:#FFEDD5"></i>Arrêt</span><span><i style="background:#FDECEA"></i>Panne</span></span><span>Clic sur une case pour modifier · case vide = ajouter</span></div></section>`;
+    const repli = $("ptDesk").querySelector("tr.sec.repli");
+    if (repli) repli.addEventListener("click", () => { autresOuverts = !autresOuverts; setPref("autres", autresOuverts ? "1" : "0"); afficher(); });
+    $("ptDesk").querySelectorAll("td[data-l]").forEach((td) => td.addEventListener("click", () => ouvrirCase(lignes.get(td.dataset.l), td.dataset.d, Number(td.dataset.span || 1), jours)));
 
-    const optionsChantiers = chantiersCache.map((c) => `<option value="${c.id}" data-nom="${escapeHtmlRH(c.name)}">${escapeHtmlRH(c.name)}</option>`).join("");
-    const aujourdhuiISO = isoDate(new Date());
+    // Téléphone : une carte par machine active (semaine en cours de la période)
+    const sem = jours.filter((d) => d >= lundi(jours[jours.length - 1]) && d.getDay() !== 0);
+    const refJour = sem.find((d) => frDate(d) === aujFR) || sem[0];
+    const couleurEt = (et) => !et ? "#EEF0F2" : et.st === "TRAVAIL" ? couleur(et.ch)[0] : et.st === "PANNE" ? "#C0392B" : et.st === "ARRET" ? "#F59E0B" : "#4C82F0";
+    let m = "";
+    sectionsVisibles.forEach((s) => {
+      const ls = [...lignes.values()].filter((L) => L.section === s.id);
+      const actives = ls.filter((L) => sem.some((d) => L.parJour[frDate(d)]));
+      if (!ls.length || (s.id === "loc" && !actives.length)) return;
+      m += `<div class="pt-mh">${s.titre}</div>` + actives.map((L) => {
+        const et = etatDuJour(L.parJour[frDate(refJour)]);
+        return `<div class="pt-at" data-l="${esc(L.cle)}"><div class="m">${esc(L.libelle)}</div>${L.sous ? `<div class="c">${esc(L.sous)}</div>` : ""}
+          <div class="now">${et ? bloc(et, 1) : `<div style="font-size:.78rem;color:var(--text-sub);padding:6px 0">Rien ${frDate(refJour) === aujFR ? "aujourd'hui" : "ce jour-là"}</div>`}</div>
+          <div class="pt-strip">${sem.map((d) => `<div class="${frDate(d) === aujFR ? "t" : ""}" data-d="${frDate(d)}">${d.toLocaleDateString("fr-FR", { weekday: "narrow" })}${d.getDate()}<i style="background:${couleurEt(etatDuJour(L.parJour[frDate(d)]))}"></i></div>`).join("")}</div></div>`;
+      }).join("") + (ls.length - actives.length && s.id !== "loc" ? `<div class="pt-libre">${ls.length - actives.length} sans activité cette semaine</div>` : "");
+    });
+    $("ptMob").innerHTML = m || `<div class="sv-vide">Aucun pointage matériel sur cette période.</div>`;
+    $("ptMob").querySelectorAll(".pt-at").forEach((c) => c.querySelectorAll(".pt-strip div").forEach((dv) => dv.addEventListener("click", () => ouvrirCase(lignes.get(c.dataset.l), dv.dataset.d, 1, jours))));
+  }
 
-    const champsSpecifiques = estMateriel
-      ? `
-        <div class="field"><label>Machine</label><input type="text" id="ajoutChamp2" list="dl_parc_machines" placeholder="ex : FUTURO N°1" autocomplete="off"></div>
-        <div class="field"><label>Statut</label><select id="ajoutChamp3">${STATUTS_MACHINE.map((s) => `<option value="${s}">${s}</option>`).join("")}</select></div>
-        <div class="field"><label>FTS / LOC</label><input type="text" id="ajoutChamp4" placeholder="auto"></div>`
-      : `
-        <div class="field"><label>Nom</label><input type="text" id="ajoutChamp2" placeholder="ex : Jean Dupont"></div>
-        <div class="field"><label>Type</label><select id="ajoutChamp3"><option value="FTS">FTS</option><option value="Intérim">Intérim</option></select></div>
-        <div class="field" style="min-width:auto"><label class="pc-edit-gd-label" style="margin-top:8px"><input type="checkbox" id="ajoutChamp4"> GD</label></div>
-        <div class="field"><label>Heures</label><input type="text" id="ajoutChamp5" placeholder="ex : 7.5" style="max-width:80px"></div>`;
+  function ouvrirCase(L, fr, span, jours) {
+    if (!L) return;
+    const i0 = jours.findIndex((d) => frDate(d) === fr);
+    const frs = jours.slice(i0, i0 + span).map(frDate);
+    const l = frs.flatMap((f) => L.parJour[f] || []);
+    const titre = `${L.libelle} — ${span > 1 ? `du ${frs[0].slice(0, 5)} au ${frs[frs.length - 1].slice(0, 5)}` : fr}`;
+    if (!l.length) return ouvrirAjout({ machine: machineParDefaut(L), date: fr });
+    ouvrirEdition(l, titre, { machine: machineParDefaut(L), date: fr });
+  }
+  function machineParDefaut(L) {
+    if (L.section === "loc" || L.cle.startsWith("X|")) return L.libelle;
+    if (L.cle.startsWith("M|") && window.FTSParc) { const m = FTSParc.parNumero(L.cle.slice(2)); return m ? m.nom : L.libelle; }
+    return L.sous ? L.sous.split(" · ")[0] : L.libelle;
+  }
 
-    ajoutForm.innerHTML = `
-      <div class="field"><label>Chantier</label><select id="ajoutChantier">${optionsChantiers}</select></div>
-      <div class="field"><label>Date</label><input type="date" id="ajoutDate" value="${aujourdhuiISO}"></div>
-      ${champsSpecifiques}
-      <button type="button" class="btn-primary" id="ajoutValider">Enregistrer</button>
-      <button type="button" class="btn-secondary" id="ajoutAnnuler">Annuler</button>
-    `;
-    ajoutForm.hidden = false;
+  // ═══ MATÉRIEL : récap par chantier ════════════════════════════
+  function bornesRecap() {
+    const p = $("periodeSel").value, n = new Date();
+    if (p === "mois") return [new Date(n.getFullYear(), n.getMonth(), 1), new Date(n.getFullYear(), n.getMonth() + 1, 0)];
+    if (p === "moisPrec") return [new Date(n.getFullYear(), n.getMonth() - 1, 1), new Date(n.getFullYear(), n.getMonth(), 0)];
+    if (p === "semaine") return [lundi(n), ajoute(lundi(n), 6)];
+    if (p === "perso") { const a = $("du").value, b = $("au").value; return [a ? new Date(a + "T00:00:00") : null, b ? new Date(b + "T00:00:00") : null]; }
+    return [null, null];
+  }
 
-    document.getElementById("ajoutAnnuler").addEventListener("click", () => { ajoutForm.hidden = true; });
-    document.getElementById("ajoutValider").addEventListener("click", async () => {
-      const btn = document.getElementById("ajoutValider");
-      const chantierSelect = document.getElementById("ajoutChantier");
-      const chantierId = chantierSelect.value;
-      const chantierName = chantierSelect.selectedOptions[0]?.dataset.nom || "";
-      const dateISO = document.getElementById("ajoutDate").value;
-      const champ2 = document.getElementById("ajoutChamp2").value.trim();
-      const champ3 = document.getElementById("ajoutChamp3").value;
-      const champ4Input = document.getElementById("ajoutChamp4");
-      const champ4 = estMateriel ? champ4Input.value.trim() : (champ4Input.checked ? "GD" : "");
-      const champ5 = !estMateriel ? (document.getElementById("ajoutChamp5")?.value.trim() || "") : "";
+  function afficherRecap(toutes) {
+    const [d1, d2] = bornesRecap();
+    const q = $("recherche").value.trim().toLowerCase();
+    const sel = toutes.filter((e) => (!d1 || e.date >= d1) && (!d2 || e.date <= d2) && (!q || e.chantierName.toLowerCase().includes(q)));
+    const parCh = new Map();
+    sel.forEach((e) => { if (!parCh.has(e.chantierId)) parCh.set(e.chantierId, []); parCh.get(e.chantierId).push(e); });
+    const noms = [...parCh.keys()].map((id) => donnees.chantiers.find((c) => c.id === id)).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+    noms.forEach((c) => couleur(c.name));
+    const html = noms.map((c) => {
+      const es = parCh.get(c.id);
+      const i = donnees.chantiers.indexOf(c);
+      const prodDates = new Set((donnees.suivis[i].production || []).map((r) => r[0]).filter((x) => { const d = parseFR(x); return d && (!d1 || d >= d1) && (!d2 || d <= d2); }));
+      const dates = es.map((e) => e.date).sort((a, b) => a - b);
+      const groupes = new Map();
+      es.forEach((e) => {
+        const g = FTSAteliers.groupeDePointage(e.cols[1], e.cols[4], e.cols[3], e.chef);
+        if (!groupes.has(g.cle)) groupes.set(g.cle, { ...g, parJour: {} });
+        (groupes.get(g.cle).parJour[e.fr] = groupes.get(g.cle).parJour[e.fr] || []).push(e.cols[2]);
+      });
+      const ordre = (id) => FTSAteliers.SECTIONS.findIndex((s) => s.id === id);
+      const gs = [...groupes.values()].sort((a, b) => (ordre(a.section) - ordre(b.section)) || a.libelle.localeCompare(b.libelle, "fr", { numeric: true }));
+      const tot = { TRAVAIL: 0, PANNE: 0, ARRET: 0, TRANSPORT: 0 };
+      let locFait = false;
+      const cell = (v, k) => `<td class="r"><span class="sv-n ${v ? k : "z"}">${v ? v + " j" : "—"}</span></td>`;
+      const lignes = gs.map((g) => {
+        const n = { TRAVAIL: 0, PANNE: 0, ARRET: 0, TRANSPORT: 0 };
+        Object.values(g.parJour).forEach((s) => { const st = FTSAteliers.statutDuJour(s); if (n[st] !== undefined) { n[st]++; tot[st]++; } });
+        const t = n.TRAVAIL + n.PANNE + n.ARRET + n.TRANSPORT || 1;
+        let sep = "";
+        if (g.section === "loc" && !locFait) { sep = `<tr class="sep"><td colspan="7">MATÉRIEL LOCATION</td></tr>`; locFait = true; }
+        return sep + `<tr class="${g.section === "loc" ? "loc" : ""}"><td><b>${esc(g.libelle)}</b>${g.sous ? `<span class="sub">${esc(g.sous)}</span>` : ""}</td>${cell(n.TRAVAIL, "t")}${cell(n.PANNE, "p")}${cell(n.ARRET, "a")}${cell(n.TRANSPORT, "tr")}
+          <td class="r"><b>${n.TRAVAIL + n.PANNE + n.ARRET + n.TRANSPORT} j</b></td><td class="r c-rep"><div class="sv-stack"><div style="width:${n.TRAVAIL / t * 100}%;background:#27AE60"></div><div style="width:${n.PANNE / t * 100}%;background:#C0392B"></div><div style="width:${n.ARRET / t * 100}%;background:#F59E0B"></div><div style="width:${n.TRANSPORT / t * 100}%;background:#4C82F0"></div></div></td></tr>`;
+      }).join("");
+      const tech = FTSDrive.techniquesChantier(c.meta || {});
+      return `<section class="sv-card pt-rc"><div class="sv-ch" style="--cc:${couleur(c.name)[0]}"><div><h2>${esc(codeDe(c.name))} — ${esc(c.name.split(/\s+/).slice(1).join(" "))} ${tech.map((t) => `<span class="sv-badge sv-b-${esc(t)}" style="vertical-align:2px">${esc(t)}</span>`).join(" ")}</h2>
+        <div class="s">Période : du ${frDate(dates[0]).slice(0, 5)} au ${frDate(dates[dates.length - 1]).slice(0, 5)} · ${prodDates.size} jour${prodDates.size > 1 ? "s" : ""} de rapport</div></div><span class="sv-sp"></span>
+        <div class="k"><span>Travail <b>${tot.TRAVAIL} j</b></span><span>Panne <b>${tot.PANNE} j</b></span><span>Arrêt <b>${tot.ARRET} j</b></span><span>Transport <b>${tot.TRANSPORT} j</b></span></div>
+        <a class="sv-btn" style="text-decoration:none" href="../detail-chantier/index.html?id=${encodeURIComponent(c.id)}&name=${encodeURIComponent(c.name)}#materiel">Voir le chantier →</a></div>
+        <table class="sv-tbl"><thead><tr><th>Machine</th><th class="r">Travail</th><th class="r">Panne</th><th class="r">Arrêt</th><th class="r">Transport</th><th class="r">Total</th><th class="r c-rep" style="width:210px">Répartition</th></tr></thead><tbody>${lignes}</tbody></table></section>`;
+    }).join("");
+    const vide = famille === "px"
+      ? `<div class="sv-vide">🏛️ Aucun chantier pieux pour l'instant — les jours matériel pieux apparaîtront ici dès que le rapport journalier pieux sera en place.</div>`
+      : `<div class="sv-vide">Aucun pointage matériel sur cette période${q ? " pour cette recherche" : ""}.</div>`;
+    $("ptDesk").innerHTML = html || vide;
+    $("ptMob").innerHTML = html || vide;
+  }
 
-      if (!chantierId || !dateISO || !champ2) { document.getElementById("rhStatus").textContent = "Chantier, date et nom/machine sont obligatoires."; return; }
+  // ═══ Ajout / modification / suppression ═══════════════════════
+  function machinePointage(saisie, ftsLocSaisi) {
+    const nom = String(saisie || "").trim().toUpperCase();
+    const m = window.FTSParc ? FTSParc.parNom(nom) || FTSParc.parNumero(nom) : null;
+    if (m) return { nom: m.nom, ftsLoc: "FTS", numero: m.numero };
+    return { nom, ftsLoc: String(ftsLocSaisi || "").trim().toUpperCase() || "LOC", numero: "" };
+  }
 
-      const [a, m, j] = dateISO.split("-");
-      const dateAffichage = `${j}/${m}/${a}`;
-
-      btn.disabled = true;
-      document.getElementById("rhStatus").textContent = "Ajout en cours...";
-      try {
-        const mp = estMateriel ? machinePointage(champ2, champ4) : null;
-        const valeurs = estMateriel ? [dateAffichage, mp.nom, champ3, mp.ftsLoc, mp.numero] : [dateAffichage, champ2, champ3, champ4, champ5];
-        await FTSSheets.ajouterLignePointage(chantierId, chantierName, onglet, valeurs);
-        document.getElementById("rhStatus").textContent = "Entrée ajoutée.";
-        ajoutForm.hidden = true;
-        chargerSemaine();
-      } catch (err) {
-        console.error(err);
-        document.getElementById("rhStatus").textContent = `Erreur : ${err.message}`;
-      } finally {
-        btn.disabled = false;
-      }
+  function ouvrirEdition(liste, titre, defaut) {
+    const corps = `<div class="full" style="grid-column:1/-1">${liste.map((e, i) => estMateriel
+      ? `<div class="pt-ent" data-i="${i}"><div class="q">${esc(e.cols[1])} <span class="sv-st ${esc(String(e.cols[2]).toUpperCase())}" style="margin-left:6px"><i></i>${esc(LIB_ST[String(e.cols[2]).toUpperCase()] || e.cols[2])}</span><small>${esc(e.fr)} · ${esc(e.chantierName)}${(e.cols[3] || "").toUpperCase() === "LOC" ? " · LOC" : ""}</small></div>
+          <div style="white-space:nowrap"><button type="button" class="sv-ib" data-a="edit" title="Modifier">✏️</button><button type="button" class="sv-ib" data-a="del" title="Supprimer">🗑️</button></div>
+          <div class="ed"><input type="text" class="e-m" list="dlMachines" value="${esc(e.cols[1])}" style="min-width:180px"><select class="e-s">${STATUTS.map((s) => `<option value="${s}" ${String(e.cols[2]).toUpperCase() === s ? "selected" : ""}>${LIB_ST[s]}</option>`).join("")}</select><button type="button" class="sv-btn pri" data-a="save">Enregistrer</button></div></div>`
+      : `<div class="pt-ent" data-i="${i}"><div class="q">${esc(e.cols[1])}${e.cols[2] === "Intérim" ? ' <span class="sv-int">INTÉRIM</span>' : ""} · ${e.cols[4] ? esc(e.cols[4]) + " h" : "—"}${e.cols[3] === "GD" ? ' <span class="sv-gd">GD</span>' : ""}<small>${esc(e.fr)} · ${esc(e.chantierName)}</small></div>
+          <div style="white-space:nowrap"><button type="button" class="sv-ib" data-a="edit" title="Modifier">✏️</button><button type="button" class="sv-ib" data-a="del" title="Supprimer">🗑️</button></div>
+          <div class="ed"><input type="text" class="e-n" list="dlNoms" value="${esc(e.cols[1])}" style="min-width:160px"><select class="e-t"><option value="FTS" ${e.cols[2] !== "Intérim" ? "selected" : ""}>FTS</option><option value="Intérim" ${e.cols[2] === "Intérim" ? "selected" : ""}>Intérim</option></select><input type="text" class="e-h" value="${esc(e.cols[4] || "")}" placeholder="heures" style="width:80px"><label style="display:flex;gap:4px;align-items:center;font-size:.86rem;font-weight:600"><input type="checkbox" class="e-g" ${e.cols[3] === "GD" ? "checked" : ""}> GD</label><button type="button" class="sv-btn pri" data-a="save">Enregistrer</button></div></div>`).join("")}</div>
+      <p class="sv-mstatus" id="edStatus"></p>`;
+    const m = FTSShell.modale({ titre: esc(titre), corps, pied: `<button type="button" class="sv-btn" data-x>Fermer</button><button type="button" class="sv-btn" data-add>+ Ajouter une ligne</button>` });
+    const st = m.el.querySelector("#edStatus");
+    m.el.querySelector("[data-x]").addEventListener("click", m.fermer);
+    m.el.querySelector("[data-add]").addEventListener("click", () => { m.fermer(); ouvrirAjout({ ...defaut, chantierId: liste[0].chantierId }); });
+    m.el.querySelectorAll(".pt-ent").forEach((row) => {
+      const e = liste[Number(row.dataset.i)];
+      row.querySelector('[data-a="edit"]').addEventListener("click", () => row.classList.toggle("editing"));
+      row.querySelector('[data-a="del"]').addEventListener("click", async (ev) => {
+        if (!confirm("Supprimer cette ligne de pointage ?")) return;
+        m.el.querySelectorAll("button").forEach((b) => (b.disabled = true));
+        st.textContent = "Suppression…";
+        try {
+          await FTSSheets.supprimerLignePointage(e.spreadsheetId, onglet, e.sheetRow);
+          m.fermer(); FTSShell.toast("Ligne supprimée."); charger(true);
+        } catch (err) { st.textContent = `Erreur : ${err.message}`; st.className = "sv-mstatus err"; m.el.querySelectorAll("button").forEach((b) => (b.disabled = false)); }
+      });
+      row.querySelector('[data-a="save"]').addEventListener("click", async (ev) => {
+        ev.target.disabled = true; st.textContent = "Enregistrement…"; st.className = "sv-mstatus";
+        try {
+          let valeurs;
+          if (estMateriel) {
+            const mp = machinePointage(row.querySelector(".e-m").value, e.cols[3]);
+            valeurs = [e.fr, mp.nom, row.querySelector(".e-s").value, mp.ftsLoc, mp.numero, e.cols[5] || ""];
+          } else {
+            valeurs = [e.fr, row.querySelector(".e-n").value.trim().toUpperCase(), row.querySelector(".e-t").value, row.querySelector(".e-g").checked ? "GD" : "", row.querySelector(".e-h").value.trim().replace(".", ","), e.cols[5] || ""];
+          }
+          await FTSSheets.modifierLignePointage(e.spreadsheetId, onglet, e.sheetRow, valeurs);
+          m.fermer(); FTSShell.toast("Modification enregistrée."); charger(true);
+        } catch (err) { st.textContent = `Erreur : ${err.message}`; st.className = "sv-mstatus err"; ev.target.disabled = false; }
+      });
     });
   }
 
-  function convertirDateFRversISO(s) {
-    const [j, m, a] = (s || "").split("/");
-    return j && m && a ? `${a}-${m.padStart(2, "0")}-${j.padStart(2, "0")}` : null;
+  function ouvrirAjout(pre) {
+    if (!donnees) { FTSShell.toast("Connecte-toi d'abord."); return; }
+    const chantiers = donnees.chantiers.filter((c) => dansFamille(famChantier(c.meta)) && (c.meta || {}).statutChantier !== "Termine");
+    const dateISO = pre.date ? isoDate(parseFR(pre.date)) : isoDate(new Date());
+    const m = FTSShell.modale({
+      titre: estMateriel ? "Ajouter un pointage matériel" : "Ajouter un pointage personnel",
+      corps: `<div class="sv-f full"><label>Chantier</label><select id="aCh">${chantiers.map((c) => `<option value="${esc(c.id)}" ${c.id === pre.chantierId ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div>
+        <div class="sv-f"><label>Date</label><input type="date" id="aDate" value="${dateISO}"></div>
+        ${estMateriel
+          ? `<div class="sv-f"><label>Statut</label><select id="aSt">${STATUTS.map((s) => `<option value="${s}">${LIB_ST[s]}</option>`).join("")}</select></div>
+             <div class="sv-f full"><label>Machine <i>(nom du Parc matériel ; pour une centrale, ajoute MA12, PH15 et GE)</i></label><input type="text" id="aM" list="dlMachines" value="${esc(pre.machine || "")}" placeholder="ex : FUTURO N°1"></div>`
+          : `<div class="sv-f"><label>Nom</label><input type="text" id="aN" list="dlNoms" value="${esc(pre.nom || "")}" placeholder="ex : HUGO LAJUS"></div>
+             <div class="sv-f"><label>Type</label><select id="aT"><option value="FTS">FTS</option><option value="Intérim">Intérim</option></select></div>
+             <div class="sv-f"><label>Heures</label><input type="text" id="aH" placeholder="ex : 8"></div>
+             <div class="sv-f"><label>&nbsp;</label><span class="chkline"><input type="checkbox" id="aG"> Grand déplacement</span></div>`}
+        <p class="sv-mstatus" id="aStatus"></p>`,
+      pied: `<button type="button" class="sv-btn" data-x>Annuler</button><button type="button" class="sv-btn pri" id="aOk">Ajouter</button>`,
+    });
+    m.el.querySelector("[data-x]").addEventListener("click", m.fermer);
+    m.el.querySelector("#aOk").addEventListener("click", async (ev) => {
+      const st = m.el.querySelector("#aStatus");
+      const v = (id) => (m.el.querySelector("#" + id) || {}).value || "";
+      const c = donnees.chantiers.find((x) => x.id === v("aCh"));
+      const qui = estMateriel ? v("aM").trim() : v("aN").trim();
+      if (!c || !v("aDate") || !qui) { st.textContent = "Chantier, date et " + (estMateriel ? "machine" : "nom") + " sont obligatoires."; st.className = "sv-mstatus err"; return; }
+      const [a, mo, j] = v("aDate").split("-");
+      const fr = `${j}/${mo}/${a}`;
+      let valeurs;
+      if (estMateriel) { const mp = machinePointage(qui, ""); valeurs = [fr, mp.nom, v("aSt"), mp.ftsLoc, mp.numero]; }
+      else valeurs = [fr, qui.toUpperCase(), v("aT"), m.el.querySelector("#aG").checked ? "GD" : "", v("aH").trim().replace(".", ",")];
+      ev.target.disabled = true; st.textContent = "Ajout…"; st.className = "sv-mstatus";
+      try {
+        await FTSSheets.ajouterLignePointage(c.id, c.name, onglet, valeurs);
+        m.fermer(); FTSShell.toast("Entrée ajoutée."); charger(true);
+      } catch (err) { st.textContent = `Erreur : ${err.message}`; st.className = "sv-mstatus err"; ev.target.disabled = false; }
+    });
   }
 
-  async function synchroniserAgenda() {
-    const status = document.getElementById("rhStatus");
-    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { status.textContent = "Connecte-toi d'abord."; return; }
-    if (!window.FTSCalendar) { status.textContent = "Erreur : module Agenda non chargé."; return; }
-    if (dernieresEntrees.length === 0) { status.textContent = "Charge d'abord une semaine avant de synchroniser."; return; }
+  // ═══ Export / agenda ═══════════════════════════════════════════
+  function entreesAffichees() {
+    const toutes = entrees().filter((e) => dansFamille(e.fam));
+    if (vue === "recap") { const [d1, d2] = bornesRecap(); const q = $("recherche").value.trim().toLowerCase(); return toutes.filter((e) => (!d1 || e.date >= d1) && (!d2 || e.date <= d2) && (!q || e.chantierName.toLowerCase().includes(q))); }
+    const frs = new Set(joursPeriode().map(frDate));
+    return toutes.filter((e) => frs.has(e.fr));
+  }
 
-    const syncBtn = document.getElementById("syncBtn");
-    syncBtn.disabled = true;
-    status.textContent = "Synchronisation avec Google Agenda...";
+  function telecharger(lignes, nom) {
+    const csv = lignes.map((l) => l.map((x) => `"${String(x ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" }));
+    const a = document.createElement("a"); a.href = url; a.download = nom; a.click(); URL.revokeObjectURL(url);
+  }
+
+  function exporter() {
+    if (!donnees) return;
+    const es = entreesAffichees().sort((a, b) => a.date - b.date || a.chantierName.localeCompare(b.chantierName));
+    const suffixe = `${famille === "tous" ? "" : famille === "mp" ? "_micropieux" : "_pieux"}`;
+    if (estMateriel && vue === "recap") {
+      const lignes = [["Chantier", "Machine", "Travail (j)", "Panne (j)", "Arrêt (j)", "Transport (j)", "Total (j)"]];
+      const parCh = {};
+      es.forEach((e) => { const g = FTSAteliers.groupeDePointage(e.cols[1], e.cols[4], e.cols[3], e.chef); const k = e.chantierName + "||" + g.libelle; (parCh[k] = parCh[k] || { ch: e.chantierName, m: g.libelle + (g.section === "loc" ? " (LOC)" : ""), j: {} }); (parCh[k].j[e.fr] = parCh[k].j[e.fr] || []).push(e.cols[2]); });
+      Object.values(parCh).sort((a, b) => a.ch.localeCompare(b.ch) || a.m.localeCompare(b.m)).forEach((g) => {
+        const n = { TRAVAIL: 0, PANNE: 0, ARRET: 0, TRANSPORT: 0 };
+        Object.values(g.j).forEach((s) => { const st = FTSAteliers.statutDuJour(s); if (n[st] !== undefined) n[st]++; });
+        lignes.push([g.ch, g.m, n.TRAVAIL, n.PANNE, n.ARRET, n.TRANSPORT, n.TRAVAIL + n.PANNE + n.ARRET + n.TRANSPORT]);
+      });
+      return telecharger(lignes, `Recap_materiel_par_chantier${suffixe}.csv`);
+    }
+    const lignes = estMateriel ? [["Date", "Chantier", "Machine", "Statut", "FTS/LOC", "N° machine"]] : [["Date", "Chantier", "Nom", "Type", "GD", "Heures"]];
+    es.forEach((e) => lignes.push([e.fr, e.chantierName, ...e.cols.slice(1, estMateriel ? 5 : 5)]));
+    telecharger(lignes, `Pointage_${estMateriel ? "materiel" : "personnel"}_S${numSemaine(debut)}_${debut.getFullYear()}${suffixe}.csv`);
+  }
+
+  async function synchroniser() {
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { FTSShell.toast("Connecte-toi d'abord."); return; }
+    if (!window.FTSCalendar) { FTSShell.toast("Module Agenda non chargé."); return; }
+    const es = entreesAffichees();
+    if (!es.length) { FTSShell.toast("Rien à synchroniser sur cette période."); return; }
+    const b = $("syncBtn"); b.disabled = true;
+    FTSShell.toast("Synchronisation avec Google Agenda…", 20000);
     try {
       const groupes = {};
-      dernieresEntrees.forEach((e) => {
-        const dateISO = convertirDateFRversISO(e.cols[0]);
-        if (!dateISO) return;
-        const cle = `${e.chantierName}||${dateISO}`;
-        if (!groupes[cle]) groupes[cle] = { chantierName: e.chantierName, dateISO, items: [] };
-        groupes[cle].items.push(e.cols);
-      });
-      const listeGroupes = Object.values(groupes);
-      for (const g of listeGroupes) {
-        if (estMateriel) {
-          const machines = g.items.map((cols) => ({ nom: cols[1], statut: cols[2], ftsLoc: cols[3], atelier: cols[5] || "" }));
-          await FTSCalendar.enregistrerPointageMachine(g.chantierName, g.dateISO, machines);
-        } else {
-          const personnel = g.items.map((cols) => ({ nom: cols[1], type: cols[2], gd: cols[3] === "GD", heures: cols[4], atelier: cols[5] || "" }));
-          await FTSCalendar.enregistrerPointagePersonnel(g.chantierName, g.dateISO, personnel);
-        }
+      es.forEach((e) => { const k = e.chantierName + "||" + isoDate(e.date); (groupes[k] = groupes[k] || { ch: e.chantierName, iso: isoDate(e.date), items: [] }).items.push(e.cols); });
+      for (const g of Object.values(groupes)) {
+        if (estMateriel) await FTSCalendar.enregistrerPointageMachine(g.ch, g.iso, g.items.map((c) => ({ nom: c[1], statut: c[2], ftsLoc: c[3], atelier: c[5] || "" })));
+        else await FTSCalendar.enregistrerPointagePersonnel(g.ch, g.iso, g.items.map((c) => ({ nom: c[1], type: c[2], gd: c[3] === "GD", heures: c[4], atelier: c[5] || "" })));
       }
-      status.textContent = `Synchronisé avec Google Agenda (${listeGroupes.length} jour(s) × chantier mis à jour).`;
-    } catch (err) {
-      console.error(err);
-      status.textContent = `Erreur de synchronisation : ${err.message}`;
-    } finally {
-      syncBtn.disabled = false;
-    }
+      FTSShell.toast(`Agenda mis à jour (${Object.keys(groupes).length} jour(s) × chantier).`);
+    } catch (err) { FTSShell.toast(`Erreur de synchronisation : ${err.message}`, 6000); }
+    finally { b.disabled = false; }
   }
 
-  document.getElementById("ajouterBtn").addEventListener("click", ouvrirFormulaireAjout);
-  document.getElementById("syncBtn").addEventListener("click", synchroniserAgenda);
-
-  function exporterCSV() {
-    const lignes = estMateriel
-      ? [["Date", "Chantier", "Machine", "Statut", "FTS/LOC"]]
-      : [["Date", "Chantier", "Nom", "Type", "GD", "Heures"]];
-
-    const jours = [];
-    for (let i = 0; i < 6; i++) { const d = new Date(lundiCourant); d.setDate(d.getDate() + i); jours.push(d); }
-
-    FTSSheets.listerPointageToutesChantiers(onglet, isoDate(lundiCourant), isoDate(jours[5])).then((entrees) => {
-      entrees.forEach((e) => lignes.push([e.cols[0], e.chantierName, ...e.cols.slice(1)]));
-      const csv = lignes.map((l) => l.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
-      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Pointage_${type}_semaine_${numeroSemaine(lundiCourant)}_${lundiCourant.getFullYear()}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-  }
-
-  document.getElementById("exportTopBtn").addEventListener("click", exporterCSV);
-
-  document.getElementById("semainePrecBtn").addEventListener("click", () => {
-    lundiCourant.setDate(lundiCourant.getDate() - 7);
-    chargerSemaine();
-  });
-  document.getElementById("semaineSuivBtn").addEventListener("click", () => {
-    lundiCourant.setDate(lundiCourant.getDate() + 7);
-    chargerSemaine();
-  });
-  document.getElementById("semaineActuelleBtn").addEventListener("click", () => {
-    lundiCourant = lundiDeLaSemaine(new Date());
-    chargerSemaine();
+  FTSShell.monter({
+    actif: estMateriel ? "materiel" : "personnel",
+    titre: estMateriel ? "Pointage matériel" : "Pointage personnel",
+    sousTitre: estMateriel ? "Où est chaque machine, jour par jour" : "Heures et grands déplacements, jour par jour",
+    actions: `<button type="button" class="sv-btn" id="syncBtn">📅 Synchroniser l'agenda</button>
+      <button type="button" class="sv-btn" id="exportBtn">⬇️ Exporter Excel</button>
+      <button type="button" class="sv-btn pri" id="ajoutBtn">+ Ajouter une entrée</button>`,
+    menuMobile: [
+      { label: "+ Ajouter une entrée", action: () => ouvrirAjout({}) },
+      { label: "⬇️ Exporter Excel", action: () => exporter() },
+      { label: "📅 Synchroniser l'agenda", action: () => synchroniser() },
+      { label: "🔄 Actualiser", action: () => charger(true) },
+    ],
+    onSession: (c) => { if (c) charger(); else afficher(); },
   });
 
-  if (window.FTSAuth) {
-    FTSAuth.onAuthChange(async (signedIn) => {
-      const adminAccountInfo = document.getElementById("adminAccountInfo");
-      const userDot = document.getElementById("userDot");
-      if (signedIn) {
-        const info = await FTSAuth.getUserInfo();
-        adminAccountInfo.textContent = info ? info.email : "Connecté";
-        userDot.classList.add("online");
-        chargerSemaine();
-      } else {
-        adminAccountInfo.textContent = "Non connecté";
-        userDot.classList.remove("online");
-      }
-    });
-    FTSAuth.init();
-    if (FTSAuth.isSignedIn()) {
-      FTSAuth.getUserInfo().then((info) => {
-        document.getElementById("adminAccountInfo").textContent = info ? info.email : "Connecté";
-        document.getElementById("userDot").classList.add("online");
-      });
-      chargerSemaine();
-    } else {
-      document.getElementById("rhStatus").textContent = "Connecte-toi depuis le dashboard principal, puis reviens sur cette page.";
-    }
-  }
+  // ═══ Commandes ═════════════════════════════════════════════════
+  $("ajoutBtn").addEventListener("click", () => ouvrirAjout({}));
+  $("exportBtn").addEventListener("click", exporter);
+  $("syncBtn").addEventListener("click", synchroniser);
+  document.querySelectorAll("#vueSeg button").forEach((b) => b.addEventListener("click", () => { vue = b.dataset.v; setPref("vue", vue); afficher(); }));
+  document.querySelectorAll("#famSeg button").forEach((b) => b.addEventListener("click", () => { famille = b.dataset.f; setPref("fam", famille); afficher(); }));
+  document.querySelectorAll("#dureeSeg button").forEach((b) => b.addEventListener("click", () => {
+    nbSemaines = Number(b.dataset.n); setPref("sem", String(nbSemaines));
+    debut = nbSemaines === 1 ? lundi(new Date()) : ajoute(lundi(new Date()), -7 * (nbSemaines === 4 ? 2 : 1));
+    afficher();
+  }));
+  $("precBtn").addEventListener("click", () => { debut = ajoute(debut, -7 * (estMateriel ? nbSemaines : 1)); afficher(); });
+  $("suivBtn").addEventListener("click", () => { debut = ajoute(debut, 7 * (estMateriel ? nbSemaines : 1)); afficher(); });
+  $("auj").addEventListener("click", () => { debut = nbSemaines <= 1 ? lundi(new Date()) : ajoute(lundi(new Date()), -7 * (nbSemaines === 4 ? 2 : 1)); afficher(); });
+  $("recherche").addEventListener("input", afficher);
+  $("periodeSel").addEventListener("change", () => { $("persoDates").style.display = $("periodeSel").value === "perso" ? "flex" : "none"; afficher(); });
+  ["du", "au"].forEach((id) => $(id).addEventListener("change", afficher));
+  $("auj").textContent = estMateriel ? "Aujourd'hui" : "Semaine actuelle";
+
+  // Téléphone : version allégée — le pointage reste consultable sur demande
+  let forcer = false;
+  try { forcer = sessionStorage.getItem("fts_pt_forcer") === "1"; } catch (e) {}
+  if (FTSShell.estTelephone() && !forcer) { document.body.classList.add("pt-bloque"); $("ptTel").hidden = false; }
+  $("ptForcer").addEventListener("click", () => {
+    try { sessionStorage.setItem("fts_pt_forcer", "1"); } catch (e) {}
+    document.body.classList.remove("pt-bloque"); $("ptTel").hidden = true;
+  });
+
+  remplirListes();
+  if (window.FTSParc) FTSParc.charger().catch(() => {}).then(() => { remplirListes(); afficher(); });
+  afficher();
 });
 </script>
 </body>

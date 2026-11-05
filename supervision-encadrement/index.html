@@ -314,6 +314,19 @@ html { font-size: 16px; }
   .se-table-scroll { overflow-x: auto; }
 }
 </style>
+<style>
+/* ─── Téléphone : version allégée (consultation) ─────────────────
+   Vue d'ensemble seule ; pointages, statistiques, référentiels et
+   création de chantier restent sur ordinateur. */
+.tel-only { display: none; }
+@media (max-width: 760px) {
+  .sv-tabbar, .sv-fab, .sv-sidebar, .sv-backdrop { display: none !important; }
+  .sv-content { padding-bottom: 30px !important; }
+  .tel-only { display: block; }
+  .tel-hint { font-size: 0.74rem; color: var(--text-sub); text-align: center; padding: 14px 0 4px; }
+  .sv-foot span:last-child { display: none; }
+}
+</style>
 </head>
 <body>
 
@@ -402,6 +415,7 @@ html { font-size: 16px; }
       <div class="sv-empty" id="chantiersEmpty" hidden></div>
       <div class="sv-foot"><span id="chantiersCompteur"></span><span>Clic sur une ligne = détail du chantier</span></div>
     </section>
+    <div class="tel-only tel-hint">Version téléphone : consultation. Pointages, statistiques et saisies sur ordinateur.</div>
   </div>
 
   <!-- ─── STATISTIQUES ────────────────────────────────────── -->
@@ -745,7 +759,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function fermerMenuMobile() { document.body.classList.remove("menu-ouvert"); }
 
+  const estTelephone = () => window.matchMedia("(max-width: 760px)").matches;
+
   function afficherVue(id) {
+    if (estTelephone() && id !== "se-view-overview") id = "se-view-overview"; // version allégée
     document.querySelectorAll("[data-view]").forEach((b) => {
       b.classList.toggle("active", b.dataset.view === id && b.classList.contains("se-nav-btn"));
       b.classList.toggle("on", b.dataset.view === id && b.classList.contains("tab-btn"));
@@ -942,9 +959,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const heuresSemaine = persoSemaine.reduce((t, r) => t + nombre(r[4]), 0);
 
       const jours = resume.joursRapportes > 0 ? resume.joursRapportes : null;
-      const duree = meta.dureeChantier || null;
+      // Avenants / TS validés (Détail chantier) : s'ajoutent au marché principal
+      const avenants = Array.isArray(meta.avenants) ? meta.avenants : [];
+      const avMpx = avenants.reduce((t, a) => t + (Number(a.mpx) || 0), 0);
+      const avJours = avenants.reduce((t, a) => t + (Number(a.jours) || 0), 0);
+      const duree = ((Number(meta.dureeChantier) || 0) + avJours) || null;
       const prevuMpx = ((tech.includes("Micropieux") ? Number(meta.micropieuxPrevus) || 0 : 0)
-        + (tech.includes("Battage") ? Number(meta.battagePrevus || (!tech.includes("Micropieux") ? meta.micropieuxPrevus : 0)) || 0 : 0)) || null;
+        + (tech.includes("Battage") ? Number(meta.battagePrevus || (!tech.includes("Micropieux") ? meta.micropieuxPrevus : 0)) || 0 : 0) + (compteMpx ? avMpx : 0)) || null;
 
       return {
         id: c.id, code, nom, nomComplet: c.name, tech, termine,
@@ -1724,6 +1745,21 @@ document.addEventListener("DOMContentLoaded", () => {
     a.click();
     URL.revokeObjectURL(url);
   }
+
+  // Arrivée depuis une autre page sur une vue précise (…/index.html#se-view-stats)
+  const vueDemandee = (location.hash || "").slice(1);
+  if (vueDemandee && document.getElementById(vueDemandee) && vueDemandee !== "se-view-overview") {
+    setTimeout(() => {
+      const b = document.querySelector(`.se-nav-btn[data-view="${vueDemandee}"]`);
+      if (b) b.click(); else afficherVue(vueDemandee);
+    }, 0);
+  }
+
+  window.addEventListener("hashchange", () => {
+    const v = (location.hash || "").slice(1);
+    const b = document.querySelector(`.se-nav-btn[data-view="${v}"]`);
+    if (b) b.click();
+  });
 
   // ─── Démarrage ───────────────────────────────────────────────────
   donnees = lireCacheLocal(); // affichage immédiat de la dernière consultation

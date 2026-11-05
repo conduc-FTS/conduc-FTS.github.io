@@ -332,3 +332,5 @@ const FTSParc = (() => {
     resoudreAncienNom, majuscules,
   };
 })();
+
+window.FTSParc = FTSParc;

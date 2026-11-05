@@ -399,6 +399,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if ($("view-documents").classList.contains("active")) FTSDocs.afficher(false);
   }
 
+  // ─── Boîte d'envoi des rapports (livraison 2) ────────────────
+  if (window.FTSBoiteEnvoi) {
+    FTSBoiteEnvoi.monterBandeau($("boiteEnvoi"), { seConnecter: () => FTSAuth.signIn() });
+    let nbAvant = null;
+    FTSBoiteEnvoi.onChange((liste) => {
+      // un rapport vient de partir : objectif et activité à jour
+      if (nbAvant !== null && liste.length < nbAvant) rendreAccueil(true);
+      nbAvant = liste.length;
+    });
+  }
+
   // ─── Démarrage ───────────────────────────────────────────────
   rendreDate();
   majReseau();
@@ -410,6 +421,7 @@ document.addEventListener("DOMContentLoaded", () => {
     onAuthChange(FTSAuth.isSignedIn());
   }
   if (window.FTSNotifications) FTSNotifications.init();
+  if (window.FTSBoiteEnvoi) FTSBoiteEnvoi.demarrer();
 
   // Lien « Choisis ton chantier » du rapport journalier (/index.html#chantiers)
   if (window.location.hash === "#chantiers") {

@@ -197,6 +197,25 @@ const FTSAuth = (() => {
     }
   }
 
+  // Appli ouverte sans réseau : le script Google n'a pas pu se charger.
+  // Au retour du réseau, on le recharge et on relance la connexion
+  // silencieuse — sinon les rapports en attente ne pourraient pas partir
+  // sans recharger la page.
+  window.addEventListener("online", () => {
+    if (typeof google === "undefined" || !google.accounts) {
+      if (document.querySelector("script[data-fts-gsi]")) return;
+      const s = document.createElement("script");
+      s.src = "https://accounts.google.com/gsi/client";
+      s.async = true;
+      s.dataset.ftsGsi = "1";
+      s.onload = () => { window.__ftsAuthInitRetries = 0; init(); };
+      s.onerror = () => s.remove();
+      document.head.appendChild(s);
+    } else if (!accessToken) {
+      tenterRenouvellementSilencieux();
+    }
+  });
+
   function signIn() {
     if (!tokenClient) {
       console.warn("FTSAuth : tokenClient non initialisé. Appeler init() d'abord.");

@@ -555,7 +555,9 @@ body {
 .ac-horsligne[hidden] { display: none; }
 
 .ac-top-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 18px 24px 0; max-width: 1400px; margin: 0 auto; width: 100%; }
-.ac-top-row + .app-body { padding-top: 12px; }
+.ac-top-row + .app-body, .ac-boite + .app-body { padding-top: 12px; }
+.ac-boite { padding: 0 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
+.ac-boite:empty { display: none; }
 .ac-chantier-card { position: relative; background: var(--anthracite); border: 2px solid #F5A800; border-radius: 14px; padding: 14px 110px 14px 18px; display: flex; flex-direction: column; justify-content: center; text-align: left; cursor: pointer; font: inherit; min-height: 84px; }
 .ac-chantier-card:active { background: #2e2e2e; }
 .ac-chantier-card .lbl { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.08em; color: #9CA3AF; text-transform: uppercase; }
@@ -687,7 +689,8 @@ body {
 
 @media (max-width: 900px) {
   .ac-top-row { padding: 14px 16px 0; gap: 12px; }
-  .ac-top-row + .app-body { padding: 12px 16px; }
+  .ac-top-row + .app-body, .ac-boite + .app-body { padding: 12px 16px; }
+  .ac-boite { padding: 0 16px; }
   .dc-wrap { padding: 12px 16px; }
   .dc { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .dc-side { display: flex; gap: 6px; overflow-x: auto; border-right: 0; border-bottom: 1px solid #E2E5EA; }

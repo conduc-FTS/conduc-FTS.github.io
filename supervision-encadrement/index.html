@@ -11,6 +11,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 </script>
 <title>FTS — Supervision Encadrement</title>
 <link rel="stylesheet" href="../css/dashboard.css">
+<link rel="stylesheet" href="../css/statistiques.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 * { box-sizing: border-box; }
@@ -421,53 +422,18 @@ html { font-size: 16px; }
   <!-- ─── STATISTIQUES ────────────────────────────────────── -->
   <div class="se-view" id="se-view-stats">
     <div class="se-page-title">Statistiques</div>
-    <div class="se-page-sub">Analyse sur plusieurs chantiers et sur la durée — exportable pour un suivi pluriannuel.</div>
+    <div class="se-page-sub">Analyse des chantiers à partir des rapports journaliers et des infos de chaque chantier (marché + avenants validés).</div>
 
     <div class="se-subtabs">
-      <button type="button" class="se-subtab active" data-statview="stats-avancement">Avancement chantier</button>
-      <button type="button" class="se-subtab" data-statview="stats-personnel">Personnel</button>
+      <button type="button" class="se-subtab active" data-statview="vr">Vendu / réalisé<small>A-t-on tenu ce qu'on a vendu ?</small></button>
+      <button type="button" class="se-subtab" data-statview="tp">Temps perdu<small>Où part notre temps ?</small></button>
+      <button type="button" class="se-subtab" data-statview="parc">Parc matériel<small>Machines utilisées et fiables ?</small></button>
+      <button type="button" class="se-subtab" data-statview="bilans">Bilans de fin de chantier<small>Que retenir pour chiffrer ?</small></button>
+      <button type="button" class="se-subtab" data-statview="stats-personnel">Personnel<small>Heures, intérim, GD</small></button>
     </div>
 
-    <!-- Avancement chantier -->
-    <div id="stats-avancement">
-      <div class="se-stats-controls">
-        <div class="se-stats-controls-left">
-          <button type="button" class="se-famille-chip mp active" data-famille="mp">● Micropieux + Battage</button>
-          <button type="button" class="se-famille-chip pieux" data-famille="pieux">● Pieux</button>
-          <select class="se-periode-select" id="statsAvancPeriode">
-            <option value="toutes">Toutes périodes</option>
-            <option value="annee">Cette année</option>
-            <option value="trimestre">Ce trimestre</option>
-            <option value="mois">Ce mois</option>
-          </select>
-        </div>
-        <button type="button" class="se-nav-btn" id="refreshStatsAvancBtn" style="width:auto;background:var(--bg);color:var(--anthracite);border:1px solid var(--border);padding:7px 12px" title="Recharger depuis Google">🔄</button>
-        <button type="button" class="se-export-btn" id="statsAvancExportBtn">⬇ Exporter Excel</button>
-      </div>
-
-      <div class="se-kpi-row">
-        <div class="se-kpi-card"><div class="se-kpi-label">Volume réalisé (période)</div><div class="se-kpi-value" id="statsAvancVolume">—</div></div>
-        <div class="se-kpi-card"><div class="se-kpi-label">Cadence moyenne</div><div class="se-kpi-value" id="statsAvancCadence">—</div></div>
-        <div class="se-kpi-card"><div class="se-kpi-label">Chantiers actifs (période)</div><div class="se-kpi-value" id="statsAvancChantiers">—</div></div>
-        <div class="se-kpi-card"><div class="se-kpi-label">Chantiers en retard</div><div class="se-kpi-value" id="statsAvancRetard">—</div></div>
-      </div>
-
-      <div class="se-panel">
-        <h2 style="margin-bottom:14px">Volume réalisé par mois</h2>
-        <div class="se-chart" id="statsAvancChart"></div>
-      </div>
-
-      <div class="se-panel">
-        <h2 style="margin-bottom:14px">Classement des chantiers par avancement (réalisé / prévu)</h2>
-        <div class="se-table-scroll">
-        <table class="se-table">
-          <thead><tr><th>Chantier</th><th>Cadence (ml/j)</th><th>Avancement</th><th>Statut</th></tr></thead>
-          <tbody id="statsAvancTbody"></tbody>
-        </table>
-        </div>
-        <div class="se-empty-state" id="statsAvancEmpty" hidden></div>
-      </div>
-    </div>
+    <!-- Vendu / réalisé, Temps perdu, Parc matériel, Bilans (js/statistiques.js) -->
+    <div id="stats-avancement"></div>
 
     <!-- Personnel -->
     <div id="stats-personnel" style="display:none">
@@ -727,6 +693,8 @@ html { font-size: 16px; }
 <script src="../js/calendar.js"></script>
 <script src="../js/parc-materiel.js"></script>
 <script src="../js/personnel.js"></script>
+<script src="../js/ateliers.js"></script>
+<script src="../js/statistiques.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -1443,9 +1411,10 @@ document.addEventListener("DOMContentLoaded", () => {
     tab.addEventListener("click", () => {
       document.querySelectorAll(".se-subtab").forEach((t) => t.classList.remove("active"));
       tab.classList.add("active");
-      document.getElementById("stats-avancement").style.display = tab.dataset.statview === "stats-avancement" ? "block" : "none";
-      document.getElementById("stats-personnel").style.display = tab.dataset.statview === "stats-personnel" ? "block" : "none";
-      if (tab.dataset.statview === "stats-personnel") chargerStatsPersonnel();
+      const perso = tab.dataset.statview === "stats-personnel";
+      document.getElementById("stats-avancement").style.display = perso ? "none" : "block";
+      document.getElementById("stats-personnel").style.display = perso ? "block" : "none";
+      if (perso) chargerStatsPersonnel(); else FTSStats.ouvrir(tab.dataset.statview);
     });
   });
 
@@ -1467,167 +1436,14 @@ document.addEventListener("DOMContentLoaded", () => {
     return date && date >= debut && date <= fin;
   }
 
-  let familleAvancement = "mp";
-
-  document.querySelectorAll(".se-famille-chip").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      document.querySelectorAll(".se-famille-chip").forEach((c) => c.classList.remove("active"));
-      chip.classList.add("active");
-      familleAvancement = chip.dataset.famille;
-      afficherStatsAvancement(); // déjà en cache : pas besoin de relire Google
-    });
-  });
-  document.getElementById("statsAvancPeriode").addEventListener("change", afficherStatsAvancement);
-
-  let dernieresLignesAvancement = [];
-  let cacheStatsAvancement = null; // { chantier, meta, production }[] — TOUTES familles confondues
-  let statsAvancementChargeeA = 0;
-
-  async function chargerStatsAvancement(forcer = false) {
-    const empty = document.getElementById("statsAvancEmpty");
-    if (!window.FTSDrive || !window.FTSSheets) return;
-    if (!donnees && (!window.FTSAuth || !FTSAuth.isSignedIn())) { empty.hidden = false; empty.textContent = "Connecte-toi d'abord."; return; }
-
-    if (!forcer && cacheStatsAvancement && (Date.now() - statsAvancementChargeeA) < CACHE_TTL_MS) {
-      afficherStatsAvancement();
-      return;
-    }
-
-    const tbody = document.getElementById("statsAvancTbody");
-    tbody.innerHTML = "";
-    empty.hidden = false;
-    empty.textContent = "Chargement...";
-
-    try {
-      // On lit TOUS les chantiers une seule fois, indépendamment de la
-      // famille choisie — changer de famille ou de période ensuite ne
-      // relit plus rien, juste un recalcul local instantané.
-      // Même lecture groupée que la Vue d'ensemble (déjà en mémoire le plus
-      // souvent) : aucune requête supplémentaire vers Google.
-      const d = await obtenirDonnees(forcer);
-      const details = d.chantiers.map((c, i) => ({
-        chantier: { id: c.id, name: c.name },
-        meta: c.meta || {},
-        production: ((d.suivis[i] || {}).production || []).map((r) => ({
-          date: r[0], nbPieux: Number(r[1]) || 0, longueurTotale: parseFloat(r[2]) || 0,
-          longueurMoyenne: parseFloat(r[3]) || 0, nomChef: r[4] || "",
-        })),
-      }));
-
-      cacheStatsAvancement = details;
-      statsAvancementChargeeA = Date.now();
-      afficherStatsAvancement();
-    } catch (err) {
-      console.error("Erreur chargement statistiques avancement :", err);
-      empty.hidden = false;
-      empty.textContent = `Erreur : ${err.message}`;
-    }
+  // ─── Statistiques chantiers (Vendu / réalisé, Temps perdu, Parc, Bilans) ──
+  FTSStats.monter(document.getElementById("stats-avancement"), { obtenirDonnees: (forcer) => obtenirDonnees(forcer) });
+  function chargerStatsAvancement(forcer = false) {
+    const t = document.querySelector(".se-subtab.active");
+    if (t && t.dataset.statview === "stats-personnel") return chargerStatsPersonnel(forcer);
+    FTSStats.ouvrir();
+    return FTSStats.charger(forcer);
   }
-
-  function afficherStatsAvancement() {
-    if (!cacheStatsAvancement) return;
-    const tbody = document.getElementById("statsAvancTbody");
-    const empty = document.getElementById("statsAvancEmpty");
-    const [debut, fin] = bornesPeriode(document.getElementById("statsAvancPeriode").value);
-
-    const ciblés = cacheStatsAvancement.filter(({ meta }) => {
-      const tech = FTSDrive.techniquesChantier(meta);
-      return familleAvancement === "mp" ? (tech.includes("Micropieux") || tech.includes("Battage")) : tech.includes("Pieux");
-    });
-
-    if (ciblés.length === 0) {
-      empty.hidden = false;
-      empty.textContent = "Aucun chantier dans cette famille.";
-      tbody.innerHTML = "";
-      document.getElementById("statsAvancVolume").textContent = "0 ml";
-      document.getElementById("statsAvancCadence").textContent = "—";
-      document.getElementById("statsAvancChantiers").textContent = "0";
-      document.getElementById("statsAvancRetard").textContent = "0";
-      document.getElementById("statsAvancChart").innerHTML = "";
-      return;
-    }
-
-    // Filtrage par période sur les lignes de Production
-    let volumeTotal = 0, joursProdTotal = 0;
-    const parMois = {};
-    const chantiersActifsPeriode = new Set();
-    const lignesClassement = [];
-
-    ciblés.forEach(({ chantier, meta, production }) => {
-      const prodPeriode = production.filter((p) => dansPeriode(parseDateFRLocale(p.date), debut, fin));
-      if (prodPeriode.length > 0) chantiersActifsPeriode.add(chantier.id);
-
-      prodPeriode.forEach((p) => {
-        volumeTotal += p.longueurTotale;
-        joursProdTotal += 1;
-        const d = parseDateFRLocale(p.date);
-        if (d) {
-          const cle = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-          parMois[cle] = (parMois[cle] || 0) + p.longueurTotale;
-        }
-      });
-
-      const totalMl = production.reduce((s, p) => s + p.longueurTotale, 0);
-      // Deux ateliers le même jour = un seul jour de chantier
-      const nbJours = new Set(production.map((p) => p.date)).size;
-      const cadence = nbJours > 0 ? totalMl / nbJours : 0;
-      const prevu = meta.micropieuxPrevus || null;
-      const totalPieux = production.reduce((s, p) => s + p.nbPieux, 0);
-      const pct = prevu ? Math.min(100, (totalPieux / prevu) * 100) : null;
-      const duree = meta.dureeChantier || null;
-      const joursRapport = nbJours;
-      const enRetard = !!(duree && joursRapport > duree) && meta.statutChantier !== "Termine";
-
-      lignesClassement.push({ nom: chantier.name, cadence, pct, enRetard, hasPct: pct !== null });
-    });
-
-    dernieresLignesAvancement = lignesClassement;
-
-    // KPI
-    document.getElementById("statsAvancVolume").textContent = `${volumeTotal.toFixed(0)} ml`;
-    document.getElementById("statsAvancCadence").textContent = joursProdTotal > 0 ? `${(volumeTotal / joursProdTotal).toFixed(1)} ml/j` : "—";
-    document.getElementById("statsAvancChantiers").textContent = String(chantiersActifsPeriode.size);
-    document.getElementById("statsAvancRetard").textContent = String(lignesClassement.filter((l) => l.enRetard).length);
-
-    // Graphique : volume par mois (6 derniers mois avec données, triés)
-    const moisTries = Object.keys(parMois).sort().slice(-6);
-    const maxVal = Math.max(1, ...moisTries.map((m) => parMois[m]));
-    const couleurFamille = familleAvancement === "mp" ? "#4C82F0" : "#C0392B";
-    document.getElementById("statsAvancChart").innerHTML = moisTries.length === 0
-      ? '<p class="se-empty-state" style="padding:10px">Aucune donnée sur cette période.</p>'
-      : moisTries.map((m) => {
-          const [a, mo] = m.split("-");
-          const label = new Date(Number(a), Number(mo) - 1, 1).toLocaleDateString("fr-FR", { month: "short" });
-          const val = parMois[m];
-          const hauteur = Math.max(3, (val / maxVal) * 100);
-          return `<div class="se-bar-group"><span class="se-bar-val">${val.toFixed(0)}</span><div class="se-bar" style="height:${hauteur}%;background:${couleurFamille}"></div><span class="se-bar-label">${label}</span></div>`;
-        }).join("");
-
-    // Classement
-    const avecPct = lignesClassement.filter((l) => l.hasPct).sort((a, b) => b.pct - a.pct);
-    if (avecPct.length === 0) {
-      empty.hidden = false;
-      empty.textContent = "Aucun chantier avec un nombre de micropieux prévus renseigné, pour établir un classement.";
-      tbody.innerHTML = "";
-    } else {
-      empty.hidden = true;
-      tbody.innerHTML = avecPct.map((l) => `
-        <tr>
-          <td>${escapeHtmlSE(l.nom)}</td>
-          <td>${l.cadence.toFixed(1)}</td>
-          <td>${l.pct.toFixed(0)}% <span class="se-pct-bar"><span class="se-pct-fill" style="width:${l.pct}%;${l.enRetard ? "background:#C0392B" : ""}"></span></span></td>
-          <td><span class="se-statut-chip ${l.enRetard ? "se-statut-panne" : "se-statut-travail"}"><span class="se-dot"></span>${l.enRetard ? "Retard" : "Dans les temps"}</span></td>
-        </tr>`).join("");
-    }
-  }
-
-  document.getElementById("refreshStatsAvancBtn").addEventListener("click", () => chargerStatsAvancement(true));
-
-  document.getElementById("statsAvancExportBtn").addEventListener("click", () => {
-    const lignes = [["Chantier", "Cadence (ml/j)", "Avancement (%)", "Statut"]];
-    dernieresLignesAvancement.forEach((l) => lignes.push([l.nom, l.cadence.toFixed(1), l.hasPct ? l.pct.toFixed(0) : "", l.enRetard ? "Retard" : "Dans les temps"]));
-    exporterCSVGenerique(lignes, `Statistiques_avancement_${familleAvancement}.csv`);
-  });
 
   document.getElementById("statsPersPeriode").addEventListener("change", afficherStatsPersonnel);
 

@@ -684,6 +684,38 @@ const FTSSheets = (() => {
     return resultats;
   }
 
+  /**
+   * Pannes + Arrêts de plusieurs classeurs (Statistiques), une requête par
+   * classeur, 8 à la fois. Un ancien classeur sans ces onglets → listes vides.
+   * @param {Array<{id:string, spreadsheetId:string}>} liste
+   * @returns {Promise<Object<string,{pannes:Array, arrets:Array}>>} par id de chantier
+   */
+  async function lirePannesArrets(liste) {
+    const out = {};
+    const aLire = liste.filter((x) => x && x.spreadsheetId);
+    const ranges = [ONGLET_PANNES, ONGLET_ARRETS].map((o) => "ranges=" + encodeURIComponent(`${o}!A2:Z`)).join("&");
+    let suivant = 0;
+    async function ouvrier() {
+      while (suivant < aLire.length) {
+        const x = aLire[suivant++];
+        try {
+          const res = await fetchAvecRetry(`${API_BASE}/${x.spreadsheetId}/values:batchGet?${ranges}`, { headers: authHeader() });
+          if (res.ok) {
+            const v = ((await res.json()).valueRanges || []).map((r) => r.values || []);
+            out[x.id] = { pannes: v[0] || [], arrets: v[1] || [] };
+          } else {
+            const [pannes, arrets] = await Promise.all([ONGLET_PANNES, ONGLET_ARRETS].map((o) => lireOnglet(x.spreadsheetId, o).catch(() => [])));
+            out[x.id] = { pannes, arrets };
+          }
+        } catch (e) {
+          out[x.id] = { pannes: [], arrets: [] };
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(8, aLire.length) }, ouvrier));
+    return out;
+  }
+
   function parseDateFR(s) {
     const [j, m, a] = (s || "").split("/");
     // new Date(année, mois, jour) avec des nombres est TOUJOURS interprété
@@ -1011,6 +1043,7 @@ const FTSSheets = (() => {
     resumeChantier,
     calculerResume,
     chargerDonneesSupervision,
+    lirePannesArrets,
     parseDateFR,
     verifierPieuxDejaRealises,
     listerPointageToutesChantiers,

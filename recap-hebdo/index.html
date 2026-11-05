@@ -218,11 +218,12 @@ document.addEventListener("DOMContentLoaded", () => {
     afficher();
     enCours = (async () => {
       try {
-        const [chantiers] = await Promise.all([
-          FTSDrive.listChantiersAvecMeta(),
-          window.FTSParc ? FTSParc.charger().catch(() => {}) : null,
-          window.FTSPersonnel ? FTSPersonnel.charger().catch(() => {}) : null,
-        ]);
+        // Parc / Personnel en parallèle, sans bloquer : ré-affichage à l'arrivée
+        Promise.all([
+          window.FTSParc ? FTSParc.charger({ rapide: true }).catch(() => {}) : null,
+          window.FTSPersonnel ? FTSPersonnel.charger({ rapide: true }).catch(() => {}) : null,
+        ]).then(() => { if (!enCours) { remplirListes(); afficher(); } });
+        const chantiers = await FTSDrive.listChantiersAvecMeta();
         const suivis = await FTSSheets.chargerDonneesSupervision(chantiers);
         donnees = { savedAt: Date.now(), chantiers, suivis };
         fraiches = true;
@@ -762,7 +763,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   remplirListes();
-  if (window.FTSParc) FTSParc.charger().catch(() => {}).then(() => { remplirListes(); afficher(); });
   afficher();
 });
 </script>

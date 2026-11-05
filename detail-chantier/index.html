@@ -231,15 +231,21 @@ document.addEventListener("DOMContentLoaded", () => {
     $("dcStatus").classList.remove("err");
     chargementEnCours = (async () => {
       try {
+        // Parc et Personnel ne bloquent pas l'affichage : on ré-affiche
+        // simplement quand ils arrivent (noms des machines, types).
+        const refs = Promise.all([
+          window.FTSParc ? FTSParc.charger({ rapide: true }).catch(() => {}) : null,
+          window.FTSPersonnel ? FTSPersonnel.charger({ rapide: true }).catch(() => {}) : null,
+        ]);
         const [meta, suivi] = await Promise.all([
           FTSDrive.getMetadonneesChantier(chantierId),
           FTSSheets.lireSuiviDetail(chantierId, chantierName),
-          window.FTSParc ? FTSParc.charger().catch(() => {}) : null,
-          window.FTSPersonnel ? FTSPersonnel.charger().catch(() => {}) : null,
         ]);
-        donnees = { meta, suivi };
+        donnees = { meta, suivi, complet: true };
         afficherTout();
         $("dcStatus").textContent = "";
+        majCacheSupervision(meta, suivi);
+        refs.then((r) => { if (r.some((x) => x !== null) && donnees) afficherTout(); }).catch(() => {});
       } catch (err) {
         console.error("Détail chantier :", err);
         $("dcStatus").textContent = `Erreur : ${err.message}`;
@@ -249,6 +255,37 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     })();
     return chargementEnCours;
+  }
+
+  // ─── Cache partagé avec la Vue d'ensemble ───────────────────────
+  // Affichage immédiat à partir des chiffres déjà lus par la Vue
+  // d'ensemble (sans pannes/arrêts, complétés ensuite en arrière-plan),
+  // et mise à jour de ce chantier dans ce cache après lecture.
+  const CLE_CACHE_SUP = "fts_supervision_cache_v1";
+  function lireCacheSupervision() {
+    try { const d = JSON.parse(localStorage.getItem(CLE_CACHE_SUP)); return d && Array.isArray(d.chantiers) ? d : null; } catch (e) { return null; }
+  }
+  function donneesDepuisCache() {
+    const d = lireCacheSupervision();
+    if (!d) return null;
+    const ch = d.chantiers.find((x) => x.id === chantierId);
+    const su = (d.suivis || []).find((x) => x && x.id === chantierId);
+    if (!ch || !su) return null;
+    return {
+      meta: ch.meta || {},
+      suivi: { spreadsheetId: su.spreadsheetId || null, materiel: su.materiel || [], production: su.production || [], personnel: su.personnel || [], pannes: [], arrets: [] },
+      complet: false,
+    };
+  }
+  function majCacheSupervision(meta, suivi) {
+    const d = lireCacheSupervision();
+    if (!d) return;
+    const ch = d.chantiers.find((x) => x.id === chantierId);
+    const i = (d.suivis || []).findIndex((x) => x && x.id === chantierId);
+    if (!ch || i < 0) return;
+    ch.meta = meta;
+    d.suivis[i] = { ...d.suivis[i], spreadsheetId: suivi.spreadsheetId, materiel: suivi.materiel, production: suivi.production, personnel: suivi.personnel };
+    try { localStorage.setItem(CLE_CACHE_SUP, JSON.stringify(d)); } catch (e) {}
   }
 
   // ─── Calculs ───────────────────────────────────────────────────
@@ -392,6 +429,7 @@ document.addEventListener("DOMContentLoaded", () => {
       kpi("Cadence moyenne", `${fmt(cadence, 1)} <small>${c.unite}/j</small>`, objectif ? `objectif : ${fmt(objectif, 1)} ${c.unite}/j` : ""),
       kpi("Mètres forés", `${fmt(c.ml)} <small>ml</small>`, c.realise ? `${fmt(c.ml / c.realise, 1)} ml par ${c.aMpx ? "Mpx" : "pieu"}` : ""),
       kpi("Heures personnel", `${fmt(c.heures)} <small>h</small>`, c.heuresInterim ? `dont ${fmt(c.heuresInterim)} h intérim` : ""),
+      donnees.complet === false ? kpi("Temps perdu", `… <small>h</small>`, "pannes et arrêts en cours de lecture") :
       kpi("Temps perdu", `${fmt(c.hPannes + c.hArrets, 1)} <small>h</small>`, `pannes ${fmt(c.hPannes, 1)} h · arrêts ${fmt(c.hArrets, 1)} h`, "", (c.hPannes + c.hArrets) > 0 ? "warn" : ""),
     ].join("");
     $("thUnite").textContent = c.aMpx ? "Micropieux" : "Pieux";
@@ -470,7 +508,9 @@ document.addEventListener("DOMContentLoaded", () => {
     c.suivi.pannes.forEach((r) => { const k = r[1] || "—"; (parMachine[k] = parMachine[k] || { n: 0, h: 0, dates: [] }); parMachine[k].n++; parMachine[k].h += nb(r[2]); parMachine[k].dates.push(r[0]); });
     const top = Object.entries(parMachine).sort((a, b) => b[1].h - a[1].h)[0];
     const perdu = c.hPannes + c.hArrets;
-    if (top) {
+    if (donnees.complet === false) {
+      pt("b", "🔧", `Lecture des pannes et arrêts…`);
+    } else if (top) {
       const part = perdu ? Math.round(top[1].h / perdu * 100) : 0;
       pt(top[1].n > 1 ? "r" : "w", "🔧", `<b>${esc(top[0])} : ${top[1].n} panne${top[1].n > 1 ? "s" : ""} en ${c.jours} jours</b> (${fmt(top[1].h, 1)} h au total). C'est ${part} % du temps perdu sur le chantier.`);
     } else {
@@ -505,6 +545,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function afficherTempsPerdu(c) {
+    if (donnees.complet === false) { $("lossSub").textContent = ""; $("dcLoss").innerHTML = `<p class="sv-status">Lecture des pannes et arrêts…</p>`; return; }
     const causes = {};
     c.suivi.pannes.forEach((r) => { const k = "🔧 Panne " + (r[1] || ""); causes[k] = (causes[k] || 0) + nb(r[2]); });
     c.suivi.arrets.forEach((r) => { const k = "⏸️ " + (r[1] || "Arrêt"); causes[k] = (causes[k] || 0) + nb(r[2]); });
@@ -674,6 +715,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const lignes = [...c.suivi.pannes.map((r) => ({ d: r[0], t: "pa", type: "Panne", quoi: r[1], h: nb(r[2]), obs: r[3] })),
       ...c.suivi.arrets.map((r) => ({ d: r[0], t: "ar", type: "Arrêt", quoi: r[1], h: nb(r[2]), obs: r[3] }))]
       .filter((l) => parseFR(l.d)).sort((a, b) => parseFR(b.d) - parseFR(a.d));
+    if (donnees.complet === false) { $("nPannes").textContent = "…"; $("pannesBody").innerHTML = `<tr><td colspan="5" style="color:var(--text-sub);padding:24px 18px">Lecture des pannes et arrêts…</td></tr>`; return; }
     $("nPannes").textContent = lignes.length;
     if (!lignes.length) { $("pannesBody").innerHTML = `<tr><td colspan="5" style="color:var(--text-sub);padding:24px 18px">Aucune panne ni aucun arrêt déclaré sur ce chantier.</td></tr>`; return; }
     $("pannesBody").innerHTML = lignes.map((l) => `<tr><td>${esc(l.d.slice(0, 5))}</td><td><span class="sv-evt ${l.t}">${l.type}</span></td><td>${esc(l.quoi || "—")}</td><td class="r">${fmt(l.h, 1)} h</td><td>${esc(l.obs || "")}</td></tr>`).join("")
@@ -855,6 +897,19 @@ document.addEventListener("DOMContentLoaded", () => {
       b.disabled = true;
       try { await FTSDrive.desarchiverChantier(chantierId); charger(); } catch (err) { alert(`Erreur : ${err.message}`); b.disabled = false; }
     });
+  }
+
+  // Affichage immédiat depuis le cache (la lecture Google, lancée par
+  // monter() si la session est active, complète ensuite en arrière-plan)
+  if (!donnees && chantierId) {
+    const pre = donneesDepuisCache();
+    if (pre) {
+      donnees = pre;
+      try {
+        afficherTout();
+        $("dcStatus").textContent = chargementEnCours ? "Actualisation…" : "";
+      } catch (e) { console.warn("Affichage depuis le cache impossible", e); donnees = null; }
+    }
   }
 });
 </script>

@@ -448,10 +448,21 @@ const FTSSheets = (() => {
    * (lignes brutes, dans l'ordre des colonnes des onglets).
    */
   async function lireSuiviDetail(chantierFolderId, chantierName) {
-    const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
     const onglets = [ONGLET_MATERIEL, ONGLET_PRODUCTION, ONGLET_PERSONNEL, ONGLET_PANNES, ONGLET_ARRETS];
     const ranges = onglets.map((o) => "ranges=" + encodeURIComponent(`${o}!A2:Z`)).join("&");
-    const res = await fetchAvecRetry(`${API_BASE}/${spreadsheetId}/values:batchGet?${ranges}`, { headers: authHeader() });
+    // Identifiant mémorisé (Vue d'ensemble déjà ouverte) : lecture directe,
+    // sans recherche Drive ni vérification des onglets.
+    let spreadsheetId = idSuiviMemorise(chantierFolderId);
+    let res = null;
+    if (spreadsheetId) {
+      res = await fetchAvecRetry(`${API_BASE}/${spreadsheetId}/values:batchGet?${ranges}`, { headers: authHeader() });
+      if (res.status === 404 || res.status === 403) res = null;
+    }
+    if (!res) {
+      spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
+      memoriserIdSuivi(chantierFolderId, spreadsheetId);
+      res = await fetchAvecRetry(`${API_BASE}/${spreadsheetId}/values:batchGet?${ranges}`, { headers: authHeader() });
+    }
     let v;
     if (res.ok) {
       v = ((await res.json()).valueRanges || []).map((r) => r.values || []);
@@ -550,8 +561,40 @@ const FTSSheets = (() => {
    * @param {Array<{id:string, name:string}>} chantiers
    * @returns {Promise<Array<{id, spreadsheetId, materiel, production, personnel}>>}
    */
-  async function chargerDonneesSupervision(chantiers) {
-    // 1) Tous les classeurs de suivi accessibles, avec leur dossier parent
+  /**
+   * Mémo local des identifiants des classeurs "Suivi" (par compte Google),
+   * pour éviter la recherche Drive sur tout le compte à chaque ouverture.
+   * Utilisé en LECTURE seulement (Supervision, Détail, Pointages) : le
+   * rapport journalier garde sa recherche par nom avant d'écrire.
+   * Revalidé par une vraie recherche au moins toutes les 24 h, et dès
+   * qu'un chantier inconnu apparaît ou qu'un identifiant ne répond plus.
+   */
+  const CLE_MEMO_SUIVI = "fts_ids_suivi";
+  const MEMO_DUREE = 24 * 3600 * 1000;
+  const compteActuel = () => (window.FTSAuth && FTSAuth.emailMemorise && FTSAuth.emailMemorise()) || "";
+  function lireMemoSuivi() {
+    try {
+      const m = JSON.parse(localStorage.getItem(CLE_MEMO_SUIVI) || "null");
+      if (m && m.compte === compteActuel() && Date.now() - (m.date || 0) < MEMO_DUREE) return m;
+    } catch (e) {}
+    return { compte: compteActuel(), date: 0, ids: {} };
+  }
+  function ecrireMemoSuivi(m) {
+    try { localStorage.setItem(CLE_MEMO_SUIVI, JSON.stringify(m)); } catch (e) {}
+  }
+  /** id mémorisé du classeur Suivi d'un chantier (null = pas de classeur, undefined = inconnu) */
+  function idSuiviMemorise(chantierId) {
+    const m = lireMemoSuivi();
+    return Object.prototype.hasOwnProperty.call(m.ids, chantierId) ? m.ids[chantierId] : undefined;
+  }
+  function memoriserIdSuivi(chantierId, spreadsheetId) {
+    const m = lireMemoSuivi();
+    if (!m.date) m.date = Date.now();
+    m.ids[chantierId] = spreadsheetId || null;
+    ecrireMemoSuivi(m);
+  }
+
+  async function rechercherTousLesSuivis() {
     const parDossier = {};
     let pageToken = "";
     do {
@@ -567,42 +610,77 @@ const FTSSheets = (() => {
       }));
       pageToken = data.nextPageToken || "";
     } while (pageToken);
+    return parDossier;
+  }
 
-    // 2) Lecture des 3 onglets utiles, 4 chantiers à la fois maximum
-    //    (au-delà, Google renvoie des 429 qu'il faut ensuite attendre).
+  async function chargerDonneesSupervision(chantiers) {
+    // 1) Identifiants des classeurs : mémo local si tous les chantiers y
+    //    sont, sinon UNE recherche Drive (et le mémo est mis à jour).
+    let memo = lireMemoSuivi();
+    const connu = (c) => Object.prototype.hasOwnProperty.call(memo.ids, c.id);
+    async function rafraichirMemo() {
+      const parDossier = await rechercherTousLesSuivis();
+      const ids = {};
+      chantiers.forEach((c) => {
+        const candidats = parDossier[c.id] || [];
+        const f = candidats.find((x) => x.name === `Suivi ${c.name}`) || candidats[0];
+        ids[c.id] = f ? f.id : null;
+      });
+      memo = { compte: compteActuel(), date: Date.now(), ids: { ...memo.ids, ...ids } };
+      ecrireMemoSuivi(memo);
+    }
+    let rechercheFaite = false;
+    if (!memo.date || !chantiers.every(connu)) { await rafraichirMemo(); rechercheFaite = true; }
+
+    // 2) Lecture des 3 onglets utiles, 8 chantiers à la fois maximum
+    //    (fetchAvecRetry absorbe les 429 éventuels).
     const ONGLETS = [ONGLET_MATERIEL, ONGLET_PRODUCTION, ONGLET_PERSONNEL];
     async function lireChantier(c) {
-      const candidats = parDossier[c.id] || [];
-      const classeur = candidats.find((f) => f.name === `Suivi ${c.name}`) || candidats[0];
+      const id = memo.ids[c.id];
       const vide = { id: c.id, spreadsheetId: null, materiel: [], production: [], personnel: [] };
-      if (!classeur) return vide;
+      if (!id) return vide;
       const ranges = ONGLETS.map((o) => "ranges=" + encodeURIComponent(`${o}!A2:Z`)).join("&");
-      const res = await fetchAvecRetry(`${API_BASE}/${classeur.id}/values:batchGet?${ranges}`, { headers: authHeader() });
+      const res = await fetchAvecRetry(`${API_BASE}/${id}/values:batchGet?${ranges}`, { headers: authHeader() });
       if (res.ok) {
         const data = await res.json();
         const v = (data.valueRanges || []).map((r) => r.values || []);
-        return { ...vide, spreadsheetId: classeur.id, materiel: v[0] || [], production: v[1] || [], personnel: v[2] || [] };
+        return { ...vide, spreadsheetId: id, materiel: v[0] || [], production: v[1] || [], personnel: v[2] || [] };
       }
+      // Classeur supprimé / plus partagé : l'identifiant mémorisé est périmé
+      if (res.status === 404 || res.status === 403) return { ...vide, perime: true };
       // Un ancien classeur sans l'un des onglets fait échouer tout le
       // batchGet : on relit alors onglet par onglet, sans bloquer.
-      const [materiel, production, personnel] = await Promise.all(ONGLETS.map((o) => lireOnglet(classeur.id, o).catch(() => [])));
-      return { ...vide, spreadsheetId: classeur.id, materiel, production, personnel };
+      const [materiel, production, personnel] = await Promise.all(ONGLETS.map((o) => lireOnglet(id, o).catch(() => [])));
+      return { ...vide, spreadsheetId: id, materiel, production, personnel };
     }
 
-    const resultats = new Array(chantiers.length);
-    let suivant = 0;
-    async function ouvrier() {
-      while (suivant < chantiers.length) {
-        const i = suivant++;
-        try {
-          resultats[i] = await lireChantier(chantiers[i]);
-        } catch (e) {
-          console.warn(`Supervision : lecture impossible pour "${chantiers[i].name}"`, e);
-          resultats[i] = { id: chantiers[i].id, spreadsheetId: null, materiel: [], production: [], personnel: [], erreur: true };
+    async function lireTous(liste) {
+      const resultats = new Array(liste.length);
+      let suivant = 0;
+      async function ouvrier() {
+        while (suivant < liste.length) {
+          const i = suivant++;
+          try {
+            resultats[i] = await lireChantier(liste[i]);
+          } catch (e) {
+            console.warn(`Supervision : lecture impossible pour "${liste[i].name}"`, e);
+            resultats[i] = { id: liste[i].id, spreadsheetId: null, materiel: [], production: [], personnel: [], erreur: true };
+          }
         }
       }
+      await Promise.all(Array.from({ length: Math.min(8, liste.length) }, ouvrier));
+      return resultats;
     }
-    await Promise.all(Array.from({ length: Math.min(4, chantiers.length) }, ouvrier));
+
+    const resultats = await lireTous(chantiers);
+    // Identifiants périmés : une seule nouvelle recherche, puis relecture
+    const perimes = chantiers.filter((c, i) => resultats[i] && resultats[i].perime);
+    if (perimes.length && !rechercheFaite) {
+      await rafraichirMemo();
+      const relus = await lireTous(perimes);
+      perimes.forEach((c, k) => { resultats[chantiers.indexOf(c)] = relus[k]; });
+    }
+    resultats.forEach((r) => { if (r) delete r.perime; });
     return resultats;
   }
 

@@ -56,7 +56,7 @@ const FTSPersonnel = (() => {
   }
   function connecte() { return !!(window.FTSAuth && FTSAuth.isSignedIn() && window.FTSDrive); }
   function lireCache() { try { const r = localStorage.getItem(CACHE_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
-  function ecrireCache() { try { localStorage.setItem(CACHE_KEY, JSON.stringify({ personnes: etat.personnes, date: Date.now() })); } catch (e) {} }
+  function ecrireCache() { try { localStorage.setItem(CACHE_KEY, JSON.stringify({ personnes: etat.personnes, date: Date.now(), spreadsheetId: etat.spreadsheetId || null, modifiable: !!etat.modifiable })); } catch (e) {} }
 
   async function trouverClasseur() {
     const q = encodeURIComponent(`name = '${NOM_CLASSEUR}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`);
@@ -77,7 +77,15 @@ const FTSPersonnel = (() => {
   }
 
   /** Charge la base : classeur Google → copie locale → liste de départ. */
-  async function charger() {
+  async function charger(options = {}) {
+    // options.rapide : copie locale du classeur si elle a moins d'une heure
+    if (options.rapide) {
+      const c = lireCache();
+      if (c && c.spreadsheetId && c.personnes && c.personnes.length && Date.now() - (c.date || 0) < 3600 * 1000) {
+        etat = { personnes: c.personnes, source: "sheet", spreadsheetId: c.spreadsheetId, modifiable: !!c.modifiable };
+        return { source: "sheet", existe: true, modifiable: etat.modifiable };
+      }
+    }
     if (!connecte()) return depuisCache(null);
     try {
       const f = await trouverClasseur();

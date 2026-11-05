@@ -236,12 +236,31 @@ const FTSDrive = (() => {
    */
   // Les dossiers racine ne changent pas d'identifiant : on les garde en
   // mémoire le temps de la page, au lieu de les rechercher à chaque appel.
-  const cacheRacines = {};
+  // Mémorisés aussi sur l'appareil (par compte Google) : la recherche d'un
+  // dossier racine parcourt tout le Drive et c'est l'une des demandes les
+  // plus lentes ; son identifiant, lui, ne change jamais.
+  const CLE_RACINES = "fts_ids_racines";
+  const compteActuel = () => (window.FTSAuth && FTSAuth.emailMemorise && FTSAuth.emailMemorise()) || "";
+  function lireRacinesMemo() {
+    try {
+      const m = JSON.parse(localStorage.getItem(CLE_RACINES) || "null");
+      return m && m.compte === compteActuel() ? m.ids || {} : {};
+    } catch (e) { return {}; }
+  }
+  function ecrireRacinesMemo(ids) {
+    try { localStorage.setItem(CLE_RACINES, JSON.stringify({ compte: compteActuel(), ids })); } catch (e) {}
+  }
+  const cacheRacines = lireRacinesMemo();
+
+  function oublierRacine(name) {
+    delete cacheRacines[name];
+    ecrireRacinesMemo(cacheRacines);
+  }
 
   async function getRootFolder(name) {
     if (cacheRacines[name]) return cacheRacines[name];
     const id = await findFolderExact(name, null);
-    if (id) cacheRacines[name] = id;
+    if (id) { cacheRacines[name] = id; ecrireRacinesMemo(cacheRacines); }
     if (!id) {
       throw new Error(
         `Dossier racine "${name}" introuvable à la racine du Drive connecté. ` +
@@ -463,8 +482,18 @@ const FTSDrive = (() => {
    * @returns {Promise<Array<{id:string, name:string}>>}
    */
   async function listChantiers() {
-    const rootId = await getRootFolder(ROOT_DOSSIER_CHANTIER);
-    const folders = await listSubfolders(rootId);
+    const memorise = !!cacheRacines[ROOT_DOSSIER_CHANTIER];
+    let folders;
+    try {
+      folders = await listSubfolders(await getRootFolder(ROOT_DOSSIER_CHANTIER));
+      if (memorise && folders.length === 0) throw new Error("vide");
+    } catch (e) {
+      if (!memorise) throw e;
+      // Identifiant mémorisé périmé (autre compte, dossier déplacé…) : on le
+      // recherche à nouveau une fois.
+      oublierRacine(ROOT_DOSSIER_CHANTIER);
+      folders = await listSubfolders(await getRootFolder(ROOT_DOSSIER_CHANTIER));
+    }
     return folders.sort((a, b) => a.name.localeCompare(b.name));
   }
 

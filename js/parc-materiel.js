@@ -145,7 +145,7 @@ const FTSParc = (() => {
     try { const raw = localStorage.getItem(CACHE_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
   }
   function ecrireCache() {
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ machines: etat.machines, location: etat.location, date: Date.now() })); } catch (e) {}
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ machines: etat.machines, location: etat.location, date: Date.now(), spreadsheetId: etat.spreadsheetId || null, modifiable: !!etat.modifiable })); } catch (e) {}
   }
 
   // ── Accès au classeur ───────────────────────────────────────────
@@ -179,7 +179,16 @@ const FTSParc = (() => {
    * Charge le parc. Ordre : classeur Google → copie locale → liste de départ.
    * @returns {Promise<{source:'sheet'|'cache'|'defaut', existe:boolean, modifiable:boolean}>}
    */
-  async function charger() {
+  async function charger(options = {}) {
+    // options.rapide : pages de consultation (Détail, Pointages) — la copie
+    // locale suffit si elle vient du classeur et a moins d'une heure.
+    if (options.rapide) {
+      const c = lireCache();
+      if (c && c.spreadsheetId && c.machines && c.machines.length && Date.now() - (c.date || 0) < 3600 * 1000) {
+        etat = { machines: c.machines, location: c.location || [], source: "sheet", spreadsheetId: c.spreadsheetId, modifiable: !!c.modifiable };
+        return { source: "sheet", existe: true, modifiable: etat.modifiable };
+      }
+    }
     if (connecte()) {
       try {
         const fichier = await trouverClasseur();

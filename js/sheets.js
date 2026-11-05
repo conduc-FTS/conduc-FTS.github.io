@@ -454,6 +454,14 @@ const FTSSheets = (() => {
       lireOnglet(spreadsheetId, ONGLET_MATERIEL),
       lireOnglet(spreadsheetId, ONGLET_PRODUCTION),
     ]);
+    return calculerResume(materiel, production);
+  }
+
+  /**
+   * Même calcul que resumeChantier, à partir de lignes déjà lues (utilisé
+   * par la Supervision, qui lit tous les chantiers d'un coup).
+   */
+  function calculerResume(materiel, production) {
 
     // Date la plus récente présente dans l'onglet Matériel, et date la
     // plus ancienne tous onglets confondus (= date du premier rapport
@@ -509,6 +517,74 @@ const FTSSheets = (() => {
       premierJour,
       joursRapportes,
     };
+  }
+
+  /**
+   * Lecture groupée pour la Supervision : TOUS les chantiers actifs en un
+   * minimum de requêtes, en lecture seule (ne crée ni classeur ni onglet).
+   *   - 1 requête Drive pour retrouver tous les classeurs "Suivi ..." ;
+   *   - 1 requête Sheets (batchGet) par chantier pour Materiel +
+   *     Production + Personnel ensemble.
+   * Avant : ~8 requêtes par chantier, lancées toutes en même temps, d'où
+   * les erreurs 429 de Google et les longues attentes.
+   *
+   * @param {Array<{id:string, name:string}>} chantiers
+   * @returns {Promise<Array<{id, spreadsheetId, materiel, production, personnel}>>}
+   */
+  async function chargerDonneesSupervision(chantiers) {
+    // 1) Tous les classeurs de suivi accessibles, avec leur dossier parent
+    const parDossier = {};
+    let pageToken = "";
+    do {
+      const q = encodeURIComponent("name contains 'Suivi ' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
+      const res = await fetchAvecRetry(
+        `${DRIVE_API_BASE}/files?q=${q}&fields=nextPageToken,files(id,name,parents)&pageSize=1000&spaces=drive&includeItemsFromAllDrives=true&supportsAllDrives=true${pageToken ? "&pageToken=" + pageToken : ""}`,
+        { headers: authHeader() }
+      );
+      if (!res.ok) throw new Error(`Erreur recherche des classeurs de suivi : ${res.status}`);
+      const data = await res.json();
+      (data.files || []).forEach((f) => (f.parents || []).forEach((p) => {
+        (parDossier[p] = parDossier[p] || []).push(f);
+      }));
+      pageToken = data.nextPageToken || "";
+    } while (pageToken);
+
+    // 2) Lecture des 3 onglets utiles, 4 chantiers à la fois maximum
+    //    (au-delà, Google renvoie des 429 qu'il faut ensuite attendre).
+    const ONGLETS = [ONGLET_MATERIEL, ONGLET_PRODUCTION, ONGLET_PERSONNEL];
+    async function lireChantier(c) {
+      const candidats = parDossier[c.id] || [];
+      const classeur = candidats.find((f) => f.name === `Suivi ${c.name}`) || candidats[0];
+      const vide = { id: c.id, spreadsheetId: null, materiel: [], production: [], personnel: [] };
+      if (!classeur) return vide;
+      const ranges = ONGLETS.map((o) => "ranges=" + encodeURIComponent(`${o}!A2:Z`)).join("&");
+      const res = await fetchAvecRetry(`${API_BASE}/${classeur.id}/values:batchGet?${ranges}`, { headers: authHeader() });
+      if (res.ok) {
+        const data = await res.json();
+        const v = (data.valueRanges || []).map((r) => r.values || []);
+        return { ...vide, spreadsheetId: classeur.id, materiel: v[0] || [], production: v[1] || [], personnel: v[2] || [] };
+      }
+      // Un ancien classeur sans l'un des onglets fait échouer tout le
+      // batchGet : on relit alors onglet par onglet, sans bloquer.
+      const [materiel, production, personnel] = await Promise.all(ONGLETS.map((o) => lireOnglet(classeur.id, o).catch(() => [])));
+      return { ...vide, spreadsheetId: classeur.id, materiel, production, personnel };
+    }
+
+    const resultats = new Array(chantiers.length);
+    let suivant = 0;
+    async function ouvrier() {
+      while (suivant < chantiers.length) {
+        const i = suivant++;
+        try {
+          resultats[i] = await lireChantier(chantiers[i]);
+        } catch (e) {
+          console.warn(`Supervision : lecture impossible pour "${chantiers[i].name}"`, e);
+          resultats[i] = { id: chantiers[i].id, spreadsheetId: null, materiel: [], production: [], personnel: [], erreur: true };
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(4, chantiers.length) }, ouvrier));
+    return resultats;
   }
 
   function parseDateFR(s) {
@@ -835,6 +911,9 @@ const FTSSheets = (() => {
     enregistrerDonneesRapport,
     lireSuiviComplet,
     resumeChantier,
+    calculerResume,
+    chargerDonneesSupervision,
+    parseDateFR,
     verifierPieuxDejaRealises,
     listerPointageToutesChantiers,
     modifierLignePointage,

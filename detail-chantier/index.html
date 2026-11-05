@@ -325,6 +325,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if (duree) metaMisAJour.dureeChantier = Number(duree); else delete metaMisAJour.dureeChantier;
       if (micropieux) metaMisAJour.micropieuxPrevus = Number(micropieux); else delete metaMisAJour.micropieuxPrevus;
       if (montant) metaMisAJour.montantVendu = Number(montant); else delete metaMisAJour.montantVendu;
+      // Type changé ici : la liste des techniques (cochées à la création)
+      // n'est plus à jour, on la remplace par ce type pour rester cohérent
+      // avec la Supervision.
+      if (metaExistante.typeChantier !== typeChantier && Array.isArray(metaMisAJour.techniques)) {
+        metaMisAJour.techniques = [typeChantier];
+      }
       metaMisAJour.typeChantier = typeChantier;
       await FTSDrive.setMetadonneesChantier(chantierId, metaMisAJour);
       previsionStatus.textContent = "Prévisions enregistrées.";

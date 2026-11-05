@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#3A3A3A">
 <link rel="manifest" href="../manifest_conducteur.json">
 <link rel="icon" type="image/png" sizes="192x192" href="../icon-dashboard-192.png">
@@ -15,38 +15,6 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <style>
 * { box-sizing: border-box; }
 body { margin: 0; display: flex; min-height: 100vh; }
-
-/* ─── Barre latérale ─────────────────────────────────────── */
-.se-sidebar {
-  width: 230px; background: var(--anthracite); color: white;
-  display: flex; flex-direction: column; flex-shrink: 0;
-  position: sticky; top: 0; height: 100vh;
-}
-.se-sidebar-brand { padding: 20px 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-.se-sidebar-brand img { height: 32px; width: auto; background: white; border-radius: 6px; padding: 3px 6px; flex-shrink: 0; }
-.se-sidebar-brand div div:first-child { font-weight: 800; font-size: 0.82rem; letter-spacing: 0.02em; }
-.se-sidebar-brand div div:last-child { font-size: 0.66rem; color: #B8BAC0; }
-.se-sidebar-nav { flex: 1; padding: 14px 10px; display: flex; flex-direction: column; gap: 3px; }
-.se-sidebar-nav button, .se-sidebar-nav a {
-  color: #C9CBCF; text-decoration: none; padding: 10px 12px; border-radius: 8px;
-  font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 10px;
-  background: none; border: none; cursor: pointer; width: 100%; text-align: left; font-family: inherit;
-}
-.se-sidebar-nav button.active { background: var(--fts-yellow); color: var(--anthracite); }
-.se-sidebar-nav button:hover:not(.active), .se-sidebar-nav a:hover { background: rgba(255,255,255,0.06); }
-.se-sidebar-footer { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.72rem; color: #B8BAC0; }
-.se-sidebar-footer .email { color: white; font-weight: 600; display: block; margin: 2px 0 8px 0; word-break: break-all; }
-.se-sidebar-footer button {
-  background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 6px;
-  padding: 7px 10px; font-size: 0.74rem; font-weight: 600; cursor: pointer; width: 100%;
-}
-.se-sidebar-footer button:hover { background: rgba(255,255,255,0.18); }
-
-.se-main { flex: 1; padding: 30px 36px; max-width: 1500px; }
-.se-view { display: none; }
-.se-view.active { display: block; }
-.se-page-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
-.se-page-sub { color: var(--text-sub); font-size: 0.88rem; margin-bottom: 22px; }
 
 /* ─── KPI ─────────────────────────────────────────────────── */
 .se-kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
@@ -97,63 +65,6 @@ body { margin: 0; display: flex; min-height: 100vh; }
 .se-last-activity { color: var(--text-sub); font-size: 0.8rem; white-space: nowrap; }
 .se-empty-state { padding: 40px 20px; text-align: center; color: var(--text-sub); font-size: 0.88rem; }
 
-@media (max-width: 1000px) {
-  .se-kpi-row { grid-template-columns: repeat(2, 1fr); }
-}
-.se-burger { display: none; background: none; border: none; padding: 0; cursor: pointer; width: 100%; }
-
-@media (max-width: 720px) and (orientation: portrait), (max-height: 500px) and (orientation: landscape) {
-  body { flex-direction: column; }
-  .se-sidebar { width: 100%; height: auto; position: relative; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; }
-
-  /* Ligne 1 : logo à gauche, hamburger à droite, sur la même ligne */
-  .se-sidebar-brand { order: 1; flex: 1; min-width: 0; }
-  .se-burger {
-    order: 2; flex: 0 0 auto; width: auto; display: flex; justify-content: flex-end; align-items: center;
-  }
-  .se-burger span {
-    display: flex; align-items: center; justify-content: center;
-    width: 46px; height: 46px; background: rgba(255,255,255,0.08); border-radius: 9px;
-    color: white; font-size: 1.4rem;
-  }
-
-  /* Statut de connexion Google Drive : sa propre ligne, juste sous le logo */
-
-  /* Menu déroulant en overlay, fermé par défaut — plus simple à lire
-     qu'une rangée d'onglets à faire défiler horizontalement. */
-  .se-sidebar-nav {
-    display: none; order: 4; flex: 0 0 100%; flex-direction: column; overflow-x: visible;
-    position: absolute; top: 100%; left: 0; right: 0; background: var(--anthracite);
-    border-top: 1px solid rgba(255,255,255,0.08); box-shadow: 0 8px 16px rgba(0,0,0,0.25); z-index: 30;
-  }
-  .se-sidebar-nav.open { display: flex; }
-  .se-sidebar-nav button, .se-sidebar-nav a { white-space: normal; padding: 13px 18px; border-radius: 0; }
-
-  .se-sidebar-footer {
-    order: 3; flex: 0 0 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-    border-top: 1px solid rgba(255,255,255,0.08); border-left: none;
-    padding: 10px 14px; width: auto; margin-top: 8px;
-  }
-  .se-sidebar-footer .email { display: inline; margin: 0; font-size: 0.68rem; }
-  .se-sidebar-footer button { width: auto; padding: 6px 10px; }
-  .se-main { padding: 16px; }
-  .se-kpi-row { grid-template-columns: 1fr 1fr; }
-
-  /* Le tableau des chantiers devient une liste de cartes empilées —
-     plus lisible qu'un tableau large à faire défiler pour une simple
-     consultation sur téléphone (la vraie supervision reste au bureau). */
-  .se-table-scroll { overflow-x: visible; }
-  .se-table, .se-table thead, .se-table tbody, .se-table tr { display: block; width: 100%; min-width: 0; }
-  .se-table thead { display: none; }
-  .se-table tr { border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px; padding: 10px 14px; background: white; }
-  .se-table tr:hover td { background: none; }
-  .se-table td { display: block; width: auto; border: none; padding: 5px 0; }
-  .se-table td[data-label]::before {
-    content: attr(data-label); display: block; font-size: 0.62rem; text-transform: uppercase;
-    letter-spacing: 0.03em; color: var(--text-sub); font-weight: 700; margin-bottom: 2px;
-  }
-}
-
 .se-subtabs { display: flex; gap: 8px; margin-bottom: 18px; }
 .se-subtab { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 0.83rem; font-weight: 700; color: var(--text-sub); cursor: pointer; }
 .se-subtab.active { background: var(--anthracite); color: white; border-color: var(--anthracite); }
@@ -171,149 +82,326 @@ body { margin: 0; display: flex; min-height: 100vh; }
 .se-pct-bar { display: inline-block; width: 60px; height: 5px; background: #EEE; border-radius: 3px; overflow: hidden; margin-left: 8px; vertical-align: middle; }
 .se-pct-fill { height: 100%; background: var(--fts-yellow); }
 .se-export-btn { background: var(--fts-yellow); border: 1px solid var(--fts-yellow); color: var(--anthracite); padding: 9px 16px; border-radius: 8px; font-weight: 800; font-size: 0.82rem; cursor: pointer; }
+/* ─── Habillage Supervision (v2 : barre latérale groupée + barre du haut) ─── */
+html { font-size: 16px; }
+.sv-sidebar {
+  width: 230px; background: var(--anthracite); color: #fff; display: flex; flex-direction: column;
+  flex-shrink: 0; position: sticky; top: 0; height: 100vh; z-index: 40;
+}
+.sv-brand { display: flex; gap: 10px; align-items: center; padding: 18px 18px 12px; text-decoration: none; color: #fff; }
+.sv-brand img { width: 54px; height: 28px; object-fit: contain; background: #fff; border-radius: 6px; padding: 3px 5px; flex-shrink: 0; }
+.sv-brand b { font-size: 0.82rem; letter-spacing: 0.04em; display: block; }
+.sv-brand small { font-size: 0.68rem; color: #A8ABB2; }
+.sv-nav { flex: 1; padding: 4px 12px; overflow-y: auto; }
+.sv-grp { font-size: 0.62rem; letter-spacing: 0.09em; color: #8A8D94; font-weight: 800; margin: 16px 8px 6px; }
+.sv-nav button, .sv-nav a {
+  display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; width: 100%;
+  color: #D0D2D6; text-decoration: none; font-weight: 600; font-size: 0.9rem; background: none; border: none;
+  cursor: pointer; text-align: left; font-family: inherit;
+}
+.sv-nav .ic { width: 20px; text-align: center; flex-shrink: 0; }
+.sv-nav button.active { background: var(--fts-yellow); color: var(--anthracite); }
+.sv-nav button:hover:not(.active), .sv-nav a:hover { background: rgba(255,255,255,0.07); }
+.sv-acct { border-top: 1px solid rgba(255,255,255,0.08); padding: 14px 14px; display: flex; gap: 10px; align-items: center; }
+.sv-av {
+  width: 34px; height: 34px; border-radius: 50%; background: var(--fts-yellow); color: var(--anthracite);
+  display: grid; place-items: center; font-weight: 800; font-size: 0.78rem; position: relative; flex-shrink: 0;
+}
+.sv-av::after { content: ""; position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px; border-radius: 50%; background: #9AA0AA; border: 2px solid var(--anthracite); }
+.sv-av.on::after { background: #27AE60; }
+.sv-av.exp::after { background: #E39B0B; }
+.sv-who { font-size: 0.8rem; font-weight: 700; line-height: 1.25; min-width: 0; flex: 1; }
+.sv-who small { display: block; color: #9A9DA4; font-weight: 500; font-size: 0.68rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv-logout { background: rgba(255,255,255,0.08); border: none; color: #D0D2D6; width: 30px; height: 30px; border-radius: 7px; cursor: pointer; font-size: 0.85rem; flex-shrink: 0; }
+.sv-logout:hover { background: rgba(255,255,255,0.16); }
+
+.sv-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sv-top {
+  background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 14px 32px;
+  display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 20;
+}
+.sv-top h1 { font-size: 1.3rem; margin: 0; font-weight: 800; }
+.sv-top .sv-date { color: var(--text-sub); font-size: 0.82rem; }
+.sv-sp { flex: 1; }
+.sv-search { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: var(--bg); border-radius: 9px; padding: 0 12px; width: 300px; }
+.sv-search input { border: none; background: none; outline: none; font: inherit; font-size: 0.86rem; padding: 9px 0; width: 100%; }
+.sv-sync { font-size: 0.78rem; color: var(--text-sub); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sv-sync .dot { width: 8px; height: 8px; border-radius: 50%; background: #9AA0AA; flex-shrink: 0; }
+.sv-sync.ok .dot { background: #27AE60; }
+.sv-sync.exp .dot { background: #E39B0B; }
+.sv-sync.load .dot { background: var(--fts-yellow); animation: svPulse 1s infinite; }
+@keyframes svPulse { 50% { opacity: 0.3; } }
+.sv-btn { border: 1px solid var(--border); background: #fff; border-radius: 9px; padding: 9px 14px; font-weight: 700; font-size: 0.86rem; cursor: pointer; color: var(--text-main); font-family: inherit; white-space: nowrap; }
+.sv-btn:hover { background: var(--bg); }
+.sv-btn.pri { background: var(--fts-yellow); border-color: var(--fts-yellow); color: var(--anthracite); }
+.sv-btn.pri:hover { filter: brightness(0.97); }
+.sv-btn:disabled { opacity: 0.6; cursor: default; }
+.sv-content { padding: 22px 32px 40px; width: 100%; }
+
+/* Les anciennes vues gardent leur contenu : le titre passe dans la barre du haut */
+.se-view .se-page-title { display: none; }
+.se-view .se-page-sub { margin: 0 0 16px; font-size: 0.88rem; color: var(--text-sub); }
+/* Panneaux des statistiques : titre et graphique décollés du bord */
+.se-panel > h2 { font-size: 1rem; font-weight: 800; padding: 16px 20px 0; margin: 0 0 14px !important; }
+.se-panel > .se-chart { padding: 0 20px 16px; height: 170px; }
+.se-pct-fill { display: block; }
+.se-view { display: none; }
+.se-view.active { display: block; }
+.se-panel + .se-panel { margin-top: 16px; }
+
+/* Bandeau session */
+.sv-banner { display: flex; align-items: center; gap: 12px; background: #FFF3DC; border: 1px solid #F3D9A4; color: #8A4F00; padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; font-size: 0.86rem; font-weight: 600; flex-wrap: wrap; }
+.sv-banner[hidden] { display: none; }
+
+/* KPI */
+.sv-kpis { display: grid; grid-template-columns: repeat(var(--nk, 5), 1fr); gap: 14px; margin-bottom: 18px; }
+.sv-kpi { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; display: flex; align-items: center; gap: 14px; min-width: 0; }
+.sv-kpi[hidden] { display: none; }
+.sv-kpi .ico { width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; font-size: 1.2rem; background: var(--bg); flex-shrink: 0; }
+.sv-kpi .l { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-sub); font-weight: 700; }
+.sv-kpi .v { font-size: 1.7rem; font-weight: 800; line-height: 1.15; }
+.sv-kpi .s { font-size: 0.76rem; color: var(--text-sub); }
+.sv-kpi.mp .ico { background: #EAF1FE; }
+.sv-kpi.px .ico { background: #FDEEF1; }
+.sv-kpi.px.avenir .v { color: #B6BAC2; }
+.sv-kpi.alert { border-color: #F2C4BE; background: #FFFAF9; }
+.sv-kpi.alert .v { color: #C0392B; }
+.sv-kpi.alert .ico { background: #FDECEA; }
+
+/* Tableau chantiers */
+.sv-panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.sv-ph { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.sv-ph h2 { font-size: 1rem; margin: 0; font-weight: 800; }
+.sv-seg { display: flex; background: var(--bg); border-radius: 9px; padding: 3px; gap: 2px; }
+.sv-seg button { border: none; background: none; padding: 6px 13px; border-radius: 7px; font-weight: 700; font-size: 0.82rem; color: var(--text-sub); cursor: pointer; font-family: inherit; white-space: nowrap; }
+.sv-seg button.on { background: #fff; color: var(--anthracite); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+.sv-chk { font-size: 0.84rem; color: var(--text-sub); display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.sv-table { width: 100%; border-collapse: collapse; }
+.sv-table th { text-align: left; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-sub); font-weight: 700; padding: 10px 18px; border-bottom: 1px solid var(--border); white-space: nowrap; background: #FBFBFC; user-select: none; }
+.sv-table th[data-sort] { cursor: pointer; }
+.sv-table th .ar { opacity: 0.35; margin-left: 3px; }
+.sv-table th.sorted .ar { opacity: 1; color: var(--anthracite); }
+.sv-table td { padding: 12px 18px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 0.9rem; }
+.sv-table tbody tr:last-child td { border-bottom: none; }
+.sv-table tbody tr { cursor: pointer; }
+.sv-table tbody tr:hover td { background: #FAFBFC; }
+.sv-table tr.late td:first-child { box-shadow: inset 3px 0 0 #C0392B; }
+.sv-table tr.done td { opacity: 0.6; }
+.sv-code { font-size: 0.74rem; color: var(--text-sub); display: block; }
+.sv-nom { font-weight: 700; }
+.sv-tag { font-size: 0.64rem; font-weight: 800; margin-left: 6px; color: var(--text-sub); white-space: nowrap; }
+.sv-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+.sv-badge { font-size: 0.7rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.sv-b-Micropieux { background: #EAF1FE; color: #2A5DBF; }
+.sv-b-Battage { background: #EAF6EE; color: #1D6E3E; }
+.sv-b-Pieux { background: #FDEEF1; color: #B84A63; }
+.sv-st { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; white-space: nowrap; background: #F0F1F3; color: #5B6270; }
+.sv-st i { width: 8px; height: 8px; border-radius: 50%; background: #9AA0AA; }
+.sv-st.TRAVAIL { background: #EAF6EE; color: #1D6E3E; } .sv-st.TRAVAIL i { background: #27AE60; }
+.sv-st.PANNE { background: #FDECEA; color: #8E2E22; } .sv-st.PANNE i { background: #C0392B; }
+.sv-st.TRANSPORT { background: #EAF1FE; color: #2A5DBF; } .sv-st.TRANSPORT i { background: #4C82F0; }
+.sv-mach { font-size: 0.74rem; color: var(--text-sub); display: block; margin-top: 3px; }
+.sv-prog { min-width: 140px; max-width: 260px; }
+.sv-prog + .sv-prog { margin-top: 7px; }
+.sv-prog .n { display: flex; justify-content: space-between; font-size: 0.84rem; font-weight: 700; margin-bottom: 4px; gap: 8px; }
+.sv-prog .n small { color: var(--text-sub); font-weight: 600; }
+.sv-prog .n em { font-style: normal; font-size: 0.68rem; color: var(--text-sub); font-weight: 700; margin-right: 4px; }
+.sv-prog.late .n, .sv-prog.late .n small { color: #C0392B; }
+.sv-bar { height: 6px; background: #EEF0F2; border-radius: 3px; overflow: hidden; }
+.sv-bar div { height: 100%; background: var(--fts-yellow); border-radius: 3px; }
+.sv-prog.late .sv-bar div { background: #C0392B; }
+.sv-avenir { font-size: 0.76rem; color: #B6BAC2; font-weight: 600; font-style: italic; }
+.sv-last { font-size: 0.86rem; white-space: nowrap; }
+.sv-last small { display: block; color: var(--text-sub); font-size: 0.72rem; }
+.sv-last.warn { color: #A15C00; font-weight: 700; }
+.sv-chef { font-size: 0.86rem; }
+.sv-act { white-space: nowrap; text-align: right; }
+.sv-ab { border: 1px solid var(--border); background: #fff; border-radius: 8px; width: 34px; height: 34px; display: inline-grid; place-items: center; font-size: 0.95rem; margin-left: 4px; text-decoration: none; cursor: pointer; }
+.sv-ab:hover { background: var(--bg); }
+.sv-foot { padding: 10px 18px; font-size: 0.78rem; color: var(--text-sub); border-top: 1px solid var(--border); display: flex; justify-content: space-between; background: #FBFBFC; gap: 10px; }
+.sv-empty { padding: 40px 20px; text-align: center; color: var(--text-sub); font-size: 0.9rem; }
+.sv-empty[hidden] { display: none; }
+.sv-skel td div { height: 12px; border-radius: 6px; background: linear-gradient(90deg, #EEF0F2 25%, #F6F7F8 50%, #EEF0F2 75%); background-size: 200% 100%; animation: svSkel 1.2s infinite; }
+@keyframes svSkel { to { background-position: -200% 0; } }
+
+/* Fenêtre Nouveau chantier */
+.sv-ov { position: fixed; inset: 0; background: rgba(20,20,20,0.45); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+.sv-ov.open { display: flex; }
+.sv-modal { background: #fff; border-radius: 14px; width: 640px; max-width: 100%; max-height: 92vh; overflow: auto; box-shadow: 0 20px 50px rgba(0,0,0,0.25); }
+.sv-mh { display: flex; align-items: center; padding: 16px 22px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: #fff; z-index: 1; }
+.sv-mh h3 { margin: 0; font-size: 1.1rem; }
+.sv-x { margin-left: auto; border: none; background: var(--bg); width: 34px; height: 34px; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+.sv-mb { padding: 18px 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+.sv-f { display: flex; flex-direction: column; gap: 5px; }
+.sv-f[hidden] { display: none; }
+.sv-f.full { grid-column: 1 / -1; }
+.sv-f label { font-size: 0.76rem; font-weight: 700; color: var(--text-sub); }
+.sv-f label i { font-style: normal; font-weight: 500; }
+.sv-f input { border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; font-size: 0.92rem; font-family: inherit; width: 100%; }
+.sv-f input:focus { outline: 2px solid var(--fts-yellow); outline-offset: -1px; }
+.sv-techs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sv-techs label { border: 1.5px solid var(--border); border-radius: 10px; padding: 11px 10px; font-weight: 700; font-size: 0.86rem; cursor: pointer; color: var(--text-sub); display: flex; align-items: center; gap: 8px; }
+.sv-techs input { width: 18px; height: 18px; accent-color: var(--anthracite); margin: 0; }
+.sv-techs label:has(input:checked) { border-color: var(--anthracite); color: var(--anthracite); background: #FFFBEA; }
+.sv-sep { grid-column: 1 / -1; font-size: 0.66rem; letter-spacing: 0.08em; font-weight: 800; color: var(--text-sub); border-top: 1px solid var(--border); padding-top: 12px; margin-top: 2px; }
+.sv-sep i { font-style: normal; font-weight: 500; letter-spacing: 0; }
+.sv-hint { grid-column: 1 / -1; font-size: 0.78rem; color: var(--text-sub); background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+.sv-mstatus { grid-column: 1 / -1; font-size: 0.84rem; font-weight: 600; margin: 0; }
+.sv-mstatus.err { color: #C0392B; }
+.sv-mstatus.ok { color: #1D6E3E; }
+.sv-mf { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 22px; border-top: 1px solid var(--border); background: #FBFBFC; position: sticky; bottom: 0; }
+
+/* Mobile */
+.sv-mtop { display: none; background: var(--anthracite); color: #fff; padding: 12px 14px; padding-top: max(12px, env(safe-area-inset-top)); align-items: center; gap: 10px; position: sticky; top: 0; z-index: 20; }
+.sv-mtop img { width: 54px; height: 28px; object-fit: contain; background: #fff; border-radius: 6px; padding: 3px 5px; }
+.sv-mtop b { font-size: 1rem; }
+.sv-mtop .sv-sync { color: #B8BAC0; }
+.sv-fab { display: none; }
+.sv-tabbar { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--border); justify-content: space-around; padding: 6px 0 max(10px, env(safe-area-inset-bottom)); z-index: 30; }
+.sv-tabbar a, .sv-tabbar button { display: flex; flex-direction: column; align-items: center; font-size: 0.66rem; color: var(--text-sub); text-decoration: none; font-weight: 700; gap: 2px; background: none; border: none; font-family: inherit; cursor: pointer; padding: 0 6px; }
+.sv-tabbar span { font-size: 1.2rem; }
+.sv-tabbar .on { color: var(--anthracite); }
+.sv-backdrop { display: none; }
+
+@media (max-width: 1250px) {
+  .sv-kpis { grid-template-columns: repeat(3, 1fr); }
+  .sv-search { width: 220px; }
+}
+@media (max-width: 1000px) {
+  .se-kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .sv-top .sv-date, .sv-top .sv-sync span:last-child { display: none; }
+}
+@media (max-width: 760px) {
+  body { flex-direction: column; }
+  .sv-top { display: none; }
+  .sv-mtop, .sv-tabbar { display: flex; }
+  /* Barre latérale = tiroir ouvert par "Plus" */
+  .sv-sidebar { position: fixed; left: 0; top: 0; bottom: 0; height: auto; transform: translateX(-100%); transition: transform 0.2s; width: 260px; padding-top: env(safe-area-inset-top); }
+  body.menu-ouvert .sv-sidebar { transform: none; }
+  body.menu-ouvert .sv-backdrop { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 35; }
+  .sv-content { padding: 12px 12px 96px; }
+  .sv-kpis { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .sv-kpi { padding: 10px 12px; }
+  .sv-kpi .ico { display: none; }
+  .sv-kpi .v { font-size: 1.35rem; }
+  .sv-kpi .s { font-size: 0.72rem; }
+  .sv-kpi:first-child { grid-column: 1 / -1; }
+  .sv-ph { padding: 12px 14px; gap: 10px; }
+  .sv-ph h2 { width: 100%; }
+  .sv-seg { width: 100%; }
+  .sv-seg button { flex: 1; padding: 7px 4px; font-size: 0.8rem; }
+  .sv-ph .sv-sp { display: none; }
+  .sv-table, .sv-table tbody, .sv-table tr, .sv-table td { display: block; }
+  .sv-table thead { display: none; }
+  .sv-table tbody tr { padding: 12px 14px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+  .sv-table tbody tr:last-child { border-bottom: none; }
+  .sv-table td { padding: 0; border: none; }
+  .sv-table td.c-type, .sv-table td.c-chef, .sv-table td.c-act { display: none; }
+  .sv-table td.c-st { text-align: right; }
+  .sv-table td.c-last { grid-column: 1 / -1; font-size: 0.78rem; color: var(--text-sub); }
+  .sv-table td.c-last small { display: inline; margin-left: 4px; }
+  .sv-prog { min-width: 0; max-width: none; }
+  .sv-table tr.late td:first-child { box-shadow: none; }
+  .sv-table tr.late { box-shadow: inset 3px 0 0 #C0392B; }
+  .sv-table tr.sv-skel { display: block; }
+  .sv-fab { display: grid; position: fixed; right: 16px; bottom: calc(78px + env(safe-area-inset-bottom)); width: 54px; height: 54px; border-radius: 50%; background: var(--fts-yellow); border: none; font-size: 1.7rem; font-weight: 800; box-shadow: 0 6px 16px rgba(0,0,0,0.2); place-items: center; z-index: 31; color: var(--anthracite); cursor: pointer; }
+  .sv-mb { grid-template-columns: 1fr; }
+  .sv-ov { align-items: flex-end; padding: 0; }
+  .sv-modal { border-radius: 16px 16px 0 0; max-height: 94vh; }
+  .sv-mf { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+  /* Anciennes vues (stats, archives, personnel, parc) */
+  .se-kpi-row { grid-template-columns: 1fr 1fr; }
+  .se-table-scroll { overflow-x: auto; }
+}
 </style>
 </head>
 <body>
 
-<div class="se-sidebar">
-  <button type="button" class="se-burger" id="burgerBtn" aria-label="Menu"><span>☰</span></button>
-  <div class="se-sidebar-brand">
-    <img src="../assets/logo-fts.png" alt="FTS">
-    <div>
-      <div>SUPERVISION</div>
-      <div>Fondations et Travaux Spéciaux</div>
-    </div>
+<aside class="sv-sidebar" id="sidebar">
+  <a class="sv-brand" href="index.html">
+    <img src="../assets/logo-fts.png" alt="FTS" width="54" height="28">
+    <div><b>SUPERVISION</b><small>Fondations &amp; Travaux Spéciaux</small></div>
+  </a>
+  <nav class="sv-nav" id="sidebarNav">
+    <div class="sv-grp">PILOTAGE</div>
+    <button type="button" class="se-nav-btn active" data-view="se-view-overview"><span class="ic">📊</span>Vue d'ensemble</button>
+    <button type="button" class="se-nav-btn" data-view="se-view-stats"><span class="ic">📈</span>Statistiques</button>
+    <div class="sv-grp">POINTAGES</div>
+    <a href="../recap-hebdo/index.html?type=materiel"><span class="ic">🔧</span>Matériel</a>
+    <a href="../recap-hebdo/index.html?type=personnel"><span class="ic">👷</span>Personnel</a>
+    <div class="sv-grp">RÉFÉRENTIELS</div>
+    <button type="button" class="se-nav-btn" data-view="se-view-personnel"><span class="ic">👥</span>Personnel FTS</button>
+    <button type="button" class="se-nav-btn" data-view="se-view-parc"><span class="ic">🚜</span>Parc matériel</button>
+    <div class="sv-grp">CHANTIERS</div>
+    <button type="button" class="se-nav-btn" data-view="se-view-archives"><span class="ic">🗄️</span>Archives</button>
+  </nav>
+  <div class="sv-acct">
+    <div class="sv-av" id="userAvatar">?</div>
+    <div class="sv-who"><span id="userName">Non connecté</span><small id="userLabel">—</small></div>
+    <button type="button" class="sv-logout" id="signOutBtn" title="Se déconnecter" hidden>🚪</button>
   </div>
-  <div class="se-sidebar-nav" id="sidebarNav">
-    <button type="button" class="se-nav-btn active" data-view="se-view-overview">📊 Vue d'ensemble</button>
-    <button type="button" class="se-nav-btn" data-view="se-view-creer">➕ Créer un chantier</button>
-    <button type="button" class="se-nav-btn" data-view="se-view-archives">🗄️ Archives</button>
-    <a href="../recap-hebdo/index.html?type=materiel">🔧 Pointage Matériel</a>
-    <a href="../recap-hebdo/index.html?type=personnel">👷 Pointage Personnel</a>
-    <button type="button" class="se-nav-btn" data-view="se-view-stats">📈 Statistiques</button>
-    <button type="button" class="se-nav-btn" data-view="se-view-personnel">👥 Personnel FTS</button>
-    <button type="button" class="se-nav-btn" data-view="se-view-parc">🚜 Parc matériel</button>
-  </div>
-  <div class="se-sidebar-footer">
-    <span id="userDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#9AA0AA;margin-right:5px"></span>Connexion
-    <span class="email" id="userLabel">Non connecté</span>
-    <button type="button" id="signInBtn">Se connecter</button>
-    <button type="button" id="signOutBtn" hidden>Se déconnecter</button>
-  </div>
+</aside>
+<div class="sv-backdrop" id="menuBackdrop"></div>
+
+<div class="sv-mtop">
+  <img src="../assets/logo-fts.png" alt="FTS" width="54" height="28">
+  <b id="mobileTitle">Supervision</b><span class="sv-sp"></span>
+  <span class="sv-sync" id="syncMobile"><span class="dot"></span><span class="txt"></span></span>
 </div>
 
-<div class="se-main">
+<div class="sv-main">
+  <header class="sv-top">
+    <div><h1 id="pageTitle">Vue d'ensemble</h1><div class="sv-date" id="topDate"></div></div>
+    <span class="sv-sp"></span>
+    <label class="sv-search" id="searchBox">🔍<input type="text" id="rechercheChantier" placeholder="Rechercher un chantier, un chef…"></label>
+    <span class="sv-sync" id="syncTop"><span class="dot"></span><span class="txt"></span></span>
+    <button type="button" class="sv-btn" id="refreshVueEnsembleBtn" title="Recharger depuis Google">🔄</button>
+    <button type="button" class="sv-btn pri" id="nouveauChantierBtn">+ Nouveau chantier</button>
+  </header>
+
+  <div class="sv-content">
+    <div class="sv-banner" id="sessionBanner" hidden>
+      <span id="sessionBannerTxt"></span><span class="sv-sp"></span>
+      <button type="button" class="sv-btn pri" id="signInBtn">Reprendre la session</button>
+    </div>
 
   <!-- ─── VUE D'ENSEMBLE ─────────────────────────────────── -->
   <div class="se-view active" id="se-view-overview">
-    <div class="se-page-title">Vue d'ensemble</div>
-    <div class="se-page-sub" id="overviewDate"></div>
-
-    <div class="se-kpi-row">
-      <div class="se-kpi-card">
-        <div class="se-kpi-label">Chantiers actifs</div>
-        <div class="se-kpi-value" id="kpiChantiers">—</div>
-        <div class="se-kpi-sub" id="kpiChantiersSub">&nbsp;</div>
-      </div>
-      <div class="se-kpi-card">
-        <div class="se-kpi-label">Total micropieux réalisés</div>
-        <div class="se-kpi-value" id="kpiMicropieux">—</div>
-        <div class="se-kpi-sub">tous chantiers, cumul</div>
-      </div>
-      <div class="se-kpi-card">
-        <div class="se-kpi-label">Chantiers en retard</div>
-        <div class="se-kpi-value" id="kpiRetard">—</div>
-        <div class="se-kpi-sub">jours de rapport &gt; durée prévue</div>
-      </div>
-      <div class="se-kpi-card">
-        <div class="se-kpi-label">Heures pointées cette semaine</div>
-        <div class="se-kpi-value" id="kpiHeures">—</div>
-        <div class="se-kpi-sub" id="kpiHeuresSub">&nbsp;</div>
-      </div>
+    <div class="sv-kpis" id="kpis">
+      <div class="sv-kpi" id="kpiActifs"><div class="ico">🏗️</div><div><div class="l">Chantiers actifs</div><div class="v">—</div><div class="s">&nbsp;</div></div></div>
+      <div class="sv-kpi mp" id="kpiMpx"><div class="ico">🔩</div><div><div class="l">Mpx cette semaine</div><div class="v">—</div><div class="s">&nbsp;</div></div></div>
+      <div class="sv-kpi px avenir" id="kpiPieux"><div class="ico">🏛️</div><div><div class="l">Pieux cette semaine</div><div class="v">—</div><div class="s">rapport pieux à venir</div></div></div>
+      <div class="sv-kpi" id="kpiRetard"><div class="ico">⏱️</div><div><div class="l">En retard</div><div class="v">—</div><div class="s">jours de rapport &gt; durée prévue</div></div></div>
+      <div class="sv-kpi" id="kpiHeures"><div class="ico">👷</div><div><div class="l">Heures cette semaine</div><div class="v">—</div><div class="s">&nbsp;</div></div></div>
     </div>
 
-    <div class="se-panel">
-      <div class="se-panel-head">
+    <section class="sv-panel">
+      <div class="sv-ph">
         <h2>Chantiers en cours</h2>
-        <div class="se-panel-head-right">
-          <div class="se-filter-chips" id="typeFilterChips">
-            <button type="button" class="se-filter-chip active" data-type="">Tous</button>
-            <button type="button" class="se-filter-chip" data-type="Micropieux">Micropieux</button>
-            <button type="button" class="se-filter-chip" data-type="Pieux">Pieux</button>
-          </div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;color:var(--text-sub);white-space:nowrap"><input type="checkbox" id="afficherTermines"> Afficher les terminés</label>
-          <div class="se-search-box">🔍<input type="text" id="rechercheChantier" placeholder="Rechercher..."></div>
-          <button type="button" class="se-nav-btn" id="refreshVueEnsembleBtn" style="width:auto;background:var(--bg);color:var(--anthracite);border:1px solid var(--border);padding:7px 12px" title="Recharger depuis Google">🔄 Actualiser</button>
+        <div class="sv-seg" id="typeFilterChips">
+          <button type="button" data-f="tous" class="on">Tous</button>
+          <button type="button" data-f="mp">Micropieux</button>
+          <button type="button" data-f="px">Pieux</button>
         </div>
+        <span class="sv-sp"></span>
+        <label class="sv-chk"><input type="checkbox" id="afficherTermines"> Afficher les terminés</label>
       </div>
-      <div id="tableWrap">
-        <div class="se-table-scroll">
-        <table class="se-table">
-          <thead>
-            <tr>
-              <th data-sort="nom">Chantier <span class="se-arrow">↕</span></th>
-              <th data-sort="type">Type <span class="se-arrow">↕</span></th>
-              <th>Statut foreuse</th>
-              <th data-sort="jours">Jours <span class="se-arrow">↕</span></th>
-              <th data-sort="micropieux">Micropieux <span class="se-arrow">↕</span></th>
-              <th>Dernière activité</th>
-            </tr>
-          </thead>
-          <tbody id="chantiersTbody"></tbody>
-        </table>
-        </div>
-        <div class="se-empty-state" id="chantiersEmpty" hidden></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ─── CRÉER UN CHANTIER ──────────────────────────────── -->
-  <div class="se-view" id="se-view-creer">
-    <div class="se-page-title">Créer un chantier</div>
-    <div class="se-page-sub">Crée l'arborescence Drive avant de le partager avec le chef de chantier — n'apparaît pas dans l'appli tablette du chef.</div>
-
-    <div class="se-panel" style="padding: 22px 24px">
-      <form class="chantier-form" id="chantierForm">
-        <div class="field">
-          <label for="numAffaire">N° affaire</label>
-          <input type="text" id="numAffaire" placeholder="ex : 25 FTS 381" required>
-        </div>
-        <div class="field">
-          <label for="nomChantier">Nom du chantier</label>
-          <input type="text" id="nomChantier" placeholder="ex : CAP8000 Auchan Lac" required>
-        </div>
-        <div class="field">
-          <label for="typeChantier">Type de chantier</label>
-          <select id="typeChantier">
-            <option value="Micropieux">Micropieux</option>
-            <option value="Battage">Battage</option>
-            <option value="Pieux">Pieux</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="adresseChantier">Adresse / commune (optionnel)</label>
-          <input type="text" id="adresseChantier" placeholder="ex : Talence / Bordeaux">
-        </div>
-        <div class="field">
-          <label for="gpsChantier">Coordonnées GPS (optionnel, si pas d'adresse précise)</label>
-          <input type="text" id="gpsChantier" placeholder="ex : 44.833328, -0.577580">
-        </div>
-        <div class="field">
-          <label for="nbMicropieuxPrevus">Nombre de micropieux prévus (optionnel)</label>
-          <input type="number" id="nbMicropieuxPrevus" placeholder="ex : 25" min="0">
-        </div>
-        <div class="field">
-          <label for="dureeChantier">Durée de chantier (jours, optionnel)</label>
-          <input type="number" id="dureeChantier" placeholder="ex : 15" min="0">
-        </div>
-        <div class="field">
-          <label for="montantVendu">Montant total vendu (€, optionnel)</label>
-          <input type="number" id="montantVendu" placeholder="ex : 45000" min="0" step="0.01">
-        </div>
-        <button type="submit" class="btn-primary">Créer le chantier</button>
-      </form>
-      <p class="form-status" id="chantierStatus"></p>
-    </div>
+      <table class="sv-table">
+        <thead><tr>
+          <th data-sort="nom">Chantier <span class="ar">↕</span></th>
+          <th>Type</th>
+          <th>Foreuse</th>
+          <th data-sort="avancement">Avancement <span class="ar">↕</span></th>
+          <th data-sort="delai">Délai <span class="ar">↕</span></th>
+          <th data-sort="chef">Chef <span class="ar">↕</span></th>
+          <th data-sort="dernier">Dernier rapport <span class="ar">↕</span></th>
+          <th></th>
+        </tr></thead>
+        <tbody id="chantiersTbody"></tbody>
+      </table>
+      <div class="sv-empty" id="chantiersEmpty" hidden></div>
+      <div class="sv-foot"><span id="chantiersCompteur"></span><span>Clic sur une ligne = détail du chantier</span></div>
+    </section>
   </div>
 
   <!-- ─── STATISTIQUES ────────────────────────────────────── -->
@@ -579,6 +667,45 @@ body { margin: 0; display: flex; min-height: 100vh; }
   </div>
 
 </div>
+</div><!-- /sv-main -->
+
+<button type="button" class="sv-fab" id="nouveauChantierFab" aria-label="Nouveau chantier">+</button>
+<nav class="sv-tabbar">
+  <button type="button" class="tab-btn on" data-view="se-view-overview"><span>📊</span>Accueil</button>
+  <a href="../recap-hebdo/index.html?type=materiel"><span>🔧</span>Matériel</a>
+  <a href="../recap-hebdo/index.html?type=personnel"><span>👷</span>Personnel</a>
+  <button type="button" class="tab-btn" data-view="se-view-stats"><span>📈</span>Stats</button>
+  <button type="button" id="menuPlusBtn"><span>☰</span>Plus</button>
+</nav>
+
+<!-- ─── FENÊTRE NOUVEAU CHANTIER ───────────────────────────── -->
+<div class="sv-ov" id="chantierModal">
+  <form class="sv-modal" id="chantierForm" autocomplete="off">
+    <div class="sv-mh"><h3>Nouveau chantier</h3><button type="button" class="sv-x" id="chantierModalClose" aria-label="Fermer">✕</button></div>
+    <div class="sv-mb">
+      <div class="sv-f full"><label>Technique(s) — coche tout ce qui sera réalisé</label>
+        <div class="sv-techs">
+          <label><input type="checkbox" name="tech" value="Micropieux" checked>🔩 Micropieux</label>
+          <label><input type="checkbox" name="tech" value="Pieux">🏛️ Pieux</label>
+          <label><input type="checkbox" name="tech" value="Battage">🔨 Battage</label>
+        </div>
+      </div>
+      <div class="sv-f"><label for="numAffaire">N° affaire</label><input type="text" id="numAffaire" placeholder="ex : 26FTS012" required></div>
+      <div class="sv-f"><label for="nomChantier">Nom du chantier</label><input type="text" id="nomChantier" placeholder="ex : CAP8000 AUCHAN LAC" required></div>
+      <div class="sv-f"><label for="adresseChantier">Adresse / commune <i>(optionnel)</i></label><input type="text" id="adresseChantier" placeholder="ex : 12 RUE THIAC, BORDEAUX"></div>
+      <div class="sv-f"><label for="gpsChantier">GPS <i>(optionnel, si pas d'adresse précise)</i></label><input type="text" id="gpsChantier" placeholder="ex : 44.833328, -0.577580"></div>
+      <div class="sv-sep">PRÉVISIONS <i>(optionnel, modifiable plus tard)</i></div>
+      <div class="sv-f" data-tech="Micropieux"><label for="nbMicropieuxPrevus">Micropieux prévus</label><input type="number" id="nbMicropieuxPrevus" placeholder="ex : 25" min="0"></div>
+      <div class="sv-f" data-tech="Pieux" hidden><label for="nbPieuxPrevus">Pieux prévus</label><input type="number" id="nbPieuxPrevus" placeholder="ex : 12" min="0"></div>
+      <div class="sv-f" data-tech="Battage" hidden><label for="nbBattagePrevus">Battage prévus</label><input type="number" id="nbBattagePrevus" placeholder="ex : 40" min="0"></div>
+      <div class="sv-f"><label for="dureeChantier">Durée (jours)</label><input type="number" id="dureeChantier" placeholder="ex : 15" min="0"></div>
+      <div class="sv-f"><label for="montantVendu">Montant vendu (€)</label><input type="number" id="montantVendu" placeholder="ex : 45000" min="0" step="0.01"></div>
+      <div class="sv-hint">Crée le dossier Drive (PLAN, NDC, SECURITE + ACCUEIL SECURITE, RAPPORT JOURNALIER, DICT, SONDAGE). Le chantier apparaît ensuite dans le sélecteur « Chantier actif » de la tablette.</div>
+      <p class="sv-mstatus" id="chantierStatus"></p>
+    </div>
+    <div class="sv-mf"><button type="button" class="sv-btn" id="chantierModalCancel">Annuler</button><button type="submit" class="sv-btn pri" id="chantierSubmit">Créer le chantier</button></div>
+  </form>
+</div>
 
 <script src="../js/auth.js"></script>
 <script src="../js/drive.js"></script>
@@ -601,66 +728,440 @@ document.addEventListener("DOMContentLoaded", () => {
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   }
 
-  document.getElementById("overviewDate").textContent =
-    "Supervision de tous les chantiers en cours — " + new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  function escapeHtmlSE(str) {
+    const div = document.createElement("div");
+    div.textContent = str == null ? "" : String(str);
+    return div.innerHTML;
+  }
+  const $ = (id) => document.getElementById(id);
 
-  // --- Menu hamburger (mobile portrait) ---
-  const sidebarNav = document.getElementById("sidebarNav");
-  document.getElementById("burgerBtn").addEventListener("click", () => {
-    sidebarNav.classList.toggle("open");
+  $("topDate").textContent = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  // ─── Navigation (barre latérale + barre d'onglets mobile) ─────────
+  const TITRES_VUES = {
+    "se-view-overview": "Vue d'ensemble", "se-view-stats": "Statistiques", "se-view-personnel": "Personnel FTS",
+    "se-view-parc": "Parc matériel", "se-view-archives": "Archives", "se-view-adresses": "Adresses Personnel",
+  };
+
+  function fermerMenuMobile() { document.body.classList.remove("menu-ouvert"); }
+
+  function afficherVue(id) {
+    document.querySelectorAll("[data-view]").forEach((b) => {
+      b.classList.toggle("active", b.dataset.view === id && b.classList.contains("se-nav-btn"));
+      b.classList.toggle("on", b.dataset.view === id && b.classList.contains("tab-btn"));
+    });
+    document.querySelectorAll(".se-view").forEach((v) => v.classList.toggle("active", v.id === id));
+    $("pageTitle").textContent = TITRES_VUES[id] || "Supervision";
+    $("mobileTitle").textContent = id === "se-view-overview" ? "Supervision" : (TITRES_VUES[id] || "Supervision");
+    $("searchBox").style.visibility = id === "se-view-overview" ? "visible" : "hidden";
+    if (id === "se-view-overview") afficherVueEnsemble();
+    if (id === "se-view-archives") chargerArchives();
+    if (id === "se-view-stats") chargerStatsAvancement();
+    if (id === "se-view-adresses") chargerAdresses();
+    fermerMenuMobile();
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll(".se-nav-btn[data-view], .tab-btn[data-view]").forEach((btn) => {
+    btn.addEventListener("click", () => afficherVue(btn.dataset.view));
+  });
+  $("menuPlusBtn").addEventListener("click", () => document.body.classList.toggle("menu-ouvert"));
+  $("menuBackdrop").addEventListener("click", fermerMenuMobile);
+
+  // ─── Données : une seule lecture groupée, partagée par toutes les vues ──
+  // Gardée aussi dans le navigateur : à la réouverture de la page, les
+  // chiffres de la dernière consultation s'affichent tout de suite, puis
+  // sont rafraîchis en arrière-plan dès que la session Google est active.
+  const CLE_CACHE_LOCAL = "fts_supervision_cache_v1";
+  let donnees = null;          // { savedAt, chantiers:[{id,name,meta}], suivis:[{id,materiel,production,personnel}] }
+  let donneesFraiches = false; // true = lues depuis Google pendant cette visite
+  let promesseChargement = null;
+
+  function lireCacheLocal() {
+    try { const d = JSON.parse(localStorage.getItem(CLE_CACHE_LOCAL)); return d && Array.isArray(d.chantiers) ? d : null; } catch (e) { return null; }
+  }
+  function ecrireCacheLocal(d) {
+    try { localStorage.setItem(CLE_CACHE_LOCAL, JSON.stringify(d)); } catch (e) { /* plein ou bloqué : pas grave */ }
+  }
+  function effacerCacheLocal() {
+    try { localStorage.removeItem(CLE_CACHE_LOCAL); } catch (e) {}
+  }
+
+  async function obtenirDonnees(forcer = false) {
+    if (!forcer && donnees && donneesFraiches && (Date.now() - donnees.savedAt) < CACHE_TTL_MS) return donnees;
+    if (promesseChargement) return promesseChargement;
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
+      if (donnees) return donnees;
+      throw new Error("Connecte-toi d'abord.");
+    }
+    promesseChargement = (async () => {
+      const chantiers = await FTSDrive.listChantiersAvecMeta();
+      const suivis = await FTSSheets.chargerDonneesSupervision(chantiers);
+      donnees = { savedAt: Date.now(), chantiers, suivis };
+      donneesFraiches = true;
+      ecrireCacheLocal(donnees);
+      return donnees;
+    })();
+    majIndicateurSync();
+    try { return await promesseChargement; } finally { promesseChargement = null; majIndicateurSync(); }
+  }
+
+  // ─── Indicateur "Mis à jour il y a…" ─────────────────────────────
+  function depuis(ts) {
+    const min = Math.floor((Date.now() - ts) / 60000);
+    if (min < 1) return "à l'instant";
+    if (min < 60) return `il y a ${min} min`;
+    const d = new Date(ts);
+    const memeJour = d.toDateString() === new Date().toDateString();
+    const heure = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    return memeJour ? `à ${heure}` : `le ${d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })} à ${heure}`;
+  }
+  // "tu vois les données d'il y a 5 min" / "de 14:32" / "du 04/11 à 17:10"
+  function ageDonnees(ts) {
+    const t = depuis(ts);
+    if (t === "à l'instant") return "de la dernière consultation";
+    if (t.startsWith("il y a")) return "d'" + t;
+    if (t.startsWith("le ")) return "du " + t.slice(3);
+    return "de " + t.slice(2);
+  }
+
+  function majIndicateurSync() {
+    const connecte = window.FTSAuth && FTSAuth.isSignedIn();
+    let etat = "", txt = "";
+    if (promesseChargement) { etat = "load"; txt = "Actualisation…"; }
+    else if (donnees && connecte) { etat = "ok"; txt = "Mis à jour " + depuis(donnees.savedAt); }
+    else if (donnees) { etat = "exp"; txt = "Données " + ageDonnees(donnees.savedAt); }
+    else { txt = connecte ? "" : "Non connecté"; }
+    ["syncTop", "syncMobile"].forEach((id) => {
+      const el = $(id);
+      el.className = "sv-sync " + etat;
+      el.querySelector(".txt").textContent = id === "syncMobile" ? txt.replace("Mis à jour ", "") : txt;
+    });
+  }
+  setInterval(majIndicateurSync, 30000);
+
+  // ─── Compte Google / session ─────────────────────────────────────
+  async function majSession() {
+    const connecte = window.FTSAuth && FTSAuth.isSignedIn();
+    const connue = window.FTSAuth && FTSAuth.sessionConnue && FTSAuth.sessionConnue();
+    const email = (window.FTSAuth && FTSAuth.emailMemorise && FTSAuth.emailMemorise()) || "";
+    const av = $("userAvatar");
+    av.classList.toggle("on", !!connecte);
+    av.classList.toggle("exp", !connecte && !!connue);
+    $("signOutBtn").hidden = !connecte && !connue;
+    $("userLabel").textContent = email || (connecte ? "Connecté" : "—");
+    if (!connecte) $("userName").textContent = connue ? "Session expirée" : "Non connecté";
+
+    const banner = $("sessionBanner");
+    if (connecte) {
+      banner.hidden = true;
+    } else {
+      banner.hidden = false;
+      $("signInBtn").textContent = connue ? "Reprendre la session" : "Se connecter avec Google";
+      $("sessionBannerTxt").textContent = connue
+        ? (donnees ? `⚠️ Session Google expirée — tu vois les données ${ageDonnees(donnees.savedAt)}.` : "⚠️ Session Google expirée.")
+        : "Connecte-toi avec le compte Google du bureau pour afficher les chantiers.";
+    }
+    majIndicateurSync();
+
+    if (connecte) {
+      FTSAuth.getUserInfo().then((info) => {
+        if (!info) return;
+        $("userName").textContent = info.name || "Connecté";
+        $("userLabel").textContent = info.email || "";
+        const ini = (info.name || info.email || "?").split(/[\s.@]+/).filter(Boolean).slice(0, 2).map((m) => m[0].toUpperCase()).join("");
+        av.textContent = ini || "?";
+      }).catch(() => {});
+      const vueActive = document.querySelector(".se-view.active");
+      if (vueActive && vueActive.id === "se-view-overview") chargerVueEnsemble();
+    }
+  }
+
+  $("signInBtn").addEventListener("click", () => window.FTSAuth && FTSAuth.signIn());
+  $("signOutBtn").addEventListener("click", () => {
+    if (!confirm("Se déconnecter de Google sur cet appareil ?")) return;
+    effacerCacheLocal(); // les données chantier ne restent pas sur l'appareil
+    donnees = null; donneesFraiches = false;
+    window.FTSAuth && FTSAuth.signOut();
+    afficherVueEnsemble();
   });
 
-  // --- Navigation barre latérale ---
-  document.querySelectorAll(".se-nav-btn[data-view]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".se-nav-btn[data-view]").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".se-view").forEach((v) => v.classList.remove("active"));
-      btn.classList.add("active");
-      document.getElementById(btn.dataset.view).classList.add("active");
-      if (btn.dataset.view === "se-view-archives") chargerArchives();
-      if (btn.dataset.view === "se-view-stats") chargerStatsAvancement();
-      if (btn.dataset.view === "se-view-adresses") chargerAdresses();
-      sidebarNav.classList.remove("open");
+  // ─── Vue d'ensemble ──────────────────────────────────────────────
+  let filtreFamille = "tous";
+  let filtreRecherche = "";
+  let triColonne = "nom";
+  let triSens = 1;
+
+  const aMpx = (tech) => tech.includes("Micropieux") || tech.includes("Battage");
+  const aPieux = (tech) => tech.includes("Pieux");
+  const FAMILLES = { tous: () => true, mp: aMpx, px: aPieux };
+
+  function lundiDeLaSemaine(d) {
+    const date = new Date(d);
+    const jour = date.getDay();
+    date.setDate(date.getDate() + (jour === 0 ? -6 : 1 - jour));
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }
+  function jourSeul(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+  const fmtCourt = (d) => d ? `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}` : "";
+  const nombre = (v) => parseFloat(String(v == null ? "" : v).replace(",", ".")) || 0;
+
+  // Transforme les lignes brutes des Sheets en une ligne de tableau par chantier
+  function construireLignes(d) {
+    const lundi = lundiDeLaSemaine(new Date());
+    const finSemaine = new Date(lundi); finSemaine.setDate(finSemaine.getDate() + 6); finSemaine.setHours(23, 59, 59, 999);
+    const dansSemaine = (s) => { const x = FTSSheets.parseDateFR(s); return x && x >= lundi && x <= finSemaine; };
+    const aujourdhui = jourSeul(new Date());
+
+    return d.chantiers.map((c, i) => {
+      const s = d.suivis[i] || { materiel: [], production: [], personnel: [] };
+      const meta = c.meta || {};
+      const tech = FTSDrive.techniquesChantier(meta);
+      const resume = FTSSheets.calculerResume(s.materiel, s.production);
+      const spaceIdx = c.name.search(/\s/);
+      const code = spaceIdx > 0 ? c.name.slice(0, spaceIdx) : c.name;
+      const nom = spaceIdx > 0 ? c.name.slice(spaceIdx + 1) : c.name;
+      const termine = meta.statutChantier === "Termine";
+
+      // Dernier rapport (date la plus récente, Production ou Matériel) + chef de ce jour-là
+      let dernier = null, chef = "";
+      s.production.forEach((r) => {
+        const x = FTSSheets.parseDateFR(r[0]);
+        if (x && (!dernier || x >= dernier)) { dernier = x; if (r[4]) chef = r[4]; }
+      });
+      s.materiel.forEach((r) => { const x = FTSSheets.parseDateFR(r[0]); if (x && (!dernier || x > dernier)) dernier = x; });
+      const ecartJours = dernier ? Math.round((aujourdhui - jourSeul(dernier)) / 86400000) : null;
+
+      // Production : le rapport actuel ne distingue pas encore micropieux /
+      // pieux / battage — tout est compté en Mpx tant que le rapport Pieux
+      // et le compteur battage n'existent pas (un chantier Pieux seul n'est
+      // donc pas compté).
+      const compteMpx = aMpx(tech);
+      const mpxSemaine = compteMpx ? s.production.filter((r) => dansSemaine(r[0])).reduce((t, r) => t + nombre(r[1]), 0) : 0;
+      const persoSemaine = s.personnel.filter((r) => dansSemaine(r[0]));
+      const heuresSemaine = persoSemaine.reduce((t, r) => t + nombre(r[4]), 0);
+
+      const jours = resume.joursRapportes > 0 ? resume.joursRapportes : null;
+      const duree = meta.dureeChantier || null;
+      const prevuMpx = ((tech.includes("Micropieux") ? Number(meta.micropieuxPrevus) || 0 : 0)
+        + (tech.includes("Battage") ? Number(meta.battagePrevus || (!tech.includes("Micropieux") ? meta.micropieuxPrevus : 0)) || 0 : 0)) || null;
+
+      return {
+        id: c.id, code, nom, nomComplet: c.name, tech, termine,
+        dateFin: meta.dateFinChantier || "",
+        statut: resume.derniereMachine ? (resume.derniereMachine.statut || "").toUpperCase() : "",
+        machine: resume.derniereMachine ? resume.derniereMachine.nom : "",
+        mpx: compteMpx ? (resume.totalMicropieux || 0) : null, prevuMpx,
+        pieuxPrevus: meta.pieuxPrevus || null,
+        jours, duree, enRetard: !termine && !!(duree && jours && jours > duree),
+        chef, dernier, ecartJours,
+        mpxSemaine, heuresSemaine, personnesSemaine: persoSemaine.map((r) => (r[1] || "").trim().toUpperCase()).filter(Boolean),
+      };
+    });
+  }
+
+  function lignesFiltrees(toutes) {
+    const avecTermines = $("afficherTermines").checked;
+    const q = filtreRecherche.trim().toLowerCase();
+    return toutes.filter((c) => {
+      if (c.termine && !avecTermines) return false;
+      if (!FAMILLES[filtreFamille](c.tech)) return false;
+      if (q && !`${c.code} ${c.nom} ${c.chef}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }
+
+  function majKpis(toutes) {
+    const famille = toutes.filter((c) => !c.termine && FAMILLES[filtreFamille](c.tech));
+    const actifs = famille.filter((c) => c.jours);
+    const enTravail = actifs.filter((c) => c.statut === "TRAVAIL").length;
+    const enPanne = actifs.filter((c) => c.statut === "PANNE").length;
+    const kv = (id, v, s) => { $(id).querySelector(".v").textContent = v; if (s !== undefined) $(id).querySelector(".s").textContent = s; };
+
+    kv("kpiActifs", actifs.length, `${enTravail} en travail${enPanne ? ` · ${enPanne} en panne` : ""}`);
+    const mpxCumul = toutes.filter((c) => FAMILLES[filtreFamille](c.tech)).reduce((t, c) => t + (c.mpx || 0), 0);
+    kv("kpiMpx", famille.reduce((t, c) => t + c.mpxSemaine, 0), `cumul : ${mpxCumul} Mpx`);
+    const retard = actifs.filter((c) => c.enRetard).length;
+    kv("kpiRetard", retard);
+    $("kpiRetard").classList.toggle("alert", retard > 0);
+    const heures = famille.reduce((t, c) => t + c.heuresSemaine, 0);
+    const personnes = new Set(famille.flatMap((c) => c.personnesSemaine)).size;
+    kv("kpiHeures", `${Math.round(heures)} h`, `${personnes} personne${personnes > 1 ? "s" : ""}`);
+
+    $("kpiMpx").hidden = filtreFamille === "px";
+    $("kpiPieux").hidden = filtreFamille === "mp";
+    $("kpis").style.setProperty("--nk", filtreFamille === "tous" ? 5 : 4);
+
+    document.querySelectorAll("#typeFilterChips button").forEach((b) => {
+      const n = toutes.filter((c) => !c.termine && FAMILLES[b.dataset.f](c.tech)).length;
+      b.textContent = { tous: "Tous", mp: "Micropieux", px: "Pieux" }[b.dataset.f] + ` · ${n}`;
+      b.classList.toggle("on", b.dataset.f === filtreFamille);
+    });
+  }
+
+  function barre(n, total, label, enRetard) {
+    if (!total) return `<div class="sv-prog"><div class="n"><span>${label ? `<em>${label}</em>` : ""}${n}</span></div></div>`;
+    const pct = Math.round((n / total) * 100);
+    return `<div class="sv-prog${enRetard ? " late" : ""}"><div class="n"><span>${label ? `<em>${label}</em>` : ""}${n} / ${total}</span><small>${pct} %</small></div><div class="sv-bar"><div style="width:${Math.min(100, pct)}%"></div></div></div>`;
+  }
+
+  function celluleAvancement(c) {
+    const parts = [];
+    const deux = aMpx(c.tech) && aPieux(c.tech);
+    if (aMpx(c.tech) && filtreFamille !== "px") parts.push(barre(c.mpx || 0, c.prevuMpx, deux ? "Mpx" : "", false));
+    if (aPieux(c.tech) && filtreFamille !== "mp") {
+      parts.push(`<div class="sv-prog"><div class="n"><span>${deux ? "<em>Pieux</em>" : ""}<span class="sv-avenir">rapport pieux à venir${c.pieuxPrevus ? ` · ${c.pieuxPrevus} prévus` : ""}</span></span></div></div>`);
+    }
+    return parts.join("");
+  }
+
+  function celluleDelai(c) {
+    if (!c.jours) return `<div class="sv-prog"><div class="n"><span>—</span></div></div>`;
+    if (!c.duree) return `<div class="sv-prog"><div class="n"><span>${c.jours} j</span></div></div>`;
+    if (c.enRetard) {
+      return `<div class="sv-prog late"><div class="n"><span>${c.jours} / ${c.duree} j</span><small>+${c.jours - c.duree} j</small></div><div class="sv-bar"><div style="width:100%"></div></div></div>`;
+    }
+    return barre(c.jours, c.duree, "", false).replace(`${c.jours} / ${c.duree}<`, `${c.jours} / ${c.duree} j<`);
+  }
+
+  function celluleDernier(c) {
+    if (!c.dernier) return `<td class="c-last sv-last">Aucun rapport</td>`;
+    const e = c.ecartJours;
+    const txt = e <= 0 ? "Aujourd'hui" : e === 1 ? "Hier" : `Il y a ${e} j`;
+    const warn = !c.termine && e >= 3;
+    return `<td class="c-last sv-last${warn ? " warn" : ""}">${txt}<small>${fmtCourt(c.dernier)}</small></td>`;
+  }
+
+  function afficherVueEnsemble() {
+    const tbody = $("chantiersTbody");
+    const empty = $("chantiersEmpty");
+    majIndicateurSync();
+
+    if (!donnees) {
+      const connecte = window.FTSAuth && FTSAuth.isSignedIn();
+      if (connecte || promesseChargement) {
+        empty.hidden = true;
+        tbody.innerHTML = Array.from({ length: 5 }, () => `<tr class="sv-skel">${"<td><div></div></td>".repeat(8)}</tr>`).join("");
+      } else {
+        tbody.innerHTML = "";
+        empty.hidden = false;
+        empty.textContent = "Connecte-toi pour afficher les chantiers.";
+      }
+      $("chantiersCompteur").textContent = "";
+      return;
+    }
+
+    const toutes = construireLignes(donnees);
+    majKpis(toutes);
+    const lignes = lignesFiltrees(toutes);
+
+    const cles = {
+      nom: (c) => c.nomComplet,
+      avancement: (c) => (c.prevuMpx ? (c.mpx || 0) / c.prevuMpx : -1),
+      delai: (c) => (c.duree && c.jours ? c.jours / c.duree : -1),
+      chef: (c) => c.chef || "~",
+      dernier: (c) => (c.dernier ? -c.dernier.getTime() : Infinity),
+    };
+    const cle = cles[triColonne] || cles.nom;
+    lignes.sort((a, b) => { const va = cle(a), vb = cle(b); return va < vb ? -triSens : va > vb ? triSens : 0; });
+
+    const nbTerminesMasques = toutes.filter((c) => c.termine && FAMILLES[filtreFamille](c.tech)).length;
+    $("chantiersCompteur").textContent = `${lignes.length} chantier${lignes.length > 1 ? "s" : ""} affiché${lignes.length > 1 ? "s" : ""}`
+      + (!$("afficherTermines").checked && nbTerminesMasques ? ` · ${nbTerminesMasques} terminé${nbTerminesMasques > 1 ? "s" : ""} masqué${nbTerminesMasques > 1 ? "s" : ""}` : "");
+
+    if (lignes.length === 0) {
+      tbody.innerHTML = "";
+      empty.hidden = false;
+      empty.textContent = donnees.chantiers.length === 0 ? "Aucun chantier créé pour l'instant." : "Aucun chantier ne correspond à ce filtre.";
+      return;
+    }
+    empty.hidden = true;
+
+    tbody.innerHTML = lignes.map((c) => {
+      const badges = c.tech.map((t) => `<span class="sv-badge sv-b-${escapeHtmlSE(t)}">${escapeHtmlSE(t)}</span>`).join("");
+      const statut = c.statut
+        ? `<span class="sv-st ${escapeHtmlSE(c.statut)}"><i></i>${escapeHtmlSE(c.statut.charAt(0) + c.statut.slice(1).toLowerCase())}</span>`
+        : `<span class="sv-st"><i></i>—</span>`;
+      const tagFin = c.termine ? `<span class="sv-tag">✓ TERMINÉ${c.dateFin ? " " + escapeHtmlSE(c.dateFin) : ""}</span>` : "";
+      return `<tr class="${c.enRetard ? "late" : ""}${c.termine ? " done" : ""}" data-id="${escapeHtmlSE(c.id)}" data-name="${escapeHtmlSE(c.nomComplet)}">
+        <td class="c-nom"><span class="sv-code">${escapeHtmlSE(c.code)}</span><span class="sv-nom">${escapeHtmlSE(c.nom)}</span>${tagFin}</td>
+        <td class="c-type"><div class="sv-badges">${badges}</div></td>
+        <td class="c-st">${statut}<span class="sv-mach">${escapeHtmlSE(c.machine || "—")}</span></td>
+        <td class="c-mp">${celluleAvancement(c)}</td>
+        <td class="c-j">${celluleDelai(c)}</td>
+        <td class="c-chef sv-chef">${escapeHtmlSE(c.chef || "—")}</td>
+        ${celluleDernier(c)}
+        <td class="c-act sv-act"><a class="sv-ab" title="Rapports et détail" href="../detail-chantier/index.html?id=${encodeURIComponent(c.id)}&name=${encodeURIComponent(c.nomComplet)}">📄</a><a class="sv-ab sv-drive" title="Ouvrir le dossier Drive" target="_blank" rel="noopener" href="https://drive.google.com/drive/folders/${encodeURIComponent(c.id)}">📁</a></td>
+      </tr>`;
+    }).join("");
+  }
+
+  $("chantiersTbody").addEventListener("click", (e) => {
+    if (e.target.closest("a")) return; // les boutons gèrent leur propre lien
+    const tr = e.target.closest("tr[data-id]");
+    if (!tr) return;
+    window.location.href = `../detail-chantier/index.html?id=${encodeURIComponent(tr.dataset.id)}&name=${encodeURIComponent(tr.dataset.name)}`;
+  });
+
+  async function chargerVueEnsemble(forcer = false) {
+    if (!window.FTSDrive || !window.FTSSheets) return;
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { afficherVueEnsemble(); return; }
+    if (!forcer && donneesFraiches && donnees && (Date.now() - donnees.savedAt) < CACHE_TTL_MS) { afficherVueEnsemble(); return; }
+    afficherVueEnsemble(); // affiche tout de suite le cache (ou le squelette)
+    try {
+      await obtenirDonnees(forcer);
+      afficherVueEnsemble();
+    } catch (err) {
+      console.error("Erreur chargement vue d'ensemble :", err);
+      majIndicateurSync();
+      if (!donnees) { $("chantiersTbody").innerHTML = ""; $("chantiersEmpty").hidden = false; $("chantiersEmpty").textContent = `Erreur : ${err.message}`; }
+    }
+  }
+
+  document.querySelectorAll("#typeFilterChips button").forEach((b) => b.addEventListener("click", () => { filtreFamille = b.dataset.f; afficherVueEnsemble(); }));
+  $("afficherTermines").addEventListener("change", afficherVueEnsemble);
+  $("rechercheChantier").addEventListener("input", (e) => { filtreRecherche = e.target.value; afficherVueEnsemble(); });
+  $("refreshVueEnsembleBtn").addEventListener("click", () => {
+    const vue = document.querySelector(".se-view.active");
+    if (vue && vue.id === "se-view-stats") { chargerStatsAvancement(true); return; }
+    if (vue && vue.id === "se-view-archives") { chargerArchives(true); return; }
+    chargerVueEnsemble(true);
+  });
+  document.querySelectorAll(".sv-table th[data-sort]").forEach((th) => {
+    th.addEventListener("click", () => {
+      const col = th.dataset.sort;
+      if (triColonne === col) triSens *= -1; else { triColonne = col; triSens = 1; }
+      document.querySelectorAll(".sv-table th[data-sort]").forEach((t) => t.classList.toggle("sorted", t === th));
+      afficherVueEnsemble();
     });
   });
 
-  // --- Compte Google ---
-  if (window.FTSAuth) {
-    FTSAuth.init();
-    FTSAuth.onAuthChange(updateUserBlock);
-    updateUserBlock(FTSAuth.isSignedIn());
+  // ─── Fenêtre Nouveau chantier ────────────────────────────────────
+  const modal = $("chantierModal");
+  const chantierForm = $("chantierForm");
+  const chantierStatus = $("chantierStatus");
+  const techsCochees = () => [...chantierForm.querySelectorAll("input[name=tech]:checked")].map((i) => i.value);
+
+  function ouvrirCreation() {
+    chantierStatus.textContent = ""; chantierStatus.className = "sv-mstatus";
+    modal.classList.add("open");
+    setTimeout(() => $("numAffaire").focus(), 50);
   }
-
-  async function updateUserBlock(signedIn) {
-    const dot = document.getElementById("userDot");
-    const label = document.getElementById("userLabel");
-    const signInBtn = document.getElementById("signInBtn");
-    const signOutBtn = document.getElementById("signOutBtn");
-
-    if (!signedIn) {
-      dot.style.background = "#9AA0AA";
-      label.textContent = "Non connecté";
-      signInBtn.hidden = false;
-      signOutBtn.hidden = true;
-      return;
-    }
-    dot.style.background = "#27AE60";
-    signInBtn.hidden = true;
-    signOutBtn.hidden = false;
-    label.textContent = "Connecté";
-    if (window.FTSAuth) {
-      const info = await FTSAuth.getUserInfo();
-      if (info) label.textContent = info.email || info.name || "Connecté";
-    }
-    chargerVueEnsemble();
+  function fermerCreation() { modal.classList.remove("open"); }
+  function majChampsPrevus() {
+    const t = techsCochees();
+    chantierForm.querySelectorAll(".sv-f[data-tech]").forEach((f) => { f.hidden = !t.includes(f.dataset.tech); });
   }
+  $("nouveauChantierBtn").addEventListener("click", ouvrirCreation);
+  $("nouveauChantierFab").addEventListener("click", ouvrirCreation);
+  $("chantierModalClose").addEventListener("click", fermerCreation);
+  $("chantierModalCancel").addEventListener("click", fermerCreation);
+  modal.addEventListener("click", (e) => { if (e.target === modal) fermerCreation(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && modal.classList.contains("open")) fermerCreation(); });
+  chantierForm.querySelectorAll("input[name=tech]").forEach((i) => i.addEventListener("change", majChampsPrevus));
 
-  document.getElementById("signInBtn").addEventListener("click", () => window.FTSAuth && FTSAuth.signIn());
-  document.getElementById("signOutBtn").addEventListener("click", () => window.FTSAuth && FTSAuth.signOut());
-
-  // --- Créer un chantier ---
   ["numAffaire", "nomChantier", "adresseChantier"].forEach((id) => {
-    const el = document.getElementById(id);
+    const el = $(id);
     el.addEventListener("input", () => {
       const pos = el.selectionStart;
       el.value = el.value.toUpperCase();
@@ -668,286 +1169,46 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  const chantierForm = document.getElementById("chantierForm");
-  const chantierStatus = document.getElementById("chantierStatus");
-
   chantierForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const numAffaire = document.getElementById("numAffaire").value.trim();
-    const nomChantier = document.getElementById("nomChantier").value.trim();
-    const typeChantier = document.getElementById("typeChantier").value;
-    const adresseChantier = document.getElementById("adresseChantier").value.trim();
-    const gpsChantier = document.getElementById("gpsChantier").value.trim();
-    const nbMicropieuxPrevus = document.getElementById("nbMicropieuxPrevus").value.trim();
-    const dureeChantier = document.getElementById("dureeChantier").value.trim();
-    const montantVendu = document.getElementById("montantVendu").value.trim();
-    const submitBtn = chantierForm.querySelector(".btn-primary");
+    const techniques = techsCochees();
+    const val = (id) => $(id).value.trim();
+    const setStatus = (txt, cls) => { chantierStatus.textContent = txt; chantierStatus.className = "sv-mstatus" + (cls ? " " + cls : ""); };
 
-    if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
-      chantierStatus.textContent = "Connecte-toi d'abord pour créer l'arborescence Drive.";
-      return;
-    }
-    if (!window.FTSDrive) {
-      chantierStatus.textContent = "Erreur : module Drive non chargé.";
-      return;
-    }
+    if (techniques.length === 0) { setStatus("Coche au moins une technique.", "err"); return; }
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { setStatus("Session Google expirée : clique sur « Reprendre la session » puis recommence.", "err"); return; }
+    if (!window.FTSDrive) { setStatus("Erreur : module Drive non chargé.", "err"); return; }
 
+    // typeChantier reste renseigné pour les pages qui ne lisent qu'un type
+    // (détail chantier, historique) : la technique principale.
+    const typeChantier = techniques.includes("Micropieux") ? "Micropieux" : techniques.includes("Battage") ? "Battage" : "Pieux";
+    const submitBtn = $("chantierSubmit");
     submitBtn.disabled = true;
-    chantierStatus.textContent = "Création de l'arborescence Drive en cours...";
-
+    setStatus("Création du dossier Drive en cours…");
     try {
       const result = await FTSDrive.creerArborescenceChantier({
-        numAffaire, nom: nomChantier, typeChantier, adresse: adresseChantier, gps: gpsChantier,
-        micropieuxPrevus: nbMicropieuxPrevus, dureeChantier, montantVendu,
+        numAffaire: val("numAffaire"), nom: val("nomChantier"), typeChantier, techniques,
+        adresse: val("adresseChantier"), gps: val("gpsChantier"),
+        micropieuxPrevus: techniques.includes("Micropieux") ? val("nbMicropieuxPrevus") : "",
+        pieuxPrevus: techniques.includes("Pieux") ? val("nbPieuxPrevus") : "",
+        battagePrevus: techniques.includes("Battage") ? val("nbBattagePrevus") : "",
+        dureeChantier: val("dureeChantier"), montantVendu: val("montantVendu"),
       });
-      const subfolderNames = Object.keys(result.subfolders).filter((k) => !k.includes("/"));
-      const statusPrefix = result.reused
-        ? `Dossier chantier "${result.chantierName}" déjà existant, sous-dossiers vérifiés`
-        : `Chantier "${result.chantierName}" (${typeChantier}) créé sur Drive`;
-      chantierStatus.textContent = `${statusPrefix} (${subfolderNames.join(", ")}, + ACCUEIL SECURITE dans SECURITE). Il apparaîtra dans le sélecteur "Chantier actif" de l'appli.`;
+      setStatus(result.reused
+        ? `Le dossier « ${result.chantierName} » existait déjà : sous-dossiers vérifiés et prévisions mises à jour.`
+        : `Chantier « ${result.chantierName} » créé sur Drive.`, "ok");
       chantierForm.reset();
-      chargerVueEnsemble();
+      majChampsPrevus();
+      chargerVueEnsemble(true);
+      setTimeout(fermerCreation, 1800);
     } catch (err) {
       console.error("Erreur création chantier :", err);
-      chantierStatus.textContent = `Erreur : ${err.message}`;
+      setStatus(`Erreur : ${err.message}`, "err");
     } finally {
       submitBtn.disabled = false;
     }
   });
 
-  // --- Vue d'ensemble : chargement des données ---
-  const ICONE_STATUT = {
-    TRAVAIL: "se-statut-travail", PANNE: "se-statut-panne",
-    ARRET: "se-statut-arret", TRANSPORT: "se-statut-transport",
-  };
-
-  let donneesChantiers = [];
-  let filtreType = "";
-  let filtreRecherche = "";
-  let triColonne = "nom";
-  let triSens = 1;
-  let vueEnsembleChargeeA = 0;
-
-  function escapeHtmlSE(str) {
-    const div = document.createElement("div");
-    div.textContent = str || "";
-    return div.innerHTML;
-  }
-
-  async function chargerVueEnsemble(forcer = false) {
-    const tbody = document.getElementById("chantiersTbody");
-    const empty = document.getElementById("chantiersEmpty");
-    if (!window.FTSDrive || !window.FTSSheets) return;
-
-    if (!forcer && donneesChantiers.length > 0 && (Date.now() - vueEnsembleChargeeA) < CACHE_TTL_MS) {
-      afficherTableau();
-      return;
-    }
-
-    tbody.innerHTML = "";
-    empty.hidden = false;
-    empty.textContent = "Chargement des chantiers...";
-
-    try {
-      const chantiers = await FTSDrive.listChantiers();
-      if (chantiers.length === 0) {
-        empty.textContent = "Aucun chantier créé pour l'instant.";
-        document.getElementById("kpiChantiers").textContent = "0";
-        document.getElementById("kpiMicropieux").textContent = "0";
-        document.getElementById("kpiRetard").textContent = "0";
-        return;
-      }
-
-      const details = await Promise.all(
-        chantiers.map(async (c) => {
-          try {
-            const [resume, meta] = await Promise.all([
-              FTSSheets.resumeChantier(c.id, c.name),
-              FTSDrive.getMetadonneesChantier(c.id),
-            ]);
-            return { chantier: c, resume, meta };
-          } catch (e) {
-            return { chantier: c, resume: { derniereMachine: null, totalMicropieux: 0, joursRapportes: 0 }, meta: {} };
-          }
-        })
-      );
-
-      donneesChantiers = details.map(({ chantier, resume, meta }) => {
-        const spaceIdx = chantier.name.search(/\s/);
-        const code = spaceIdx > 0 ? chantier.name.slice(0, spaceIdx) : chantier.name;
-        const nom = spaceIdx > 0 ? chantier.name.slice(spaceIdx + 1) : chantier.name;
-
-        const termine = meta.statutChantier === "Termine";
-
-        // "Jours" = nombre de jours où un rapport a été soumis (voir
-        // resumeChantier) — pas un décompte calendaire, pour ne pas
-        // compter les périodes de stand-by (chef envoyé ailleurs).
-        let jours = resume.joursRapportes > 0 ? resume.joursRapportes : null;
-        const duree = meta.dureeChantier || null;
-        const prevu = meta.micropieuxPrevus || null;
-        const enRetard = !termine && !!(duree && jours !== null && jours > duree);
-
-        return {
-          id: chantier.id, code, nom, nomComplet: chantier.name,
-          type: meta.typeChantier || "Micropieux",
-          statut: resume.derniereMachine?.statut || null,
-          jours, duree, enRetard, termine,
-          dateFinChantier: meta.dateFinChantier || null,
-          micropieux: resume.totalMicropieux || 0, prevu,
-          derniereDate: resume.derniereMachine?.date || null,
-        };
-      });
-
-      // KPI
-      // "Actif" = au moins un rapport journalier soumis (jours > 0) et pas
-      // marqué terminé — un chantier tout juste créé sans rapport, ou déjà
-      // clôturé, ne compte pas.
-      const chantiersActifs = donneesChantiers.filter((c) => c.jours && c.jours > 0 && !c.termine);
-      document.getElementById("kpiChantiers").textContent = String(chantiersActifs.length);
-      const enTravail = chantiersActifs.filter((c) => c.statut === "TRAVAIL").length;
-      document.getElementById("kpiChantiersSub").textContent = `${enTravail} en travail`;
-      document.getElementById("kpiMicropieux").textContent = String(donneesChantiers.reduce((s, c) => s + c.micropieux, 0));
-      const nbRetard = chantiersActifs.filter((c) => c.enRetard).length;
-      const kpiRetardEl = document.getElementById("kpiRetard");
-      kpiRetardEl.textContent = String(nbRetard);
-      kpiRetardEl.classList.toggle("alert", nbRetard > 0);
-
-      chargerHeuresSemaine();
-      afficherTableau();
-    } catch (err) {
-      console.error("Erreur chargement vue d'ensemble :", err);
-      empty.textContent = `Erreur : ${err.message}`;
-    }
-  }
-
-  function lundiDeLaSemaine(d) {
-    const date = new Date(d);
-    const jour = date.getDay();
-    const diff = jour === 0 ? -6 : 1 - jour;
-    date.setDate(date.getDate() + diff);
-    date.setHours(0, 0, 0, 0);
-    return date;
-  }
-
-  async function chargerHeuresSemaine() {
-    const kpiHeures = document.getElementById("kpiHeures");
-    const kpiHeuresSub = document.getElementById("kpiHeuresSub");
-    try {
-      const lundi = lundiDeLaSemaine(new Date());
-      const samedi = new Date(lundi);
-      samedi.setDate(samedi.getDate() + 5);
-      const entrees = await FTSSheets.listerPointageToutesChantiers("Personnel", dateLocaleISO(lundi), dateLocaleISO(samedi));
-      const totalHeures = entrees.reduce((s, e) => s + (parseFloat((e.cols[4] || "").replace(",", ".")) || 0), 0);
-      const personnesUniques = new Set(entrees.map((e) => e.cols[1])).size;
-      kpiHeures.textContent = `${totalHeures.toFixed(0)}h`;
-      kpiHeuresSub.textContent = `${personnesUniques} personne${personnesUniques > 1 ? "s" : ""}`;
-    } catch (e) {
-      kpiHeures.textContent = "—";
-      kpiHeuresSub.textContent = "indisponible";
-    }
-  }
-
-  function afficherTableau() {
-    const tbody = document.getElementById("chantiersTbody");
-    const empty = document.getElementById("chantiersEmpty");
-
-    const afficherTermines = document.getElementById("afficherTermines").checked;
-    let lignes = donneesChantiers.filter((c) => {
-      if (c.termine && !afficherTermines) return false;
-      if (filtreType) {
-        const memeFamille = filtreType === "Micropieux" ? (c.type === "Micropieux" || c.type === "Battage") : c.type === filtreType;
-        if (!memeFamille) return false;
-      }
-      if (filtreRecherche) {
-        const cible = (c.code + " " + c.nom).toLowerCase();
-        if (!cible.includes(filtreRecherche.toLowerCase())) return false;
-      }
-      return true;
-    });
-
-    const cles = {
-      nom: (c) => c.nomComplet,
-      type: (c) => c.type,
-      jours: (c) => (c.jours === null ? -1 : c.jours),
-      micropieux: (c) => c.micropieux,
-    };
-    const cleTri = cles[triColonne] || cles.nom;
-    lignes.sort((a, b) => {
-      const va = cleTri(a), vb = cleTri(b);
-      if (va < vb) return -1 * triSens;
-      if (va > vb) return 1 * triSens;
-      return 0;
-    });
-
-    if (lignes.length === 0) {
-      tbody.innerHTML = "";
-      empty.hidden = false;
-      empty.textContent = "Aucun chantier ne correspond à ce filtre.";
-      return;
-    }
-    empty.hidden = true;
-
-    tbody.innerHTML = lignes.map((c) => {
-      const typeClass = c.type === "Pieux" ? "se-type-pieux" : c.type === "Battage" ? "se-type-battage" : "se-type-mp";
-      const statutHtml = c.statut
-        ? `<span class="se-statut-chip ${ICONE_STATUT[c.statut] || "se-statut-arret"}"><span class="se-dot"></span>${c.statut}</span>`
-        : `<span class="se-statut-chip se-statut-arret"><span class="se-dot"></span>—</span>`;
-
-      const joursTxt = c.jours === null ? "—" : (c.duree ? `${c.jours} / ${c.duree}j` : `${c.jours}j`);
-      const joursBar = c.duree
-        ? `<div class="se-progress-bar"><div class="se-progress-fill ${c.enRetard ? "retard" : ""}" style="width:${Math.min(100, (c.jours / c.duree) * 100)}%"></div></div>`
-        : "";
-
-      const mpTxt = c.prevu ? `${c.micropieux} / ${c.prevu}` : String(c.micropieux);
-      const mpBar = c.prevu
-        ? `<div class="se-progress-bar"><div class="se-progress-fill" style="width:${Math.min(100, (c.micropieux / c.prevu) * 100)}%"></div></div>`
-        : "";
-
-      return `
-        <tr data-id="${c.id}" data-name="${escapeHtmlSE(c.nomComplet)}">
-          <td data-label="Chantier"><span class="se-code">${escapeHtmlSE(c.code)}</span><span class="se-nom">${escapeHtmlSE(c.nom)}${c.enRetard ? '<span class="se-alert-badge">⚠ RETARD</span>' : ""}${c.termine ? `<span class="se-alert-badge" style="color:var(--text-sub)">✓ TERMINÉ${c.dateFinChantier ? " " + escapeHtmlSE(c.dateFinChantier) : ""}</span>` : ""}</span></td>
-          <td data-label="Type"><span class="se-type-badge ${typeClass}">${c.type}</span></td>
-          <td data-label="Statut foreuse">${statutHtml}</td>
-          <td data-label="Jours"><div class="se-progress-cell"><span class="se-progress-nums">${joursTxt}</span>${joursBar}</div></td>
-          <td data-label="Micropieux"><div class="se-progress-cell"><span class="se-progress-nums">${mpTxt}</span>${mpBar}</div></td>
-          <td data-label="Dernière activité" class="se-last-activity">${c.derniereDate ? escapeHtmlSE(c.derniereDate) : "Aucune donnée"}</td>
-        </tr>`;
-    }).join("");
-
-    tbody.querySelectorAll("tr").forEach((tr) => {
-      tr.addEventListener("click", () => {
-        window.location.href = `../detail-chantier/index.html?id=${encodeURIComponent(tr.dataset.id)}&name=${encodeURIComponent(tr.dataset.name)}`;
-      });
-    });
-  }
-
-  document.querySelectorAll(".se-filter-chip").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      document.querySelectorAll(".se-filter-chip").forEach((c) => c.classList.remove("active"));
-      chip.classList.add("active");
-      filtreType = chip.dataset.type;
-      afficherTableau();
-    });
-  });
-
-  document.getElementById("afficherTermines").addEventListener("change", afficherTableau);
-
-  document.getElementById("refreshVueEnsembleBtn").addEventListener("click", () => chargerVueEnsemble(true));
-
-  document.getElementById("rechercheChantier").addEventListener("input", (e) => {
-    filtreRecherche = e.target.value;
-    afficherTableau();
-  });
-
-  document.querySelectorAll("th[data-sort]").forEach((th) => {
-    th.addEventListener("click", () => {
-      const col = th.dataset.sort;
-      if (triColonne === col) { triSens *= -1; } else { triColonne = col; triSens = 1; }
-      document.querySelectorAll("th[data-sort]").forEach((t) => t.classList.remove("sorted"));
-      th.classList.add("sorted");
-      afficherTableau();
-    });
-  });
 
   let cacheArchives = null;
   let archivesChargeesA = 0;
@@ -975,14 +1236,7 @@ document.addEventListener("DOMContentLoaded", () => {
         empty.textContent = "Aucun chantier archivé pour l'instant.";
         return;
       }
-      const details = await Promise.all(chantiers.map(async (c) => {
-        try {
-          const meta = await FTSDrive.getMetadonneesChantier(c.id);
-          return { chantier: c, meta };
-        } catch (e) {
-          return { chantier: c, meta: {} };
-        }
-      }));
+      const details = chantiers.map((c) => ({ chantier: c, meta: FTSDrive.parseMetadonnees(c.description) }));
 
       cacheArchives = details;
       archivesChargeesA = Date.now();
@@ -1013,7 +1267,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return `
         <tr data-id="${chantier.id}" data-name="${escapeHtmlSE(chantier.name)}">
           <td><span class="se-code">${escapeHtmlSE(code)}</span><span class="se-nom">${escapeHtmlSE(nom)}</span></td>
-          <td><span class="se-type-badge ${meta.typeChantier === "Pieux" ? "se-type-pieux" : meta.typeChantier === "Battage" ? "se-type-battage" : "se-type-mp"}">${meta.typeChantier || "Micropieux"}</span></td>
+          <td><div class="sv-badges">${FTSDrive.techniquesChantier(meta).map((t) => `<span class="sv-badge sv-b-${escapeHtmlSE(t)}">${escapeHtmlSE(t)}</span>`).join("")}</div></td>
           <td class="se-last-activity">${meta.dateArchivage ? escapeHtmlSE(meta.dateArchivage) : "—"}</td>
           <td><button type="button" class="btn-rouvrir desarchiver-row-btn" style="padding:6px 12px;font-size:.78rem">Désarchiver</button></td>
         </tr>`;
@@ -1211,7 +1465,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function chargerStatsAvancement(forcer = false) {
     const empty = document.getElementById("statsAvancEmpty");
     if (!window.FTSDrive || !window.FTSSheets) return;
-    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { empty.hidden = false; empty.textContent = "Connecte-toi d'abord."; return; }
+    if (!donnees && (!window.FTSAuth || !FTSAuth.isSignedIn())) { empty.hidden = false; empty.textContent = "Connecte-toi d'abord."; return; }
 
     if (!forcer && cacheStatsAvancement && (Date.now() - statsAvancementChargeeA) < CACHE_TTL_MS) {
       afficherStatsAvancement();
@@ -1227,15 +1481,16 @@ document.addEventListener("DOMContentLoaded", () => {
       // On lit TOUS les chantiers une seule fois, indépendamment de la
       // famille choisie — changer de famille ou de période ensuite ne
       // relit plus rien, juste un recalcul local instantané.
-      const tousChantiers = await FTSDrive.listChantiers();
-      const chantiersMeta = await Promise.all(tousChantiers.map(async (c) => ({ chantier: c, meta: await FTSDrive.getMetadonneesChantier(c.id).catch(() => ({})) })));
-      const details = await Promise.all(chantiersMeta.map(async ({ chantier, meta }) => {
-        try {
-          const suivi = await FTSSheets.lireSuiviComplet(chantier.id, chantier.name);
-          return { chantier, meta, production: suivi.production };
-        } catch (e) {
-          return { chantier, meta, production: [] };
-        }
+      // Même lecture groupée que la Vue d'ensemble (déjà en mémoire le plus
+      // souvent) : aucune requête supplémentaire vers Google.
+      const d = await obtenirDonnees(forcer);
+      const details = d.chantiers.map((c, i) => ({
+        chantier: { id: c.id, name: c.name },
+        meta: c.meta || {},
+        production: ((d.suivis[i] || {}).production || []).map((r) => ({
+          date: r[0], nbPieux: Number(r[1]) || 0, longueurTotale: parseFloat(r[2]) || 0,
+          longueurMoyenne: parseFloat(r[3]) || 0, nomChef: r[4] || "",
+        })),
       }));
 
       cacheStatsAvancement = details;
@@ -1255,8 +1510,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const [debut, fin] = bornesPeriode(document.getElementById("statsAvancPeriode").value);
 
     const ciblés = cacheStatsAvancement.filter(({ meta }) => {
-      const type = meta.typeChantier || "Micropieux";
-      return familleAvancement === "mp" ? (type === "Micropieux" || type === "Battage") : type === "Pieux";
+      const tech = FTSDrive.techniquesChantier(meta);
+      return familleAvancement === "mp" ? (tech.includes("Micropieux") || tech.includes("Battage")) : tech.includes("Pieux");
     });
 
     if (ciblés.length === 0) {
@@ -1362,7 +1617,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function chargerStatsPersonnel(forcer = false) {
     const empty = document.getElementById("statsPersEmpty");
     if (!window.FTSSheets) return;
-    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { empty.hidden = false; empty.textContent = "Connecte-toi d'abord."; return; }
+    if (!donnees && (!window.FTSAuth || !FTSAuth.isSignedIn())) { empty.hidden = false; empty.textContent = "Connecte-toi d'abord."; return; }
 
     if (!forcer && cachePersonnelEntrees && (Date.now() - statsPersonnelChargeeA) < CACHE_TTL_MS) {
       afficherStatsPersonnel();
@@ -1377,7 +1632,8 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       // Toujours la plage la plus large : changer la période ensuite ne
       // relit plus rien, juste un filtrage local instantané.
-      const entrees = await FTSSheets.listerPointageToutesChantiers("Personnel", dateLocaleISO(new Date(2000, 0, 1)), dateLocaleISO(new Date(2099, 11, 31)));
+      const d = await obtenirDonnees(forcer);
+      const entrees = d.chantiers.flatMap((c, i) => ((d.suivis[i] || {}).personnel || []).map((cols) => ({ chantierName: c.name, chantierFolderId: c.id, cols })));
       cachePersonnelEntrees = entrees;
       statsPersonnelChargeeA = Date.now();
       afficherStatsPersonnel();
@@ -1469,9 +1725,15 @@ document.addEventListener("DOMContentLoaded", () => {
     URL.revokeObjectURL(url);
   }
 
-  if (window.FTSAuth && FTSAuth.isSignedIn()) {
-    chargerVueEnsemble();
+  // ─── Démarrage ───────────────────────────────────────────────────
+  donnees = lireCacheLocal(); // affichage immédiat de la dernière consultation
+  afficherVueEnsemble();
+  if (window.FTSAuth) {
+    FTSAuth.onAuthChange(majSession);
+    FTSAuth.init();
+    majSession();
   }
+
 });
 </script>
 

@@ -143,7 +143,7 @@ const FTSDrive = (() => {
     const q = encodeURIComponent(
       `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`
     );
-    const res = await fetchAvecRetry(`${API_BASE}/files?q=${q}&fields=files(id,name)&spaces=drive&pageSize=1000`, {
+    const res = await fetchAvecRetry(`${API_BASE}/files?q=${q}&fields=files(id,name,description)&spaces=drive&pageSize=1000`, {
       headers: authHeader(),
     });
     if (!res.ok) {
@@ -171,6 +171,30 @@ const FTSDrive = (() => {
     } catch (e) {
       return {};
     }
+  }
+
+  function parseMetadonnees(description) {
+    try { return description ? JSON.parse(description) : {}; } catch (e) { return {}; }
+  }
+
+  /**
+   * Techniques d'un chantier (un chantier peut en cumuler plusieurs) :
+   * tableau parmi "Micropieux", "Pieux", "Battage". Les anciens chantiers
+   * n'ont que typeChantier (une seule valeur) : on s'en sert à défaut.
+   */
+  function techniquesChantier(meta) {
+    const t = meta && Array.isArray(meta.techniques) && meta.techniques.length ? meta.techniques : null;
+    return t || [(meta && meta.typeChantier) || "Micropieux"];
+  }
+
+  /**
+   * Chantiers de DOSSIER CHANTIER avec leurs métadonnées, en UNE requête
+   * (la description du dossier, qui contient le JSON, est lue avec la
+   * liste) — au lieu d'une requête par chantier.
+   */
+  async function listChantiersAvecMeta() {
+    const chantiers = await listChantiers();
+    return chantiers.map((c) => ({ id: c.id, name: c.name, meta: parseMetadonnees(c.description) }));
   }
 
   async function setMetadonneesChantier(chantierId, metadonnees) {
@@ -210,8 +234,14 @@ const FTSDrive = (() => {
    * connecté — on ne les crée jamais automatiquement pour éviter un
    * doublon mal placé si le nom réel diffère légèrement (accent, casse...).
    */
+  // Les dossiers racine ne changent pas d'identifiant : on les garde en
+  // mémoire le temps de la page, au lieu de les rechercher à chaque appel.
+  const cacheRacines = {};
+
   async function getRootFolder(name) {
+    if (cacheRacines[name]) return cacheRacines[name];
     const id = await findFolderExact(name, null);
+    if (id) cacheRacines[name] = id;
     if (!id) {
       throw new Error(
         `Dossier racine "${name}" introuvable à la racine du Drive connecté. ` +
@@ -339,6 +369,9 @@ const FTSDrive = (() => {
       const metaMisAJour = {
         ...metaExistante,
         typeChantier: chantier.typeChantier || metaExistante.typeChantier || "Micropieux",
+        ...(chantier.techniques && chantier.techniques.length ? { techniques: chantier.techniques } : {}),
+        ...(chantier.pieuxPrevus ? { pieuxPrevus: Number(chantier.pieuxPrevus) } : {}),
+        ...(chantier.battagePrevus ? { battagePrevus: Number(chantier.battagePrevus) } : {}),
         ...(chantier.adresse ? { adresse: chantier.adresse } : {}),
         ...(chantier.gps ? { gps: chantier.gps } : {}),
         ...(chantier.micropieuxPrevus ? { micropieuxPrevus: Number(chantier.micropieuxPrevus) } : {}),
@@ -723,6 +756,9 @@ const FTSDrive = (() => {
     downloadFileBlob,
     getMetadonneesChantier,
     setMetadonneesChantier,
+    listChantiersAvecMeta,
+    parseMetadonnees,
+    techniquesChantier,
     getDossierRapportChef,
     getRootFolder,
     archiverChantier,

@@ -32,6 +32,11 @@ const FTSAuth = (() => {
   ].join(" ");
 
   const STORAGE_KEY = "fts_auth_token";
+  const EMAIL_KEY = "fts_auth_email";
+
+  function emailMemorise() {
+    try { return localStorage.getItem(EMAIL_KEY) || ""; } catch (e) { return ""; }
+  }
 
   let tokenClient = null;
   let accessToken = null;
@@ -99,6 +104,9 @@ const FTSAuth = (() => {
     });
     if (!res.ok) return null;
     cachedUserInfo = await res.json(); // { name, email, given_name, family_name, picture, ... }
+    // Mémorisé pour la reconnexion en un clic (voir signIn) : Google
+    // reconnaît alors directement le compte, sans écran de choix.
+    try { if (cachedUserInfo.email) localStorage.setItem(EMAIL_KEY, cachedUserInfo.email); } catch (e) {}
     return cachedUserInfo;
   }
 
@@ -221,7 +229,16 @@ const FTSAuth = (() => {
       console.warn("FTSAuth : tokenClient non initialisé. Appeler init() d'abord.");
       return;
     }
-    tokenClient.requestAccessToken();
+    // Compte déjà connu sur cet appareil : on le donne à Google (hint) pour
+    // sauter l'écran de choix du compte — la reconnexion se fait alors en
+    // un clic, la fenêtre Google s'ouvre et se referme seule.
+    const email = emailMemorise();
+    tokenClient.requestAccessToken(email ? { hint: email, login_hint: email, prompt: "" } : {});
+  }
+
+  /** Une session a déjà existé sur cet appareil (même expirée). */
+  function sessionConnue() {
+    return !!chargerTokenBrut() || !!emailMemorise();
   }
 
   function signOut() {
@@ -229,9 +246,12 @@ const FTSAuth = (() => {
       google.accounts.oauth2.revoke(accessToken, () => {});
     }
     clearToken();
+    try { localStorage.removeItem(EMAIL_KEY); } catch (e) {}
   }
 
   return {
+    sessionConnue,
+    emailMemorise,
     init,
     signIn,
     signOut,

@@ -23,7 +23,7 @@ const FTSPersonnel = (() => {
   const CACHE_KEY = "fts_personnel_cache";
 
   const CATEGORIES = ["MICROPIEUX", "PIEUX", "LES DEUX"];
-  const POSTES = ["CHEF DE CHANTIER", "SECOND", "FOREUR", "POMPISTE", "MANŒUVRE"];
+  const POSTES = ["CHEF DE CHANTIER", "SECOND", "FOREUR", "POMPISTE", "MANŒUVRE", "SOUDEUR", "RECÉPEUR", "POLYVALENT"];
   const STATUTS = ["ACTIF", "PARTI"];
 
   // Liste de départ : les chefs de chantier connus (e-mail à compléter
@@ -190,6 +190,39 @@ const FTSPersonnel = (() => {
       });
   }
 
+  /**
+   * Partage automatique du dossier REFERENTIEL (Supervision) : chaque
+   * personne ACTIVE avec un e-mail reçoit l'accès en LECTURE, sans e-mail
+   * de notification ; une personne PARTIE perd son accès. Les accès
+   * propriétaire / éditeur ne sont jamais touchés.
+   * @returns {Promise<{ajoutes:string[], retires:string[], erreurs:string[], total:number}>}
+   */
+  async function synchroniserPartages() {
+    const dossierId = await FTSDrive.findOrCreateFolder(DOSSIER, null);
+    const res = await fetchAvecRetry(`${DRIVE_API}/files/${dossierId}/permissions?fields=permissions(id,emailAddress,role,type)&supportsAllDrives=true`, { headers: authHeader() });
+    if (!res.ok) throw new Error(`Lecture des partages de ${DOSSIER} : ${res.status}`);
+    const perms = (await res.json()).permissions || [];
+    const lecteurs = new Map(perms.filter((p) => p.type === "user" && p.emailAddress).map((p) => [p.emailAddress.toLowerCase(), p]));
+    const bilan = { ajoutes: [], retires: [], erreurs: [], total: 0 };
+    for (const p of etat.personnes) {
+      if (!p.email) continue;
+      const deja = lecteurs.get(p.email);
+      if (p.statut === "ACTIF") {
+        bilan.total++;
+        if (deja) continue;
+        const r = await fetchAvecRetry(`${DRIVE_API}/files/${dossierId}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, {
+          method: "POST", headers: { ...authHeader(), "Content-Type": "application/json" },
+          body: JSON.stringify({ role: "reader", type: "user", emailAddress: p.email }),
+        });
+        if (r.ok) bilan.ajoutes.push(p.email); else bilan.erreurs.push(`${p.email} (${r.status})`);
+      } else if (deja && deja.role === "reader") {
+        const r = await fetchAvecRetry(`${DRIVE_API}/files/${dossierId}/permissions/${deja.id}?supportsAllDrives=true`, { method: "DELETE", headers: authHeader() });
+        if (r.ok) bilan.retires.push(p.email); else bilan.erreurs.push(`${p.email} (${r.status})`);
+      }
+    }
+    return bilan;
+  }
+
   // ── Lecture pour les modules ────────────────────────────────────
   function toutes() { return etat.personnes.slice(); }
   function actifs() { return etat.personnes.filter((p) => p.statut === "ACTIF"); }
@@ -205,7 +238,7 @@ const FTSPersonnel = (() => {
 
   return {
     CATEGORIES, POSTES, STATUTS, DEFAUT, NOM_CLASSEUR,
-    charger, creer, enregistrer, verifier, manquantesDepuisAdresses, toutes, actifs, chefs, parEmail, parNom, nomComplet, cle, majuscules,
+    charger, creer, enregistrer, verifier, manquantesDepuisAdresses, synchroniserPartages, toutes, actifs, chefs, parEmail, parNom, nomComplet, cle, majuscules,
     source: () => etat.source,
   };
 })();

@@ -445,7 +445,7 @@ body { margin: 0; display: flex; min-height: 100vh; }
   <!-- ─── PERSONNEL FTS (remplace Adresses Personnel) ────────────── -->
   <div class="se-view" id="se-view-personnel">
     <div class="se-page-title">Personnel FTS</div>
-    <div class="se-page-sub">Base unique de tout le personnel FTS. Nom, prénom, catégorie, poste et e-mail sont lus par les tablettes : noms proposés dans le rapport, et chef reconnu grâce à l'e-mail du compte Google de sa tablette. L'adresse 🔒 reste dans un fichier séparé, réservé à la Supervision.</div>
+    <div class="se-page-sub">Base unique de tout le personnel FTS. Nom, prénom, catégorie, poste et e-mail sont lus par les tablettes : noms proposés dans le rapport, et chef reconnu grâce à l'e-mail du compte Google de sa tablette. L'adresse 🔒 reste dans un fichier séparé, réservé à la Supervision. Renseigner un e-mail suffit : le dossier REFERENTIEL (parc matériel + personnel) est partagé automatiquement en lecture avec cette adresse, et l'accès est retiré si la personne passe en PARTI.</div>
 
     <div class="se-panel" id="psCreerPanel" hidden>
       <div class="se-panel-head"><h2>La base personnel n'existe pas encore</h2></div>
@@ -1750,8 +1750,19 @@ document.addEventListener("DOMContentLoaded", () => {
       const adr = await FTSSheets.listerAdresses().catch(() => null);
       if (adr) adresses = { spreadsheetId: adr.spreadsheetId, liste: adr.adresses };
       personnes = FTSPersonnel.toutes(); enEdition = null;
-      $("psStatus").textContent = "✅ " + message;
+      $("psStatus").textContent = "✅ " + message + " Mise à jour des accès au dossier REFERENTIEL...";
       afficher();
+      // Accès en lecture au dossier REFERENTIEL selon les e-mails renseignés
+      try {
+        const b = await FTSPersonnel.synchroniserPartages();
+        const morceaux = [];
+        if (b.ajoutes.length) morceaux.push(`accès donné à ${b.ajoutes.join(", ")}`);
+        if (b.retires.length) morceaux.push(`accès retiré à ${b.retires.join(", ")}`);
+        if (b.erreurs.length) morceaux.push(`⚠️ partage impossible pour ${b.erreurs.join(", ")}`);
+        $("psStatus").textContent = "✅ " + message + ` REFERENTIEL partagé en lecture avec ${b.total} personne(s)` + (morceaux.length ? " : " + morceaux.join(" ; ") + "." : ".");
+      } catch (e) {
+        $("psStatus").textContent = "✅ " + message + " ⚠️ Partage du dossier REFERENTIEL non mis à jour : " + e.message;
+      }
       return true;
     } catch (e) { $("psStatus").textContent = "❌ " + e.message; return false; }
   }

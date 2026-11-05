@@ -20,33 +20,48 @@ if ("serviceWorker" in navigator) {
 
 <div class="app-shell active" id="appShell">
 
-  <!-- Barre du haut : logo, chantier actif, utilisateur -->
+  <!-- Barre du haut : logo, pastille hors ligne, bouton compte -->
   <header class="app-topbar">
     <a href="/index.html" class="app-topbar-brand" style="text-decoration:none;color:inherit;cursor:pointer" aria-label="Retour à l'accueil">
       <img src="/assets/logo-fts.png" alt="FTS" class="logo-badge-img">
-
       <div class="brand-titles">
         <h1>TABLEAU DE BORD</h1>
         <p>Fondations et Travaux Spéciaux</p>
       </div>
     </a>
     <div class="app-topbar-right">
-      <div class="chantier-badge" id="chantierBadge" hidden>
-        <div class="code" id="chantierBadgeCode">—</div>
-        <div class="nom" id="chantierBadgeNom">—</div>
-      </div>
-      <div class="user-avatar-block">
+      <span class="ac-horsligne" id="pastilleHorsLigne" hidden>📡 Hors ligne</span>
+      <button type="button" class="user-avatar-block ac-user-btn" id="userBtn" aria-label="Mon compte">
         <div class="user-avatar" id="userAvatar">?</div>
-        <div>
+        <div style="text-align:left">
           <div class="name" id="userName">Non connecté</div>
-          <div class="role" id="userRole">—</div>
+          <div class="role" id="userRole"><span class="ac-st off">● Toucher pour se connecter</span></div>
         </div>
-      </div>
+      </button>
     </div>
   </header>
 
   <!-- Vue ACCUEIL -->
   <main class="app-view active" id="view-accueil">
+    <div class="ac-top-row">
+      <div class="date-banner">
+        <div class="date-box">
+          <div class="mois" id="dateBoxMois">—</div>
+          <div class="jour" id="dateBoxJour">—</div>
+        </div>
+        <div>
+          <div class="date-main" id="dateMain">—</div>
+          <div class="date-sub" id="dateSub">—</div>
+        </div>
+      </div>
+      <button type="button" class="ac-chantier-card" id="chantierCard">
+        <span class="lbl">Chantier en cours</span>
+        <span class="code" id="chantierCode">Aucun chantier</span>
+        <span class="nom" id="chantierNom">Touche ici pour choisir ton chantier</span>
+        <span class="chg" id="chantierChg">Choisir</span>
+      </button>
+    </div>
+
     <div class="app-body">
       <div class="app-col-left">
         <div class="activite-title" style="margin-top:0">Applications</div>
@@ -79,84 +94,33 @@ if ("serviceWorker" in navigator) {
       </div>
 
       <div class="app-col-right">
-        <div class="date-banner">
-          <div class="date-box">
-            <div class="mois" id="dateBoxMois">—</div>
-            <div class="jour" id="dateBoxJour">—</div>
-          </div>
-          <div>
-            <div class="date-main" id="dateMain">—</div>
-            <div class="date-sub" id="dateSub">—</div>
-          </div>
-        </div>
-
-        <div class="activite-title">Activité récente</div>
+        <div id="objectifBloc" hidden></div>
+        <div class="activite-title" id="activiteTitre">Activité récente</div>
         <div id="activiteList">
-          <div class="activite-empty">Sélectionne un chantier pour voir son activité.</div>
+          <div class="activite-empty">Choisis un chantier pour voir son activité.</div>
         </div>
       </div>
     </div>
   </main>
 
-  <!-- Vue CHANTIERS -->
-  <main class="app-view" id="view-chantiers">
-    <div class="app-body" style="flex-direction:column;max-width:700px">
-      <div class="panel" id="panel-chantier-actif">
-        <h2 class="panel-title">Chantier actif</h2>
-        <p class="panel-sub">Choisis le chantier sur lequel tu travailles aujourd'hui.</p>
-        <div class="chantier-actif-row">
-          <select id="chantierActifSelect" class="chantier-select">
-            <option value="">— Sélectionner un chantier —</option>
-          </select>
-          <button type="button" class="btn-secondary" id="refreshChantiersBtn">↻ Actualiser</button>
-        </div>
-        <p class="form-status" id="chantierActifStatus"></p>
-      </div>
-
-      <!-- Documents du chantier -->
-      <div class="panel" id="panel-documents" hidden>
-        <h2 class="panel-title">Documents du chantier</h2>
-        <p class="panel-sub" id="docsChantierNom" style="font-weight:700;color:var(--text-main)"></p>
-        <p class="panel-sub">Consulte les dossiers et fichiers directement ici, sans ouvrir Google Drive.</p>
-
-        <!-- Fil d'ariane -->
-        <div id="docsBreadcrumb" class="docs-breadcrumb"></div>
-
-        <!-- Grille des dossiers -->
-        <div id="docsFolders" class="docs-folders-grid"></div>
-
-        <!-- Liste des fichiers d'un dossier -->
-        <div id="docsFiles" class="docs-files-list"></div>
-      </div>
-    </div>
-  </main>
-
-  <!-- Aperçu de fichier -->
-  <div class="doc-preview-overlay" id="docPreviewOverlay">
-    <div class="doc-preview-box">
-      <div class="doc-preview-header">
-        <span id="docPreviewTitle">Fichier</span>
-        <div>
-          <a id="docPreviewOpenLink" href="#" target="_blank" class="btn-secondary" style="margin-right:8px">Ouvrir dans Drive ↗</a>
-          <button class="icon-btn-dark" id="docPreviewClose">✕</button>
-        </div>
-      </div>
-      <iframe id="docPreviewFrame" class="doc-preview-frame"></iframe>
-    </div>
-  </div>
-
-  <!-- Vue RÉGLAGES -->
- <main class="app-view" id="view-reglages">
-    <div class="app-body" style="flex-direction:column;max-width:600px">
-      <div class="panel">
-        <h2 class="panel-title">Compte Google</h2>
-        <p class="panel-sub" id="adminAccountInfo">Non connecté</p>
-        <button class="btn-secondary" id="signInBtn">Se connecter</button>
-        <button class="btn-secondary" id="signOutBtn" hidden>Se déconnecter</button>
-      </div>
-      <div class="panel">
-        <h2 class="panel-title">À propos</h2>
-        <p class="panel-sub">TABLEAU DE BORD — Fondations et Travaux Spéciaux.<br>Une seule appli pour l'ouverture de chantier, les rapports, les accueils et la fiche matériel.</p>
+  <!-- Vue DOCUMENTS -->
+  <main class="app-view" id="view-documents">
+    <div class="dc-wrap">
+      <div class="dc" id="dcRoot">
+        <nav class="dc-side" id="dcSide"></nav>
+        <section class="dc-main">
+          <div class="dc-head">
+            <div class="dc-head-t">
+              <h3 id="dcTitre">Documents</h3>
+              <div class="dc-sub" id="dcSub"></div>
+            </div>
+            <input type="search" class="dc-search" id="dcRecherche" placeholder="🔍 Rechercher dans le chantier…" autocomplete="off">
+            <button type="button" class="dc-keep" id="dcGarder" hidden>📥 Tout garder hors ligne</button>
+            <button type="button" class="dc-refresh" id="dcActualiser" title="Actualiser">↻</button>
+          </div>
+          <p class="dc-status" id="dcStatus"></p>
+          <div class="dc-grid" id="dcGrid"></div>
+        </section>
       </div>
     </div>
   </main>
@@ -166,19 +130,68 @@ if ("serviceWorker" in navigator) {
     <button class="app-tab active" id="tabAccueil" data-view="view-accueil">
       <span class="tab-icon">🏠</span>ACCUEIL
     </button>
-    <button class="app-tab" id="tabChantiers" data-view="view-chantiers">
-      <span class="tab-icon">📁</span>CHANTIERS
-    </button>
-    <button class="app-tab" id="tabReglages" data-view="view-reglages">
-      <span class="tab-icon">⚙️</span>RÉGLAGES
+    <button class="app-tab" id="tabDocuments" data-view="view-documents">
+      <span class="tab-icon">📁</span>DOCUMENTS
     </button>
   </nav>
 
 </div>
 
+<!-- Fenêtre : choisir mon chantier -->
+<div class="pop-ov" id="popChantier" hidden>
+  <div class="pop" role="dialog" aria-labelledby="popChantierTitre">
+    <div class="pop-h"><span id="popChantierTitre">Choisir mon chantier</span><button type="button" class="pop-x" data-close="popChantier" aria-label="Fermer">✕</button></div>
+    <div class="pop-b">
+      <input type="search" class="pop-s" id="popChantierRecherche" placeholder="🔍 Rechercher un chantier (code, ville, nom)…" autocomplete="off">
+      <div id="popChantierListe"></div>
+      <div class="pop-note">Seuls les chantiers qui te sont partagés apparaissent ici. En changeant de chantier, les documents gardés hors ligne de l'ancien chantier sont retirés de la tablette.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Fenêtre : mon compte -->
+<div class="pop-ov" id="popCompte" hidden>
+  <div class="pop" role="dialog" aria-labelledby="popCompteTitre">
+    <div class="pop-h"><span id="popCompteTitre">Mon compte</span><button type="button" class="pop-x" data-close="popCompte" aria-label="Fermer">✕</button></div>
+    <div class="pop-b" id="popCompteCorps"></div>
+  </div>
+</div>
+
+<!-- Visionneuse plein écran (PDF, photos) -->
+<div class="vw" id="vw" hidden>
+  <div class="vw-h">
+    <button type="button" class="vw-b" id="vwRetour">← Retour</button>
+    <div class="vw-t"><span id="vwTitre"></span><small id="vwSousTitre"></small></div>
+    <div class="vw-r">
+      <button type="button" class="vw-b" id="vwTelecharger" title="Télécharger">⬇ <span>Télécharger</span></button>
+      <a class="vw-b" id="vwDrive" href="#" target="_blank" rel="noopener" title="Ouvrir dans Drive">↗ <span>Ouvrir dans Drive</span></a>
+    </div>
+  </div>
+  <div class="vw-zone" id="vwZone">
+    <div class="vw-inner" id="vwInner"></div>
+  </div>
+  <div class="vw-hint" id="vwAide" hidden>🤏 Pince pour zoomer · double-tap = zoom rapide</div>
+  <div class="vw-off" id="vwOff" hidden>✓ Disponible hors ligne</div>
+  <div class="vw-mini" id="vwMini" hidden><canvas id="vwMiniCanvas"></canvas><div class="vw-cad" id="vwCad"></div></div>
+  <div class="vw-bar" id="vwBarre" hidden>
+    <button type="button" class="vw-z" id="vwMoins" aria-label="Dézoomer">−</button>
+    <span class="vw-v" id="vwZoom">100 %</span>
+    <button type="button" class="vw-z" id="vwPlus" aria-label="Zoomer">+</button>
+    <span class="vw-s"></span>
+    <button type="button" class="vw-aj" id="vwAjuster">↔ Ajuster</button>
+    <span class="vw-s"></span>
+    <span class="vw-p" id="vwPage">Page 1 / 1</span>
+  </div>
+  <div class="vw-msg" id="vwMessage" hidden></div>
+</div>
+
+<div class="ac-toast" id="toast" hidden></div>
+
 <script src="js/auth.js"></script>
 <script src="js/drive.js"></script>
+<script src="js/sheets.js"></script>
 <script src="js/notifications.js"></script>
+<script src="js/documents.js"></script>
 <script src="js/dashboard.js"></script>
 </body>
 </html>

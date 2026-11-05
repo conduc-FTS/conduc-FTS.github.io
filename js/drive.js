@@ -559,7 +559,7 @@ const FTSDrive = (() => {
       `(${parentsClause}) and mimeType != 'application/vnd.google-apps.folder' and trashed = false`
     );
     const res = await fetchAvecRetry(
-      `${API_BASE}/files?q=${qFiles}&fields=files(id,name,createdTime,parents)&orderBy=createdTime desc&pageSize=${limite || 5}&spaces=drive`,
+      `${API_BASE}/files?q=${qFiles}&fields=files(id,name,mimeType,size,createdTime,modifiedTime,webViewLink,parents)&orderBy=createdTime desc&pageSize=${limite || 5}&spaces=drive`,
       { headers: authHeader() }
     );
     if (!res.ok) return [];
@@ -619,6 +619,55 @@ const FTSDrive = (() => {
   }
 
   /**
+   * Liste en UNE requête tous les fichiers (hors dossiers) contenus dans
+   * plusieurs dossiers : sert à l'onglet Documents de la tablette (compteurs
+   * par dossier, « Récents », recherche) sans une requête par dossier.
+   * Chaque fichier garde son champ parents pour savoir d'où il vient.
+   */
+  async function listFilesInFolders(folderIds) {
+    if (!folderIds || !folderIds.length) return [];
+    const tous = [];
+    // Par paquets de 40 dossiers (limite de longueur de la requête Drive)
+    for (let i = 0; i < folderIds.length; i += 40) {
+      const parents = folderIds.slice(i, i + 40).map((id) => `'${id}' in parents`).join(" or ");
+      const q = encodeURIComponent(`(${parents}) and mimeType != 'application/vnd.google-apps.folder' and trashed = false`);
+      let pageToken = "";
+      do {
+        const res = await fetchAvecRetry(
+          `${API_BASE}/files?q=${q}&fields=nextPageToken,files(id,name,mimeType,size,createdTime,modifiedTime,webViewLink,thumbnailLink,parents)&orderBy=modifiedTime desc&pageSize=500&spaces=drive${pageToken ? "&pageToken=" + pageToken : ""}`,
+          { headers: authHeader() }
+        );
+        if (!res.ok) throw new Error(`Erreur listage des fichiers : ${res.status}`);
+        const data = await res.json();
+        tous.push(...(data.files || []));
+        pageToken = data.nextPageToken || "";
+      } while (pageToken);
+    }
+    return tous;
+  }
+
+  /** Sous-dossiers (un niveau) de plusieurs dossiers, en une requête. */
+  async function listFoldersInFolders(folderIds) {
+    if (!folderIds || !folderIds.length) return [];
+    const parents = folderIds.map((id) => `'${id}' in parents`).join(" or ");
+    const q = encodeURIComponent(`(${parents}) and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
+    const res = await fetchAvecRetry(`${API_BASE}/files?q=${q}&fields=files(id,name,parents)&pageSize=500&spaces=drive`, { headers: authHeader() });
+    if (!res.ok) throw new Error(`Erreur listage des dossiers : ${res.status}`);
+    const data = await res.json();
+    return data.files || [];
+  }
+
+  /**
+   * Télécharge le contenu brut d'un fichier (PDF, image…) pour la
+   * visionneuse intégrée et le mode hors ligne.
+   */
+  async function downloadFileBlob(fileId) {
+    const res = await fetchAvecRetry(`${API_BASE}/files/${fileId}?alt=media`, { headers: authHeader() });
+    if (!res.ok) throw new Error(`Téléchargement impossible (${res.status})`);
+    return await res.blob();
+  }
+
+  /**
    * Trouve (ou crée) l'arborescence d'archivage personnel d'un chef de
    * chantier pour les rapports journaliers :
    *   ADMINISTRATIF / {NOM DU CHEF} / RAPPORT JOURNALIER / RJ {année}
@@ -669,6 +718,9 @@ const FTSDrive = (() => {
     getActiviteRecenteChantier,
     getSousDossiersChantier,
     listFilesInFolder,
+    listFilesInFolders,
+    listFoldersInFolders,
+    downloadFileBlob,
     getMetadonneesChantier,
     setMetadonneesChantier,
     getDossierRapportChef,

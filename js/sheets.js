@@ -801,7 +801,36 @@ const FTSSheets = (() => {
     });
   }
 
+  /**
+   * Avancement du chantier pour l'accueil tablette (objectif chantier).
+   * Lecture seule : contrairement à getOuCreerClasseurSuivi, ne crée JAMAIS
+   * le classeur s'il n'existe pas encore (aucun rapport = aucun avancement).
+   * @returns {Promise<{totalMicropieux:number, joursRapportes:number, rapportAujourdhui:boolean}>}
+   */
+  async function avancementChantier(chantierFolderId, chantierName) {
+    const nomClasseur = `Suivi ${chantierName}`;
+    const q = encodeURIComponent(
+      `name = '${nomClasseur.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.spreadsheet' and '${chantierFolderId}' in parents and trashed = false`
+    );
+    const res = await fetchAvecRetry(`${DRIVE_API_BASE}/files?q=${q}&fields=files(id)&spaces=drive`, { headers: authHeader() });
+    if (!res.ok) throw new Error(`Erreur recherche classeur suivi : ${res.status}`);
+    const data = await res.json();
+    if (!data.files || !data.files.length) return { totalMicropieux: 0, joursRapportes: 0, rapportAujourdhui: false };
+    const production = await lireOnglet(data.files[0].id, ONGLET_PRODUCTION);
+    const jours = new Set();
+    let total = 0;
+    production.forEach((r) => {
+      if (!r[0] || !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(String(r[0]).trim())) return;
+      jours.add(String(r[0]).trim());
+      total += Number(r[1]) || 0;
+    });
+    const d = new Date();
+    const auj = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+    return { totalMicropieux: total, joursRapportes: jours.size, rapportAujourdhui: jours.has(auj) };
+  }
+
   return {
+    avancementChantier,
     getOuCreerClasseurSuivi,
     enregistrerDonneesRapport,
     lireSuiviComplet,

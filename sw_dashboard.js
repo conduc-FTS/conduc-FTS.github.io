@@ -14,7 +14,10 @@
  * toujours prendre la version la plus fraîche sans avoir à changer
  * ce numéro.
  */
-const CACHE_NAME = "fts-dashboard-v5";
+const CACHE_NAME = "fts-dashboard-v6";
+// Documents gardés hors ligne par le chef (onglet DOCUMENTS) : ce cache
+// n'est JAMAIS supprimé par une mise à jour de l'appli.
+const CACHE_DOCS = "fts-docs-v1";
 const ASSETS = [
   "/",
   "/index.html",
@@ -24,6 +27,11 @@ const ASSETS = [
   "/js/notifications.js",
   "/js/calendar.js",
   "/js/dashboard.js",
+  "/js/sheets.js",
+  "/js/documents.js",
+  "/lib/pdfjs/pdf.min.js",
+  "/lib/pdfjs/pdf.worker.min.js",
+  "/assets/logo-fts.png",
   "/js/parc-materiel.js",
   "/js/personnel.js",
   "/manifest_dashboard.json",
@@ -41,7 +49,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k !== CACHE_NAME && k !== CACHE_DOCS).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
@@ -55,6 +63,9 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) {
     return;
   }
+  // Documents hors ligne : lus directement par la page (Cache Storage)
+  if (url.pathname.startsWith("/__docs/")) return;
+  if (event.request.method !== "GET") return;
 
   event.respondWith(
     fetch(event.request, { cache: "no-store" })

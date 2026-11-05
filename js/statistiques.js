@@ -5,7 +5,12 @@
  *   - Parc matériel    : utilisation et fiabilité des foreuses et centrales
  *   - Bilans           : fiche de fin de chantier (+ PDF) et cadences réelles
  *
- * Données : la lecture groupée de la Vue d'ensemble (chantiers en cours,
+ * Règle (Clément) : TOUTES les statistiques portent uniquement sur les
+ * chantiers terminés et archivés — un chantier en cours se suit sur son
+ * Détail chantier. La période retient les chantiers dont le dernier
+ * rapport tombe dans la période.
+ *
+ * Données : la lecture groupée de la Vue d'ensemble (chantiers actifs,
  * Materiel + Production), complétée par les onglets Pannes / Arrets et par
  * les chantiers archivés (gardés en copie locale : ils ne changent plus).
  *
@@ -23,7 +28,6 @@ const FTSStats = (() => {
   let enCours = null;
   let onglet = "vr";
   let periode = "annee";
-  let statut = "tous";
   let bilanSel = null;
   let derniereErreur = "";
 
@@ -115,7 +119,8 @@ const FTSStats = (() => {
           Object.keys(cache.ids).forEach((id) => { if (!garder.has(id)) delete cache.ids[id]; });
           ecrireCacheArchives(cache);
         }
-        const pa = connecte ? await FTSSheets.lirePannesArrets(d.suivis || []) : {};
+        const termines = new Set(d.chantiers.filter((c) => (c.meta || {}).statutChantier === "Termine" || (c.meta || {}).archive).map((c) => c.id));
+        const pa = connecte ? await FTSSheets.lirePannesArrets((d.suivis || []).filter((x) => x && termines.has(x.id))) : {};
         const actifs = d.chantiers.map((c, i) => {
           const s = d.suivis[i] || {};
           return { id: c.id, name: c.name, meta: c.meta || {}, materiel: s.materiel || [], production: s.production || [], pannes: (pa[c.id] || {}).pannes || [], arrets: (pa[c.id] || {}).arrets || [], archive: false };
@@ -161,35 +166,27 @@ const FTSStats = (() => {
     if (etat === "cours" && prevu && cadR > 0) projetes = realise >= prevu ? jours : jours + (prevu - realise) / cadR;
     const joursRef = termine ? jours : projetes;
     const ecart = joursVendus && jours && joursRef != null ? joursRef - joursVendus : null;
-    const caProduit = montant && prevu ? montant * Math.min(1, realise / prevu) : null;
+    // CA / jour = montant (marché + avenants) ÷ jours de rapport (chantier terminé)
+    const caProduit = montant ? (termine ? montant : (prevu ? montant * Math.min(1, realise / prevu) : null)) : null;
     const caJour = caProduit != null && jours ? caProduit / jours : null;
+    const ecartMpx = termine && prevu ? realise - prevu : null;
     const chefs = [...new Set(prod.map((r) => String(r[4] || "").trim()).filter(Boolean))];
     const pannes = (c.pannes || []).filter((r) => parseFR(r[0])).map((r) => ({ d: parseFR(r[0]), ds: r[0], quoi: String(r[1] || "").trim() || "—", h: nb(r[2]), obs: r[3] || "", atelier: r[4] || "", cat: "panne" }));
     const arrets = (c.arrets || []).filter((r) => parseFR(r[0])).map((r) => ({ d: parseFR(r[0]), ds: r[0], quoi: String(r[1] || "").trim() || "Arrêt", h: nb(r[2]), obs: r[3] || "", atelier: r[4] || "", cat: categorieArret(r[1]) }));
     return {
       ...c, meta, tech, mp, prevu, avMpx, nbAvenants: avenants.length, joursVendus, montant, prod, dates, jours, realise, ml,
-      termine, etat, cadR, cadV, projetes, ecart, caProduit, caJour, chefs, evts: [...pannes, ...arrets],
+      termine, etat, cadR, cadV, projetes, ecart, caProduit, caJour, ecartMpx, chefs, evts: [...pannes, ...arrets],
       lMoy: realise ? ml / realise : null,
       premier: dates.length ? parseFR(dates[0]) : null,
       dernier: dates.length ? parseFR(dates[dates.length - 1]) : null,
     };
   }
 
-  // Chantiers retenus selon les filtres (famille Mpx, période, statut)
-  function chantiersFiltres(ignorerStatut = false) {
+  // Chantiers retenus : micropieux, TERMINÉS ou ARCHIVÉS, avec au moins un
+  // rapport, dont le dernier rapport tombe dans la période choisie.
+  function chantiersFiltres() {
     const b = bornes();
-    const auj = new Date();
-    return jeu.chantiers.filter((c) => {
-      if (!c.mp) return false;
-      if (!ignorerStatut) {
-        if (statut === "cours" && c.etat === "termine") return false;
-        if (statut === "termines" && c.etat !== "termine") return false;
-      }
-      if (!b[0]) return true;
-      if (c.dates.some((s) => dansPeriode(parseFR(s), b))) return true;
-      if (c.evts.some((e) => dansPeriode(e.d, b))) return true;
-      return c.etat === "attente" && b[1] >= new Date(auj.getFullYear(), auj.getMonth(), auj.getDate());
-    });
+    return jeu.chantiers.filter((c) => c.mp && c.etat === "termine" && c.jours && (!b[0] || dansPeriode(c.dernier, b)));
   }
 
   // ─── Montage ─────────────────────────────────────────────────
@@ -206,18 +203,13 @@ const FTSStats = (() => {
           <option value="an-1">Année dernière</option>
           <option value="tout">Toutes périodes</option>
         </select>
-        <select id="stStatut">
-          <option value="tous">En cours + terminés</option>
-          <option value="cours">En cours seulement</option>
-          <option value="termines">Terminés (et archivés)</option>
-        </select>
+        <span class="st-etat" title="Un chantier en cours se suit sur son Détail chantier">Chantiers terminés et archivés uniquement</span>
         <span class="st-sp"></span>
         <span class="st-etat" id="stEtat"></span>
         <button type="button" class="st-btn" id="stExport">⬇ Exporter Excel</button>
       </div>
       <div id="stVue"></div>`;
     racine.querySelector("#stPeriode").addEventListener("change", (e) => { periode = e.target.value; afficher(); });
-    racine.querySelector("#stStatut").addEventListener("change", (e) => { statut = e.target.value; afficher(); });
     racine.querySelector("#stExport").addEventListener("click", exporter);
     racine.addEventListener("click", (e) => {
       const b = e.target.closest("[data-bilan]");
@@ -238,7 +230,6 @@ const FTSStats = (() => {
 
   function afficher() {
     if (!racine) return;
-    racine.querySelector("#stStatut").style.visibility = onglet === "bilans" ? "hidden" : "visible";
     const vue = racine.querySelector("#stVue");
     if (!jeu) {
       vue.innerHTML = `<div class="st-vide">${derniereErreur ? "Erreur : " + esc(derniereErreur) : enCours ? "Chargement des statistiques…" : "Connecte-toi pour afficher les statistiques."}</div>`;
@@ -264,7 +255,7 @@ const FTSStats = (() => {
   }
   function vueVenduRealise() {
     const L = lignesVR();
-    if (!L.length) return vide("Aucun chantier micropieux sur cette période.");
+    if (!L.length) return vide("Aucun chantier micropieux terminé sur cette période. Un chantier entre dans les statistiques quand il est marqué « Terminé » sur son Détail chantier (ou archivé).");
     const dem = L.filter((c) => c.jours);
     const nT = L.filter((c) => c.etat === "termine").length, nC = L.filter((c) => c.etat === "cours").length, nA = L.filter((c) => c.etat === "attente").length;
     const avecEcart = dem.filter((c) => c.ecart != null);
@@ -276,10 +267,10 @@ const FTSStats = (() => {
     const caMin = avecCa.length ? Math.min(...avecCa.map((c) => c.caJour)) : 0, caMax = avecCa.length ? Math.max(...avecCa.map((c) => c.caJour)) : 0;
 
     const kpis = `<div class="st-kpis">
-      ${kpi("Chantiers analysés", L.length, [nT && `${nT} terminé${nT > 1 ? "s" : ""}`, nC && `${nC} en cours`, nA && `${nA} pas démarré${nA > 1 ? "s" : ""}`].filter(Boolean).join(" · "))}
-      ${kpi("Écart de jours (vendu → réel / projeté)", avecEcart.length ? `${signe(ecartTot)} <small>j</small>` : "—", avecEcart.length ? `sur ${fmt1(vendusTot)} j vendus, chantiers démarrés` : "durée vendue non renseignée", avecEcart.length ? (ecartTot > 0.5 ? "alert" : "ok") : "")}
-      ${kpi("Chantiers en dépassement", `${dep.length} <small>/ ${avecEcart.length} démarré${avecEcart.length > 1 ? "s" : ""}</small>`, dep.length ? [dep.filter((c) => c.etat === "termine").length && `${dep.filter((c) => c.etat === "termine").length} terminé${dep.filter((c) => c.etat === "termine").length > 1 ? "s" : ""}`, dep.filter((c) => c.etat === "cours").length && `${dep.filter((c) => c.etat === "cours").length} en cours (projection)`].filter(Boolean).join(" · ") : "aucun", dep.length ? "warn" : "")}
-      ${kpi("CA produit par jour d'atelier", caMoy != null ? `${fmt(caMoy)} <small>€/j</small>` : "—", caMoy != null ? (avecCa.length > 1 ? `de ${fmt(caMin)} à ${fmt(caMax)} €/j selon le chantier` : "1 chantier") : "montants non renseignés")}
+      ${kpi("Chantiers terminés analysés", L.length, (() => { const na = L.filter((c) => c.archive).length, nt = L.length - na; return [nt && `${nt} terminé${nt > 1 ? "s" : ""}`, na && `${na} archivé${na > 1 ? "s" : ""}`].filter(Boolean).join(" · "); })())}
+      ${kpi("Écart de jours (vendu → réel)", avecEcart.length ? `${signe(ecartTot)} <small>j</small>` : "—", avecEcart.length ? `sur ${fmt1(vendusTot)} j vendus` : "durée vendue non renseignée", avecEcart.length ? (ecartTot > 0.5 ? "alert" : "ok") : "")}
+      ${kpi("Chantiers en dépassement", `${dep.length} <small>/ ${avecEcart.length}</small>`, dep.length ? `${fmt1(dep.reduce((x, c) => x + c.ecart, 0))} j de dépassement au total` : "aucun", dep.length ? "warn" : "")}
+      ${kpi("CA par jour de rapport", caMoy != null ? `${fmt(caMoy)} <small>€/j</small>` : "—", caMoy != null ? (avecCa.length > 1 ? `de ${fmt(caMin)} à ${fmt(caMax)} €/j selon le chantier` : "1 chantier") : "montants non renseignés")}
     </div>`;
 
     // Graphique des écarts
@@ -294,13 +285,13 @@ const FTSStats = (() => {
 
     const prio = priorites(L);
     const haut = `<div class="st-grid2">
-      <div class="st-card"><div class="st-ch"><h2>Écart de jours par chantier</h2><span class="s">vert = plus rapide que vendu · rouge = dépassement (projeté si en cours)</span></div>
-        <div class="st-cb">${lignesGraph || '<span class="st-mut">Aucun chantier démarré avec une durée vendue.</span>'}${graph.some((c) => c.etat === "cours") ? '<div class="st-mut st-small" style="margin-top:10px">* chantier en cours : projection au rythme actuel (barre claire)</div>' : ""}</div></div>
+      <div class="st-card"><div class="st-ch"><h2>Écart de jours par chantier</h2><span class="s">vert = plus rapide que vendu · rouge = dépassement</span></div>
+        <div class="st-cb">${lignesGraph || '<span class="st-mut">Aucun chantier avec une durée vendue.</span>'}</div></div>
       <div class="st-card"><div class="st-ch"><h2>À regarder en priorité</h2></div><div class="st-cb st-prio">${prio || '<span class="st-mut">Rien de particulier à signaler.</span>'}</div></div>
     </div>`;
 
     const lignes = L.map((c) => {
-      const pill = c.etat === "termine" ? `<span class="st-pill p-done">${c.archive ? "Archivé" : "Terminé"}</span>`
+      const pill = c.ecart > 0.5 ? `<span class="st-pill p-late">${c.archive ? "Archivé" : "Terminé"} · dépassé</span>` : c.etat === "termine" ? `<span class="st-pill p-done">${c.archive ? "Archivé" : "Terminé"}</span>`
         : c.etat === "attente" ? '<span class="st-pill p-wait">Pas démarré</span>'
         : c.ecart > 0.5 ? '<span class="st-pill p-late">En cours · retard</span>' : '<span class="st-pill p-run">En cours</span>';
       const q = (v, f = fmt1) => v == null || v === 0 && false ? '<span class="st-mut">—</span>' : f(v);
@@ -311,23 +302,22 @@ const FTSStats = (() => {
       return `<tr class="st-lien" data-detail="${esc(c.id)}" data-nom="${esc(c.name)}" title="Ouvrir le détail du chantier">
         <td>${nomChantier(c.name)}</td><td>${pill}</td>
         <td class="r">${c.prevu ? fmt(c.prevu) + (c.avMpx ? ` <small class="st-mut">(${c.avMpx > 0 ? "+" : ""}${c.avMpx} TS)</small>` : "") : manq("quantité vendue non renseignée")}</td>
-        <td class="r">${c.jours ? fmt(c.realise) : '<span class="st-mut">—</span>'}</td>
+        <td class="r">${fmt(c.realise)}${c.ecartMpx ? ` <span class="st-warn" title="Mpx réalisés différents des Mpx vendus (marché + avenants) : vérifier le montant / les avenants">⚠</span>` : ""}</td>
         <td>${pct != null && c.jours ? `${fmt(pct)} %${barre(pct)}` : '<span class="st-mut">—</span>'}</td>
         <td class="r">${c.joursVendus ? fmt1(c.joursVendus) : manq("durée vendue non renseignée")}</td>
         <td class="r">${c.jours ? c.jours : '<span class="st-mut">—</span>'}</td>
-        <td class="r">${c.projetes != null ? fmt1(c.projetes) : '<span class="st-mut">—</span>'}</td>
         <td class="r ${clsE}">${c.ecart != null ? signe(c.ecart) : '<span class="st-mut">—</span>'}</td>
         <td class="r">${c.cadV ? fmt(c.cadV, 1) : '<span class="st-mut">—</span>'}</td>
         <td class="r ${clsCad}">${c.cadR != null ? fmt(c.cadR, 1) : '<span class="st-mut">—</span>'}</td>
         <td class="r">${c.caJour != null ? euros(c.caJour) : c.jours ? manq("montant ou quantité vendue non renseigné") : '<span class="st-mut">—</span>'}</td></tr>`;
     }).join("");
 
-    const tableau = `<div class="st-card"><div class="st-ch"><h2>Détail par chantier</h2><span class="s">quantités et durées = marché principal + avenants / TS validés · clic sur une ligne = détail du chantier</span></div>
+    const tableau = `<div class="st-card"><div class="st-ch"><h2>Détail par chantier</h2><span class="s">quantités, durées et montants = marché principal + avenants / TS validés · clic sur une ligne = détail du chantier</span></div>
       <div class="st-scroll"><table class="st-tbl">
-        <thead><tr><th rowspan="2">Chantier</th><th rowspan="2">Statut</th><th class="g" colspan="3">MICROPIEUX</th><th class="g" colspan="4">JOURS</th><th class="g" colspan="2">CADENCE (Mpx/j)</th><th rowspan="2" class="r">CA / jour</th></tr>
-        <tr><th class="r">Vendus</th><th class="r">Réalisés</th><th>Avancement</th><th class="r">Vendus</th><th class="r">Réels</th><th class="r">Projetés</th><th class="r">Écart</th><th class="r">Vendue</th><th class="r">Réelle</th></tr></thead>
+        <thead><tr><th rowspan="2">Chantier</th><th rowspan="2">Statut</th><th class="g" colspan="3">MICROPIEUX</th><th class="g" colspan="3">JOURS</th><th class="g" colspan="2">CADENCE (Mpx/j)</th><th rowspan="2" class="r">CA / jour</th></tr>
+        <tr><th class="r">Vendus</th><th class="r">Réalisés</th><th>Avancement</th><th class="r">Vendus</th><th class="r">Réels</th><th class="r">Écart</th><th class="r">Vendue</th><th class="r">Réelle</th></tr></thead>
         <tbody>${lignes}</tbody></table></div>
-      <div class="st-note"><b>Comment lire :</b> cadence vendue = Mpx vendus ÷ jours vendus. Jours projetés = au rythme actuel, pour finir les Mpx restants. CA / jour = part du montant réalisée (montant × avancement) ÷ jours réels. « ? » = donnée manquante dans les infos du chantier (à compléter avec ✏️ Modifier les infos sur le Détail chantier).</div></div>`;
+      <div class="st-note"><b>Comment lire :</b> jours réels = jours de rapport (deux ateliers le même jour = 1 jour). Cadence vendue = Mpx vendus ÷ jours vendus. CA / jour = montant (marché + avenants validés) ÷ jours de rapport. ⚠ = Mpx réalisés différents des Mpx vendus (avenant manquant ?). « ? » = donnée manquante dans les infos du chantier (à compléter avec ✏️ Modifier les infos sur le Détail chantier).</div></div>`;
     return kpis + haut + tableau;
   }
 
@@ -365,12 +355,12 @@ const FTSStats = (() => {
   function evenementsPeriode() {
     const b = bornes();
     const out = [];
-    chantiersFiltres().forEach((c) => c.evts.forEach((e) => { if (dansPeriode(e.d, b)) out.push({ ...e, c }); }));
+    chantiersFiltres().forEach((c) => c.evts.forEach((e) => out.push({ ...e, c })));
     return out.sort((a, b) => b.d - a.d);
   }
   function vueTempsPerdu() {
     const E = evenementsPeriode();
-    if (!E.length) return vide("Aucune panne ni aucun arrêt déclaré sur cette période (les pannes et arrêts existent depuis le rapport journalier v2).");
+    if (!E.length) return vide("Aucune panne ni aucun arrêt déclaré sur les chantiers terminés de cette période (les pannes et arrêts existent depuis le rapport journalier v2).");
     const parCat = {};
     E.forEach((e) => { parCat[e.cat] = (parCat[e.cat] || 0) + e.h; });
     const tot = E.reduce((s, e) => s + e.h, 0);
@@ -383,7 +373,7 @@ const FTSStats = (() => {
       ${kpi("Temps perdu total", `${fmt1(tot)} <small>h</small>`, `≈ ${fmt(tot / H_JOUR, 1)} jours d'atelier (${H_JOUR} h/j)`, "alert")}
       ${kpi("Causes internes", `${fmt1(hGrp("interne"))} <small>h</small>`, `pannes ${fmt1(parCat.panne || 0)} h${parCat.appro ? ` · appro coulis ${fmt1(parCat.appro)} h` : ""} → à corriger chez nous`)}
       ${kpi("Imputables client / MOE", `${fmt1(hGrp("reclamer"))} <small>h</small>`, reclam.length ? `${reclam.length} arrêt${reclam.length > 1 ? "s" : ""} sur ${nChRec} chantier${nChRec > 1 ? "s" : ""} → à réclamer / TS` : "aucun", reclam.length ? "warn" : "")}
-      ${kpi("Météo · fournisseurs · autres", `${fmt1(hNeutre)} <small>h</small>`, [`météo ${fmt1(parCat.meteo || 0)} h`, `béton ${fmt1(parCat.beton || 0)} h`, parCat.autre ? `autres ${fmt1(parCat.autre)} h` : ""].filter(Boolean).join(" · "))}
+      ${kpi("Météo · fournisseurs · autres", `${fmt1(hNeutre)} <small>h</small>`, [parCat.meteo ? `météo ${fmt1(parCat.meteo)} h` : "", parCat.beton ? `béton ${fmt1(parCat.beton)} h` : "", parCat.autre ? `autres ${fmt1(parCat.autre)} h` : ""].filter(Boolean).join(" · ") || "aucun")}
     </div>`;
 
     const ordreCats = Object.keys(CATS).filter((k) => parCat[k] > 0);
@@ -408,7 +398,7 @@ const FTSStats = (() => {
         </tbody></table>` : '<div class="st-cb st-mut">Aucune panne sur la période.</div>'}</div>
     </div>`;
 
-    const tRec = `<div class="st-card"><div class="st-ch"><h2>Arrêts imputables au client / MOE — à réclamer</h2><span class="s">exportable (Exporter Excel) pour un courrier ou une demande de TS</span></div>
+    const tRec = `<div class="st-card"><div class="st-ch"><h2>Arrêts imputables au client / MOE — à réclamer</h2><span class="s">retour d'expérience sur les chantiers terminés (pendant un chantier : onglet Pannes &amp; arrêts du Détail chantier)</span></div>
       ${reclam.length ? `<div class="st-scroll" style="max-height:460px"><table class="st-tbl"><thead><tr><th>Date</th><th>Chantier</th><th>Motif</th><th class="r">Durée</th><th>Observation du chef</th></tr></thead><tbody>
       ${reclam.map((e) => `<tr><td>${esc(jj(e.d))}</td><td>${nomChantier(e.c.name)}</td><td>${esc(e.quoi)}</td><td class="r">${fmt1(e.h)} h</td><td class="st-mut st-wrap">${esc(e.obs)}</td></tr>`).join("")}
       </tbody></table></div>` : '<div class="st-cb st-mut">Aucun arrêt imputable au client ou à la MOE sur la période.</div>'}
@@ -429,7 +419,7 @@ const FTSStats = (() => {
     const A = window.FTSAteliers;
     const groupes = new Map();
     const loc = new Map();
-    let premiere = null;
+    let premiere = null, derniere = null;
     const grp = (g) => {
       if (!groupes.has(g.cle)) groupes.set(g.cle, { g, jours: new Map(), ch: new Set(), n: 0, h: 0 });
       return groupes.get(g.cle);
@@ -437,8 +427,9 @@ const FTSStats = (() => {
     C.forEach((c) => {
       (c.materiel || []).forEach((r) => {
         const d = parseFR(r[0]);
-        if (!dansPeriode(d, b)) return;
+        if (!d) return;
         if (!premiere || d < premiere) premiere = d;
+        if (!derniere || d > derniere) derniere = d;
         const g = A ? A.groupeDePointage(r[1], r[4], r[3], r[5]) : { cle: sansAccent(r[1]), libelle: String(r[1] || "").toUpperCase(), section: String(r[3]).toUpperCase() === "LOC" ? "loc" : "autre" };
         if (g.section === "loc") {
           const l = loc.get(g.cle) || { lib: g.libelle, jours: new Set(), par: {} };
@@ -450,21 +441,16 @@ const FTSStats = (() => {
         (x.jours.get(r[0]) || x.jours.set(r[0], []).get(r[0])).push(sansAccent(r[2]));
         x.ch.add(c.id);
       });
-      c.evts.filter((e) => e.cat === "panne" && dansPeriode(e.d, b)).forEach((e) => {
+      c.evts.filter((e) => e.cat === "panne").forEach((e) => {
         const g = A ? A.groupeDePointage(e.quoi, "", "", e.atelier) : { cle: sansAccent(e.quoi), libelle: e.quoi, section: "autre" };
         if (g.section === "loc") return;
         const x = grp(g); x.n++; x.h += e.h; x.ch.add(c.id);
       });
     });
     if (A) A.lignesDuParc().filter((g) => g.section === "foreuse" || g.section === "centrale").forEach((g) => grp(g));
-    // Début du décompte : pas avant le premier pointage matériel connu
-    // (avant, l'outil n'était pas utilisé : ces jours ne comptent pas).
-    let debutDonnees = null;
-    jeu.chantiers.forEach((c) => (c.materiel || []).forEach((r) => { const d = parseFR(r[0]); if (d && (!debutDonnees || d < debutDonnees)) debutDonnees = d; }));
-    const auj = new Date();
-    const fin = b[1] && b[1] < auj ? b[1] : auj;
-    let debut = b[0] || premiere || fin;
-    if (debutDonnees && debutDonnees > debut) debut = debutDonnees;
+    // Jours ouvrés entre le premier et le dernier pointage des chantiers retenus
+    const fin = derniere || new Date();
+    const debut = premiere || fin;
     const jo = Math.max(1, joursOuvres(debut, fin));
     const lignes = [...groupes.values()].map((x) => {
       const cpt = { TRAVAIL: 0, PANNE: 0, ARRET: 0, TRANSPORT: 0 };
@@ -510,8 +496,8 @@ const FTSStats = (() => {
     const tab = `<div class="st-card"><div class="st-ch"><h2>Utilisation et fiabilité</h2><span class="s">même regroupement que le Pointage matériel (une ligne par foreuse, une ligne par centrale)</span></div>
       <div class="st-scroll"><table class="st-tbl"><thead><tr><th>Machine</th><th class="r">Jours travail</th><th>Utilisation</th><th class="r">Jours panne</th><th class="r">Jours arrêt</th><th class="r">Jours transport</th><th class="r">Pannes déclarées</th><th class="r">Heures de panne</th><th class="r">Chantiers</th></tr></thead>
       ${corps || '<tbody><tr><td colspan="9" class="st-mut">Aucun pointage matériel sur la période.</td></tr></tbody>'}</table></div>
-      <div class="st-note">Utilisation = jours pointés « Travail » ÷ jours ouvrés de la période. Une machine au dépôt n'est pas pointée : un taux bas veut dire « peu sortie », pas forcément « disponible » (congés, entretien…). Une centrale compte en panne dès qu'une de ses machines l'est.</div></div>`;
-    const tLoc = `<div class="st-card"><div class="st-ch"><h2>Matériel de location</h2><span class="s">jours pointés « LOC » — à rapprocher des factures du loueur</span></div>
+      <div class="st-note">Utilisation = jours pointés « Travail » ÷ jours ouvrés entre le premier et le dernier pointage des chantiers terminés retenus. Une machine au dépôt n'est pas pointée : un taux bas veut dire « peu sortie », pas forcément « disponible » (congés, entretien…). Une centrale compte en panne dès qu'une de ses machines l'est.</div></div>`;
+    const tLoc = `<div class="st-card"><div class="st-ch"><h2>Matériel de location</h2><span class="s">jours pointés « LOC » sur les chantiers terminés</span></div>
       ${P.loc.length ? `<table class="st-tbl"><thead><tr><th>Machine louée</th><th class="r">Jours</th><th>Chantiers</th></tr></thead><tbody>
       ${P.loc.map((l) => `<tr><td><b>${esc(l.lib)}</b></td><td class="r">${l.n}</td><td class="st-mut">${esc(Object.entries(l.par).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} (${v})`).join(" · "))}</td></tr>`).join("")}
       </tbody></table>` : '<div class="st-cb st-mut">Aucune location pointée sur la période.</div>'}</div>`;
@@ -525,8 +511,7 @@ const FTSStats = (() => {
   // ═══ 4. BILANS ════════════════════════════════════════════════
   function bilansListe() {
     const b = bornes();
-    return jeu.chantiers.filter((c) => c.mp && c.etat === "termine" && c.jours && (!b[0] || dansPeriode(c.dernier, b)))
-      .sort((a, c) => (c.dernier || 0) - (a.dernier || 0));
+    return chantiersFiltres().sort((a, c) => (c.dernier || 0) - (a.dernier || 0));
   }
   function machinesChantier(c) {
     const A = window.FTSAteliers;
@@ -744,8 +729,8 @@ const FTSStats = (() => {
       return csv(L, "Statistiques_parc_materiel.csv");
     }
     const src = onglet === "bilans" ? bilansListe() : lignesVR();
-    const L = [["Chantier", "Statut", "Mpx vendus", "Mpx réalisés", "Jours vendus", "Jours réels", "Jours projetés", "Écart (j)", "Cadence vendue (Mpx/j)", "Cadence réelle (Mpx/j)", "ml réalisés", "ml moyen par Mpx", "Montant HT", "CA par jour", "Temps perdu (h)", "dont à réclamer (h)"]];
-    src.forEach((c) => { const { h } = heuresParGroupe(c); L.push([c.name, c.etat === "termine" ? (c.archive ? "Archivé" : "Terminé") : c.etat === "cours" ? "En cours" : "Pas démarré", c.prevu || "", c.realise, c.joursVendus || "", c.jours, n1(c.projetes), n1(c.ecart), n1(c.cadV), n1(c.cadR), n1(c.ml), n1(c.lMoy), c.montant || "", c.caJour != null ? Math.round(c.caJour) : "", n1(h.interne + h.reclamer + h.neutre), n1(h.reclamer)]); });
+    const L = [["Chantier", "Statut", "Mpx vendus", "Mpx réalisés", "Jours vendus", "Jours réels (jours de rapport)", "Écart (j)", "Cadence vendue (Mpx/j)", "Cadence réelle (Mpx/j)", "ml réalisés", "ml moyen par Mpx", "Montant HT", "CA par jour", "Temps perdu (h)", "dont à réclamer (h)"]];
+    src.forEach((c) => { const { h } = heuresParGroupe(c); L.push([c.name, c.archive ? "Archivé" : "Terminé", c.prevu || "", c.realise, c.joursVendus || "", c.jours, n1(c.ecart), n1(c.cadV), n1(c.cadR), n1(c.ml), n1(c.lMoy), c.montant || "", c.caJour != null ? Math.round(c.caJour) : "", n1(h.interne + h.reclamer + h.neutre), n1(h.reclamer)]); });
     csv(L, onglet === "bilans" ? "Statistiques_bilans.csv" : "Statistiques_vendu_realise.csv");
   }
 

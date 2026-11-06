@@ -3,7 +3,9 @@
  *
  * Classeur « Personnel FTS » (onglet Personnel), rangé dans le dossier
  * REFERENTIEL (partagé en LECTURE SEULE avec les chefs) :
- *   Nom · Prénom · Catégorie · Poste habituel · E-mail · Statut · Accès Drive · Téléphone
+ *   Nom · Prénom · Catégorie · Poste habituel · E-mail · Statut · Accès Drive · Téléphone · Fonction encadrement
+ *   (Fonction encadrement : pour une personne de chantier qui fait AUSSI partie de
+ *   l'encadrement, ex. soudeur + responsable d'atelier : elle reste sur la tablette)
  *   (le téléphone n'est pas copié sur les tablettes)
  *
  * Catégorie ENCADREMENT (conducteurs, direction, bureau) : jamais proposée
@@ -25,7 +27,7 @@ const FTSPersonnel = (() => {
   const DOSSIER = "REFERENTIEL";
   const NOM_CLASSEUR = "Personnel FTS";
   const ONGLET = "Personnel";
-  const EN_TETE = ["Nom", "Prénom", "Catégorie", "Poste habituel", "E-mail", "Statut", "Accès Drive", "Téléphone"];
+  const EN_TETE = ["Nom", "Prénom", "Catégorie", "Poste habituel", "E-mail", "Statut", "Accès Drive", "Téléphone", "Fonction encadrement"];
   const EN_TETE_TABLETTE = EN_TETE.slice(0, 6);
   const CACHE_KEY = "fts_personnel_cache";
 
@@ -36,14 +38,16 @@ const FTSPersonnel = (() => {
   // Accès Drive (encadrement) : valeur interne ↔ libellé du classeur
   const ACCES = ["MODIFICATION", "LECTURE", "AUCUN"];
   const ACCES_LIB = { MODIFICATION: "Lecture + modification", LECTURE: "Lecture seule", AUCUN: "Aucun" };
-  function lireAcces(v, categorie) {
-    if (categorie !== "ENCADREMENT") return "";
+  function lireAcces(v, categorie, fonction) {
+    if (categorie !== "ENCADREMENT" && !fonction) return "";
     const t = String(v || "").trim();
     if (/^aucun/i.test(t)) return "AUCUN";
     if (/seule|^lecture$/i.test(t)) return "LECTURE";
     return "MODIFICATION"; // vide = lecture + modification (valeur par défaut de l'encadrement)
   }
+  // estEncadrement : encadrement SEUL (jamais sur la tablette) ; aEncadrement : encadrement seul OU personne de chantier avec une fonction d'encadrement
   const estEncadrement = (p) => p.categorie === "ENCADREMENT";
+  const aEncadrement = (p) => p.categorie === "ENCADREMENT" || !!p.fonctionEnc;
   // Téléphone : « 06 12 34 56 78 » (ou +33 6 12 34 56 78 → 06 12 34 56 78) ; autre format gardé tel quel
   function formatTel(v) {
     let t = String(v == null ? "" : v).trim();
@@ -135,14 +139,15 @@ const FTSPersonnel = (() => {
         }
         return depuisCache(false);
       }
-      const res = await fetchAvecRetry(`${SHEETS_API}/${f.id}/values/${encodeURIComponent(ONGLET + "!A2:H")}`, { headers: authHeader() });
+      const res = await fetchAvecRetry(`${SHEETS_API}/${f.id}/values/${encodeURIComponent(ONGLET + "!A2:I")}`, { headers: authHeader() });
       if (!res.ok) throw new Error(`Lecture de la base personnel : ${res.status}`);
       const lignes = (await res.json()).values || [];
       etat = {
         personnes: lignes.filter((r) => r[0] || r[1]).map((r) => ({
           nom: majuscules(r[0]), prenom: majuscules(r[1]), categorie: majuscules(r[2]),
           poste: majuscules(r[3]), email: String(r[4] || "").trim().toLowerCase(), statut: majuscules(r[5]) || "ACTIF",
-          acces: lireAcces(r[6], majuscules(r[2])),
+          fonctionEnc: majuscules(r[2]) === "ENCADREMENT" ? "" : majuscules(r[8]),
+          acces: lireAcces(r[6], majuscules(r[2]), majuscules(r[2]) === "ENCADREMENT" ? "" : majuscules(r[8])),
           telephone: formatTel(r[7]),
         })),
         source: "sheet", spreadsheetId: f.id,
@@ -171,6 +176,7 @@ const FTSPersonnel = (() => {
       }
       if (p.categorie && !CATEGORIES.includes(p.categorie)) erreurs.push(`${nomComplet(p)} : catégorie inconnue.`);
       if (p.poste && !POSTES.includes(p.poste)) erreurs.push(`${nomComplet(p)} : poste inconnu.`);
+      if (p.fonctionEnc && !POSTES_ENCADREMENT.includes(p.fonctionEnc)) erreurs.push(`${nomComplet(p)} : fonction d'encadrement inconnue.`);
       if (!telValide(p.telephone)) erreurs.push(`Téléphone invalide pour ${nomComplet(p)} (ex : 06 12 34 56 78).`);
       if (!STATUTS.includes(p.statut)) erreurs.push(`${nomComplet(p)} : statut inconnu.`);
       if (p.categorie === "ENCADREMENT" && p.poste && !POSTES_ENCADREMENT.includes(p.poste)) erreurs.push(`${nomComplet(p)} : « ${p.poste} » n'est pas un poste d'encadrement.`);
@@ -184,7 +190,8 @@ const FTSPersonnel = (() => {
       nom: majuscules(p.nom), prenom: majuscules(p.prenom), categorie: majuscules(p.categorie),
       poste: majuscules(p.poste), email: String(p.email || "").trim().toLowerCase(), statut: majuscules(p.statut) || "ACTIF",
       telephone: formatTel(p.telephone),
-      acces: majuscules(p.categorie) === "ENCADREMENT" ? (ACCES.includes(p.acces) ? p.acces : "MODIFICATION") : "",
+      fonctionEnc: majuscules(p.categorie) === "ENCADREMENT" ? "" : majuscules(p.fonctionEnc),
+      acces: majuscules(p.categorie) === "ENCADREMENT" || p.fonctionEnc ? (ACCES.includes(p.acces) ? p.acces : "MODIFICATION") : "",
     };
   }
 
@@ -193,7 +200,7 @@ const FTSPersonnel = (() => {
     if (!res.ok) throw new Error(`Écriture de la base personnel : ${res.status}`);
     res = await fetchAvecRetry(`${SHEETS_API}/${spreadsheetId}/values/${encodeURIComponent(ONGLET + "!A1")}?valueInputOption=RAW`, {
       method: "PUT", headers: { ...authHeader(), "Content-Type": "application/json" },
-      body: JSON.stringify({ values: [EN_TETE, ...personnes.map((p) => [p.nom, p.prenom, p.categorie, p.poste, p.email, p.statut, p.categorie === "ENCADREMENT" ? ACCES_LIB[p.acces || "MODIFICATION"] : "", p.telephone || ""])] }),
+      body: JSON.stringify({ values: [EN_TETE, ...personnes.map((p) => [p.nom, p.prenom, p.categorie, p.poste, p.email, p.statut, aEncadrement(p) ? ACCES_LIB[p.acces || "MODIFICATION"] : "", p.telephone || "", p.fonctionEnc || ""])] }),
     });
     if (!res.ok) throw new Error(`Écriture de la base personnel : ${res.status}`);
   }
@@ -333,7 +340,7 @@ const FTSPersonnel = (() => {
   function toutes() { return etat.personnes.slice(); }
   // actifs() = personnel de chantier (tablette, pointage, rapport) : l'encadrement n'y est jamais
   function actifs() { return etat.personnes.filter((p) => p.statut === "ACTIF" && !estEncadrement(p)); }
-  function encadrement() { return etat.personnes.filter((p) => estEncadrement(p)); }
+  function encadrement() { return etat.personnes.filter((p) => aEncadrement(p)); }
   function chefs() { return actifs().filter((p) => p.poste === "CHEF DE CHANTIER"); }
   function parEmail(email) {
     const e = String(email || "").trim().toLowerCase();
@@ -346,7 +353,7 @@ const FTSPersonnel = (() => {
 
   return {
     formatTel, CATEGORIES, POSTES, POSTES_CHANTIER, POSTES_ENCADREMENT, ACCES, ACCES_LIB, STATUTS, DEFAUT, NOM_CLASSEUR,
-    encadrement, estEncadrement,
+    encadrement, estEncadrement, aEncadrement,
     charger, creer, enregistrer, verifier, publierListeTablette, manquantesDepuisAdresses, synchroniserPartages, toutes, actifs, chefs, parEmail, parNom, nomComplet, cle, majuscules,
     source: () => etat.source,
   };

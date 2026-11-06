@@ -555,6 +555,7 @@ html { font-size: 16px; }
         <div><label>Poste habituel</label><select id="psPoste"></select></div>
         <div><label>E-mail (compte Google)</label><input type="email" id="psMail" style="width:220px;text-transform:none"></div>
         <div><label>Téléphone</label><input type="tel" id="psTel" placeholder="06 12 34 56 78" style="width:140px"></div>
+        <div id="psFonctionBloc"><label>Aussi dans l'encadrement ?</label><select id="psFonction"></select></div>
         <div id="psAccesBloc" hidden><label>Accès Drive</label><select id="psAcces"></select></div>
         <div id="psAdrBloc" style="flex:1;min-width:220px"><label>Adresse 🔒</label><input type="text" id="psAdr" placeholder="N°, rue, code postal, ville" style="width:100%;text-transform:none"></div>
         <button type="button" id="psAjouterBtn" class="pm-btn">+ Ajouter</button>
@@ -1817,7 +1818,9 @@ document.addEventListener("DOMContentLoaded", () => {
 .ps-x { border: 0; background: none; font-size: 1.1rem; cursor: pointer; color: var(--text-sub); }
 .ps-md-b { padding: 16px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; overflow: auto; }
 .ps-md-b label { display: flex; flex-direction: column; gap: 5px; font-size: .74rem; font-weight: 700; color: var(--text-sub); }
-.ps-md-b label[hidden], #psAdrBloc[hidden], #psAccesBloc[hidden] { display: none; } .ps-md-b .ps-plein { grid-column: 1 / -1; }
+.ps-md-b label[hidden], #psAdrBloc[hidden], #psAccesBloc[hidden], #psFonctionBloc[hidden] { display: none; }
+.ps-aussi { display: block; font-size: 0.66rem; color: var(--text-sub); font-weight: 700; margin-top: 3px; white-space: nowrap; }
+.pm-btn.danger { white-space: nowrap; background: #fff; color: #C0392B; border: 1px solid #F1B5AE; } .ps-md-b .ps-plein { grid-column: 1 / -1; }
 .ps-md-b input, .ps-md-b select { padding: 10px 11px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: .9rem; color: var(--anthracite); background: #fff; }
 .ps-md-b input[type=email], .ps-md-b input[type=tel] { text-transform: none; }
 .ps-md-f { display: flex; gap: 10px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--border); } .ps-md-st { font-size: .8rem; color: var(--text-sub); }
@@ -1843,10 +1846,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const optsAcces = (sel) => FTSPersonnel.ACCES.map((a) => `<option value="${a}" ${a === (sel || "MODIFICATION") ? "selected" : ""}>${esc(FTSPersonnel.ACCES_LIB[a])}</option>`).join("");
   $("psCat").innerHTML = opts(FTSPersonnel.CATEGORIES, "MICROPIEUX");
   $("psAcces").innerHTML = optsAcces("MODIFICATION");
+  const optsFonction = (sel) => `<option value="">— Non —</option>` + FTSPersonnel.POSTES_ENCADREMENT.map((v) => `<option ${v === sel ? "selected" : ""}>${esc(v)}</option>`).join("");
+  $("psFonction").innerHTML = optsFonction("");
+  $("psFonction").addEventListener("change", () => majFormCat());
   function majFormCat() {
     const cat = $("psCat").value, garde = $("psPoste").value;
     $("psPoste").innerHTML = opts(postesPour(cat), postesPour(cat).includes(garde) ? garde : "", "— Aucun —");
-    $("psAccesBloc").hidden = cat !== "ENCADREMENT";
+    $("psFonctionBloc").hidden = cat === "ENCADREMENT";
+    $("psAccesBloc").hidden = !(cat === "ENCADREMENT" || $("psFonction").value);
     $("psAdrBloc").hidden = cat === "ENCADREMENT"; // pas d'adresse pour l'encadrement
   }
   $("psCat").addEventListener("change", majFormCat);
@@ -1884,8 +1891,9 @@ document.addEventListener("DOMContentLoaded", () => {
     $("psCats").innerHTML = ["TOUTES", "MICROPIEUX", "PIEUX", "ENCADREMENT"].map((c) => `<span class="pm-chip ${c === filtreCat ? "on" : ""}" data-c="${esc(c)}">${esc(c)}</span>`).join("");
     $("psCats").querySelectorAll(".pm-chip").forEach((el) => el.addEventListener("click", () => { filtreCat = el.dataset.c; afficher(); }));
     const enc = (p) => p.categorie === "ENCADREMENT";
+    const dansEnc = (p) => enc(p) || !!p.fonctionEnc; // encadrement seul ou chantier + fonction d'encadrement
     const liste = visibles.filter((p) =>
-      (filtreCat === "TOUTES" || p.categorie === filtreCat || (p.categorie === "LES DEUX" && filtreCat !== "ENCADREMENT")) &&
+      (filtreCat === "TOUTES" || (filtreCat === "ENCADREMENT" ? dansEnc(p) : p.categorie === filtreCat || p.categorie === "LES DEUX")) &&
       (!q || `${p.nom} ${p.prenom} ${p.email} ${(p.telephone || "").replace(/ /g, "")}`.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().includes(q)));
     $("psCompteur").textContent = `${liste.length} affichée(s) · ${personnes.filter((p) => p.statut === "ACTIF").length} actives`;
     // Personnes de la liste d'adresses pas encore dans la base
@@ -1896,29 +1904,34 @@ document.addEventListener("DOMContentLoaded", () => {
     $("psEmpty").hidden = liste.length > 0;
     if (!liste.length) $("psEmpty").textContent = "Personne ne correspond.";
     // Encadrement en tête (dans l'ordre des postes), puis le personnel de chantier
-    const rangPoste = (p) => { const i = FTSPersonnel.POSTES_ENCADREMENT.indexOf(p.poste); return i < 0 ? 99 : i; };
-    const lEnc = liste.filter(enc).sort((a, b) => rangPoste(a) - rangPoste(b) || (a.nom + a.prenom).localeCompare(b.nom + b.prenom, "fr"));
-    const lChantier = liste.filter((p) => !enc(p));
-    const rendu = (p) => ligneVue(p);
+    const rangPoste = (p) => { const i = FTSPersonnel.POSTES_ENCADREMENT.indexOf(p.fonctionEnc || p.poste); return i < 0 ? 99 : i; };
+    const lEnc = liste.filter(dansEnc).sort((a, b) => rangPoste(a) - rangPoste(b) || (a.nom + a.prenom).localeCompare(b.nom + b.prenom, "fr"));
+    const lChantier = filtreCat === "ENCADREMENT" ? [] : liste.filter((p) => !enc(p));
+    const rendu = (section) => (p) => ligneVue(p, section);
     const sep = (t) => `<tr class="ps-sep"><td colspan="10">${t}</td></tr>`;
     $("psTbody").innerHTML = (lEnc.length && lChantier.length)
-      ? sep("ENCADREMENT — jamais proposé sur la tablette, au pointage ni au stock") + lEnc.map(rendu).join("") + sep("PERSONNEL CHANTIER") + lChantier.map(rendu).join("")
-      : lEnc.concat(lChantier).map(rendu).join("");
+      ? sep("ENCADREMENT") + lEnc.map(rendu("enc")).join("") + sep("PERSONNEL CHANTIER") + lChantier.map(rendu("chantier")).join("")
+      : lEnc.map(rendu("enc")).join("") + lChantier.map(rendu("chantier")).join("");
     $("psTbody").querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); ouvrirEdition(b.dataset.edit); }));
     // Clic n'importe où sur la ligne (sauf sur un lien téléphone) = modifier
     if (modifiable) $("psTbody").querySelectorAll("tr[data-k]").forEach((tr) => tr.addEventListener("click", (e) => { if (!e.target.closest("a")) ouvrirEdition(tr.dataset.k); }));
   }
 
-  function ligneVue(p) {
+  function ligneVue(p, section) {
     const a = adresseDe(p);
+    // Personne de chantier avec une fonction d'encadrement : affichée dans les deux sections
+    const mixte = !!p.fonctionEnc && p.categorie !== "ENCADREMENT";
+    const posteAff = section === "enc" && mixte ? p.fonctionEnc : p.poste;
+    const aussi = mixte ? `<span class="ps-aussi">${section === "enc" ? "+ chantier : " + esc(p.poste || p.categorie) : "+ encadrement : " + esc(p.fonctionEnc)}</span>` : "";
+    const encLigne = p.categorie === "ENCADREMENT" || mixte;
     return `<tr data-k="${esc(cleP(p))}">
       <td><b>${esc(p.nom)}</b></td><td>${esc(p.prenom)}</td>
       <td>${p.categorie ? `<span class="ps-cat ${p.categorie.replace(" ", "-")}">${esc(p.categorie)}</span>` : '<span class="ps-cat" style="background:#FEF3E2;color:#B26A00">À COMPLÉTER</span>'}</td>
-      <td>${p.poste ? `<span class="ps-poste ${p.poste === "CHEF DE CHANTIER" ? "chef" : ""}">${esc(p.poste)}</span>` : '<span style="color:#bbb">—</span>'}</td>
+      <td>${posteAff ? `<span class="ps-poste ${posteAff === "CHEF DE CHANTIER" ? "chef" : ""}">${esc(posteAff)}</span>` : '<span style="color:#bbb">—</span>'}${aussi}</td>
       <td class="ps-mail">${esc(p.email) || '<span style="color:#bbb">—</span>'}</td>
       <td class="ps-tel">${p.telephone ? `<a href="tel:${esc(p.telephone.replace(/ /g, ""))}">📞 ${esc(p.telephone)}</a>` : '<span style="color:#bbb">—</span>'}</td>
-      <td class="ps-adr">${p.categorie === "ENCADREMENT" ? "" : a && a.adresse ? esc(a.adresse) : '<span style="color:#bbb">—</span>'}</td>
-      <td>${p.categorie === "ENCADREMENT" ? `<span class="ps-acc ${esc(p.acces || "MODIFICATION")}">${esc(FTSPersonnel.ACCES_LIB[p.acces || "MODIFICATION"]).toUpperCase()}</span>` : '<span style="color:#bbb" title="Accès selon le poste (chef de chantier : DOSSIER CHANTIER)">—</span>'}</td>
+      <td class="ps-adr">${p.categorie === "ENCADREMENT" || section === "enc" ? "" : a && a.adresse ? esc(a.adresse) : '<span style="color:#bbb">—</span>'}</td>
+      <td>${encLigne ? `<span class="ps-acc ${esc(p.acces || "MODIFICATION")}">${esc(FTSPersonnel.ACCES_LIB[p.acces || "MODIFICATION"]).toUpperCase()}</span>` : '<span style="color:#bbb" title="Accès selon le poste (chef de chantier : DOSSIER CHANTIER)">—</span>'}</td>
       <td><span class="pm-st ${p.statut === "ACTIF" ? "EN-SERVICE" : "VENDUE"}">${esc(p.statut)}</span></td>
       <td class="pm-act">${modifiable ? `<button type="button" data-edit="${esc(cleP(p))}">✏️ Modifier</button>` : ""}</td></tr>`;
   }
@@ -1939,26 +1952,49 @@ document.addEventListener("DOMContentLoaded", () => {
         <label>Poste habituel<select class="e-poste">${opts(postesPour(p.categorie), p.poste, "— Aucun —")}</select></label>
         <label>E-mail (compte Google)<input type="email" class="e-mail" value="${esc(p.email)}" placeholder="prenom.nom@…"></label>
         <label>Téléphone<input type="tel" class="e-tel" value="${esc(p.telephone || "")}" placeholder="06 12 34 56 78"></label>
-        <label class="e-acces-l" ${p.categorie === "ENCADREMENT" ? "" : "hidden"}>Accès Drive<select class="e-acces">${optsAcces(p.acces)}</select></label>
+        <label class="e-fonction-l" ${p.categorie === "ENCADREMENT" ? "hidden" : ""}>Aussi dans l'encadrement ?<select class="e-fonction">${optsFonction(p.fonctionEnc || "")}</select></label>
+        <label class="e-acces-l" ${p.categorie === "ENCADREMENT" || p.fonctionEnc ? "" : "hidden"}>Accès Drive<select class="e-acces">${optsAcces(p.acces)}</select></label>
         <label>Statut<select class="e-st">${opts(FTSPersonnel.STATUTS, p.statut)}</select></label>
         <label class="ps-plein e-adr-l" ${p.categorie === "ENCADREMENT" ? "hidden" : ""}>Adresse 🔒<input type="text" class="e-adr ps-adr-in" value="${esc(a ? a.adresse : "")}" placeholder="N°, rue, code postal, ville"></label>
       </div>
-      <div class="ps-md-f"><span class="ps-md-st"></span><span style="flex:1"></span><button type="button" class="pm-btn sec" data-annuler>Annuler</button><button type="button" class="pm-btn" data-ok>Enregistrer</button></div>
+      <div class="ps-md-f"><button type="button" class="pm-btn danger" data-suppr>🗑️ Supprimer</button><span class="ps-md-st"></span><span style="flex:1"></span><button type="button" class="pm-btn sec" data-annuler>Annuler</button><button type="button" class="pm-btn" data-ok>Enregistrer</button></div>
     </div>`;
     document.body.appendChild(ov);
     ov.dataset.ligne = k;
     ov.addEventListener("click", (e) => { if (e.target === ov) fermerEdition(); });
     ov.querySelectorAll("[data-annuler]").forEach((b) => b.addEventListener("click", fermerEdition));
     ov.querySelector("[data-ok]").addEventListener("click", () => enregistrerLigne(k));
-    const cat = ov.querySelector(".e-cat");
+    ov.querySelector("[data-suppr]").addEventListener("click", () => supprimerPersonne(k));
+    const cat = ov.querySelector(".e-cat"), fct = ov.querySelector(".e-fonction");
+    const majAccesFenetre = () => { ov.querySelector(".e-acces-l").hidden = !(cat.value === "ENCADREMENT" || fct.value); };
+    fct.addEventListener("change", majAccesFenetre);
     cat.addEventListener("change", () => {
       const po = ov.querySelector(".e-poste"), garde = po.value, l = postesPour(cat.value);
       po.innerHTML = opts(l, l.includes(garde) ? garde : "", "— Aucun —");
-      ov.querySelector(".e-acces-l").hidden = cat.value !== "ENCADREMENT";
+      ov.querySelector(".e-fonction-l").hidden = cat.value === "ENCADREMENT";
+      majAccesFenetre();
       ov.querySelector(".e-adr-l").hidden = cat.value === "ENCADREMENT";
     });
     ov.querySelectorAll("input.e-nom, input.e-prenom").forEach((el) => el.addEventListener("input", () => { const q = el.selectionStart; el.value = el.value.toUpperCase(); try { el.setSelectionRange(q, q); } catch (e) {} }));
     ov.querySelector(".e-nom").focus();
+  }
+  // Suppression : réservée aux erreurs / doublons. Quelqu'un qui quitte FTS passe en PARTI
+  // (ses accès Drive sont retirés, son historique reste). Une personne ACTIVE avec un e-mail
+  // doit d'abord passer en PARTI : sinon son e-mail deviendrait « inconnu » et garderait
+  // son accès à DOSSIER CHANTIER.
+  async function supprimerPersonne(k) {
+    const ov = document.getElementById("psEdit"), st = ov && ov.querySelector(".ps-md-st");
+    const p = personnes.find((x) => cleP(x) === k);
+    if (!p) return;
+    if (p.email && p.statut === "ACTIF") {
+      if (st) st.textContent = "⚠️ Passe d'abord le statut en PARTI et enregistre (ses accès Drive seront retirés), puis supprime.";
+      return;
+    }
+    if (!confirm(`Supprimer définitivement ${p.prenom} ${p.nom} de Personnel FTS ?\n\nPour quelqu'un qui quitte FTS, préfère le statut PARTI : l'historique reste.`)) return;
+    if (st) st.textContent = "Suppression…";
+    const a = adresseDe(p);
+    const ok = await sauver(personnes.filter((x) => cleP(x) !== k), `${p.prenom} ${p.nom} supprimé(e).`, a && adresses.spreadsheetId ? () => FTSSheets.supprimerAdresse(adresses.spreadsheetId, a.sheetRow) : null);
+    if (ok) fermerEdition(); else if (st) st.textContent = $("psStatus").textContent;
   }
   function fermerEdition() { const o = document.getElementById("psEdit"); if (o) o.remove(); }
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") fermerEdition(); });
@@ -2009,7 +2045,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!tr) return;
     const v = (c) => tr.querySelector(c).value;
     const ancienne = personnes.find((p) => cleP(p) === k);
-    const nouvelle = { nom: maj(v(".e-nom")), prenom: maj(v(".e-prenom")), categorie: v(".e-cat"), poste: v(".e-poste"), email: v(".e-mail"), statut: v(".e-st"), acces: v(".e-acces"), telephone: v(".e-tel") };
+    const nouvelle = { nom: maj(v(".e-nom")), prenom: maj(v(".e-prenom")), categorie: v(".e-cat"), poste: v(".e-poste"), email: v(".e-mail"), statut: v(".e-st"), acces: v(".e-acces"), telephone: v(".e-tel"), fonctionEnc: v(".e-cat") === "ENCADREMENT" ? "" : v(".e-fonction") };
     const adr = v(".e-adr").trim();
     const st = tr.querySelector(".ps-md-st"), ok = tr.querySelector("[data-ok]");
     st.textContent = "Enregistrement…"; ok.disabled = true;
@@ -2019,12 +2055,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   $("psAjouterBtn").addEventListener("click", async () => {
-    const p = { nom: maj($("psNom").value), prenom: maj($("psPrenom").value), categorie: $("psCat").value, poste: $("psPoste").value, email: $("psMail").value, statut: "ACTIF", acces: $("psAcces").value, telephone: $("psTel").value };
+    const p = { nom: maj($("psNom").value), prenom: maj($("psPrenom").value), categorie: $("psCat").value, poste: $("psPoste").value, email: $("psMail").value, statut: "ACTIF", acces: $("psAcces").value, telephone: $("psTel").value, fonctionEnc: $("psCat").value === "ENCADREMENT" ? "" : $("psFonction").value };
     if (!p.nom || !p.prenom) { $("psAjoutStatus").textContent = "⚠️ Nom et prénom obligatoires."; return; }
     $("psAjoutStatus").textContent = "";
     const adr = $("psAdr").value.trim();
     if (await sauver(personnes.concat([p]), `${p.prenom} ${p.nom} ajouté(e).`, p.categorie === "ENCADREMENT" ? null : () => enregistrerAdresse(null, p, adr))) {
-      ["psNom", "psPrenom", "psMail", "psTel", "psAdr"].forEach((id) => { $(id).value = ""; });
+      ["psNom", "psPrenom", "psMail", "psTel", "psAdr", "psFonction"].forEach((id) => { $(id).value = ""; }); majFormCat();
     }
   });
   $("psCreerBtn").addEventListener("click", async () => {

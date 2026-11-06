@@ -99,8 +99,8 @@ const FTSAcces = (() => {
   function listeEncadrement() {
     const personnes = window.FTSPersonnel ? FTSPersonnel.toutes() : [];
     const dansBase = new Set(personnes.filter((p) => p.email).map((p) => mail(p.email)));
-    const res = personnes.filter((p) => p.categorie === "ENCADREMENT" && p.statut === "ACTIF" && p.email && p.acces !== "AUCUN")
-      .map((p) => ({ nom: `${p.nom} ${p.prenom}`.trim(), poste: p.poste, email: mail(p.email), acces: p.acces === "LECTURE" ? "LECTURE" : "MODIFICATION", source: "personnel" }));
+    const res = personnes.filter((p) => (p.categorie === "ENCADREMENT" || p.fonctionEnc) && p.statut === "ACTIF" && p.email && p.acces !== "AUCUN")
+      .map((p) => ({ nom: `${p.nom} ${p.prenom}`.trim(), poste: p.fonctionEnc || p.poste, email: mail(p.email), acces: p.acces === "LECTURE" ? "LECTURE" : "MODIFICATION", source: "personnel" }));
     ((encadrement && encadrement.liste) || []).forEach((e) => {
       if (!dansBase.has(e.email) && !res.some((x) => x.email === e.email)) res.push({ ...e, poste: "", source: "ancienne" });
     });

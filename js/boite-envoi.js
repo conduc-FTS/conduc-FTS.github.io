@@ -156,22 +156,14 @@ const FTSBoiteEnvoi = (() => {
       // 1. PDF dans le dossier RAPPORT JOURNALIER du chantier
       if (!item.etapes.pdf) {
         const { id: dossierId } = await FTSDrive.getDossierModuleChantier(item.code, "RAPPORT JOURNALIER");
-        await FTSDrive.uploadFile(item.pdfBlob, item.fileName, "application/pdf", dossierId, { remplacerSiExiste: true });
+        // L'étiquette « FTS-CHEF » permet au robot de recopie de ranger une
+        // copie dans RAPPORTS PAR CHEF / chef / année / mois (primes).
+        await FTSDrive.uploadFile(item.pdfBlob, item.fileName, "application/pdf", dossierId, { remplacerSiExiste: true, description: item.nomChef ? `FTS-CHEF:${String(item.nomChef).trim().toUpperCase()}` : "" });
         item.etapes.pdf = true; await sauver(item);
       }
-      // 2. Archive dans ADMINISTRATIF / {chef} (une erreur n'empêche pas l'envoi)
-      if (!item.etapes.chef) {
-        try {
-          if (item.nomChef) {
-            const dossierChef = await FTSDrive.getDossierRapportChef(item.nomChef, String(item.dateISO).split("-")[0]);
-            await FTSDrive.uploadFile(item.pdfBlob, item.fileName, "application/pdf", dossierChef, { remplacerSiExiste: true });
-          }
-        } catch (e) {
-          if (estErreurReseau(e) || estErreurConnexion(e)) throw e;
-          item.avertissements.push("archivage ADMINISTRATIF non fait (" + e.message + ")");
-        }
-        item.etapes.chef = true; await sauver(item);
-      }
+      // 2. (supprimé) L'archive par chef n'est plus écrite par la tablette :
+      //    le robot de recopie Google la range dans RAPPORTS PAR CHEF.
+      if (!item.etapes.chef) { item.etapes.chef = true; await sauver(item); }
       // 3. Suivi du chantier (Sheets) : remplace les lignes de ce jour / atelier
       let racine = null;
       if (!item.etapes.suivi) {

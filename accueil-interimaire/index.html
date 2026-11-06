@@ -808,7 +808,17 @@ async function uploadToDrive(blob, fileName) {
   const date = document.getElementById('date').value;
   const annee = date ? date.split('-')[0] : new Date().getFullYear().toString();
 
-  const folderId = await FTSDrive.getDossierAnneeAccueilInterimaire(annee);
+  // Rangé dans le dossier du chantier (ACCUEIL INTERIMAIRE) : le robot de
+  // recopie Google en met une copie dans ACCUEIL INTERIMAIRE / année
+  // (encadrement). Sans chantier choisi : ancien emplacement central.
+  let folderId;
+  if (chantierActif && chantierActif.name) {
+    const i = chantierActif.name.search(/\s/);
+    const code = i > 0 ? chantierActif.name.slice(0, i) : chantierActif.name;
+    folderId = await FTSDrive.getDossierDepotChantier(code, 'ACCUEIL INTERIMAIRE');
+  } else {
+    folderId = await FTSDrive.getDossierAnneeAccueilInterimaire(annee);
+  }
   await FTSDrive.uploadFile(blob, fileName, 'application/pdf', folderId);
   showToast('✅ Fiche enregistrée sur Drive !', 'success');
 }

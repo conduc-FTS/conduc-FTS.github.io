@@ -713,7 +713,17 @@ async function archiverSurDrive(blob, fileName) {
 
   // Dossier par machine, retrouvé par son N° machine (stable même si le
   // nom chantier change), ex : « GE60-HUGO - GROUPE ÉLECTROGÈNE HUGO »
-  const folderId = await FTSDrive.getDossierMachineFicheMateriel(machineRef, ref.numero);
+  // Rangé dans le dossier du chantier (FICHE MATERIEL / machine) : le robot
+  // de recopie Google en met une copie dans FICHE MATERIEL / machine
+  // (encadrement). Sans chantier choisi : ancien emplacement central.
+  let folderId;
+  if (chantierActif && chantierActif.name) {
+    const i = chantierActif.name.search(/\s/);
+    const code = i > 0 ? chantierActif.name.slice(0, i) : chantierActif.name;
+    folderId = await FTSDrive.getDossierDepotChantier(code, 'FICHE MATERIEL', FTSDrive.nomDossierMachine(machineRef, ref.numero));
+  } else {
+    folderId = await FTSDrive.getDossierMachineFicheMateriel(machineRef, ref.numero);
+  }
   await FTSDrive.uploadFile(blob, fileName, 'application/pdf', folderId);
   return machineRef;
 }

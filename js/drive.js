@@ -665,6 +665,27 @@ const FTSDrive = (() => {
    *
    * @param {string} nomMachine  ex: "FUTURO N°1"
    */
+  /**
+   * Dossier de dépôt DANS LE CHANTIER (la tablette n'écrit plus que dans
+   * DOSSIER CHANTIER ; le robot de recopie Google range ensuite une copie
+   * dans les dossiers centraux de l'encadrement).
+   *   ACCUEIL INTERIMAIRE → {chantier}/ACCUEIL INTERIMAIRE
+   *   FICHE MATERIEL      → {chantier}/FICHE MATERIEL/{N° - nom machine}
+   * @returns {Promise<string>} id du dossier
+   */
+  async function getDossierDepotChantier(codeChantier, module, sousDossier) {
+    const chantier = await findChantierFolder(codeChantier);
+    if (!chantier) throw new Error(`Aucun dossier chantier trouvé pour le code "${codeChantier}".`);
+    const moduleId = await findOrCreateFolder(module, chantier.id);
+    return sousDossier ? findOrCreateFolder(sousDossier, moduleId) : moduleId;
+  }
+  /** Nom du dossier d'une machine : « {N°} - {nom} » (ou le nom seul). */
+  function nomDossierMachine(nomMachine, numeroMachine) {
+    const nom = String(nomMachine || "DIVERS").trim().toUpperCase();
+    const num = String(numeroMachine || "").trim().toUpperCase();
+    return num ? `${num} - ${nom}` : nom;
+  }
+
   async function getDossierMachineFicheMateriel(nomMachine, numeroMachine) {
     if (!nomMachine || !nomMachine.trim()) {
       throw new Error("Nom de machine requis pour archiver la fiche matériel.");
@@ -773,6 +794,8 @@ const FTSDrive = (() => {
     }
 
     const metadata = { name: fileName, parents: [folderId] };
+    // Description = étiquette lue par le robot de recopie (ex : « FTS-CHEF:HUGO LAJUS »)
+    if (options && options.description) metadata.description = options.description;
     const form = new FormData();
     form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
     form.append("file", blob);
@@ -982,6 +1005,8 @@ const FTSDrive = (() => {
     findChantierFolder,
     listChantiers,
     getDossierAnneeAccueilInterimaire,
+    getDossierDepotChantier,
+    nomDossierMachine,
     getDossierModuleChantier,
     getDossierMachineFicheMateriel,
     findOrCreateFolder,

@@ -436,12 +436,39 @@ const FTSPreparation = (() => {
     const texte = await FTSDrive.downloadFileText(fichiers[0].id);
     try { return texte ? JSON.parse(texte) : null; } catch (e) { throw new Error("Le fichier de préparation est illisible."); }
   }
+  /**
+   * Résumé de la fiche, rangé dans les métadonnées du dossier chantier : la
+   * liste « Préparation » de la Supervision l'affiche sans ouvrir chaque fiche.
+   */
+  function resume(prep) {
+    const p = prep || {};
+    const inf = p.infos || {}, ma = p.materiel || {};
+    return {
+      etat: p.envoi && p.envoi.indice ? (p.envoi.modifieApres ? "modifiee" : "envoyee") : "encours",
+      indice: p.indice === "" || p.indice == null ? "" : p.indice,
+      dateConnue: !!inf.dateConnue, date: inf.dateConnue ? inf.date || "" : "",
+      chef: (p.equipe && p.equipe.chef) || "", conducteur: inf.conducteur || "",
+      nbPieux: ((p.ndc && p.ndc.pieux) || []).length, foreuse: ma.foreuse || "",
+      envoi: p.envoi ? { indice: p.envoi.indice || "", le: p.envoi.le || "" } : null,
+      majLe: p.majLe || "",
+    };
+  }
   async function enregistrer(chantierId, prep) {
     const dossierId = await dossierPreparation(chantierId);
     const data = { ...prep, majLe: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
     await FTSDrive.uploadFile(blob, NOM_FICHIER, "application/json", dossierId, { remplacerSiExiste: true });
-    return data;
+    // Résumé dans les métadonnées du chantier (non bloquant : la fiche est déjà enregistrée)
+    let meta = null;
+    try {
+      meta = await FTSDrive.getMetadonneesChantier(chantierId);
+      meta = { ...meta, preparation: resume(data) };
+      await FTSDrive.setMetadonneesChantier(chantierId, meta);
+    } catch (e) {
+      console.warn("Résumé de la préparation non écrit dans le chantier :", e);
+      meta = null;
+    }
+    return { data, meta };
   }
 
   return {
@@ -450,7 +477,7 @@ const FTSPreparation = (() => {
     tubesAcceptes, decoupe, texteDecoupe, pieuVide, longueurRetenue, coiffePlatine, sectionPlatine,
     calculer, cleArticle, diametresPresents, tubesFiche,
     analyserCollage, lirePieux, fusionner,
-    nouvellePreparation, normaliser, lire, enregistrer,
+    nouvellePreparation, normaliser, lire, enregistrer, resume,
   };
 })();
 

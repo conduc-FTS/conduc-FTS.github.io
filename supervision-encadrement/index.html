@@ -103,6 +103,16 @@ html { font-size: 16px; }
 .sv-nav .ic { width: 20px; text-align: center; flex-shrink: 0; }
 .sv-nav button.active { background: var(--fts-yellow); color: var(--anthracite); }
 .sv-nav button:hover:not(.active), .sv-nav a:hover { background: rgba(255,255,255,0.07); }
+.sv-pill { margin-left: auto; background: #C0392B; color: #fff; font-size: 0.68rem; font-weight: 800; border-radius: 10px; padding: 1px 7px; }
+.sv-pill[hidden] { display: none; }
+.pp-kpis { --nk: 4; }
+.pp-kpis .sv-kpi.clic { cursor: pointer; }
+.pp-et { font-weight: 800; font-size: 0.72rem; padding: 3px 9px; border-radius: 6px; white-space: nowrap; display: inline-block; }
+.pp-et.afaire { background: #FDECEA; color: #C0392B; } .pp-et.encours { background: #FFF3DC; color: #A15C00; }
+.pp-et.envoyee { background: #EAF6EE; color: #1D6E3E; } .pp-et.modifiee { background: #EAF1FE; color: #2A5DBF; }
+.pp-note { display: block; font-size: 0.72rem; color: var(--text-sub); margin-top: 3px; }
+.pp-def { font-weight: 800; color: #A15C00; }
+#ppTbody tr { cursor: pointer; } #ppTbody tr:hover td { background: #FAFBFC; }
 .sv-acct { border-top: 1px solid rgba(255,255,255,0.08); padding: 14px 14px; display: flex; gap: 10px; align-items: center; }
 .sv-av {
   width: 34px; height: 34px; border-radius: 50%; background: var(--fts-yellow); color: var(--anthracite);
@@ -360,6 +370,10 @@ html { font-size: 16px; }
     <div class="sv-grp">PILOTAGE</div>
     <button type="button" class="se-nav-btn active" data-view="se-view-overview"><span class="ic">📊</span>Vue d'ensemble</button>
     <button type="button" class="se-nav-btn" data-view="se-view-stats"><span class="ic">📈</span>Statistiques</button>
+    <div class="sv-grp">CHANTIERS</div>
+    <button type="button" class="se-nav-btn" data-view="se-view-preparation"><span class="ic">📋</span>Préparation<span class="sv-pill" id="navPrepaPill" hidden></span></button>
+    <button type="button" class="se-nav-btn" data-view="se-view-archives"><span class="ic">🗄️</span>Archives</button>
+    <button type="button" class="se-nav-btn" data-view="se-view-documents"><span class="ic">📁</span>Documents</button>
     <div class="sv-grp">POINTAGES</div>
     <a href="../recap-hebdo/index.html?type=materiel"><span class="ic">🔧</span>Matériel</a>
     <a href="../recap-hebdo/index.html?type=personnel"><span class="ic">👷</span>Personnel</a>
@@ -367,9 +381,6 @@ html { font-size: 16px; }
     <button type="button" class="se-nav-btn" data-view="se-view-personnel"><span class="ic">👥</span>Personnel FTS</button>
     <button type="button" class="se-nav-btn" data-view="se-view-parc"><span class="ic">🚜</span>Parc matériel</button>
     <button type="button" class="se-nav-btn" data-view="se-view-acces"><span class="ic">🔐</span>Accès Drive</button>
-    <div class="sv-grp">CHANTIERS</div>
-    <button type="button" class="se-nav-btn" data-view="se-view-archives"><span class="ic">🗄️</span>Archives</button>
-    <button type="button" class="se-nav-btn" data-view="se-view-documents"><span class="ic">📁</span>Documents</button>
   </nav>
   <div class="sv-acct">
     <div class="sv-av" id="userAvatar">?</div>
@@ -687,6 +698,39 @@ html { font-size: 16px; }
     </div>
   </div>
 
+  <!-- ─── PRÉPARATION DE CHANTIER ─────────────────────────── -->
+  <div class="se-view" id="se-view-preparation">
+    <div class="sv-kpis pp-kpis">
+      <div class="sv-kpi clic" data-ppf="afaire"><div class="ico">📝</div><div><div class="l">À faire</div><div class="v" id="ppKAfaire">—</div><div class="s">chantier créé, pas de fiche</div></div></div>
+      <div class="sv-kpi clic" data-ppf="encours"><div class="ico">✏️</div><div><div class="l">En cours</div><div class="v" id="ppKEncours">—</div><div class="s">fiche commencée, pas envoyée</div></div></div>
+      <div class="sv-kpi clic" data-ppf="modifiee"><div class="ico">🔁</div><div><div class="l">À renvoyer</div><div class="v" id="ppKModifiee">—</div><div class="s">modifiée après envoi</div></div></div>
+      <div class="sv-kpi clic" data-ppf="sansdate"><div class="ico">📅</div><div><div class="l">Date à définir</div><div class="v" id="ppKSansdate">—</div><div class="s">intervention non planifiée</div></div></div>
+    </div>
+    <section class="sv-panel">
+      <div class="sv-ph">
+        <h2>Chantiers à préparer</h2>
+        <div class="sv-seg" id="ppFiltres">
+          <button type="button" data-f="tous" class="on">Tous</button>
+          <button type="button" data-f="afaire">À faire</button>
+          <button type="button" data-f="encours">En cours</button>
+          <button type="button" data-f="modifiee">À renvoyer</button>
+          <button type="button" data-f="envoyee">Envoyées</button>
+        </div>
+        <span class="sv-sp"></span>
+        <input type="text" id="ppRecherche" placeholder="🔍 Chantier, chef…" style="border:1px solid var(--border);border-radius:9px;padding:8px 10px;font-size:.84rem;width:200px;font-family:inherit">
+        <label class="sv-chk"><input type="checkbox" id="ppMiens"> Mes chantiers</label>
+      </div>
+      <div class="se-table-scroll">
+        <table class="sv-table">
+          <thead><tr><th>Chantier</th><th>Intervention</th><th>Chef</th><th class="r">Pieux NDC</th><th>Fiche</th><th>Dernier envoi</th><th>Conducteur</th><th></th></tr></thead>
+          <tbody id="ppTbody"></tbody>
+        </table>
+      </div>
+      <div class="se-empty-state" id="ppEmpty" hidden></div>
+      <div class="sv-foot" id="ppPied">Chantiers micropieux / battage non terminés · un chantier sort de la liste quand il passe au statut Terminé.</div>
+    </section>
+  </div>
+
   <!-- ─── ARCHIVES ────────────────────────────────────────── -->
   <div class="se-view" id="se-view-archives">
     <div class="se-page-title">Archives</div>
@@ -783,7 +827,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ─── Navigation (barre latérale + barre d'onglets mobile) ─────────
   const TITRES_VUES = {
-    "se-view-overview": "Vue d'ensemble", "se-view-stats": "Statistiques", "se-view-personnel": "Personnel FTS",
+    "se-view-overview": "Vue d'ensemble", "se-view-stats": "Statistiques", "se-view-preparation": "Préparation de chantier", "se-view-personnel": "Personnel FTS",
     "se-view-parc": "Parc matériel", "se-view-acces": "Accès Drive", "se-view-archives": "Archives", "se-view-documents": "Documents", "se-view-adresses": "Adresses Personnel",
   };
 
@@ -805,6 +849,7 @@ document.addEventListener("DOMContentLoaded", () => {
     $("searchBox").style.visibility = id === "se-view-overview" ? "visible" : "hidden";
     if (id === "se-view-overview") afficherVueEnsemble();
     if (id === "se-view-archives") chargerArchives();
+    if (id === "se-view-preparation") chargerPreparation();
     if (id === "se-view-stats") chargerStatsAvancement();
     if (id === "se-view-adresses") chargerAdresses();
     if (id === "se-view-acces" && window.FTSAcces) FTSAcces.monter($("accesDrive"));
@@ -923,12 +968,14 @@ document.addEventListener("DOMContentLoaded", () => {
       FTSAuth.getUserInfo().then((info) => {
         if (!info) return;
         $("userName").textContent = info.name || "Connecté";
+        nomUtilisateur = info.name || "";
         $("userLabel").textContent = info.email || "";
         const ini = (info.name || info.email || "?").split(/[\s.@]+/).filter(Boolean).slice(0, 2).map((m) => m[0].toUpperCase()).join("");
         av.textContent = ini || "?";
       }).catch(() => {});
       const vueActive = document.querySelector(".se-view.active");
       if (vueActive && vueActive.id === "se-view-overview") chargerVueEnsemble();
+      if (vueActive && vueActive.id === "se-view-preparation") chargerPreparation();
     }
   }
 
@@ -1113,6 +1160,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const toutes = construireLignes(donnees);
     majKpis(toutes);
+    try { majPastillePrepa(lignesPreparation(donnees)); } catch (e) {}
     const lignes = lignesFiltrees(toutes);
 
     const cles = {
@@ -1161,6 +1209,106 @@ document.addEventListener("DOMContentLoaded", () => {
     const tr = e.target.closest("tr[data-id]");
     if (!tr) return;
     window.location.href = `../detail-chantier/index.html?id=${encodeURIComponent(tr.dataset.id)}&name=${encodeURIComponent(tr.dataset.name)}`;
+  });
+
+  // ─── Préparation de chantier ─────────────────────────────────────
+  // État de chaque fiche lu dans le résumé rangé par la page Préparation
+  // dans les métadonnées du chantier (meta.preparation) : aucune lecture
+  // supplémentaire, mêmes données que la Vue d'ensemble.
+  let nomUtilisateur = "";
+  let ppFiltre = "tous";
+  const ETATS_PREPA = { afaire: "À faire", encours: "En cours", envoyee: "Envoyée", modifiee: "Modifiée après envoi" };
+  const clePersonne = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().split(/[\s.]+/).filter(Boolean).sort().join(" ");
+  function lignesPreparation(d) {
+    return d.chantiers.filter((c) => {
+      const meta = c.meta || {};
+      const tech = FTSDrive.techniquesChantier(meta);
+      return meta.statutChantier !== "Termine" && (tech.includes("Micropieux") || tech.includes("Battage"));
+    }).map((c) => {
+      const meta = c.meta || {};
+      const r = meta.preparation || null;
+      const sp = c.name.search(/\s/);
+      const etat = r ? r.etat || "encours" : "afaire";
+      const manque = [];
+      if (r) {
+        if (!r.nbPieux) manque.push("NDC à coller");
+        if (!r.foreuse) manque.push("foreuse à choisir");
+        if (!r.chef) manque.push("chef à choisir");
+      }
+      const date = r && r.dateConnue && r.date ? new Date(r.date + "T00:00:00") : null;
+      return {
+        id: c.id, nomComplet: c.name, code: sp > 0 ? c.name.slice(0, sp) : c.name, nom: sp > 0 ? c.name.slice(sp + 1) : c.name,
+        etat, r, date, note: manque.join(" · "),
+      };
+    }).sort((a, b) => (a.date && b.date ? a.date - b.date : a.date ? -1 : b.date ? 1 : a.code.localeCompare(b.code, "fr", { numeric: true })));
+  }
+  function majPastillePrepa(lignes) {
+    const n = lignes.filter((l) => l.etat === "afaire").length;
+    const pill = $("navPrepaPill");
+    pill.hidden = !n; pill.textContent = n;
+    try { localStorage.setItem("fts_prepa_a_faire", String(n)); } catch (e) {}
+  }
+  function afficherPreparation() {
+    const tbody = $("ppTbody"), empty = $("ppEmpty");
+    if (!donnees) {
+      tbody.innerHTML = Array.from({ length: 4 }, () => `<tr class="sv-skel">${"<td><div></div></td>".repeat(8)}</tr>`).join("");
+      empty.hidden = true;
+      return;
+    }
+    const toutes = lignesPreparation(donnees);
+    majPastillePrepa(toutes);
+    $("ppKAfaire").textContent = toutes.filter((l) => l.etat === "afaire").length;
+    $("ppKEncours").textContent = toutes.filter((l) => l.etat === "encours").length;
+    $("ppKModifiee").textContent = toutes.filter((l) => l.etat === "modifiee").length;
+    $("ppKSansdate").textContent = toutes.filter((l) => !l.date).length;
+    document.querySelectorAll("#ppFiltres button").forEach((b) => b.classList.toggle("on", b.dataset.f === ppFiltre));
+    const q = $("ppRecherche").value.trim().toLowerCase();
+    const moi = $("ppMiens").checked ? clePersonne(nomUtilisateur) : "";
+    const lignes = toutes.filter((l) => {
+      if (ppFiltre === "sansdate" ? !!l.date : ppFiltre !== "tous" && l.etat !== ppFiltre) return false;
+      if (moi && l.r && l.r.conducteur && clePersonne(l.r.conducteur) !== moi) return false;
+      if (q && !`${l.code} ${l.nom} ${l.r ? l.r.chef : ""} ${l.r ? l.r.conducteur : ""}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+    empty.hidden = lignes.length > 0;
+    if (!lignes.length) empty.textContent = toutes.length ? "Aucun chantier ne correspond à ce filtre." : "Aucun chantier micropieux en cours.";
+    const fmtD = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+    tbody.innerHTML = lignes.map((l) => {
+      const r = l.r;
+      const url = `../preparation/index.html?id=${encodeURIComponent(l.id)}&name=${encodeURIComponent(l.nomComplet)}`;
+      const envoi = r && r.envoi && r.envoi.indice ? `Ind ${escapeHtmlSE(r.envoi.indice)}${r.envoi.le ? " · " + escapeHtmlSE(new Date(r.envoi.le).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })) : ""}` : "—";
+      return `<tr data-url="${escapeHtmlSE(url)}">
+        <td class="c-nom"><span class="sv-code">${escapeHtmlSE(l.code)}</span><span class="sv-nom">${escapeHtmlSE(l.nom)}</span></td>
+        <td>${l.date ? `<b>${fmtD(l.date)}</b>` : '<span class="pp-def">À DÉFINIR</span>'}</td>
+        <td class="sv-chef">${escapeHtmlSE((r && r.chef) || "—")}</td>
+        <td class="r">${r && r.nbPieux ? r.nbPieux : "—"}</td>
+        <td><span class="pp-et ${l.etat}">${ETATS_PREPA[l.etat] || l.etat}</span>${l.note ? `<span class="pp-note">${escapeHtmlSE(l.note)}</span>` : ""}</td>
+        <td style="white-space:nowrap">${envoi}</td>
+        <td style="color:var(--text-sub)">${escapeHtmlSE((r && r.conducteur) || "—")}</td>
+        <td class="r"><a class="sv-btn ${l.etat === "afaire" ? "pri" : ""}" style="padding:6px 12px;font-size:.8rem;text-decoration:none" href="${escapeHtmlSE(url)}">${l.etat === "afaire" ? "Créer la fiche" : "Ouvrir"}</a></td>
+      </tr>`;
+    }).join("");
+  }
+  async function chargerPreparation(forcer = false) {
+    afficherPreparation();
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
+      if (!donnees) { $("ppTbody").innerHTML = ""; $("ppEmpty").hidden = false; $("ppEmpty").textContent = "Connecte-toi pour afficher les chantiers."; }
+      return;
+    }
+    try { await obtenirDonnees(forcer); afficherPreparation(); }
+    catch (err) {
+      console.error("Préparation :", err);
+      if (!donnees) { $("ppTbody").innerHTML = ""; $("ppEmpty").hidden = false; $("ppEmpty").textContent = `Erreur : ${err.message}`; }
+    }
+  }
+  document.querySelectorAll("#ppFiltres button").forEach((b) => b.addEventListener("click", () => { ppFiltre = b.dataset.f; afficherPreparation(); }));
+  document.querySelectorAll("#se-view-preparation [data-ppf]").forEach((k) => k.addEventListener("click", () => { ppFiltre = k.dataset.ppf; afficherPreparation(); }));
+  $("ppRecherche").addEventListener("input", afficherPreparation);
+  $("ppMiens").addEventListener("change", afficherPreparation);
+  $("ppTbody").addEventListener("click", (e) => {
+    if (e.target.closest("a")) return;
+    const tr = e.target.closest("tr[data-url]");
+    if (tr) window.location.href = tr.dataset.url;
   });
 
   async function chargerVueEnsemble(forcer = false) {

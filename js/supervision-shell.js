@@ -23,6 +23,10 @@ const FTSShell = (() => {
     { grp: "PILOTAGE" },
     { id: "se-view-overview", ic: "📊", label: "Vue d'ensemble", href: SUP },
     { id: "se-view-stats", ic: "📈", label: "Statistiques", href: SUP + "#se-view-stats" },
+    { grp: "CHANTIERS" },
+    { id: "se-view-preparation", ic: "📋", label: "Préparation", href: SUP + "#se-view-preparation", pastille: "fts_prepa_a_faire" },
+    { id: "se-view-archives", ic: "🗄️", label: "Archives", href: SUP + "#se-view-archives" },
+    { id: "se-view-documents", ic: "📁", label: "Documents", href: SUP + "#se-view-documents" },
     { grp: "POINTAGES" },
     { id: "materiel", ic: "🔧", label: "Matériel", href: "../recap-hebdo/index.html?type=materiel" },
     { id: "personnel", ic: "👷", label: "Personnel", href: "../recap-hebdo/index.html?type=personnel" },
@@ -30,10 +34,14 @@ const FTSShell = (() => {
     { id: "se-view-personnel", ic: "👥", label: "Personnel FTS", href: SUP + "#se-view-personnel" },
     { id: "se-view-parc", ic: "🚜", label: "Parc matériel", href: SUP + "#se-view-parc" },
     { id: "se-view-acces", ic: "🔐", label: "Accès Drive", href: SUP + "#se-view-acces" },
-    { grp: "CHANTIERS" },
-    { id: "se-view-archives", ic: "🗄️", label: "Archives", href: SUP + "#se-view-archives" },
-    { id: "se-view-documents", ic: "📁", label: "Documents", href: SUP + "#se-view-documents" },
   ];
+  // Pastille (ex : nombre de fiches de préparation à faire), mémorisée par la Supervision
+  function pastille(cle) {
+    if (!cle) return "";
+    let n = 0;
+    try { n = Number(localStorage.getItem(cle) || 0); } catch (e) {}
+    return n > 0 ? `<span class="sv-pill">${n}</span>` : "";
+  }
 
   let opts = {};
 
@@ -62,7 +70,7 @@ const FTSShell = (() => {
     const page = document.getElementById("svPage");
     const nav = MENU.map((m) => m.grp
       ? `<div class="sv-grp">${m.grp}</div>`
-      : `<a href="${m.href}" class="${m.id === opts.actif ? "active" : ""}"><span class="ic">${m.ic}</span>${m.label}</a>`).join("");
+      : `<a href="${m.href}" class="${m.id === opts.actif ? "active" : ""}"><span class="ic">${m.ic}</span>${m.label}${pastille(m.pastille)}</a>`).join("");
 
     const sidebar = document.createElement("aside");
     sidebar.className = "sv-sidebar";

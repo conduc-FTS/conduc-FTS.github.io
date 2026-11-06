@@ -295,12 +295,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const detailUrl = `../detail-chantier/index.html?id=${encodeURIComponent(chantierId || "")}&name=${encodeURIComponent(chantierName)}`;
   FTSShell.monter({
-    actif: "se-view-overview",
-    crumb: `<a href="../supervision-encadrement/index.html">← Vue d'ensemble</a> &nbsp;›&nbsp; <a href="${detailUrl}">${esc(code)}</a> &nbsp;›&nbsp; Préparation`,
+    actif: "se-view-preparation",
+    crumb: `<a href="../supervision-encadrement/index.html#se-view-preparation">← Préparation</a> &nbsp;›&nbsp; <a href="${detailUrl}">${esc(code)}</a>`,
     titre: `<span class="code">${esc(code)}</span>Fiche de préparation`,
     titreMobile: "Fiche de préparation",
     sousTitreMobile: esc(code),
-    retour: detailUrl,
+    retour: "../supervision-encadrement/index.html#se-view-preparation",
     actions: `<span class="pr-save" id="etatSave"></span><button type="button" class="sv-btn pri" id="btnEnregistrer" disabled>💾 Enregistrer</button>`,
     menuMobile: [{ label: "💾 Enregistrer", action: () => enregistrer() }],
     onSession: (c) => { if (c) charger(); else if (!pret) $("prStatus").textContent = "Connecte-toi pour ouvrir la préparation."; },
@@ -398,8 +398,9 @@ document.addEventListener("DOMContentLoaded", () => {
     $("btnEnregistrer").disabled = true;
     $("etatSave").textContent = "Enregistrement…";
     try {
-      const r = await P.enregistrer(chantierId, prep);
+      const { data: r, meta: m } = await P.enregistrer(chantierId, prep);
       prep.majLe = r.majLe;
+      if (m) { meta = m; majCacheSupervision(m); }
       sale = false;
       $("etatSave").textContent = `Enregistrée le ${new Date(r.majLe).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}`;
       $("etatSave").classList.remove("sale");
@@ -409,6 +410,15 @@ document.addEventListener("DOMContentLoaded", () => {
     } finally { $("btnEnregistrer").disabled = false; }
   }
   $("btnEnregistrer").addEventListener("click", enregistrer);
+  // Met à jour ce chantier dans la copie locale de la Supervision (liste Préparation à jour au retour)
+  function majCacheSupervision(m) {
+    try {
+      const cle = "fts_supervision_cache_v1";
+      const d = JSON.parse(localStorage.getItem(cle) || "null");
+      const ch = d && Array.isArray(d.chantiers) ? d.chantiers.find((x) => x.id === chantierId) : null;
+      if (ch) { ch.meta = { ...(ch.meta || {}), preparation: m.preparation }; localStorage.setItem(cle, JSON.stringify(d)); }
+    } catch (e) {}
+  }
 
   // ─── Listes (Parc, Personnel) ──────────────────────────────────
   function options(liste, sel, vide) {

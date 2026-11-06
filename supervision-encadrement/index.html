@@ -314,6 +314,26 @@ html { font-size: 16px; }
   .se-kpi-row { grid-template-columns: 1fr 1fr; }
   .se-table-scroll { overflow-x: auto; }
 }
+
+/* ─── Accès Drive (js/acces-drive.js) ─── */
+.ad-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;margin-bottom:16px;align-items:start}
+@media (max-width:1200px){.ad-grid{grid-template-columns:1fr}}
+.ad-h{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap}.ad-h h2{margin:0;font-size:1rem}.ad-h .s{color:var(--text-sub);font-size:.78rem}.ad-sp{flex:1}
+.ad-b{padding:14px 20px}
+.ad-t{width:100%;border-collapse:collapse;font-size:.85rem}.ad-t th{font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-sub);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border)}.ad-t td{padding:9px 10px;border-bottom:1px solid #EEF0F3;vertical-align:middle}.ad-t tr:last-child td{border-bottom:0}
+.ad-r{display:inline-block;border-radius:10px;padding:2px 9px;font-size:.7rem;font-weight:800;white-space:nowrap}.r-mod{background:#E6F4EA;color:#1E8E4E}.r-lec{background:#E8F0FE;color:#2457C5}.r-non{background:#F1F2F4;color:#9AA0AA}.r-perso{background:#FFF4DB;color:#9A6500}
+.ad-dot{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:8px;vertical-align:-1px}
+.ad-btn{border:1px solid var(--border);background:#fff;border-radius:8px;padding:6px 10px;font-weight:700;font-size:.8rem;cursor:pointer;font-family:inherit}.ad-btn.pri{background:var(--fts-yellow);border-color:var(--fts-yellow)}.ad-btn:disabled{opacity:.6}
+.ad-in{border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:.82rem;font-family:inherit;min-width:0;width:100%;box-sizing:border-box}
+.ad-form{display:grid;grid-template-columns:1fr 1.3fr auto auto;gap:8px;margin-top:12px}
+.ad-st{font-size:.8rem;color:var(--text-sub);margin-top:8px;min-height:1em}
+.ad-sub{color:var(--text-sub);font-size:.78rem}
+.ad-ok,.ad-warn,.ad-alert,.ad-info{border-radius:10px;padding:11px 14px;font-size:.83rem;line-height:1.55;margin-bottom:10px}
+.ad-ok{background:#EAF6EE}.ad-warn{background:#FFF4DB}.ad-alert{background:#FDECEA}.ad-info{background:#F1F5FD}
+.ad-alert ul,.ad-info ul{margin:6px 0 6px 18px;padding:0}
+.ad-note{font-size:.76rem;color:var(--text-sub);padding:10px 20px;border-top:1px solid var(--border);background:#FAFAFB;line-height:1.5}
+.ad-vide{padding:16px 20px;color:var(--text-sub)}
+.ad-verrou{max-width:560px;margin:40px auto;text-align:center;padding:34px 30px}.ad-verrou h2{margin:8px 0 10px;font-size:20px}.ad-verrou p{color:#4B5563;font-size:14px;line-height:1.5;margin:6px 0}.ad-verrou-ic{font-size:44px}
 </style>
 <style>
 /* ─── Téléphone : version allégée (consultation) ─────────────────
@@ -346,6 +366,7 @@ html { font-size: 16px; }
     <div class="sv-grp">RÉFÉRENTIELS</div>
     <button type="button" class="se-nav-btn" data-view="se-view-personnel"><span class="ic">👥</span>Personnel FTS</button>
     <button type="button" class="se-nav-btn" data-view="se-view-parc"><span class="ic">🚜</span>Parc matériel</button>
+    <button type="button" class="se-nav-btn" data-view="se-view-acces"><span class="ic">🔐</span>Accès Drive</button>
     <div class="sv-grp">CHANTIERS</div>
     <button type="button" class="se-nav-btn" data-view="se-view-archives"><span class="ic">🗄️</span>Archives</button>
   </nav>
@@ -566,6 +587,12 @@ html { font-size: 16px; }
     </div>
   </div>
 
+  <!-- ─── ACCÈS DRIVE (js/acces-drive.js) ──────────────────────── -->
+  <div class="se-view" id="se-view-acces">
+    <div class="se-page-title">Accès Drive</div>
+    <div id="accesDrive"></div>
+  </div>
+
   <!-- ─── PARC MATÉRIEL ─────────────────────────────────────── -->
   <div class="se-view" id="se-view-parc">
     <div class="se-page-title">Parc matériel</div>
@@ -693,6 +720,7 @@ html { font-size: 16px; }
 <script src="../js/calendar.js"></script>
 <script src="../js/parc-materiel.js"></script>
 <script src="../js/personnel.js"></script>
+<script src="../js/acces-drive.js"></script>
 <script src="../js/ateliers.js"></script>
 <script src="../js/statistiques.js"></script>
 <script>
@@ -722,7 +750,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ─── Navigation (barre latérale + barre d'onglets mobile) ─────────
   const TITRES_VUES = {
     "se-view-overview": "Vue d'ensemble", "se-view-stats": "Statistiques", "se-view-personnel": "Personnel FTS",
-    "se-view-parc": "Parc matériel", "se-view-archives": "Archives", "se-view-adresses": "Adresses Personnel",
+    "se-view-parc": "Parc matériel", "se-view-acces": "Accès Drive", "se-view-archives": "Archives", "se-view-adresses": "Adresses Personnel",
   };
 
   function fermerMenuMobile() { document.body.classList.remove("menu-ouvert"); }
@@ -743,6 +771,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (id === "se-view-archives") chargerArchives();
     if (id === "se-view-stats") chargerStatsAvancement();
     if (id === "se-view-adresses") chargerAdresses();
+    if (id === "se-view-acces" && window.FTSAcces) FTSAcces.monter($("accesDrive"));
     fermerMenuMobile();
     window.scrollTo(0, 0);
   }
@@ -1881,19 +1910,14 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (e) { $("psStatus").textContent = "❌ " + e.message; return false; }
   }
 
-  // Accès Drive selon la base : DOSSIER CHANTIER pour les chefs actifs,
-  // REFERENTIEL réservé à l'encadrement (voir FTSPersonnel.synchroniserPartages)
-  function texteAcces(b) {
-    const morceaux = [];
-    if (b.ajoutes.length) morceaux.push(`accès DOSSIER CHANTIER donné à ${b.ajoutes.join(", ")}`);
-    if (b.retires.length) morceaux.push(`accès retiré : ${b.retires.join(", ")}`);
-    if (b.erreurs.length) morceaux.push(`⚠️ partage impossible pour ${b.erreurs.join(", ")}`);
-    return `DOSSIER CHANTIER partagé avec ${b.total} chef(s) · REFERENTIEL réservé à l'encadrement` + (morceaux.length ? " — " + morceaux.join(" ; ") + "." : ".");
-  }
+  // Accès Drive (js/acces-drive.js) : mis à jour à chaque enregistrement et
+  // à chaque ouverture de Personnel FTS ; le détail est dans « Accès Drive ».
   async function majAcces(message) {
     try {
-      const b = await FTSPersonnel.synchroniserPartages();
-      $("psStatus").textContent = (message ? "✅ " + message + " " : "🔒 ") + texteAcces(b);
+      const d = await FTSAcces.droits().catch(() => ({ ok: false }));
+      if (!d.ok) { if (message) $("psStatus").textContent = "✅ " + message; return; }
+      const b = await FTSAcces.verifier();
+      $("psStatus").textContent = (message ? "✅ " + message + " " : "🔒 ") + FTSAcces.resume(b);
     } catch (e) {
       $("psStatus").textContent = (message ? "✅ " + message + " " : "") + "⚠️ Accès Drive non mis à jour : " + e.message;
     }

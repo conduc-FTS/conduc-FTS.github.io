@@ -48,7 +48,18 @@ const FTSAcces = (() => {
   const esc = (s) => { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; };
   const auth = () => ({ Authorization: "Bearer " + FTSAuth.getToken() });
   const cle = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim().split(" ").sort().join(" ");
-  const mail = (s) => String(s || "").trim().toLowerCase();
+  // Gmail ignore les points (r.dupont@gmail.com = rdupont@gmail.com) et Drive
+  // renvoie souvent l'adresse sans points : on compare toujours sous cette forme.
+  // L'adresse telle qu'elle est saisie (avec ses points) est gardée pour l'affichage.
+  const brut = new Map();
+  const mail = (s) => {
+    const e = String(s || "").trim().toLowerCase();
+    const m = e.match(/^([^@+]+)(?:\+[^@]*)?@(gmail\.com|googlemail\.com)$/);
+    const c = m ? m[1].replace(/\./g, "") + "@gmail.com" : e;
+    if (e && !brut.has(c)) brut.set(c, e);
+    return c;
+  };
+  const aff = (c) => brut.get(c) || c;
   async function req(url, opts = {}) {
     for (let essai = 0; essai < 4; essai++) {
       const r = await fetch(url, { ...opts, headers: { ...auth(), ...(opts.body ? { "Content-Type": "application/json" } : {}), ...(opts.headers || {}) } });
@@ -81,7 +92,7 @@ const FTSAcces = (() => {
     const id = encadrement && encadrement.spreadsheetId ? encadrement.spreadsheetId : await idClasseur(true);
     let r = await req(`${SHEETS}/${id}/values/${encodeURIComponent(ONGLET + "!A:Z")}:clear`, { method: "POST" });
     if (!r.ok) throw new Error(`Écriture de la liste Encadrement : ${r.status}`);
-    r = await req(`${SHEETS}/${id}/values/${encodeURIComponent(ONGLET + "!A1")}?valueInputOption=RAW`, { method: "PUT", body: JSON.stringify({ values: [EN_TETE, ...liste.map((p) => [p.nom, p.email, p.acces === "LECTURE" ? "Lecture seule" : "Lecture + modification"])] }) });
+    r = await req(`${SHEETS}/${id}/values/${encodeURIComponent(ONGLET + "!A1")}?valueInputOption=RAW`, { method: "PUT", body: JSON.stringify({ values: [EN_TETE, ...liste.map((p) => [p.nom, aff(p.email), p.acces === "LECTURE" ? "Lecture seule" : "Lecture + modification"])] }) });
     if (!r.ok) throw new Error(`Écriture de la liste Encadrement : ${r.status}`);
     encadrement = { spreadsheetId: id, liste };
   }
@@ -314,10 +325,10 @@ const FTSAcces = (() => {
   function rendre() {
     if (!racine) return;
     const liste = (encadrement && encadrement.liste) || [];
-    const ligne = (p, i) => edition === i ? `<tr><td><input class="ad-in" id="adNom" value="${esc(p.nom)}"></td><td><input class="ad-in" id="adMail" value="${esc(p.email)}"></td>
+    const ligne = (p, i) => edition === i ? `<tr><td><input class="ad-in" id="adNom" value="${esc(p.nom)}"></td><td><input class="ad-in" id="adMail" value="${esc(aff(p.email))}"></td>
         <td><select class="ad-in" id="adRole"><option value="MODIFICATION" ${p.acces !== "LECTURE" ? "selected" : ""}>Lecture + modification</option><option value="LECTURE" ${p.acces === "LECTURE" ? "selected" : ""}>Lecture seule</option></select></td>
         <td style="white-space:nowrap"><button type="button" class="ad-btn pri" data-ok="${i}">OK</button> <button type="button" class="ad-btn" data-annuler>✕</button></td></tr>`
-      : `<tr><td><b>${esc(p.nom || "—")}</b></td><td>${esc(p.email)}</td><td>${p.acces === "LECTURE" ? '<span class="ad-r r-lec">LECTURE SEULE</span>' : '<span class="ad-r r-mod">LECTURE + MODIFICATION</span>'}</td>
+      : `<tr><td><b>${esc(p.nom || "—")}</b></td><td>${esc(aff(p.email))}</td><td>${p.acces === "LECTURE" ? '<span class="ad-r r-lec">LECTURE SEULE</span>' : '<span class="ad-r r-mod">LECTURE + MODIFICATION</span>'}</td>
         <td style="white-space:nowrap"><button type="button" class="ad-btn" data-edit="${i}" title="Modifier">✏️</button> <button type="button" class="ad-btn" data-suppr="${i}" title="Retirer de l'encadrement">🗑️</button></td></tr>`;
     const b = dernier;
     let bilan = '<div class="ad-vide">Vérification en cours…</div>';
@@ -328,13 +339,13 @@ const FTSAcces = (() => {
       if (donnes.length) {
         const parMail = {};
         donnes.forEach((a) => { (parMail[a.email] = parMail[a.email] || []).push(`${a.dossier}${a.type === "dossier" ? " (dossier créé)" : ""} : ${roleLib(a.role || "reader")}`); });
-        bilan += `<div class="ad-info">➕ <b>Fait à l'instant</b> :<ul>${Object.entries(parMail).map(([m, l]) => `<li><b>${esc(m)}</b> — ${l.length > 3 ? `${l.length} dossiers` : esc(l.join(" · "))}</li>`).join("")}</ul></div>`;
+        bilan += `<div class="ad-info">➕ <b>Fait à l'instant</b> :<ul>${Object.entries(parMail).map(([m, l]) => `<li><b>${esc(aff(m))}</b> — ${l.length > 3 ? `${l.length} dossiers` : esc(l.join(" · "))}</li>`).join("")}</ul></div>`;
       }
-      if (retires.length) bilan += `<div class="ad-warn">🧹 <b>Accès retirés</b> : ${retires.map((a) => `${esc(a.email)} (${esc(a.dossier)})`).join(" · ")}</div>`;
-      if (b.proposes.length) bilan += `<div class="ad-alert">⚠️ <b>${b.proposes.length} accès à vérifier</b> — adresses inconnues de Personnel FTS et de l'Encadrement, sur des dossiers internes :<ul>${b.proposes.map((a) => `<li>${esc(a.email)} — ${esc(a.dossier)} (${roleLib(a.ancien)})</li>`).join("")}</ul>Si ce sont des personnes de l'encadrement, ajoute-les dans la liste à gauche puis clique sur « Vérifier maintenant ». Sinon :<br><button type="button" class="ad-btn pri" id="adRetirer" style="margin-top:8px">Retirer ces ${b.proposes.length} accès</button></div>`;
+      if (retires.length) bilan += `<div class="ad-warn">🧹 <b>Accès retirés</b> : ${retires.map((a) => `${esc(aff(a.email))} (${esc(a.dossier)})`).join(" · ")}</div>`;
+      if (b.proposes.length) bilan += `<div class="ad-alert">⚠️ <b>${b.proposes.length} accès à vérifier</b> — adresses inconnues de Personnel FTS et de l'Encadrement, sur des dossiers internes :<ul>${b.proposes.map((a) => `<li>${esc(aff(a.email))} — ${esc(a.dossier)} (${roleLib(a.ancien)})</li>`).join("")}</ul>Si ce sont des personnes de l'encadrement, ajoute-les dans la liste à gauche puis clique sur « Vérifier maintenant ». Sinon :<br><button type="button" class="ad-btn pri" id="adRetirer" style="margin-top:8px">Retirer ces ${b.proposes.length} accès</button></div>`;
       if (b.plan.chefsSansMail.length) bilan += `<div class="ad-warn">⚠️ <b>Chef(s) sans e-mail</b> : ${b.plan.chefsSansMail.map((p) => esc(`${p.nom} ${p.prenom}`)).join(", ")} — leur tablette n'a aucun accès tant que l'e-mail n'est pas renseigné dans Personnel FTS.</div>`;
       if (b.plan.absents.length) bilan += `<div class="ad-info">ℹ️ Dossiers pas encore créés : ${b.plan.absents.map(esc).join(", ")} (créés par le robot de recopie au besoin).</div>`;
-      if (b.erreurs.length) bilan += `<div class="ad-alert">❌ ${b.erreurs.length} action(s) impossible(s) : ${b.erreurs.map((a) => `${esc(a.email)} / ${esc(a.dossier)} (${esc(a.statut)})`).join(" · ")}</div>`;
+      if (b.erreurs.length) bilan += `<div class="ad-alert">❌ ${b.erreurs.length} action(s) impossible(s) : ${b.erreurs.map((a) => `${esc(aff(a.email))} / ${esc(a.dossier)} (${esc(a.statut)})`).join(" · ")}</div>`;
     }
     const cellule = (d, qui) => {
       if (qui === "enc") return '<span class="ad-r r-mod">SELON LA LISTE</span>';
@@ -348,7 +359,7 @@ const FTSAcces = (() => {
           <div class="ad-h"><h2>Encadrement</h2><span class="s">ces personnes voient tout le Drive FTS</span></div>
           <div class="ad-b">
             <table class="ad-t"><thead><tr><th>Nom</th><th>E-mail (compte Google)</th><th>Accès</th><th></th></tr></thead><tbody>
-              <tr><td><b>Conducteur de travaux</b> <span class="ad-sub">(propriétaire)</span></td><td>${esc((droitsCache && droitsCache.proprietaire) || "conduc.fts@gmail.com")}</td><td><span class="ad-r r-mod">PROPRIÉTAIRE</span></td><td></td></tr>
+              <tr><td><b>Conducteur de travaux</b> <span class="ad-sub">(propriétaire)</span></td><td>${esc(aff((droitsCache && droitsCache.proprietaire) || "") || "conduc.fts@gmail.com")}</td><td><span class="ad-r r-mod">PROPRIÉTAIRE</span></td><td></td></tr>
               ${liste.map(ligne).join("")}
             </tbody></table>
             <div class="ad-form"><input class="ad-in" id="adNouvNom" placeholder="Nom"><input class="ad-in" id="adNouvMail" placeholder="E-mail (compte Google)"><select class="ad-in" id="adNouvRole"><option value="MODIFICATION">Lecture + modification</option><option value="LECTURE">Lecture seule</option></select><button type="button" class="ad-btn pri" id="adAjouter">+ Ajouter</button></div>
@@ -384,7 +395,7 @@ const FTSAcces = (() => {
     $("adAjouter").onclick = () => {
       const p = { nom: $("adNouvNom").value.trim(), email: mail($("adNouvMail").value), acces: $("adNouvRole").value };
       const err = valider(p.nom, p.email, p.acces, -1); if (err) return statut("⚠️ " + err);
-      sauver([...liste, p], `${p.email} ajouté(e) à l'encadrement.`);
+      sauver([...liste, p], `${aff(p.email)} ajouté(e) à l'encadrement.`);
     };
     racine.querySelectorAll("[data-edit]").forEach((x) => (x.onclick = () => { edition = Number(x.dataset.edit); rendre(); }));
     racine.querySelectorAll("[data-annuler]").forEach((x) => (x.onclick = () => { edition = null; rendre(); }));
@@ -392,12 +403,12 @@ const FTSAcces = (() => {
       const i = Number(x.dataset.ok);
       const p = { nom: $("adNom").value.trim(), email: mail($("adMail").value), acces: $("adRole").value };
       const err = valider(p.nom, p.email, p.acces, i); if (err) return statut("⚠️ " + err);
-      sauver(liste.map((q, j) => (j === i ? p : q)), `${p.email} modifié(e).`);
+      sauver(liste.map((q, j) => (j === i ? p : q)), `${aff(p.email)} modifié(e).`);
     }));
     racine.querySelectorAll("[data-suppr]").forEach((x) => (x.onclick = () => {
       const p = liste[Number(x.dataset.suppr)];
-      if (!confirm(`Retirer ${p.email} de l'encadrement ?\nIl/elle perdra l'accès aux dossiers internes (REFERENTIEL, ADMINISTRATIF, rapports…) à la prochaine vérification.`)) return;
-      sauver(liste.filter((q) => q !== p), `${p.email} retiré(e) de l'encadrement.`);
+      if (!confirm(`Retirer ${aff(p.email)} de l'encadrement ?\nIl/elle perdra l'accès aux dossiers internes (REFERENTIEL, ADMINISTRATIF, rapports…) à la prochaine vérification.`)) return;
+      sauver(liste.filter((q) => q !== p), `${aff(p.email)} retiré(e) de l'encadrement.`);
     }));
     $("adVerifier").onclick = () => lancer();
     const ret = $("adRetirer");
@@ -427,7 +438,7 @@ const FTSAcces = (() => {
     if (!d.ok) {
       racine.innerHTML = `<div class="se-panel ad-verrou"><div class="ad-verrou-ic">🔒</div><h2>Réservé à l'encadrement</h2>
         <p>Cet écran modifie les accès au Drive FTS. Il est réservé au propriétaire du Drive et aux personnes de l'encadrement en « Lecture + modification ».</p>
-        <p class="ad-sub">Compte connecté : <b>${esc(d.email || "inconnu")}</b>${d.lecture ? " — inscrit en lecture seule" : ""}</p></div>`;
+        <p class="ad-sub">Compte connecté : <b>${esc(aff(d.email || "") || "inconnu")}</b>${d.lecture ? " — inscrit en lecture seule" : ""}</p></div>`;
       return;
     }
     rendre();

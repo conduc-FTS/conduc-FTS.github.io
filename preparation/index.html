@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#3A3A3A">
+<link rel="manifest" href="../manifest_conducteur.json">
+<link rel="icon" type="image/png" sizes="192x192" href="../icon-dashboard-192.png">
+<script>
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashboard.js").catch(() => {}); }
+</script>
+<title>FTS — Fiche de préparation</title>
+<link rel="stylesheet" href="../css/dashboard.css">
+<link rel="stylesheet" href="../css/supervision.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+.pr-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 16px; padding: 16px 18px; }
+.pr-grid.deux { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pr-grid .full { grid-column: 1 / -1; }
+.pr-sep { grid-column: 1 / -1; font-size: 0.66rem; letter-spacing: 0.08em; font-weight: 800; color: var(--text-sub); border-top: 1px solid var(--border); padding-top: 12px; margin-top: 2px; text-transform: uppercase; }
+.pr-sep:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+.sv-f input[readonly] { background: var(--bg); color: var(--text-sub); }
+.pr-note { font-size: 0.78rem; color: var(--text-sub); background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+.pr-note.ok { background: #EAF6EE; color: #1D6E3E; font-weight: 600; }
+.pr-note.w { background: #FFF3DC; color: #8A5A00; }
+.pr-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+.pr-bar .sv-f { min-width: 120px; }
+.pr-mini { border: 1px solid var(--border); border-radius: 7px; padding: 6px 7px; font-size: 0.84rem; font-family: inherit; width: 100%; background: #fff; }
+.pr-mini.n { text-align: right; }
+.pr-mini.main { border-color: #E8833A; background: #FFF6EE; }
+.pr-scroll { overflow: auto; max-height: 560px; }
+.pr-scroll .sv-tbl thead th { position: sticky; top: 0; z-index: 1; }
+.pr-pieux td { padding: 5px 6px; font-size: 0.82rem; }
+.pr-pieux th { padding: 8px 6px; }
+.pr-pieux .rep { font-weight: 800; white-space: nowrap; }
+.pr-pieux .calc { color: var(--text-sub); white-space: nowrap; font-size: 0.78rem; }
+.pr-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #E8833A; cursor: pointer; vertical-align: middle; margin-left: 4px; }
+.pr-sq { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; border: 1px solid rgba(0,0,0,.15); }
+.pr-dot[hidden] { display: none; }
+.pr-x { border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 4px 8px; cursor: pointer; color: #C0392B; }
+.pr-add { background: #fff; border: 1px dashed #C9CDD4; border-radius: 8px; padding: 8px 12px; font-size: 0.82rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+.pr-legende { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.76rem; color: var(--text-sub); padding: 10px 18px; }
+.pr-sw { position: relative; width: 44px; height: 26px; border-radius: 13px; background: #D1D5DB; cursor: pointer; transition: .2s; flex-shrink: 0; border: none; padding: 0; }
+.pr-sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: .2s; }
+.pr-sw.on { background: #34C759; } .pr-sw.on::after { left: 21px; }
+.pr-swrow { display: flex; align-items: center; gap: 12px; padding: 12px 18px; }
+.pr-swrow b { display: block; font-size: 0.9rem; } .pr-swrow span { font-size: 0.78rem; color: var(--text-sub); }
+.pr-kpi { display: flex; gap: 16px; flex-wrap: wrap; padding: 14px 18px; }
+.pr-kpi > div { background: var(--bg); border-radius: 10px; padding: 12px 14px; min-width: 150px; }
+.pr-kpi b { display: block; font-size: 1.35rem; } .pr-kpi span { font-size: 0.76rem; color: var(--text-sub); }
+.pr-save { display: inline-flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-sub); }
+.pr-save.sale { color: #B45309; font-weight: 700; }
+.pr-paste { width: 100%; height: 110px; border: 2px dashed #C7D9FB; border-radius: 10px; padding: 10px; font-family: ui-monospace, Menlo, monospace; font-size: 0.75rem; background: #F7FAFF; }
+.pr-map { overflow-x: auto; margin-top: 10px; }
+.pr-map table { border-collapse: collapse; font-size: 0.74rem; }
+.pr-map td, .pr-map th { border: 1px solid var(--border); padding: 4px 6px; white-space: nowrap; }
+.pr-map select { font-size: 0.74rem; padding: 3px; }
+.pr-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.pr-chip { font-size: 0.74rem; font-weight: 700; padding: 3px 9px; border-radius: 12px; background: var(--bg); }
+.pr-chip.v { background: #EAF6EE; color: #1D6E3E; } .pr-chip.o { background: #FFF3DC; color: #8A5A00; } .pr-chip.r { background: #FDECEA; color: #C0392B; }
+.pr-radio { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; cursor: pointer; font-size: 0.86rem; }
+.pr-radio input { margin-top: 3px; }
+.pr-radio small { display: block; color: var(--text-sub); }
+
+/* ── Fiche imprimée (même présentation que l'onglet Excel « Fiche Prépa Mpx ») ── */
+.fp-zone { background: #E9EAED; padding: 16px; border-radius: 12px; overflow: auto; }
+.fp-page { width: 190mm; min-height: 270mm; margin: 0 auto; background: #fff; padding: 8mm; box-shadow: 0 2px 12px rgba(0,0,0,.15); font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; box-sizing: content-box; }
+.fp-page table { border-collapse: collapse; width: 100%; }
+.fp-page td { border: 1px solid #000; padding: 3px 4px; text-align: center; vertical-align: middle; }
+.fp-page .g { background: #c8c8c8; font-weight: bold; }
+.fp-page .lbl { font-weight: bold; text-align: left; }
+.fp-page .u { text-decoration: underline; }
+.fp-page .red { color: #e00; font-weight: bold; font-size: 12px; text-align: center; padding: 6px 0 2px; }
+.fp-page .nb td { border: none; }
+.fp-page .dash td { border-left: 1px solid #000; border-right: 1px solid #000; border-top: none; border-bottom: 1px dashed #000; height: 21px; font-weight: bold; font-size: 11px; }
+.fp-page .dash tr.h td { border: 1px solid #000; font-weight: bold; font-size: 10px; height: auto; }
+.fp-top { display: grid; grid-template-columns: 38% 62%; align-items: start; }
+.fp-cols { display: grid; grid-template-columns: 38% 1fr; gap: 12px; margin-top: 10px; }
+.fp-bas { display: grid; grid-template-columns: 38% 62%; margin-top: 12px; }
+.fp-adblue { background: #8DB4E2; color: #c00; font-weight: bold; padding: 1px 4px; }
+
+@media print {
+  @page { size: A4; margin: 10mm; }
+  body * { visibility: hidden; }
+  #fichePage, #fichePage * { visibility: visible; }
+  #fichePage { position: absolute; left: 0; top: 0; box-shadow: none; padding: 0; margin: 0; }
+  .fp-zone { background: none; padding: 0; }
+}
+@media (max-width: 900px) { .pr-grid, .pr-grid.deux { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div id="svPage">
+  <div class="sv-tabs" id="prTabs">
+    <button type="button" class="on" data-t="Infos">1 · Infos chantier</button>
+    <button type="button" data-t="Materiel">2 · Matériel &amp; équipe</button>
+    <button type="button" data-t="Ndc">3 · Note de calcul <span class="n" id="nPieux">0</span></button>
+    <button type="button" data-t="Fournitures">4 · Fournitures</button>
+    <button type="button" data-t="Remarques">5 · Remarques</button>
+    <button type="button" data-t="Fiche">6 · Fiche à imprimer</button>
+  </div>
+  <p class="sv-status" id="prStatus">Chargement…</p>
+
+  <!-- 1 · INFOS -->
+  <div class="sv-tab on" id="tabInfos">
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Infos chantier</h2><span class="s">reprises du chantier, modifiables</span></div>
+      <div class="pr-grid">
+        <div class="sv-f"><label>N° dossier</label><input type="text" id="fCode" readonly></div>
+        <div class="sv-f" style="grid-column: span 2"><label>Chantier</label><input type="text" id="fNom" readonly></div>
+        <div class="sv-f"><label>Adresse</label><input type="text" data-k="infos.adresse"></div>
+        <div class="sv-f"><label>CP / Commune</label><input type="text" data-k="infos.commune"></div>
+        <div class="sv-f"><label>Conducteur de travaux</label><input type="text" data-k="infos.conducteur" list="dlConducteurs"></div>
+        <div class="sv-f"><label>Indice de la fiche</label><input type="text" data-k="indice" inputmode="numeric"></div>
+        <div class="sv-f"><label>Prise du matériel</label><select data-k="infos.priseMateriel"><option>DEPÔT</option><option>CHANTIER</option><option>DIRECT</option></select></div>
+        <div></div>
+        <div class="pr-sep">Intervention</div>
+        <div class="sv-f full"><label class="chkline" style="padding:0"><input type="checkbox" data-k="infos.dateConnue"> Date d'intervention connue <i>(sinon la fiche imprime « À DÉFINIR »)</i></label></div>
+        <div class="sv-f" id="boxDate"><label>Date de démarrage</label><input type="date" data-k="infos.date"></div>
+        <div class="sv-f"><label>Durée</label><input type="text" data-k="infos.duree" inputmode="decimal"></div>
+        <div class="sv-f"><label>Unité</label><select data-k="infos.dureeUnite"><option>JOUR(S)</option><option>SEMAINE(S)</option></select></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 2 · MATÉRIEL & ÉQUIPE -->
+  <div class="sv-tab" id="tabMateriel">
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Matériel &amp; équipe</h2><span class="s">listes du Parc matériel et de Personnel FTS · le matériel interne est livré le 1er jour</span></div>
+      <div class="pr-grid">
+        <div class="pr-sep">Équipe</div>
+        <div class="sv-f"><label>Chef d'équipe</label><select data-k="equipe.chef" id="fChef"></select></div>
+        <div class="sv-f"><label>Téléphone <i>(Personnel FTS)</i></label><input type="text" id="fTel" readonly></div>
+        <div></div>
+        <div class="pr-sep">Matériel de chantier</div>
+        <div class="sv-f"><label>Foreuse</label><select data-k="materiel.foreuse" id="fForeuse"></select></div>
+        <div class="sv-f"><label>Course / réglage</label><select data-k="materiel.reglage" id="fReglage"></select></div>
+        <div class="sv-f"><label>Tube max (calcul des tubes)</label><input type="text" id="fTubeMax" readonly></div>
+        <div class="sv-f"><label>Injection</label><input type="text" data-k="materiel.injection" list="dlInjection"></div>
+        <div class="sv-f"><label>Presse</label><input type="text" data-k="materiel.presse" list="dlPresse"></div>
+        <div class="sv-f"><label>Cuve GNR</label><select data-k="materiel.cuveGnr"><option>OUI</option><option>NON</option></select></div>
+        <div class="sv-f"><label>Cuve à eau</label><input type="text" data-k="materiel.cuveEau"></div>
+        <div class="sv-f"><label>Caisse flexible</label><input type="text" data-k="materiel.caisseFlexible" list="dlChefs"></div>
+        <div></div>
+        <div class="pr-sep">Location</div>
+        <div class="sv-f"><label>Élévateur</label><input type="text" data-k="materiel.elevateur" list="dlElevateur"></div>
+        <div class="sv-f"><label>Compresseur</label><input type="text" data-k="materiel.compresseur" list="dlCompresseur"></div>
+        <div class="sv-f"><label>Groupe électrogène</label><input type="text" data-k="materiel.groupe" list="dlGroupe"></div>
+        <div class="sv-f"><label>Pelle</label><input type="text" data-k="materiel.pelle" list="dlPelle"></div>
+        <div class="sv-f" id="boxPelle"><label>Pelle : livraison</label><input type="text" data-k="materiel.pelleLivraison" placeholder="ex : la veille, le 08/10…"></div>
+        <div></div>
+        <div class="full pr-note ok" id="noteAdblue" hidden>✓ Compresseur choisi : AD-BLUE ajouté automatiquement sur la fiche.</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 3 · NOTE DE CALCUL -->
+  <div class="sv-tab" id="tabNdc">
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Note de calcul</h2><span class="s">pieu par pieu, même numérotation que la NDC · tout est modifiable</span><span class="sv-sp"></span><button type="button" class="sv-btn pri" id="btnColler">📋 Coller depuis Excel</button></div>
+      <div class="pr-bar">
+        <div class="sv-f"><label>Indice NDC</label><input type="text" data-k="ndc.indice" style="width:90px"></div>
+        <div class="sv-f" style="flex:1;min-width:220px"><label>DDC / bureau d'études</label><input type="text" data-k="ndc.ddc"></div>
+        <div class="sv-f"><label>Ø forage chantier (mm)</label><input type="text" data-k="ndc.forage" inputmode="decimal" style="width:110px"></div>
+        <div class="sv-f"><label>Tube max foreuse</label><input type="text" id="fTubeMax2" readonly style="width:150px"></div>
+      </div>
+      <div class="pr-note" id="ndcNote" style="margin:12px 18px 0" hidden></div>
+
+      <div class="sv-ch" style="border-top:1px solid var(--border);margin-top:12px"><h2 style="font-size:.9rem">Longueurs retenues par diamètre</h2><span class="s">s'applique à tous les pieux du diamètre · la longueur NDC reste affichée pour info</span></div>
+      <table class="sv-tbl"><thead><tr><th>Tube principal</th><th class="r">Nb pieux</th><th class="r">Longueur NDC</th><th>Longueur retenue (tous)</th><th>Découpe</th></tr></thead><tbody id="parDiamBody"></tbody></table>
+
+      <div class="sv-ch" style="border-top:1px solid var(--border)"><h2 style="font-size:.9rem">Détail pieu par pieu</h2><span class="sv-sp"></span>
+        <input type="text" id="fRecherche" class="pr-mini" placeholder="🔍 Rechercher (Mp12, 114…)" style="width:200px">
+        <select id="fTypeBarreTous" class="pr-mini" style="width:auto"><option value="">Type de barre : appliquer à tous…</option></select>
+      </div>
+      <div class="pr-scroll">
+        <table class="sv-tbl pr-pieux">
+          <thead><tr><th>Repère</th><th class="r">Charge (t)</th><th>Tube Ø</th><th>Ép.</th><th class="r">Long. NDC</th><th>Long. retenue</th><th>Tube sec. Ø / ép. / long.</th><th>Barre type / Ø / long.</th><th>Platine</th><th>Découpe tubes</th><th></th></tr></thead>
+          <tbody id="pieuxBody"></tbody>
+        </table>
+      </div>
+      <div class="pr-legende" id="legendeCouleurs"></div>
+      <div style="padding:0 18px 14px;display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="pr-add" id="btnAjoutPieu">+ Ajouter un pieu</button><button type="button" class="pr-add" id="btnViderNdc" style="color:#C0392B">Vider la note de calcul</button></div>
+      <div class="pr-note" style="margin:0 18px 14px"><span class="pr-dot" style="cursor:default"></span> = longueur changée à la main sur ce pieu (différente de la longueur de son diamètre). Clic sur le point : retour à la longueur du diamètre.<br>Platine : barre → percée selon la table des perçages · sinon tube secondaire → collerette · sinon tube principal → collerette.</div>
+    </section>
+
+    <section class="sv-card">
+      <div class="pr-swrow"><button type="button" class="pr-sw" id="swPastilles" aria-label="Tubes pastillés"></button><div><b>Tubes pastillés</b><span>Pour une injection spécifique — quantités saisies à la main</span></div></div>
+      <div id="boxPastilles" hidden>
+        <table class="sv-tbl"><thead><tr><th>Qté</th><th>Ø tube</th><th>Longueur (m)</th><th></th></tr></thead><tbody id="pastillesBody"></tbody></table>
+        <div style="padding:10px 18px 14px"><button type="button" class="pr-add" id="btnAjoutPastille">+ Ajouter une ligne</button></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 4 · FOURNITURES -->
+  <div class="sv-tab" id="tabFournitures">
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Fournitures</h2><span class="s">calcul automatique · marge saisie par le conducteur</span></div>
+      <div class="pr-kpi" id="fournKpi"></div>
+      <table class="sv-tbl"><thead><tr><th>Article</th><th class="r">Calculé</th><th>Marge</th><th class="r">Sur la fiche</th></tr></thead><tbody id="fournBody"></tbody></table>
+    </section>
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Tubes ajoutés à la main</h2><span class="s">tubes non issus du calcul (ex : 1,5 m en plus « au cas où » sur un diamètre)</span></div>
+      <table class="sv-tbl"><thead><tr><th>Qté</th><th>Ø tube</th><th>Longueur</th><th></th></tr></thead><tbody id="manuelsBody"></tbody></table>
+      <div style="padding:10px 18px 14px"><button type="button" class="pr-add" id="btnAjoutManuel">+ Ajouter des tubes</button></div>
+    </section>
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Ciment</h2><span class="s">théorique : (section forage − acier du tube principal) × longueur × dosage × (1 + surconsommation)</span></div>
+      <div class="pr-bar">
+        <div class="sv-f"><label>Ciment</label><select data-k="ciment.type" id="fCiment"></select></div>
+        <div class="sv-f"><label>Surconsommation (%)</label><input type="text" data-k="ciment.surconso" inputmode="decimal" id="fSurconso" style="width:110px"></div>
+        <div class="sv-f"><label>1re livraison (palettes)</label><input type="text" data-k="ciment.premiereLivraison" inputmode="decimal" style="width:130px" placeholder="= total"></div>
+      </div>
+      <div class="pr-kpi" id="cimentKpi"></div>
+    </section>
+  </div>
+
+  <!-- 5 · REMARQUES -->
+  <div class="sv-tab" id="tabRemarques">
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Remarques</h2><span class="s">mêmes rubriques que la fiche actuelle</span></div>
+      <div class="pr-grid deux">
+        <div class="sv-f"><label>Objectif forage (U micropieux par jour minimum)</label><input type="text" data-k="remarques.objectif" inputmode="numeric"></div>
+        <div class="sv-f"><label>Micropieu(x) d'essai</label><input type="text" data-k="remarques.essais" list="dlEssais"></div>
+        <div class="sv-f"><label>Implantation</label><select data-k="remarques.implantation"><option>A NOTRE CHARGE</option><option>A LEUR CHARGE</option></select></div>
+        <div class="sv-f"><label>Évacuation des boues</label><select data-k="remarques.boues"><option>NON</option><option>OUI</option><option>A NOTRE CHARGE</option><option>A LEUR CHARGE</option></select></div>
+        <div class="sv-f"><label>Évacuation des déchets</label><select data-k="remarques.dechets"><option>A NOTRE CHARGE</option><option>A LEUR CHARGE</option></select></div>
+        <div class="sv-f"><label>Outil de forage · Ø (mm)</label><div style="display:flex;gap:8px"><input type="text" data-k="remarques.outil" list="dlOutils"><input type="text" data-k="remarques.outilDiam" inputmode="decimal" style="width:90px"></div></div>
+        <div class="sv-f full"><label>Divers</label><textarea data-k="remarques.divers" rows="3"></textarea></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 6 · FICHE -->
+  <div class="sv-tab" id="tabFiche">
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Fiche de préparation de chantier</h2><span class="s">même présentation que la fiche Excel</span><span class="sv-sp"></span><button type="button" class="sv-btn pri" id="btnImprimer">🖨️ Imprimer / PDF</button></div>
+      <div style="padding:14px"><div class="fp-zone"><div class="fp-page" id="fichePage"></div></div></div>
+    </section>
+  </div>
+</div>
+
+<datalist id="dlConducteurs"></datalist><datalist id="dlChefs"></datalist><datalist id="dlInjection"></datalist><datalist id="dlPresse"></datalist>
+<datalist id="dlElevateur"></datalist><datalist id="dlCompresseur"></datalist><datalist id="dlGroupe"></datalist><datalist id="dlPelle"></datalist>
+<datalist id="dlEssais"><option>Aucun</option><option>1 essai prévu</option><option>2 essais prévus</option><option>3 essais prévus</option></datalist>
+<datalist id="dlOutils"><option>MFT 4"</option><option>MFT 5"</option><option>MFT 6"</option><option>MFT 8"</option><option>MFT 12"</option><option>TRICONE</option><option>FISHTAIL</option><option>TRILAME 73</option><option>TRILAME 88,9</option><option>TRILAME 114</option><option>TRILAME 127</option><option>TRILAME 139,7</option><option>TRILAME 177,8</option><option>TARIERE</option></datalist>
+
+<!-- Fenêtre de collage de la NDC -->
+<div class="sv-ov" id="collerModal">
+  <div class="sv-modal" style="width:860px">
+    <div class="sv-mh"><h3>Coller la note de calcul</h3><button type="button" class="sv-x" data-fermer>✕</button></div>
+    <div style="padding:16px 22px">
+      <p style="margin:0 0 8px;font-size:.86rem;color:var(--text-sub)">Dans l'Excel du bureau d'études (onglet <b>A-5 TABLEAU RECAP</b>) : sélectionne les lignes des micropieux, avec les 2 lignes d'entête si possible, puis Ctrl + C et Ctrl + V ci-dessous.</p>
+      <textarea class="pr-paste" id="collerTexte" placeholder="Ctrl + V ici"></textarea>
+      <div id="collerApercu"></div>
+      <div style="margin-top:12px">
+        <label class="pr-radio"><input type="radio" name="mode" value="ajouter" checked><span><b>Ajouter / mettre à jour</b><small>Nouveaux repères ajoutés, repères existants mis à jour (ils reprennent la longueur de leur diamètre), les autres pieux ne bougent pas. Pour un pieu en plus, des pieux de grue, un indice partiel.</small></span></label>
+        <label class="pr-radio"><input type="radio" name="mode" value="remplacer"><span><b>Remplacer toute la NDC</b><small>Pour une note entièrement refaite : les pieux absents du collage sont retirés.</small></span></label>
+      </div>
+      <div class="pr-chips" id="collerBilan"></div>
+      <p class="sv-mstatus" id="collerStatus"></p>
+    </div>
+    <div class="sv-mf"><button type="button" class="sv-btn" data-fermer>Annuler</button><button type="button" class="sv-btn pri" id="collerValider" disabled>Valider le collage</button></div>
+  </div>
+</div>
+
+<script src="../js/auth.js"></script>
+<script src="../js/drive.js"></script>
+<script src="../js/parc-materiel.js"></script>
+<script src="../js/personnel.js"></script>
+<script src="../js/preparation.js"></script>
+<script src="../js/supervision-shell.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const P = FTSPreparation;
+  const params = new URLSearchParams(window.location.search);
+  const chantierId = params.get("id");
+  const chantierName = params.get("name") || "";
+  const spaceIdx = chantierName.search(/\s/);
+  const code = spaceIdx > 0 ? chantierName.slice(0, spaceIdx) : chantierName;
+  const nom = spaceIdx > 0 ? chantierName.slice(spaceIdx + 1) : chantierName;
+  document.title = `FTS — Préparation ${code}`;
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => FTSShell.esc(s);
+  const fr = P.fr, nombre = P.nombre;
+
+  let prep = P.nouvellePreparation();
+  let meta = {};
+  let pret = false, sale = false, chargementEnCours = null;
+  let pp = FTSParc.parametresPrepa();
+  let collage = null;
+
+  const detailUrl = `../detail-chantier/index.html?id=${encodeURIComponent(chantierId || "")}&name=${encodeURIComponent(chantierName)}`;
+  FTSShell.monter({
+    actif: "se-view-overview",
+    crumb: `<a href="../supervision-encadrement/index.html">← Vue d'ensemble</a> &nbsp;›&nbsp; <a href="${detailUrl}">${esc(code)}</a> &nbsp;›&nbsp; Préparation`,
+    titre: `<span class="code">${esc(code)}</span>Fiche de préparation`,
+    titreMobile: "Fiche de préparation",
+    sousTitreMobile: esc(code),
+    retour: detailUrl,
+    actions: `<span class="pr-save" id="etatSave"></span><button type="button" class="sv-btn pri" id="btnEnregistrer" disabled>💾 Enregistrer</button>`,
+    menuMobile: [{ label: "💾 Enregistrer", action: () => enregistrer() }],
+    onSession: (c) => { if (c) charger(); else if (!pret) $("prStatus").textContent = "Connecte-toi pour ouvrir la préparation."; },
+  });
+
+  // ─── Accès aux champs « data-k » ───────────────────────────────
+  function lireK(k) { return k.split(".").reduce((o, x) => (o == null ? "" : o[x]), prep); }
+  function ecrireK(k, v) {
+    const parts = k.split("."); let o = prep;
+    parts.slice(0, -1).forEach((x) => { if (!o[x] || typeof o[x] !== "object") o[x] = {}; o = o[x]; });
+    o[parts[parts.length - 1]] = v;
+  }
+  function remplirChamps() {
+    document.querySelectorAll("[data-k]").forEach((el) => {
+      const v = lireK(el.dataset.k);
+      if (el.type === "checkbox") el.checked = !!v;
+      else el.value = v == null ? "" : (typeof v === "number" ? fr(v) : v);
+    });
+  }
+  document.querySelectorAll("[data-k]").forEach((el) => {
+    const ev = el.tagName === "SELECT" || el.type === "checkbox" ? "change" : "input";
+    el.addEventListener(ev, () => {
+      const k = el.dataset.k;
+      let v = el.type === "checkbox" ? el.checked : el.value;
+      if (["indice", "ndc.forage", "ciment.surconso", "infos.duree"].includes(k)) v = nombre(v) === "" ? (k === "ciment.surconso" ? "" : el.value) : nombre(v);
+      ecrireK(k, v);
+      marquerSale();
+      majDependances(k);
+    });
+  });
+  function majDependances(k) {
+    if (k === "infos.dateConnue") $("boxDate").hidden = !prep.infos.dateConnue;
+    if (k === "equipe.chef") majTel();
+    if (k === "materiel.foreuse") { remplirReglages(); majTubeMax(); afficherNdc(); }
+    if (k === "materiel.reglage") { majTubeMax(); afficherNdc(); }
+    if (k === "materiel.compresseur") $("noteAdblue").hidden = !prep.materiel.compresseur.trim();
+    if (k === "materiel.pelle") $("boxPelle").hidden = !prep.materiel.pelle.trim();
+  }
+
+  function marquerSale() {
+    sale = true;
+    $("etatSave").textContent = "Modifications non enregistrées";
+    $("etatSave").classList.add("sale");
+    $("btnEnregistrer").disabled = !pret;
+  }
+  window.addEventListener("beforeunload", (e) => { if (sale) { e.preventDefault(); e.returnValue = ""; } });
+
+  // ─── Chargement ────────────────────────────────────────────────
+  async function charger() {
+    if (!chantierId) { $("prStatus").textContent = "Chantier introuvable (lien invalide)."; return; }
+    if (!window.FTSAuth || !FTSAuth.isSignedIn()) return;
+    if (pret || chargementEnCours) return chargementEnCours;
+    $("prStatus").textContent = "Chargement de la préparation…";
+    chargementEnCours = (async () => {
+      try {
+        const [m, enreg] = await Promise.all([
+          FTSDrive.getMetadonneesChantier(chantierId).catch(() => ({})),
+          P.lire(chantierId),
+          FTSParc.charger({ rapide: true }).catch(() => {}),
+          FTSPersonnel.charger({ rapide: true }).catch(() => {}),
+        ]);
+        meta = m || {};
+        pp = await FTSParc.chargerParametresPrepa().catch(() => FTSParc.parametresPrepa());
+        prep = P.normaliser(enreg, meta);
+        if (!enreg) {
+          const adr = String(meta.adresse || "");
+          const cp = adr.match(/^(.*?)[,\s]+(\d{5}\s+.+)$/);
+          prep.infos.adresse = cp ? cp[1].trim() : adr;
+          prep.infos.commune = cp ? cp[2].trim() : (meta.commune || "");
+          prep.ciment.surconso = pp.surconso;
+          if (meta.dureeChantier) prep.infos.duree = Number(meta.dureeChantier);
+        }
+        if (prep.ciment.surconso === "" || prep.ciment.surconso == null) prep.ciment.surconso = pp.surconso;
+        pret = true;
+        sale = false;
+        $("btnEnregistrer").disabled = false;
+        $("etatSave").textContent = enreg ? `Enregistrée le ${new Date(enreg.majLe || Date.now()).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}` : "Nouvelle fiche (pas encore enregistrée)";
+        $("etatSave").classList.remove("sale");
+        remplirListes();
+        remplirChamps();
+        ["infos.dateConnue", "equipe.chef", "materiel.foreuse", "materiel.compresseur", "materiel.pelle"].forEach(majDependances);
+        afficherNdc();
+        $("prStatus").textContent = "";
+      } catch (e) {
+        console.error(e);
+        $("prStatus").textContent = "Erreur : " + e.message;
+        $("prStatus").classList.add("err");
+      } finally { chargementEnCours = null; }
+    })();
+    return chargementEnCours;
+  }
+
+  async function enregistrer() {
+    if (!pret) return;
+    $("btnEnregistrer").disabled = true;
+    $("etatSave").textContent = "Enregistrement…";
+    try {
+      const r = await P.enregistrer(chantierId, prep);
+      prep.majLe = r.majLe;
+      sale = false;
+      $("etatSave").textContent = `Enregistrée le ${new Date(r.majLe).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}`;
+      $("etatSave").classList.remove("sale");
+      FTSShell.toast("✅ Préparation enregistrée dans le dossier PREPARATION du chantier");
+    } catch (e) {
+      $("etatSave").textContent = "❌ " + e.message;
+    } finally { $("btnEnregistrer").disabled = false; }
+  }
+  $("btnEnregistrer").addEventListener("click", enregistrer);
+
+  // ─── Listes (Parc, Personnel) ──────────────────────────────────
+  function options(liste, sel, vide) {
+    const vals = [...new Set(liste.filter(Boolean))];
+    if (sel && !vals.includes(sel)) vals.unshift(sel);
+    return (vide != null ? `<option value="">${esc(vide)}</option>` : "") + vals.map((v) => `<option ${v === sel ? "selected" : ""}>${esc(v)}</option>`).join("");
+  }
+  function datalist(id, liste) { $(id).innerHTML = [...new Set(liste.filter(Boolean))].map((v) => `<option value="${esc(v)}">`).join(""); }
+  function foreuses() { return FTSParc.disponibles().filter((m) => m.categorie === FTSParc.CATEGORIE_FOREUSE); }
+  function remplirListes() {
+    const chefs = FTSPersonnel.chefs().map(FTSPersonnel.nomComplet);
+    $("fChef").innerHTML = options(chefs, prep.equipe.chef, "— choisir —");
+    datalist("dlChefs", chefs);
+    datalist("dlConducteurs", FTSPersonnel.encadrement().filter((p) => /CONDUCTEUR/.test(p.poste || "") || /CONDUCTEUR/.test(p.fonctionEnc || "")).map(FTSPersonnel.nomComplet));
+    $("fForeuse").innerHTML = options(foreuses().map((m) => m.nom), prep.materiel.foreuse, "— choisir —");
+    remplirReglages();
+    const dispo = FTSParc.disponibles();
+    datalist("dlInjection", dispo.filter((m) => m.categorie === "MALAXEURS" || /PH15|TECHNIWELL|AUTONOME/.test(m.nom)).map((m) => m.nom));
+    datalist("dlPresse", dispo.filter((m) => /PH15|PRESSE/.test(m.nom)).map((m) => m.nom).concat(["PH15"]));
+    const loc = FTSParc.location();
+    datalist("dlElevateur", loc.filter((l) => /TELESCO|BUGGY|GYRO|ELEVATEUR/.test(l)).concat(dispo.filter((m) => m.categorie === "MANUTENTION").map((m) => m.nom)));
+    datalist("dlCompresseur", loc.filter((l) => /COMPRESSEUR/.test(l)).concat(dispo.filter((m) => m.categorie === "COMPRESSEURS").map((m) => m.nom)));
+    datalist("dlGroupe", ["GROUPE 40KVA", "GROUPE 60KVA", "GROUPE 80KVA", "GROUPE 100KVA"].concat(dispo.filter((m) => m.categorie === "GROUPES ÉLECTROGÈNES").map((m) => m.nom)));
+    datalist("dlPelle", loc.filter((l) => /PELLE/.test(l)).concat(dispo.filter((m) => m.categorie === "PELLES").map((m) => m.nom)));
+    $("fCiment").innerHTML = options(pp.ciments.map((c) => c.type), prep.ciment.type);
+    $("fTypeBarreTous").innerHTML = `<option value="">Type de barre : appliquer à tous…</option>` + P.TYPES_BARRE.map((t) => `<option value="${t}">${t} pour tout le chantier</option>`).join("");
+  }
+  function machineForeuse() { return FTSParc.parNom(prep.materiel.foreuse); }
+  function remplirReglages() {
+    const t = FTSParc.tubesMachine(machineForeuse());
+    const opts = [`<option value="standard">Standard${t.standard !== "" ? ` — tubes ${fr(t.standard)} m` : ""}</option>`];
+    if (t.raccourcie !== "") opts.push(`<option value="raccourcie">Raccourcie — tubes ${fr(t.raccourcie)} m</option>`);
+    $("fReglage").innerHTML = opts.join("");
+    if (prep.materiel.reglage === "raccourcie" && t.raccourcie === "") prep.materiel.reglage = "standard";
+    $("fReglage").value = prep.materiel.reglage;
+  }
+  function tubeMax() {
+    const t = FTSParc.tubesMachine(machineForeuse());
+    return prep.materiel.reglage === "raccourcie" && t.raccourcie !== "" ? t.raccourcie : t.standard;
+  }
+  function majTubeMax() {
+    const m = tubeMax();
+    const txt = !prep.materiel.foreuse ? "choisir la foreuse" : m === "" ? "à renseigner dans le Parc" : `${fr(m)} m`;
+    $("fTubeMax").value = txt; $("fTubeMax2").value = txt;
+  }
+  function majTel() {
+    const p = FTSPersonnel.parNom(prep.equipe.chef);
+    $("fTel").value = p && p.telephone ? p.telephone : (prep.equipe.chef ? "pas de téléphone dans Personnel FTS" : "");
+  }
+
+  // ─── Calcul ────────────────────────────────────────────────────
+  function ciment() { return pp.ciments.find((c) => c.type === prep.ciment.type) || pp.ciments[0] || { sac: "", sacsPalette: "" }; }
+  function calcul() {
+    return P.calculer(prep, { tubeMax: tubeMax(), percagePour: (b) => FTSParc.percagePour(b), ciment: ciment(), dosage: pp.dosage });
+  }
+
+  // ─── Note de calcul : affichage ────────────────────────────────
+  function optionsDiam(sel) {
+    const v = nombre(sel);
+    const liste = P.DIAMETRES_TUBE.includes(v) || v === "" ? P.DIAMETRES_TUBE : P.DIAMETRES_TUBE.concat([v]);
+    return `<option value="">—</option>` + liste.map((d) => `<option value="${d}" ${d === v ? "selected" : ""}>Ø${fr(d)}</option>`).join("");
+  }
+  function styleDiam(d) {
+    const c = P.couleurTube(d);
+    return c ? `background:${c};font-weight:700;${[88.9, 114, 127, 139.7].includes(nombre(d)) ? "color:#fff;" : ""}` : "";
+  }
+  function afficherNdc() {
+    $("nPieux").textContent = prep.ndc.pieux.length;
+    majTubeMax();
+    const m = tubeMax();
+    // Longueurs par diamètre
+    const diams = P.diametresPresents(prep.ndc.pieux);
+    $("parDiamBody").innerHTML = diams.length ? diams.map((x) => {
+      const L = nombre(prep.ndc.longParDiam[String(x.d)]);
+      const ndc = x.min === "" ? "—" : x.min === x.max ? `${fr(x.min, 2)} m` : `${fr(x.min, 2)} à ${fr(x.max, 2)} m`;
+      return `<tr><td><span class="pr-sq" style="background:${P.couleurTube(x.d) || "#fff"}"></span>Ø${fr(x.d)} × ${fr(x.e)}</td><td class="r">${x.nb}</td><td class="r">${ndc}</td>
+        <td><input type="text" class="pr-mini n" style="width:80px" data-ld="${x.d}" inputmode="decimal" value="${L === "" ? "" : fr(L)}" placeholder="NDC"> m</td>
+        <td class="calc">${L === "" ? "selon NDC" : P.texteDecoupe(P.decoupe(L, m))}</td></tr>`;
+    }).join("") : `<tr><td colspan="5" style="color:var(--text-sub)">Colle la note de calcul pour voir les diamètres.</td></tr>`;
+    $("parDiamBody").querySelectorAll("[data-ld]").forEach((el) => el.addEventListener("change", () => {
+      const v = nombre(el.value);
+      if (v === "") delete prep.ndc.longParDiam[el.dataset.ld]; else prep.ndc.longParDiam[el.dataset.ld] = v;
+      marquerSale(); afficherNdc();
+    }));
+    afficherPieux();
+    const presents = [...new Set(prep.ndc.pieux.map((p) => nombre(p.tubeD)).filter((d) => d > 0))].sort((a, b) => a - b);
+    $("legendeCouleurs").innerHTML = presents.length ? "<b style='color:var(--text-main)'>Code couleur :</b>" + presents.map((d) => `<span><span class="pr-sq" style="background:${P.couleurTube(d) || "#fff"}"></span>Ø${fr(d)}</span>`).join("") + "<span>· pas de couleur sur la fiche</span>" : "";
+    const note = prep.ndc.note ? `Note de la NDC : « ${esc(prep.ndc.note)} »` : "";
+    $("ndcNote").hidden = !note; $("ndcNote").innerHTML = note;
+    $("swPastilles").classList.toggle("on", !!prep.pastilles.actif);
+    $("boxPastilles").hidden = !prep.pastilles.actif;
+    afficherPastilles();
+  }
+  function lignePieu(p, i) {
+    const r = P.longueurRetenue(p, prep.ndc.longParDiam);
+    const regle = P.longueurRetenue({ ...p, longMain: "" }, prep.ndc.longParDiam);
+    const main = r.origine === "main";
+    const t = P.decoupe(r.L, tubeMax());
+    const ts = nombre(p.tubeSecD) > 0 ? P.decoupe(nombre(p.tubeSecL), tubeMax()) : [];
+    const n = (v) => (v === "" || v == null ? "" : fr(v));
+    return `<tr data-i="${i}">
+      <td><input type="text" class="pr-mini rep" data-f="rep" value="${esc(p.rep)}" style="width:74px"></td>
+      <td class="r"><input type="text" class="pr-mini n" data-f="charge" value="${n(p.charge)}" style="width:56px"></td>
+      <td><select class="pr-mini" data-f="tubeD" style="width:88px;${styleDiam(p.tubeD)}">${optionsDiam(p.tubeD)}</select></td>
+      <td><input type="text" class="pr-mini n" data-f="tubeE" value="${n(p.tubeE)}" style="width:48px"></td>
+      <td class="r"><input type="text" class="pr-mini n" data-f="longNdc" value="${n(p.longNdc)}" style="width:58px"></td>
+      <td style="white-space:nowrap"><input type="text" class="pr-mini n ${main ? "main" : ""}" data-f="longMain" value="${main ? n(p.longMain) : ""}" placeholder="${n(regle.L)}" style="width:58px"><span class="pr-dot" data-raz title="Revenir à la longueur du diamètre (${n(regle.L)} m)" ${main ? "" : "hidden"}></span></td>
+      <td style="white-space:nowrap"><select class="pr-mini" data-f="tubeSecD" style="width:78px">${optionsDiam(p.tubeSecD)}</select> <input type="text" class="pr-mini n" data-f="tubeSecE" value="${n(p.tubeSecE)}" style="width:44px"> <input type="text" class="pr-mini n" data-f="tubeSecL" value="${n(p.tubeSecL)}" style="width:50px"></td>
+      <td style="white-space:nowrap"><select class="pr-mini" data-f="barreType" style="width:92px">${options(P.TYPES_BARRE, p.barreType, "—")}</select> <input type="text" class="pr-mini n" data-f="barreD" value="${n(p.barreD)}" style="width:44px"> <input type="text" class="pr-mini n" data-f="barreL" value="${n(p.barreL)}" style="width:44px"></td>
+      <td style="white-space:nowrap"><input type="text" class="pr-mini" data-f="platine" value="${esc(p.platine)}" style="width:78px"><span class="sub calc c-coiffe">${esc(P.coiffePlatine(p, (b) => FTSParc.percagePour(b)))}</span></td>
+      <td class="calc c-dec">${texteDecoupePieu(t, ts)}</td>
+      <td><button type="button" class="pr-x" data-suppr title="Supprimer ce pieu">✕</button></td></tr>`;
+  }
+  function texteDecoupePieu(t, ts) { return `${P.texteDecoupe(t)}${ts.length ? `<span class="sub">sec. ${P.texteDecoupe(ts)}</span>` : ""}`; }
+  /** Met à jour les cases calculées d'une ligne sans la redessiner (le curseur reste où il est) */
+  function majLigne(tr, p) {
+    const r = P.longueurRetenue(p, prep.ndc.longParDiam);
+    const regle = P.longueurRetenue({ ...p, longMain: "" }, prep.ndc.longParDiam);
+    const main = r.origine === "main";
+    const inp = tr.querySelector('[data-f="longMain"]');
+    inp.classList.toggle("main", main); inp.placeholder = regle.L === "" ? "" : fr(regle.L);
+    if (!main && document.activeElement !== inp) inp.value = "";
+    const dot = tr.querySelector("[data-raz]"); dot.hidden = !main; dot.title = `Revenir à la longueur du diamètre (${fr(regle.L)} m)`;
+    const ts = nombre(p.tubeSecD) > 0 ? P.decoupe(nombre(p.tubeSecL), tubeMax()) : [];
+    tr.querySelector(".c-dec").innerHTML = texteDecoupePieu(P.decoupe(r.L, tubeMax()), ts);
+    tr.querySelector(".c-coiffe").textContent = P.coiffePlatine(p, (b) => FTSParc.percagePour(b));
+    ["barreType", "barreL"].forEach((f) => { const el = tr.querySelector(`[data-f="${f}"]`); if (el && document.activeElement !== el) el.value = p[f] === "" ? "" : (typeof p[f] === "number" ? fr(p[f]) : p[f]); });
+    if (p.barreType === "" ) tr.querySelector('[data-f="barreType"]').value = "";
+  }
+  function afficherPieux() {
+    const q = $("fRecherche").value.trim().toUpperCase().replace(/\s+/g, "");
+    const lignes = prep.ndc.pieux.map((p, i) => ({ p, i })).filter(({ p }) => !q || `${p.rep}|Ø${fr(p.tubeD)}|${p.tubeD}`.toUpperCase().replace(/\s+/g, "").includes(q));
+    $("pieuxBody").innerHTML = lignes.length ? lignes.map(({ p, i }) => lignePieu(p, i)).join("") : `<tr><td colspan="11" style="color:var(--text-sub);padding:16px 18px">${prep.ndc.pieux.length ? "Aucun pieu ne correspond." : "Aucun pieu : clique sur « Coller depuis Excel »."}</td></tr>`;
+  }
+  const CHAMPS_NUM = ["charge", "tubeD", "tubeE", "longNdc", "longMain", "tubeSecD", "tubeSecE", "tubeSecL", "barreD", "barreL"];
+  $("pieuxBody").addEventListener("change", (e) => {
+    const tr = e.target.closest("tr[data-i]"); if (!tr) return;
+    const i = Number(tr.dataset.i), f = e.target.dataset.f; if (!f) return;
+    const p = prep.ndc.pieux[i];
+    let v = e.target.value;
+    if (CHAMPS_NUM.includes(f)) v = nombre(v);
+    if (f === "rep") {
+      v = String(v).trim();
+      if (!v) { e.target.value = p.rep; return; }
+      if (prep.ndc.pieux.some((x, j) => j !== i && P.cleRep(x.rep) === P.cleRep(v))) { FTSShell.toast(`⚠️ Le repère ${v} existe déjà.`); e.target.value = p.rep; return; }
+    }
+    if (f === "longMain") {
+      const regle = P.longueurRetenue({ ...p, longMain: "" }, prep.ndc.longParDiam).L;
+      if (v !== "" && v === regle) v = "";
+    }
+    if (f === "barreD" && v === "") { p.barreType = ""; p.barreL = ""; }
+    if (f === "barreD" && v !== "" && !p.barreType) p.barreType = "GEWI";
+    p[f] = v;
+    marquerSale();
+    if (["tubeD", "rep"].includes(f)) { if (f === "rep") prep.ndc.pieux.sort((a, b) => P.compareReperes(a.rep, b.rep)); afficherNdc(); }
+    else majLigne(tr, p);
+  });
+  $("pieuxBody").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-i]"); if (!tr) return;
+    const i = Number(tr.dataset.i);
+    if (e.target.matches("[data-raz]")) { prep.ndc.pieux[i].longMain = ""; marquerSale(); tr.querySelector('[data-f="longMain"]').value = ""; majLigne(tr, prep.ndc.pieux[i]); }
+    if (e.target.matches("[data-suppr]")) {
+      if (!confirm(`Supprimer le pieu ${prep.ndc.pieux[i].rep} ?`)) return;
+      prep.ndc.pieux.splice(i, 1); marquerSale(); afficherNdc();
+    }
+  });
+  $("fRecherche").addEventListener("input", afficherPieux);
+  $("fTypeBarreTous").addEventListener("change", () => {
+    const t = $("fTypeBarreTous").value; if (!t) return;
+    const concernes = prep.ndc.pieux.filter((p) => nombre(p.barreD) > 0);
+    if (concernes.length && confirm(`Mettre ${t} sur les ${concernes.length} pieux qui ont une barre ? Tu pourras encore changer un pieu à la main (chantier panaché).`)) {
+      concernes.forEach((p) => { p.barreType = t; }); marquerSale(); afficherPieux();
+    }
+    $("fTypeBarreTous").value = "";
+  });
+  $("btnAjoutPieu").addEventListener("click", () => {
+    const rep = prompt("Repère du nouveau pieu (ex : Mp25, MpG1) :");
+    if (!rep || !rep.trim()) return;
+    if (prep.ndc.pieux.some((x) => P.cleRep(x.rep) === P.cleRep(rep))) { FTSShell.toast(`⚠️ Le repère ${rep} existe déjà.`); return; }
+    const dernier = prep.ndc.pieux[prep.ndc.pieux.length - 1];
+    const p = dernier ? { ...dernier, rep: rep.trim(), longMain: "" } : { ...P.pieuVide(), rep: rep.trim(), forage: prep.ndc.forage };
+    prep.ndc.pieux.push(p);
+    prep.ndc.pieux.sort((a, b) => P.compareReperes(a.rep, b.rep));
+    marquerSale(); afficherNdc();
+    FTSShell.toast(`${rep.trim()} ajouté (valeurs reprises du pieu précédent, à corriger).`);
+  });
+  $("btnViderNdc").addEventListener("click", () => {
+    if (!prep.ndc.pieux.length || !confirm("Retirer tous les pieux de la note de calcul ?")) return;
+    prep.ndc.pieux = []; marquerSale(); afficherNdc();
+  });
+
+  // Tubes pastillés
+  function afficherPastilles() {
+    const l = prep.pastilles.lignes;
+    $("pastillesBody").innerHTML = l.map((x, i) => `<tr data-p="${i}">
+      <td><input type="text" class="pr-mini n" data-pf="qte" value="${x.qte === "" ? "" : fr(x.qte)}" style="width:70px"></td>
+      <td><select class="pr-mini" data-pf="d" style="width:100px;${styleDiam(x.d)}">${optionsDiam(x.d)}</select></td>
+      <td><select class="pr-mini" data-pf="l" style="width:90px">${FTSParc.LONGUEURS_TUBE.map((t) => `<option value="${t}" ${t === nombre(x.l) ? "selected" : ""}>${fr(t)} m</option>`).join("")}</select></td>
+      <td><button type="button" class="pr-x" data-pdel>✕</button></td></tr>`).join("") || `<tr><td colspan="4" style="color:var(--text-sub)">Aucune ligne.</td></tr>`;
+  }
+  $("swPastilles").addEventListener("click", () => {
+    prep.pastilles.actif = !prep.pastilles.actif;
+    if (prep.pastilles.actif && !prep.pastilles.lignes.length) prep.pastilles.lignes.push({ qte: "", d: "", l: 3 });
+    marquerSale(); afficherNdc();
+  });
+  function afficherManuels() {
+    const l = prep.tubesManuels;
+    $("manuelsBody").innerHTML = l.map((x, i) => `<tr data-m="${i}">
+      <td><input type="text" class="pr-mini n" data-mf="qte" value="${x.qte === "" ? "" : fr(x.qte)}" style="width:70px"></td>
+      <td><select class="pr-mini" data-mf="d" style="width:100px;${styleDiam(x.d)}">${optionsDiam(x.d)}</select></td>
+      <td><select class="pr-mini" data-mf="l" style="width:90px">${FTSParc.LONGUEURS_TUBE.map((t) => `<option value="${t}" ${t === nombre(x.l) ? "selected" : ""}>${fr(t)} m</option>`).join("")}</select></td>
+      <td><button type="button" class="pr-x" data-mdel>✕</button></td></tr>`).join("") || `<tr><td colspan="4" style="color:var(--text-sub)">Aucun.</td></tr>`;
+  }
+  $("btnAjoutManuel").addEventListener("click", () => { prep.tubesManuels.push({ qte: "", d: "", l: 1.5 }); marquerSale(); afficherManuels(); });
+  $("manuelsBody").addEventListener("change", (e) => {
+    const tr = e.target.closest("tr[data-m]"); if (!tr || !e.target.dataset.mf) return;
+    prep.tubesManuels[Number(tr.dataset.m)][e.target.dataset.mf] = nombre(e.target.value);
+    marquerSale(); afficherManuels();
+  });
+  $("manuelsBody").addEventListener("click", (e) => {
+    if (!e.target.matches("[data-mdel]")) return;
+    prep.tubesManuels.splice(Number(e.target.closest("tr").dataset.m), 1); marquerSale(); afficherManuels();
+  });
+  $("btnAjoutPastille").addEventListener("click", () => { prep.pastilles.lignes.push({ qte: "", d: "", l: 3 }); marquerSale(); afficherPastilles(); });
+  $("pastillesBody").addEventListener("change", (e) => {
+    const tr = e.target.closest("tr[data-p]"); if (!tr || !e.target.dataset.pf) return;
+    prep.pastilles.lignes[Number(tr.dataset.p)][e.target.dataset.pf] = nombre(e.target.value);
+    marquerSale(); afficherPastilles();
+  });
+  $("pastillesBody").addEventListener("click", (e) => {
+    if (!e.target.matches("[data-pdel]")) return;
+    prep.pastilles.lignes.splice(Number(e.target.closest("tr").dataset.p), 1); marquerSale(); afficherPastilles();
+  });
+
+  // ─── Collage de la NDC ─────────────────────────────────────────
+  function ouvrirCollage() {
+    $("collerTexte").value = ""; $("collerApercu").innerHTML = ""; $("collerBilan").innerHTML = ""; $("collerStatus").textContent = "";
+    $("collerValider").disabled = true; collage = null;
+    $("collerModal").classList.add("open");
+    setTimeout(() => $("collerTexte").focus(), 50);
+  }
+  function fermerCollage() { $("collerModal").classList.remove("open"); }
+  $("btnColler").addEventListener("click", ouvrirCollage);
+  $("collerModal").querySelectorAll("[data-fermer]").forEach((b) => b.addEventListener("click", fermerCollage));
+  function modeCollage() { return document.querySelector('input[name="mode"]:checked').value; }
+  function analyser() {
+    const txt = $("collerTexte").value;
+    if (!txt.trim()) { collage = null; $("collerApercu").innerHTML = ""; $("collerBilan").innerHTML = ""; $("collerValider").disabled = true; return; }
+    if (!collage || collage.texte !== txt) collage = { texte: txt, ...P.analyserCollage(txt) };
+    const res = P.lirePieux(collage.lignes, collage.colonnes);
+    collage.res = res;
+    const opts = (k) => `<option value="">— ignorée —</option>` + P.CHAMPS.map((c) => `<option value="${c.k}" ${c.k === k ? "selected" : ""}>${c.lib}</option>`).join("");
+    const exemple = collage.lignes.slice(0, 3);
+    $("collerApercu").innerHTML = `<div class="pr-map"><table><tr>${collage.colonnes.map((k, c) => `<th><select data-col="${c}">${opts(k)}</select></th>`).join("")}</tr>
+      ${exemple.map((l) => `<tr>${collage.colonnes.map((_, c) => `<td>${esc(l[c] || "")}</td>`).join("")}</tr>`).join("")}</table></div>
+      <p style="font-size:.76rem;color:var(--text-sub);margin:6px 0 0">${collage.entete ? "Colonnes reconnues d'après l'entête collée." : "Pas d'entête : ordre des colonnes de l'onglet A-5 utilisé."} Corrige une colonne si besoin.</p>`;
+    $("collerApercu").querySelectorAll("[data-col]").forEach((s) => s.addEventListener("change", () => {
+      const k = s.value, c = Number(s.dataset.col);
+      collage.colonnes = collage.colonnes.map((x, j) => (j === c ? k : x === k && k ? "" : x));
+      analyser();
+    }));
+    const f = P.fusionner(prep.ndc.pieux, res.pieux, modeCollage());
+    const chips = [`<span class="pr-chip v">${res.pieux.length} pieux lus</span>`];
+    if (f.nouveaux.length) chips.push(`<span class="pr-chip v">${f.nouveaux.length} nouveau(x)${f.nouveaux.length <= 6 ? " : " + esc(f.nouveaux.join(", ")) : ""}</span>`);
+    if (f.misAJour.length) chips.push(`<span class="pr-chip o">${f.misAJour.length} mis à jour</span>`);
+    if (modeCollage() === "ajouter" && f.inchanges > 0) chips.push(`<span class="pr-chip">${f.inchanges} inchangé(s)</span>`);
+    if (f.retires.length) chips.push(`<span class="pr-chip r">${f.retires.length} retiré(s)${f.retires.length <= 6 ? " : " + esc(f.retires.join(", ")) : ""}</span>`);
+    if (res.ignorees) chips.push(`<span class="pr-chip">${res.ignorees} ligne(s) vide(s) ignorée(s)</span>`);
+    if (res.note) chips.push(`<span class="pr-chip">note reprise : « ${esc(res.note.slice(0, 60))} »</span>`);
+    $("collerBilan").innerHTML = chips.join("");
+    $("collerStatus").textContent = res.pieux.length ? "" : "Aucun pieu reconnu : vérifie la colonne « Repère » et la colonne « Longueur ».";
+    $("collerStatus").className = "sv-mstatus" + (res.pieux.length ? "" : " err");
+    $("collerValider").disabled = !res.pieux.length;
+  }
+  $("collerTexte").addEventListener("input", () => { collage = null; analyser(); });
+  document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener("change", analyser));
+  $("collerValider").addEventListener("click", () => {
+    if (!collage || !collage.res || !collage.res.pieux.length) return;
+    const mode = modeCollage();
+    const f = P.fusionner(prep.ndc.pieux, collage.res.pieux, mode);
+    if (mode === "remplacer" && f.retires.length && !confirm(`${f.retires.length} pieu(x) absent(s) du collage seront retirés. Continuer ?`)) return;
+    prep.ndc.pieux = f.pieux;
+    const forages = collage.res.pieux.map((p) => nombre(p.forage)).filter((x) => x > 0);
+    if (forages.length) prep.ndc.forage = forages[0];
+    if (collage.res.note) prep.ndc.note = collage.res.note;
+    marquerSale(); remplirChamps(); afficherNdc(); fermerCollage();
+    FTSShell.toast(`✅ ${collage.res.pieux.length} pieux collés`);
+  });
+
+  // ─── Fournitures ───────────────────────────────────────────────
+  function marge(cle) { return nombre(prep.marges[cle]) || 0; }
+  function articles(c) {
+    const a = [];
+    c.tubes.forEach((t) => a.push({ cle: P.cleArticle("tube", t), lib: `Tube Ø${fr(t.d)} · ${fr(t.l)} m${t.pastille ? " · PASTILLÉ" : ""}`, d: t.d, qte: t.qte, sorte: "tube", x: t }));
+    c.platines.forEach((p) => a.push({ cle: P.cleArticle("platine", p), lib: `Platine ${p.section || "?"} · ${p.coiffe.toLowerCase()}`, qte: p.qte, sorte: "platine", x: p }));
+    c.centreurs.forEach((p) => a.push({ cle: P.cleArticle("centreur", p), lib: `As de carreau Ø${fr(p.forage)} · tube Ø${fr(p.d)}`, d: p.d, qte: p.qte, sorte: "centreur", x: p }));
+    c.barres.forEach((b) => a.push({ cle: P.cleArticle("barre", b), lib: `Barre ${b.type} Ø${fr(b.d)} · ${fr(b.l)} m + écrou`, qte: b.qte, sorte: "barre", x: b }));
+    return a;
+  }
+  function afficherFournitures() {
+    const c = calcul();
+    const m = tubeMax();
+    $("fournKpi").innerHTML = `<div><b>${c.nbPieux}</b><span>micropieux</span></div><div><b>${fr(c.lineaire, 1)} m</b><span>linéaire retenu</span></div><div><b>${m === "" ? "?" : fr(m) + " m"}</b><span>tube max de la foreuse</span></div>`;
+    const a = articles(c);
+    const sections = [["tube", "Tubes"], ["platine", "Platines"], ["centreur", "As de carreau"], ["barre", "Barres / écrous"]];
+    $("fournBody").innerHTML = a.length ? sections.map(([s, titre]) => {
+      const l = a.filter((x) => x.sorte === s);
+      if (!l.length) return "";
+      return `<tr class="sep"><td colspan="4">${titre.toUpperCase()}</td></tr>` + l.map((x) => `<tr>
+        <td>${x.d && s === "tube" ? `<span class="pr-sq" style="background:${P.couleurTube(x.d) || "#fff"}"></span>` : ""}${esc(x.lib)}</td><td class="r">${x.qte}</td>
+        <td><input type="text" class="pr-mini n" data-marge="${esc(x.cle)}" value="${marge(x.cle) ? (marge(x.cle) > 0 ? "+" : "") + marge(x.cle) : "0"}" style="width:70px"></td>
+        <td class="r"><b>${Math.max(0, x.qte + marge(x.cle))}</b></td></tr>`).join("");
+    }).join("") : `<tr><td colspan="4" style="color:var(--text-sub)">Colle la note de calcul et choisis la foreuse pour calculer les fournitures.</td></tr>`;
+    if (m === "" && prep.ndc.pieux.length) $("fournBody").insertAdjacentHTML("afterbegin", `<tr><td colspan="4"><div class="pr-note w">⚠️ Longueur de tube de la foreuse inconnue : choisis la foreuse (étape 2) ou renseigne-la dans le Parc matériel.</div></td></tr>`);
+    $("fournBody").querySelectorAll("[data-marge]").forEach((el) => el.addEventListener("change", () => {
+      const v = nombre(String(el.value).replace("+", ""));
+      if (v === "" || v === 0) delete prep.marges[el.dataset.marge]; else prep.marges[el.dataset.marge] = Math.round(v);
+      marquerSale(); afficherFournitures();
+    }));
+    afficherManuels();
+    const ci = c.ciment;
+    const pal = ci.palettes === "" ? "?" : ci.palettes;
+    $("cimentKpi").innerHTML = `<div><b>${pal} palette${pal === 1 ? "" : "s"}</b><span>${ci.sacsPalette === "" ? "sacs par palette à renseigner dans le Parc matériel" : `${ci.sacsPalette} sacs par palette`}</span></div>
+      <div><b>${ci.sacs === "" ? "?" : ci.sacs} sacs</b><span>de ${fr(ci.sac)} kg · ${fr(ci.kg / 1000, 2)} t</span></div>
+      <div><b>${fr(ci.volume, 2)} m³</b><span>volume théorique · dosage ${fr(ci.dosage)} kg/m³ · +${fr(ci.surconso === "" ? 0 : ci.surconso)} %</span></div>`;
+  }
+
+  // ─── Fiche imprimée ────────────────────────────────────────────
+  function dateFr(iso) { const [a, m, j] = String(iso || "").split("-"); return a && m && j ? `${j}/${m}/${a}` : ""; }
+  function dashRows(lignes, nbMin) {
+    const out = lignes.map((cells) => `<tr>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`);
+    while (out.length < nbMin) out.push(`<tr><td></td><td></td><td></td></tr>`);
+    return out.join("");
+  }
+  function afficherFiche() {
+    const c = calcul();
+    const q = (cle, n) => Math.max(0, n + marge(cle));
+    const chef = FTSPersonnel.parNom(prep.equipe.chef);
+    const tel = chef && chef.telephone ? chef.telephone : "";
+    const ma = prep.materiel, re = prep.remarques, inf = prep.infos;
+    const foreuse = machineForeuse();
+    const ci = c.ciment;
+    const premiere = nombre(prep.ciment.premiereLivraison);
+    const pal = (v) => (v === "" ? "?" : `${v} Pal`);
+    const platines = c.platines.map((p) => [`${q(P.cleArticle("platine", p), p.qte)} u`, esc(p.section), esc(p.coiffe)]);
+    const centreurs = c.centreurs.map((p) => [`${q(P.cleArticle("centreur", p), p.qte)} u`, `Ø ${fr(p.forage)}`, `Ø ${fr(p.d)}`]);
+    const tubes = P.tubesFiche(c, prep).map((t) => [`${t.qte} u`, `Ø ${t.d.toFixed(1)}${t.pastille ? " PASTILLÉ" : ""}`, `${t.l.toFixed(1)} ML`]);
+    const barres = c.barres.map((b) => [`${q(P.cleArticle("barre", b), b.qte)} u`, `${esc(b.type)} Ø ${fr(b.d)}`, `${b.l === "" ? "" : Number(b.l).toFixed(1) + " ML"}`]);
+    const L = (n) => (n || n === 0 ? n : "");
+    $("fichePage").innerHTML = `
+<div class="fp-top">
+  <div><img src="../assets/logo-fts.png" alt="FTS" style="height:19mm;width:auto;display:block">
+    <table style="width:70%;margin-top:6px"><tr><td class="g">Indice :</td><td><b>${esc(L(prep.indice))}</b></td></tr></table></div>
+  <div><table>
+    <tr><td class="g" style="width:40%">N° DOSSIER:</td><td><b>${esc(code)}</b></td></tr>
+    <tr><td class="g">CHANTIER</td><td style="font-size:8px">${esc(nom)}</td></tr>
+    <tr><td class="g">CONDUCTEUR DE TRAVAUX :</td><td>${esc(inf.conducteur)}</td></tr>
+    <tr><td class="g">EQUIPE:</td><td><b>${esc(prep.equipe.chef)}</b></td></tr>
+    <tr class="nb"><td></td><td>${tel ? "Tél. : " + esc(tel) : ""}</td></tr>
+  </table></div>
+</div>
+<div class="fp-cols">
+  <div>
+    <table><tr><td class="g lbl">ADRESSE :</td><td colspan="2">${esc(inf.adresse)}</td></tr><tr><td colspan="3">${esc(inf.commune)}</td></tr>
+    <tr><td class="lbl u">PRISE DU MATÉRIEL :</td><td colspan="2">${esc(inf.priseMateriel)}</td></tr></table>
+    <div class="red">MATERIEL DE CHANTIER</div>
+    <table>
+      <tr><td class="g">FOREUSE :</td><td class="g">INJECTION :</td></tr><tr><td style="height:22px">${esc(foreuse ? foreuse.designation || foreuse.nom : ma.foreuse)}</td><td>${esc(ma.injection)}</td></tr>
+      <tr><td class="g">PRESSE :</td><td class="g">CUVE GNR :</td></tr><tr><td style="height:22px">${esc(ma.presse)}</td><td>${esc(ma.cuveGnr)}</td></tr>
+      <tr><td class="g">CUVE A EAU :</td><td class="g">CAISSE FLEXIBLE :</td></tr><tr><td style="height:22px">${esc(ma.cuveEau)}</td><td>${esc(ma.caisseFlexible)}</td></tr>
+    </table>
+    <div class="red">LOCATION</div>
+    <table>
+      <tr><td class="g">ELEVATEUR :</td><td class="g">COMPRESSEUR :</td></tr><tr><td style="height:22px">${esc(ma.elevateur)}</td><td>${esc(ma.compresseur)}${ma.compresseur.trim() ? ' <span class="fp-adblue">AD-BLUE</span>' : ""}</td></tr>
+      <tr><td class="g">GROUPE ELECTROGENE :</td><td class="g">PELLE :</td></tr><tr><td style="height:22px">${esc(ma.groupe)}</td><td>${esc(ma.pelle)}${ma.pelle.trim() && ma.pelleLivraison ? `<br><b>Livraison : ${esc(ma.pelleLivraison)}</b>` : ""}</td></tr>
+    </table>
+    <div class="red">MATERIAUX</div>
+    <table><tr><td class="g" colspan="3">CIMENT :</td></tr><tr><td colspan="2">Total Chantier</td><td>1 ère Livraison</td></tr>
+      <tr><td style="height:22px">${pal(ci.palettes)}</td><td>${esc(prep.ciment.type)}</td><td>${pal(premiere === "" ? ci.palettes : premiere)}</td></tr></table>
+  </div>
+  <div>
+    <table><tr><td class="g lbl" colspan="2">DATE INTERVENTION ET DURÉE :</td></tr><tr><td>${inf.dateConnue && inf.date ? dateFr(inf.date) : "<b>À DÉFINIR</b>"}</td><td>${esc(L(inf.duree))} ${esc(inf.dureeUnite)}</td></tr></table>
+    <table style="margin-top:8px">
+      <tr><td class="g lbl u" colspan="2">REMARQUES</td></tr>
+      <tr><td class="lbl" style="height:24px">Objectif forage :</td><td>${re.objectif !== "" ? esc(re.objectif) + " U micropieux par jour (minimum)" : ""}</td></tr>
+      <tr><td class="lbl" style="height:24px">Micropieu(x) d'essai :</td><td>${esc(re.essais)}</td></tr>
+      <tr><td class="lbl" style="height:24px">IMPLANTATION :</td><td>${esc(re.implantation)}</td></tr>
+      <tr><td class="lbl" style="height:24px">EVACUATION DES BOUES :</td><td>${esc(re.boues)}</td></tr>
+      <tr><td class="lbl" style="height:24px">EVACUATION DES DECHETS :</td><td>${esc(re.dechets)}</td></tr>
+      <tr><td class="lbl">NDC :</td><td>${prep.ndc.indice ? "Ind " + esc(prep.ndc.indice) : ""}${prep.ndc.ddc ? " — " + esc(prep.ndc.ddc) : ""}</td></tr>
+    </table>
+    <table style="margin-top:8px"><tr><td class="g">OUTILS DE FORAGE :</td><td class="g">Ø (mm)</td><td class="g">DIVERS :</td></tr>
+      <tr><td>${esc(re.outil)}</td><td>${esc(re.outilDiam)}</td><td rowspan="6" style="text-align:left;vertical-align:top;white-space:pre-wrap">${esc(re.divers)}</td></tr>
+      ${'<tr><td style="height:14px"></td><td></td></tr>'.repeat(5)}</table>
+  </div>
+</div>
+<div class="fp-bas">
+  <table class="dash">
+    <tr class="h"><td class="g" colspan="3">PLATINES</td></tr><tr class="h"><td>quantité</td><td>section</td><td>coiffe</td></tr>
+    ${dashRows(platines, 6)}
+    <tr class="h"><td class="g" colspan="3">AS DE CARREAU</td></tr><tr class="h"><td>quantité</td><td>Ø forage</td><td>Ø tube</td></tr>
+    ${dashRows(centreurs, 7)}
+  </table>
+  <table class="dash">
+    <tr class="h"><td class="g" colspan="3">TUBES</td></tr><tr class="h"><td>Qté</td><td>Ø / Section</td><td>Longueur</td></tr>
+    ${dashRows(tubes, 9)}
+    <tr class="h"><td class="g" colspan="3">BARRES / ÉCROUS</td></tr><tr class="h"><td>Qté</td><td>Ø</td><td>Longueur</td></tr>
+    ${dashRows(barres, 3)}
+  </table>
+</div>`;
+  }
+  $("btnImprimer").addEventListener("click", () => { afficherFiche(); window.print(); });
+
+  // ─── Onglets ───────────────────────────────────────────────────
+  function ouvrirOnglet(t) {
+    document.querySelectorAll("#prTabs button").forEach((b) => b.classList.toggle("on", b.dataset.t === t));
+    document.querySelectorAll(".sv-tab").forEach((x) => x.classList.toggle("on", x.id === "tab" + t));
+    if (t === "Fournitures") afficherFournitures();
+    if (t === "Fiche") afficherFiche();
+    if (t === "Ndc") afficherNdc();
+  }
+  document.querySelectorAll("#prTabs button").forEach((b) => b.addEventListener("click", () => ouvrirOnglet(b.dataset.t)));
+
+  $("fCode").value = code; $("fNom").value = nom;
+  if (window.FTSAuth && FTSAuth.isSignedIn()) charger();
+});
+</script>
+</body>
+</html>

@@ -213,10 +213,12 @@ document.addEventListener("DOMContentLoaded", () => {
     sousTitreMobile: `<span id="mSous">${esc(code)}</span>`,
     retour: "../supervision-encadrement/index.html",
     actions: `<a class="sv-btn" id="driveBtn" href="https://drive.google.com/drive/folders/${encodeURIComponent(chantierId || "")}" target="_blank" rel="noopener" style="text-decoration:none">📁 Dossier Drive</a>
+      <a class="sv-btn" href="../preparation/index.html?id=${encodeURIComponent(chantierId || "")}&name=${encodeURIComponent(chantierName)}" style="text-decoration:none">📋 Fiche de préparation</a>
       <button type="button" class="sv-btn" id="modifierInfosBtn">✏️ Modifier les infos</button>
       <span id="statutActions"></span>`,
     menuMobile: [
       { label: "📁 Ouvrir le dossier Drive", action: () => window.open(`https://drive.google.com/drive/folders/${encodeURIComponent(chantierId || "")}`, "_blank") },
+      { label: "📋 Fiche de préparation", action: () => { window.location.href = `../preparation/index.html?id=${encodeURIComponent(chantierId || "")}&name=${encodeURIComponent(chantierName)}`; } },
       { label: "🔄 Actualiser", action: () => charger() },
     ],
     onSession: (c) => { if (c) charger(); else if (!donnees) $("dcStatus").textContent = "Connecte-toi pour afficher le chantier."; },

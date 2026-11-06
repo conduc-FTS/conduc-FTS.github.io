@@ -65,26 +65,45 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 /* ── Fiche imprimée (même présentation que l'onglet Excel « Fiche Prépa Mpx ») ── */
 .fp-zone { background: #E9EAED; padding: 16px; border-radius: 12px; overflow: auto; }
 .fp-page { width: 190mm; min-height: 270mm; margin: 0 auto; background: #fff; padding: 8mm; box-shadow: 0 2px 12px rgba(0,0,0,.15); font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #000; box-sizing: content-box; }
-.fp-page table { border-collapse: collapse; width: 100%; }
-.fp-page td { border: 1px solid #000; padding: 3px 4px; text-align: center; vertical-align: middle; }
+/* Toutes les cases : largeurs fixes (colgroup) et hauteurs fixes → les traits tombent les uns sous les autres */
+.fp-page table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+.fp-page td { border: 1px solid #000; padding: 2px 5px; text-align: center; vertical-align: middle; height: 17px; overflow: hidden; overflow-wrap: anywhere; line-height: 1.2; }
+.fp-page td.v { height: 21px; }
 .fp-page .g { background: #c8c8c8; font-weight: bold; }
 .fp-page .lbl { font-weight: bold; text-align: left; }
+.fp-page .gauche { text-align: left; }
 .fp-page .u { text-decoration: underline; }
-.fp-page .red { color: #e00; font-weight: bold; font-size: 12px; text-align: center; padding: 6px 0 2px; }
-.fp-page .nb td { border: none; }
-.fp-page .dash td { border-left: 1px solid #000; border-right: 1px solid #000; border-top: none; border-bottom: 1px dashed #000; height: 21px; font-weight: bold; font-size: 11px; }
-.fp-page .dash tr.h td { border: 1px solid #000; font-weight: bold; font-size: 10px; height: auto; }
-.fp-top { display: grid; grid-template-columns: 38% 62%; align-items: start; }
-.fp-cols { display: grid; grid-template-columns: 38% 1fr; gap: 12px; margin-top: 10px; }
-.fp-bas { display: grid; grid-template-columns: 38% 62%; margin-top: 12px; }
-.fp-adblue { background: #8DB4E2; color: #c00; font-weight: bold; padding: 1px 4px; }
+.fp-page .red { color: #e00; font-weight: bold; font-size: 12px; text-align: center; height: 20px; line-height: 20px; }
+.fp-page .esp { height: 8px; }
+.fp-page .dash td { border-left: 1px solid #000; border-right: 1px solid #000; border-top: none; border-bottom: 1px dashed #000; height: 19px; font-weight: bold; font-size: 11px; }
+.fp-page .dash tr.h td { border: 1px solid #000; font-weight: bold; font-size: 10px; }
+.fp-page .dash tr:last-child td { border-bottom: 1px solid #000; }
+/* Une seule grille pour tout le haut et le bas : colonne gauche 38 %, même espace de 3 mm partout */
+.fp-top, .fp-cols, .fp-bas { display: grid; grid-template-columns: 38% minmax(0, 1fr); column-gap: 3mm; }
+.fp-top { align-items: end; }
+.fp-cols { margin-top: 4mm; align-items: stretch; }
+.fp-droite { display: flex; flex-direction: column; }
+.fp-divers { flex: 1; min-height: 32mm; border: 1px solid #000; display: flex; flex-direction: column; margin-top: 8px; }
+.fp-divers .t { background: #c8c8c8; font-weight: bold; text-align: center; border-bottom: 1px solid #000; height: 17px; line-height: 17px; }
+.fp-divers .c { flex: 1; padding: 4px 6px; text-align: left; white-space: pre-wrap; font-size: 10px; outline: none; cursor: text; }
+.fp-zone .fp-divers .c:empty::before { content: "Clique ici pour écrire (texte libre)"; color: #9aa0aa; font-style: italic; }
+.fp-zone .fp-divers .c:focus { background: #FFFBEA; }
+.fp-signe { margin-top: 4mm; }
+.fp-signe td.vide { height: 14mm; }
+.fp-page.serre1 .dash td { height: 16px; font-size: 10px; }
+.fp-page.serre2 .dash td { height: 14px; font-size: 9px; padding-top: 0; padding-bottom: 0; }
+.fp-page tr { break-inside: avoid; }
+#printZone { display: none; }
+.fp-bas { margin-top: 4mm; align-items: start; }
+.fp-adblue { display: inline-block; background: #8DB4E2; color: #c00; font-weight: bold; padding: 0 4px; white-space: nowrap; font-size: 9px; }
+.fp-petit { font-size: 8.5px; }
 
 @media print {
   @page { size: A4; margin: 10mm; }
-  body * { visibility: hidden; }
-  #fichePage, #fichePage * { visibility: visible; }
-  #fichePage { position: absolute; left: 0; top: 0; box-shadow: none; padding: 0; margin: 0; }
-  .fp-zone { background: none; padding: 0; }
+  html, body { display: block !important; background: #fff !important; }
+  body > *:not(#printZone) { display: none !important; }
+  #printZone { display: block !important; }
+  #printZone .fp-page { width: auto; min-height: 0; padding: 0; margin: 0; box-shadow: none; }
 }
 @media (max-width: 900px) { .pr-grid, .pr-grid.deux { grid-template-columns: 1fr; } }
 </style>
@@ -236,7 +255,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   <!-- 6 · FICHE -->
   <div class="sv-tab" id="tabFiche">
     <section class="sv-card">
-      <div class="sv-ch"><h2>Fiche de préparation de chantier</h2><span class="s">même présentation que la fiche Excel</span><span class="sv-sp"></span><button type="button" class="sv-btn pri" id="btnImprimer">🖨️ Imprimer / PDF</button></div>
+      <div class="sv-ch"><h2>Fiche de préparation de chantier</h2><span class="s">même présentation que la fiche Excel · clique dans DIVERS pour écrire directement · la fiche se resserre toute seule pour tenir sur une page A4</span><span class="sv-sp"></span><button type="button" class="sv-btn pri" id="btnImprimer">🖨️ Imprimer / PDF</button></div>
       <div style="padding:14px"><div class="fp-zone"><div class="fp-page" id="fichePage"></div></div></div>
     </section>
   </div>
@@ -723,7 +742,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const m = tubeMax();
     $("fournKpi").innerHTML = `<div><b>${c.nbPieux}</b><span>micropieux</span></div><div><b>${fr(c.lineaire, 1)} m</b><span>linéaire retenu</span></div><div><b>${m === "" ? "?" : fr(m) + " m"}</b><span>tube max de la foreuse</span></div>`;
     const a = articles(c);
-    const sections = [["tube", "Tubes"], ["platine", "Platines"], ["centreur", "As de carreau"], ["barre", "Barres / écrous"]];
+    const sections = [["tube", "Tubes"], ["platine", "Platines"], ["centreur", "As de carreau / pointes"], ["barre", "Barres / écrous"]];
     $("fournBody").innerHTML = a.length ? sections.map(([s, titre]) => {
       const l = a.filter((x) => x.sorte === s);
       if (!l.length) return "";
@@ -753,7 +772,28 @@ document.addEventListener("DOMContentLoaded", () => {
     while (out.length < nbMin) out.push(`<tr><td></td><td></td><td></td></tr>`);
     return out.join("");
   }
+  // Hauteur utile d'une page A4 (297 mm − 2 × 10 mm de marge), en pixels écran
+  const HAUTEUR_A4 = 277 * 96 / 25.4;
   function afficherFiche() {
+    const page = $("fichePage");
+    const style = getComputedStyle(page);
+    const pad = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    // Niveaux : 0 normal · 1 lignes plus basses · 2 moins de lignes vides · 3 très serré · 4 sans ligne vide
+    for (let n = 0; n <= 4; n++) {
+      dessinerFiche(n);
+      page.classList.toggle("serre1", n === 1 || n === 2);
+      page.classList.toggle("serre2", n >= 3);
+      if (page.scrollHeight - pad <= HAUTEUR_A4 || n === 4) break;
+    }
+    const div = $("fpDivers");
+    if (div) div.addEventListener("input", () => {
+      prep.remarques.divers = div.innerText.replace(/\n$/, "");
+      const champ = document.querySelector('[data-k="remarques.divers"]');
+      if (champ) champ.value = prep.remarques.divers;
+      marquerSale();
+    });
+  }
+  function dessinerFiche(niveau) {
     const c = calcul();
     const q = (cle, n) => Math.max(0, n + marge(cle));
     const chef = FTSPersonnel.parNom(prep.equipe.chef);
@@ -768,69 +808,98 @@ document.addEventListener("DOMContentLoaded", () => {
     const tubes = P.tubesFiche(c, prep).map((t) => [`${t.qte} u`, `Ø ${t.d.toFixed(1)}${t.pastille ? " PASTILLÉ" : ""}`, `${t.l.toFixed(1)} ML`]);
     const barres = c.barres.map((b) => [`${q(P.cleArticle("barre", b), b.qte)} u`, `${esc(b.type)} Ø ${fr(b.d)}`, `${b.l === "" ? "" : Number(b.l).toFixed(1) + " ML"}`]);
     const L = (n) => (n || n === 0 ? n : "");
+    // Bas de page : même nombre de lignes à gauche et à droite → les traits sont alignés
+    // Lignes vides pour compléter au stylo : réduites si la fiche est longue (niveau de resserrage)
+    const vides = [[6, 7, 9, 3], [6, 7, 9, 3], [3, 3, 4, 2], [1, 1, 1, 1], [0, 0, 0, 0]][niveau] || [0, 0, 0, 0];
+    const plus = niveau >= 2 ? 1 : 0; // au moins une ligne libre sous les données
+    const nPl = Math.max(vides[0], platines.length + plus), nCe = Math.max(vides[1], centreurs.length + plus);
+    let nTu = Math.max(vides[2], tubes.length + plus), nBa = Math.max(vides[3], barres.length + plus);
+    const gauche = nPl + nCe, droite = nTu + nBa;
+    // Alignement gauche / droite seulement si la fiche tient facilement (sinon des lignes vides gaspilleraient la page)
+    if (niveau < 3 && droite < gauche) nTu += gauche - droite;
+    const nCe2 = nCe + (niveau < 3 ? Math.max(0, droite - gauche) : 0);
+    const cg = (...w) => `<colgroup>${w.map((x) => `<col style="width:${x}%">`).join("")}</colgroup>`;
     $("fichePage").innerHTML = `
 <div class="fp-top">
-  <div><img src="../assets/logo-fts.png" alt="FTS" style="height:19mm;width:auto;display:block">
-    <table style="width:70%;margin-top:6px"><tr><td class="g">Indice :</td><td><b>${esc(L(prep.indice))}</b></td></tr></table></div>
-  <div><table>
-    <tr><td class="g" style="width:40%">N° DOSSIER:</td><td><b>${esc(code)}</b></td></tr>
-    <tr><td class="g">CHANTIER</td><td style="font-size:8px">${esc(nom)}</td></tr>
+  <div><img src="../assets/logo-fts.png" alt="FTS" style="height:18mm;width:auto;display:block;margin-bottom:3mm">
+    <table>${cg(50, 50)}<tr><td class="g">Indice :</td><td><b>${esc(L(prep.indice))}</b></td></tr></table></div>
+  <div><table>${cg(40, 60)}
+    <tr><td class="g">N° DOSSIER :</td><td><b>${esc(code)}</b></td></tr>
+    <tr><td class="g">CHANTIER :</td><td class="fp-petit">${esc(nom)}</td></tr>
     <tr><td class="g">CONDUCTEUR DE TRAVAUX :</td><td>${esc(inf.conducteur)}</td></tr>
-    <tr><td class="g">EQUIPE:</td><td><b>${esc(prep.equipe.chef)}</b></td></tr>
-    <tr class="nb"><td></td><td>${tel ? "Tél. : " + esc(tel) : ""}</td></tr>
+    <tr><td class="g">ÉQUIPE :</td><td><b>${esc(prep.equipe.chef)}</b></td></tr>
+    <tr><td class="g">TÉL. CHEF :</td><td>${esc(tel)}</td></tr>
   </table></div>
 </div>
 <div class="fp-cols">
   <div>
-    <table><tr><td class="g lbl">ADRESSE :</td><td colspan="2">${esc(inf.adresse)}</td></tr><tr><td colspan="3">${esc(inf.commune)}</td></tr>
-    <tr><td class="lbl u">PRISE DU MATÉRIEL :</td><td colspan="2">${esc(inf.priseMateriel)}</td></tr></table>
+    <table>${cg(46, 54)}
+      <tr><td class="g lbl" rowspan="2">ADRESSE :</td><td class="gauche">${esc(inf.adresse)}</td></tr>
+      <tr><td class="gauche">${esc(inf.commune)}</td></tr>
+      <tr><td class="g lbl" style="white-space:nowrap;font-size:9.5px">PRISE DU MATÉRIEL :</td><td>${esc(inf.priseMateriel)}</td></tr>
+    </table>
     <div class="red">MATERIEL DE CHANTIER</div>
-    <table>
-      <tr><td class="g">FOREUSE :</td><td class="g">INJECTION :</td></tr><tr><td style="height:22px">${esc(foreuse ? foreuse.designation || foreuse.nom : ma.foreuse)}</td><td>${esc(ma.injection)}</td></tr>
-      <tr><td class="g">PRESSE :</td><td class="g">CUVE GNR :</td></tr><tr><td style="height:22px">${esc(ma.presse)}</td><td>${esc(ma.cuveGnr)}</td></tr>
-      <tr><td class="g">CUVE A EAU :</td><td class="g">CAISSE FLEXIBLE :</td></tr><tr><td style="height:22px">${esc(ma.cuveEau)}</td><td>${esc(ma.caisseFlexible)}</td></tr>
+    <table>${cg(50, 50)}
+      <tr><td class="g">FOREUSE :</td><td class="g">INJECTION :</td></tr><tr><td class="v">${esc(foreuse ? foreuse.designation || foreuse.nom : ma.foreuse)}</td><td class="v">${esc(ma.injection)}</td></tr>
+      <tr><td class="g">PRESSE :</td><td class="g">CUVE GNR :</td></tr><tr><td class="v">${esc(ma.presse)}</td><td class="v">${esc(ma.cuveGnr)}</td></tr>
+      <tr><td class="g">CUVE A EAU :</td><td class="g">CAISSE FLEXIBLE :</td></tr><tr><td class="v">${esc(ma.cuveEau)}</td><td class="v">${esc(ma.caisseFlexible)}</td></tr>
     </table>
     <div class="red">LOCATION</div>
-    <table>
-      <tr><td class="g">ELEVATEUR :</td><td class="g">COMPRESSEUR :</td></tr><tr><td style="height:22px">${esc(ma.elevateur)}</td><td>${esc(ma.compresseur)}${ma.compresseur.trim() ? ' <span class="fp-adblue">AD-BLUE</span>' : ""}</td></tr>
-      <tr><td class="g">GROUPE ELECTROGENE :</td><td class="g">PELLE :</td></tr><tr><td style="height:22px">${esc(ma.groupe)}</td><td>${esc(ma.pelle)}${ma.pelle.trim() && ma.pelleLivraison ? `<br><b>Livraison : ${esc(ma.pelleLivraison)}</b>` : ""}</td></tr>
+    <table>${cg(50, 50)}
+      <tr><td class="g">ÉLÉVATEUR :</td><td class="g">COMPRESSEUR :</td></tr><tr><td class="v">${esc(ma.elevateur)}</td><td class="v">${esc(ma.compresseur)}${ma.compresseur.trim() ? ' <span class="fp-adblue">+ AD-BLUE</span>' : ""}</td></tr>
+      <tr><td class="g fp-petit">GROUPE ÉLECTROGÈNE :</td><td class="g">PELLE :</td></tr><tr><td class="v">${esc(ma.groupe)}</td><td class="v">${esc(ma.pelle)}${ma.pelle.trim() && ma.pelleLivraison ? ` <span class="fp-petit">(livr. ${esc(ma.pelleLivraison)})</span>` : ""}</td></tr>
     </table>
     <div class="red">MATERIAUX</div>
-    <table><tr><td class="g" colspan="3">CIMENT :</td></tr><tr><td colspan="2">Total Chantier</td><td>1 ère Livraison</td></tr>
-      <tr><td style="height:22px">${pal(ci.palettes)}</td><td>${esc(prep.ciment.type)}</td><td>${pal(premiere === "" ? ci.palettes : premiere)}</td></tr></table>
+    <table>${cg(25, 25, 50)}<tr><td class="g" colspan="3">CIMENT :</td></tr><tr><td colspan="2">Total chantier</td><td>1ère livraison</td></tr>
+      <tr><td class="v"><b>${pal(ci.palettes)}</b></td><td class="v">${esc(prep.ciment.type)}</td><td class="v"><b>${pal(premiere === "" ? ci.palettes : premiere)}</b></td></tr></table>
   </div>
-  <div>
-    <table><tr><td class="g lbl" colspan="2">DATE INTERVENTION ET DURÉE :</td></tr><tr><td>${inf.dateConnue && inf.date ? dateFr(inf.date) : "<b>À DÉFINIR</b>"}</td><td>${esc(L(inf.duree))} ${esc(inf.dureeUnite)}</td></tr></table>
-    <table style="margin-top:8px">
+  <div class="fp-droite">
+    <table>${cg(50, 50)}<tr><td class="g lbl" colspan="2">DATE INTERVENTION ET DURÉE :</td></tr><tr><td class="v">${inf.dateConnue && inf.date ? `<b>${dateFr(inf.date)}</b>` : "<b>À DÉFINIR</b>"}</td><td class="v">${esc(L(inf.duree))} ${esc(inf.dureeUnite)}</td></tr></table>
+    <div class="esp"></div>
+    <table>${cg(42, 58)}
       <tr><td class="g lbl u" colspan="2">REMARQUES</td></tr>
-      <tr><td class="lbl" style="height:24px">Objectif forage :</td><td>${re.objectif !== "" ? esc(re.objectif) + " U micropieux par jour (minimum)" : ""}</td></tr>
-      <tr><td class="lbl" style="height:24px">Micropieu(x) d'essai :</td><td>${esc(re.essais)}</td></tr>
-      <tr><td class="lbl" style="height:24px">IMPLANTATION :</td><td>${esc(re.implantation)}</td></tr>
-      <tr><td class="lbl" style="height:24px">EVACUATION DES BOUES :</td><td>${esc(re.boues)}</td></tr>
-      <tr><td class="lbl" style="height:24px">EVACUATION DES DECHETS :</td><td>${esc(re.dechets)}</td></tr>
-      <tr><td class="lbl">NDC :</td><td>${prep.ndc.indice ? "Ind " + esc(prep.ndc.indice) : ""}${prep.ndc.ddc ? " — " + esc(prep.ndc.ddc) : ""}</td></tr>
+      <tr><td class="lbl v">Objectif forage :</td><td class="v">${re.objectif !== "" ? esc(re.objectif) + " U micropieux / jour (minimum)" : ""}</td></tr>
+      <tr><td class="lbl v">Micropieu(x) d'essai :</td><td class="v">${esc(re.essais)}</td></tr>
+      <tr><td class="lbl v">IMPLANTATION :</td><td class="v">${esc(re.implantation)}</td></tr>
+      <tr><td class="lbl v">ÉVACUATION DES BOUES :</td><td class="v">${esc(re.boues)}</td></tr>
+      <tr><td class="lbl v">ÉVACUATION DES DÉCHETS :</td><td class="v">${esc(re.dechets)}</td></tr>
+      <tr><td class="lbl v">NDC :</td><td class="v fp-petit">${prep.ndc.indice ? "Ind " + esc(prep.ndc.indice) : ""}${prep.ndc.ddc ? (prep.ndc.indice ? " — " : "") + esc(prep.ndc.ddc) : ""}</td></tr>
     </table>
-    <table style="margin-top:8px"><tr><td class="g">OUTILS DE FORAGE :</td><td class="g">Ø (mm)</td><td class="g">DIVERS :</td></tr>
-      <tr><td>${esc(re.outil)}</td><td>${esc(re.outilDiam)}</td><td rowspan="6" style="text-align:left;vertical-align:top;white-space:pre-wrap">${esc(re.divers)}</td></tr>
-      ${'<tr><td style="height:14px"></td><td></td></tr>'.repeat(5)}</table>
+    <div class="esp"></div>
+    <table>${cg(70, 30)}<tr><td class="g">OUTILS DE FORAGE :</td><td class="g">Ø (mm)</td></tr>
+      <tr><td>${esc(re.outil)}</td><td>${esc(re.outilDiam)}</td></tr>
+      <tr><td></td><td></td></tr></table>
+    <div class="fp-divers"><div class="t">DIVERS :</div><div class="c" id="fpDivers" contenteditable="true" spellcheck="true">${esc(re.divers)}</div></div>
   </div>
 </div>
 <div class="fp-bas">
-  <table class="dash">
-    <tr class="h"><td class="g" colspan="3">PLATINES</td></tr><tr class="h"><td>quantité</td><td>section</td><td>coiffe</td></tr>
-    ${dashRows(platines, 6)}
-    <tr class="h"><td class="g" colspan="3">AS DE CARREAU</td></tr><tr class="h"><td>quantité</td><td>Ø forage</td><td>Ø tube</td></tr>
-    ${dashRows(centreurs, 7)}
+  <table class="dash">${cg(25, 30, 45)}
+    <tr class="h"><td class="g" colspan="3">PLATINES</td></tr><tr class="h"><td>Qté</td><td>Section</td><td>Coiffe</td></tr>
+    ${dashRows(platines, nPl)}
+    <tr class="h"><td class="g" colspan="3">AS DE CARREAU / POINTES</td></tr><tr class="h"><td>Qté</td><td>Ø forage</td><td>Ø tube</td></tr>
+    ${dashRows(centreurs, nCe2)}
   </table>
-  <table class="dash">
+  <table class="dash">${cg(18, 52, 30)}
     <tr class="h"><td class="g" colspan="3">TUBES</td></tr><tr class="h"><td>Qté</td><td>Ø / Section</td><td>Longueur</td></tr>
-    ${dashRows(tubes, 9)}
+    ${dashRows(tubes, nTu)}
     <tr class="h"><td class="g" colspan="3">BARRES / ÉCROUS</td></tr><tr class="h"><td>Qté</td><td>Ø</td><td>Longueur</td></tr>
-    ${dashRows(barres, 3)}
+    ${dashRows(barres, nBa)}
   </table>
-</div>`;
+</div>
+<table class="fp-signe">${cg(34, 33, 33)}
+  <tr><td class="g">PRÉPARÉ PAR :</td><td class="g">LE :</td><td class="g">SIGNATURE :</td></tr>
+  <tr><td class="vide"></td><td class="vide"></td><td class="vide"></td></tr>
+</table>`;
   }
-  $("btnImprimer").addEventListener("click", () => { afficherFiche(); window.print(); });
+  $("btnImprimer").addEventListener("click", () => {
+    afficherFiche();
+    // Copie de la fiche directement sous <body> : l'impression peut alors continuer sur une 2e page si besoin
+    let z = $("printZone");
+    if (!z) { z = document.createElement("div"); z.id = "printZone"; document.body.appendChild(z); }
+    z.innerHTML = `<div class="fp-page ${$("fichePage").className.replace("fp-page", "")}">${$("fichePage").innerHTML}</div>`;
+    const d = z.querySelector("#fpDivers"); if (d) { d.removeAttribute("id"); d.removeAttribute("contenteditable"); }
+    window.print();
+  });
 
   // ─── Onglets ───────────────────────────────────────────────────
   function ouvrirOnglet(t) {

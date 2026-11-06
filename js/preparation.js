@@ -18,6 +18,8 @@
  *  - Ciment théorique : (section forage − section acier du tube principal)
  *    × longueur × dosage × (1 + surconsommation). Barres et tubes
  *    secondaires négligés.
+ *  - As de carreau (pointes) : 1 par pieu au Ø du tube principal + 1 au Ø du
+ *    tube secondaire s'il y en a un.
  *  - Tubes pastillés : lignes ajoutées à la main uniquement.
  *
  * Les fonctions de calcul sont pures (testables sans navigateur).
@@ -139,7 +141,9 @@ const FTSPreparation = (() => {
       const coiffe = coiffePlatine(p, ctx.percagePour);
       const section = sectionPlatine(p.platine);
       if (section || coiffe) ajoute(platines, `${section}|${coiffe}`, { section, coiffe });
+      // As de carreau (pointes) : un par tube principal, et un de plus par tube secondaire, au Ø du tube
       if (d > 0) ajoute(centreurs, `${forageMm}|${d}`, { forage: forageMm, d });
+      if (ds > 0) ajoute(centreurs, `${forageMm}|${ds}`, { forage: forageMm, d: ds });
       const bd = nombre(p.barreD);
       if (bd > 0) {
         const type = majuscules(p.barreType) || "GEWI";

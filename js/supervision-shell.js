@@ -29,6 +29,7 @@ const FTSShell = (() => {
     { grp: "RÉFÉRENTIELS" },
     { id: "se-view-personnel", ic: "👥", label: "Personnel FTS", href: SUP + "#se-view-personnel" },
     { id: "se-view-parc", ic: "🚜", label: "Parc matériel", href: SUP + "#se-view-parc" },
+    { id: "se-view-acces", ic: "🔐", label: "Accès Drive", href: SUP + "#se-view-acces" },
     { grp: "CHANTIERS" },
     { id: "se-view-archives", ic: "🗄️", label: "Archives", href: SUP + "#se-view-archives" },
   ];

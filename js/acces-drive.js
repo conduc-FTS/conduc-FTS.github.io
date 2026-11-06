@@ -3,8 +3,10 @@
  * dans le Drive FTS, calculé et appliqué automatiquement.
  *
  * Règles (validées avec Clément le 06/11/2026) :
- *  - ENCADREMENT (liste tenue dans REFERENTIEL / « Accès Drive FTS ») : accès à
- *    tous les dossiers racine, en modification ou en lecture seule ;
+ *  - ENCADREMENT = Personnel FTS, catégorie ENCADREMENT, ACTIF, avec e-mail et
+ *    « Accès Drive » Lecture + modification ou Lecture seule : accès à tous
+ *    les dossiers racine. L'ancienne liste (REFERENTIEL / « Accès Drive FTS »)
+ *    reste lue en transition pour les adresses absentes de Personnel FTS ;
  *  - CHEFS DE CHANTIER ACTIFS avec e-mail (Personnel FTS) :
  *      DOSSIER CHANTIER → modification · ADMINISTRATIF / {son dossier} →
  *      lecture (créé s'il manque) · ARCHIVES → AUCUN accès (réservé aux
@@ -40,10 +42,11 @@ const FTSAcces = (() => {
   const RANG = { reader: 1, commenter: 1, writer: 2, fileOrganizer: 3, organizer: 3, owner: 4 };
 
   let racine = null;
-  let encadrement = null; // { spreadsheetId, liste:[{nom,email,acces}] }
+  let encadrement = null; // ANCIENNE liste « Accès Drive FTS » : { spreadsheetId, liste:[{nom,email,acces}] }
   let dernier = null;     // dernier bilan
   let enCours = null;
-  let edition = null;
+  let messageStatut = ""; // message sous le formulaire, conservé entre deux affichages
+  let aRefaire = false;     // une modification arrivée pendant une vérification : on en relance une après
 
   const esc = (s) => { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; };
   const auth = () => ({ Authorization: "Bearer " + FTSAuth.getToken() });
@@ -88,6 +91,26 @@ const FTSAcces = (() => {
     const v = r.ok ? (await r.json()).values || [] : [];
     return (encadrement = { spreadsheetId: id, liste: v.filter((x) => x[1]).map((x) => ({ nom: x[0] || "", email: mail(x[1]), acces: /MODIF/i.test(String(x[2] || "")) || !String(x[2] || "").trim() ? "MODIFICATION" : "LECTURE" })) });
   }
+  /**
+   * Encadrement en vigueur : Personnel FTS (catégorie ENCADREMENT) + les
+   * personnes de l'ancienne liste dont l'adresse n'est pas dans Personnel FTS.
+   * [{ nom, poste, email, acces: "MODIFICATION"|"LECTURE", source: "personnel"|"ancienne" }]
+   */
+  function listeEncadrement() {
+    const personnes = window.FTSPersonnel ? FTSPersonnel.toutes() : [];
+    const dansBase = new Set(personnes.filter((p) => p.email).map((p) => mail(p.email)));
+    const res = personnes.filter((p) => p.categorie === "ENCADREMENT" && p.statut === "ACTIF" && p.email && p.acces !== "AUCUN")
+      .map((p) => ({ nom: `${p.nom} ${p.prenom}`.trim(), poste: p.poste, email: mail(p.email), acces: p.acces === "LECTURE" ? "LECTURE" : "MODIFICATION", source: "personnel" }));
+    ((encadrement && encadrement.liste) || []).forEach((e) => {
+      if (!dansBase.has(e.email) && !res.some((x) => x.email === e.email)) res.push({ ...e, poste: "", source: "ancienne" });
+    });
+    return res;
+  }
+  async function personnelLu() {
+    const rp = window.FTSPersonnel ? await FTSPersonnel.charger({ rapide: true }).catch(() => null) : null;
+    return !!(rp && rp.source === "sheet");
+  }
+
   async function enregistrerEncadrement(liste) {
     const id = encadrement && encadrement.spreadsheetId ? encadrement.spreadsheetId : await idClasseur(true);
     let r = await req(`${SHEETS}/${id}/values/${encodeURIComponent(ONGLET + "!A:Z")}:clear`, { method: "POST" });
@@ -104,14 +127,20 @@ const FTSAcces = (() => {
   let droitsCache = null;
   async function droits() {
     if (droitsCache) return droitsCache;
+    // Session pas encore prête (ouverture directe sur #se-view-acces, nouvel
+    // ordinateur…) : on attend la connexion Google jusqu'à ~30 s.
+    for (let i = 0; i < 60 && !(window.FTSAuth && FTSAuth.isSignedIn && FTSAuth.isSignedIn()); i++) await new Promise((ok) => setTimeout(ok, 500));
+    if (!(window.FTSAuth && FTSAuth.isSignedIn && FTSAuth.isSignedIn())) return { ok: false, email: "", pasConnecte: true };
     let email = "";
     try { const u = window.FTSAuth && FTSAuth.getUserInfo ? await FTSAuth.getUserInfo() : null; email = mail(u && u.email); } catch (e) {}
     if (!email && window.FTSAuth && FTSAuth.emailMemorise) email = mail(FTSAuth.emailMemorise());
     const q = encodeURIComponent("name = 'DOSSIER CHANTIER' and mimeType = 'application/vnd.google-apps.folder' and 'me' in owners and trashed = false");
     const r = await req(`${DRIVE}/files?q=${q}&fields=files(id)`).catch(() => null);
+    if (!r || !r.ok) return { ok: false, email, erreur: r ? r.status : "réseau" }; // pas mis en cache : on réessaiera
     if (r && r.ok && ((await r.json()).files || []).length) return (droitsCache = { ok: true, email, proprio: true, proprietaire: email });
     if (!encadrement) await chargerEncadrement().catch(() => (encadrement = { spreadsheetId: null, liste: [] }));
-    const e = encadrement.liste.find((x) => x.email === email);
+    if (!(await personnelLu())) return { ok: false, email, lecture: false }; // Personnel FTS illisible = pas l'encadrement
+    const e = listeEncadrement().find((x) => x.email === email);
     let proprietaire = "";
     try {
       const q2 = encodeURIComponent("name = 'DOSSIER CHANTIER' and mimeType = 'application/vnd.google-apps.folder' and trashed = false");
@@ -137,13 +166,13 @@ const FTSAcces = (() => {
   async function analyser() {
     if (!encadrement) await chargerEncadrement();
     // Sécurité : on ne touche à rien si la vraie base Personnel FTS n'est pas lue
-    const rp = window.FTSPersonnel ? await FTSPersonnel.charger({ rapide: true }).catch(() => null) : null;
-    if (!rp || rp.source !== "sheet") throw new Error("base Personnel FTS illisible : aucun accès modifié");
+    if (!(await personnelLu())) throw new Error("base Personnel FTS illisible : aucun accès modifié");
     const personnes = FTSPersonnel.toutes();
     const base = new Map(personnes.filter((p) => p.email).map((p) => [mail(p.email), p]));
     const chefs = personnes.filter((p) => p.statut === "ACTIF" && p.poste === "CHEF DE CHANTIER" && p.email);
     const chefsSansMail = personnes.filter((p) => p.statut === "ACTIF" && p.poste === "CHEF DE CHANTIER" && !p.email);
-    const enc = new Map(encadrement.liste.map((e) => [e.email, e.acces === "LECTURE" ? "reader" : "writer"]));
+    const listeEnc = listeEncadrement();
+    const enc = new Map(listeEnc.map((e) => [e.email, e.acces === "LECTURE" ? "reader" : "writer"]));
     const actions = [];
     const absents = [];
     const ajouter = (dossier, fileId, email, role, raison) => actions.push({ type: "ajout", dossier, fileId, email, role, raison, auto: true });
@@ -240,7 +269,7 @@ const FTSAcces = (() => {
       const actuelle = r.ok ? ((await r.json()).folderColorRgb || "").toLowerCase() : "";
       if (actuelle !== d.couleur) couleurs.push({ id: racines[d.nom], couleur: d.couleur, nom: d.nom });
     }
-    return { actions, couleurs, partages, chefs, chefsSansMail, absents };
+    return { actions, couleurs, partages, chefs, chefsSansMail, absents, nbEncadrement: listeEnc.length };
   }
 
   async function executer(plan, inclureProposes) {
@@ -249,7 +278,7 @@ const FTSAcces = (() => {
       if (!a.auto && !inclureProposes) continue;
       try {
         let r;
-        const poser = (role) => req(`${DRIVE}/files/${a.fileId}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, { method: "POST", body: JSON.stringify({ role, type: "user", emailAddress: a.email }) });
+        const poser = (role) => req(`${DRIVE}/files/${a.fileId}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, { method: "POST", body: JSON.stringify({ role, type: "user", emailAddress: aff(a.email) }) });
         if (a.type === "ajout") r = await poser(a.role);
         else if (a.type === "role") {
           r = await req(`${DRIVE}/files/${a.fileId}/permissions/${a.permId}?supportsAllDrives=true`, { method: "PATCH", body: JSON.stringify({ role: a.role }) });
@@ -263,7 +292,7 @@ const FTSAcces = (() => {
         }
         else if (a.type === "dossier") {
           const id = await FTSDrive.createFolder(a.nomDossier, a.parentId);
-          r = await req(`${DRIVE}/files/${id}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, { method: "POST", body: JSON.stringify({ role: "reader", type: "user", emailAddress: a.email }) });
+          r = await req(`${DRIVE}/files/${id}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, { method: "POST", body: JSON.stringify({ role: "reader", type: "user", emailAddress: aff(a.email) }) });
         }
         if (r && (r.ok || r.status === 204)) faits.push(a); else erreurs.push({ ...a, statut: r ? r.status : "?" });
       } catch (e) { erreurs.push({ ...a, statut: e.message }); }
@@ -305,6 +334,12 @@ const FTSAcces = (() => {
     return enCours;
   }
 
+  /** Comme verifier(), mais si une vérification tourne déjà, en relance une après (prend en compte la dernière modification). */
+  async function verifierAJour(options = {}) {
+    if (enCours) await enCours.catch(() => {});
+    return verifier(options);
+  }
+
   /** Résumé en une ligne (écran Personnel FTS). */
   function resume(b) {
     const aj = b.faits.filter((a) => a.type !== "retrait").length, re = b.faits.filter((a) => a.type === "retrait").length;
@@ -324,17 +359,19 @@ const FTSAcces = (() => {
   const restants = (b) => (b.plan.partages || []).filter((x) => !x.proprio).length;
   function rendre() {
     if (!racine) return;
-    const liste = (encadrement && encadrement.liste) || [];
-    const ligne = (p, i) => edition === i ? `<tr><td><input class="ad-in" id="adNom" value="${esc(p.nom)}"></td><td><input class="ad-in" id="adMail" value="${esc(aff(p.email))}"></td>
-        <td><select class="ad-in" id="adRole"><option value="MODIFICATION" ${p.acces !== "LECTURE" ? "selected" : ""}>Lecture + modification</option><option value="LECTURE" ${p.acces === "LECTURE" ? "selected" : ""}>Lecture seule</option></select></td>
-        <td style="white-space:nowrap"><button type="button" class="ad-btn pri" data-ok="${i}">OK</button> <button type="button" class="ad-btn" data-annuler>✕</button></td></tr>`
-      : `<tr><td><b>${esc(p.nom || "—")}</b></td><td>${esc(aff(p.email))}</td><td>${p.acces === "LECTURE" ? '<span class="ad-r r-lec">LECTURE SEULE</span>' : '<span class="ad-r r-mod">LECTURE + MODIFICATION</span>'}</td>
-        <td style="white-space:nowrap"><button type="button" class="ad-btn" data-edit="${i}" title="Modifier">✏️</button> <button type="button" class="ad-btn" data-suppr="${i}" title="Retirer de l'encadrement">🗑️</button></td></tr>`;
+    const liste = listeEncadrement();
+    const anciens = liste.filter((p) => p.source === "ancienne");
+    const badgeAcces = (a) => a === "LECTURE" ? '<span class="ad-r r-lec">LECTURE SEULE</span>' : '<span class="ad-r r-mod">LECTURE + MODIFICATION</span>';
+    const posteLib = (t) => t ? t.charAt(0) + t.slice(1).toLowerCase() : "";
+    const ligne = (p) => p.source === "ancienne"
+      ? `<tr class="ad-ancien"><td><b>${esc(p.nom || "—")}</b></td><td><span class="ad-r r-perso">ANCIENNE LISTE</span></td><td>${esc(aff(p.email))}</td><td>${badgeAcces(p.acces)}</td>
+          <td><button type="button" class="ad-btn" data-suppr-ancien="${esc(p.email)}" title="Retirer de l'ancienne liste">🗑️</button></td></tr>`
+      : `<tr><td><b>${esc(p.nom)}</b></td><td class="ad-sub">${esc(posteLib(p.poste)) || "—"}</td><td>${esc(aff(p.email))}</td><td>${badgeAcces(p.acces)}</td><td></td></tr>`;
     const b = dernier;
     let bilan = '<div class="ad-vide">Vérification en cours…</div>';
     if (b) {
       const donnes = b.faits.filter((a) => a.type !== "retrait"), retires = b.faits.filter((a) => a.type === "retrait");
-      bilan = `<div class="ad-ok">✅ <b>${b.plan.chefs.length} chef(s) de chantier</b> avec e-mail : DOSSIER CHANTIER (modification) et leur dossier ADMINISTRATIF (lecture). ARCHIVES réservé à l'encadrement.<br>✅ Dossiers internes réservés à l'encadrement (${liste.length} personne(s) + le propriétaire).<br>✅ Couleurs des dossiers appliquées.<br>${restants(b) ? "" : `✅ Les chefs ne peuvent pas partager DOSSIER CHANTIER ni les dossiers des chantiers${b.partagesBloques ? ` (réglé à l'instant sur ${b.partagesBloques} dossier(s))` : ""}.`}</div>`;
+      bilan = `<div class="ad-ok">✅ <b>${b.plan.chefs.length} chef(s) de chantier</b> avec e-mail : DOSSIER CHANTIER (modification) et leur dossier ADMINISTRATIF (lecture). ARCHIVES réservé à l'encadrement.<br>✅ Dossiers internes réservés à l'encadrement (${b.plan.nbEncadrement} personne(s) + le propriétaire).<br>✅ Couleurs des dossiers appliquées.<br>${restants(b) ? "" : `✅ Les chefs ne peuvent pas partager DOSSIER CHANTIER ni les dossiers des chantiers${b.partagesBloques ? ` (réglé à l'instant sur ${b.partagesBloques} dossier(s))` : ""}.`}</div>`;
       if (restants(b)) bilan += `<div class="ad-warn">⚠️ <b>${restants(b)} dossier(s) de chantier</b> encore partageables par les chefs : seul le propriétaire du Drive peut bloquer le partage. Ouvre cet écran une fois avec le compte propriétaire (conduc.fts).</div>`;
       if (donnes.length) {
         const parMail = {};
@@ -342,7 +379,7 @@ const FTSAcces = (() => {
         bilan += `<div class="ad-info">➕ <b>Fait à l'instant</b> :<ul>${Object.entries(parMail).map(([m, l]) => `<li><b>${esc(aff(m))}</b> — ${l.length > 3 ? `${l.length} dossiers` : esc(l.join(" · "))}</li>`).join("")}</ul></div>`;
       }
       if (retires.length) bilan += `<div class="ad-warn">🧹 <b>Accès retirés</b> : ${retires.map((a) => `${esc(aff(a.email))} (${esc(a.dossier)})`).join(" · ")}</div>`;
-      if (b.proposes.length) bilan += `<div class="ad-alert">⚠️ <b>${b.proposes.length} accès à vérifier</b> — adresses inconnues de Personnel FTS et de l'Encadrement, sur des dossiers internes :<ul>${b.proposes.map((a) => `<li>${esc(aff(a.email))} — ${esc(a.dossier)} (${roleLib(a.ancien)})</li>`).join("")}</ul>Si ce sont des personnes de l'encadrement, ajoute-les dans la liste à gauche puis clique sur « Vérifier maintenant ». Sinon :<br><button type="button" class="ad-btn pri" id="adRetirer" style="margin-top:8px">Retirer ces ${b.proposes.length} accès</button></div>`;
+      if (b.proposes.length) bilan += `<div class="ad-alert">⚠️ <b>${b.proposes.length} accès à vérifier</b> — adresses inconnues de Personnel FTS et de l'Encadrement, sur des dossiers internes :<ul>${b.proposes.map((a) => `<li>${esc(aff(a.email))} — ${esc(a.dossier)} (${roleLib(a.ancien)})</li>`).join("")}</ul>Si ce sont des personnes de l'encadrement, ajoute-les dans Personnel FTS (catégorie ENCADREMENT) puis clique sur « Vérifier maintenant ». Sinon :<br><button type="button" class="ad-btn pri" id="adRetirer" style="margin-top:8px">Retirer ces ${b.proposes.length} accès</button></div>`;
       if (b.plan.chefsSansMail.length) bilan += `<div class="ad-warn">⚠️ <b>Chef(s) sans e-mail</b> : ${b.plan.chefsSansMail.map((p) => esc(`${p.nom} ${p.prenom}`)).join(", ")} — leur tablette n'a aucun accès tant que l'e-mail n'est pas renseigné dans Personnel FTS.</div>`;
       if (b.plan.absents.length) bilan += `<div class="ad-info">ℹ️ Dossiers pas encore créés : ${b.plan.absents.map(esc).join(", ")} (créés par le robot de recopie au besoin).</div>`;
       if (b.erreurs.length) bilan += `<div class="ad-alert">❌ ${b.erreurs.length} action(s) impossible(s) : ${b.erreurs.map((a) => `${esc(aff(a.email))} / ${esc(a.dossier)} (${esc(a.statut)})`).join(" · ")}</div>`;
@@ -353,22 +390,24 @@ const FTSAcces = (() => {
       return d.interne ? '<span class="ad-r r-non">RETIRÉE</span>' : '<span class="ad-sub">jamais retirée (client, MOE… partagés sur un chantier)</span>';
     };
     racine.innerHTML = `
-      <div class="se-page-sub" style="margin-bottom:14px">Qui voit quoi dans le Drive FTS. Les accès des chefs viennent de Personnel FTS (poste « Chef de chantier » + e-mail) ; ceux de l'encadrement, de la liste ci-dessous. Vérifiés à chaque ouverture de cette page.</div>
+      <div class="se-page-sub" style="margin-bottom:14px">Qui voit quoi dans le Drive FTS. Tout vient de Personnel FTS : les chefs (poste « Chef de chantier » + e-mail) et l'encadrement (catégorie « Encadrement » + e-mail + accès Drive). Vérifié à chaque ouverture de cette page.</div>
       <div class="ad-grid">
         <div class="se-panel">
-          <div class="ad-h"><h2>Encadrement</h2><span class="s">ces personnes voient tout le Drive FTS</span></div>
+          <div class="ad-h"><h2>Encadrement</h2><span class="s">vient de Personnel FTS (catégorie ENCADREMENT)</span></div>
           <div class="ad-b">
-            <table class="ad-t"><thead><tr><th>Nom</th><th>E-mail (compte Google)</th><th>Accès</th><th></th></tr></thead><tbody>
-              <tr><td><b>Conducteur de travaux</b> <span class="ad-sub">(propriétaire)</span></td><td>${esc(aff((droitsCache && droitsCache.proprietaire) || "") || "conduc.fts@gmail.com")}</td><td><span class="ad-r r-mod">PROPRIÉTAIRE</span></td><td></td></tr>
+            <table class="ad-t"><thead><tr><th>Nom</th><th>Poste</th><th>E-mail (compte Google)</th><th>Accès</th><th></th></tr></thead><tbody>
+              <tr><td><b>Compte propriétaire</b></td><td class="ad-sub">compte commun</td><td>${esc(aff((droitsCache && droitsCache.proprietaire) || "") || "conduc.fts@gmail.com")}</td><td><span class="ad-r r-mod">PROPRIÉTAIRE</span></td><td></td></tr>
               ${liste.map(ligne).join("")}
             </tbody></table>
-            <div class="ad-form"><input class="ad-in" id="adNouvNom" placeholder="Nom"><input class="ad-in" id="adNouvMail" placeholder="E-mail (compte Google)"><select class="ad-in" id="adNouvRole"><option value="MODIFICATION">Lecture + modification</option><option value="LECTURE">Lecture seule</option></select><button type="button" class="ad-btn pri" id="adAjouter">+ Ajouter</button></div>
+            ${liste.filter((p) => p.source === "personnel").length ? "" : '<div class="ad-vide" style="padding:10px 0">Personne de l\'encadrement dans Personnel FTS pour l\'instant.</div>'}
+            ${anciens.length ? `<div class="ad-warn" style="margin-top:10px">ℹ️ <b>${anciens.length} personne(s) de l'ancienne liste</b> pas encore dans Personnel FTS : elles gardent leur accès. Ajoute-les dans Personnel FTS (catégorie <b>ENCADREMENT</b>, même e-mail) : elles quitteront alors l'ancienne liste d'elles-mêmes.</div>` : ""}
+            <div style="margin-top:12px"><button type="button" class="ad-btn pri" id="adVersPersonnel">👥 Modifier dans Personnel FTS</button></div>
             <div class="ad-st" id="adStatut"></div>
           </div>
           <div class="ad-note">⚠️ <b>Nouvelle adresse (encadrement ou chef)</b> : l'ajouter aussi dans les <b>utilisateurs test</b> de la console Google Cloud (My First Project › Google Auth Platform › Audience › Add users), sinon elle ne pourra pas se connecter au site.</div>
         </div>
         <div class="se-panel">
-          <div class="ad-h"><h2>Dernière vérification</h2><span class="s">${b ? "à " + b.le.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}</span><span class="ad-sp"></span><button type="button" class="ad-btn" id="adVerifier">🔄 Vérifier maintenant</button></div>
+          <div class="ad-h"><h2>Dernière vérification</h2><span class="s">${(lancement || enCours) ? "⏳ vérification en cours…" : b ? "à " + b.le.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}</span><span class="ad-sp"></span><button type="button" class="ad-btn" id="adVerifier">🔄 Vérifier maintenant</button></div>
           <div class="ad-b">${bilan}</div>
         </div>
       </div>
@@ -380,35 +419,20 @@ const FTSAcces = (() => {
         <div class="ad-note">Les chefs n'ont pas besoin des dossiers centraux : leur tablette range tout dans le chantier, et le robot de recopie Google range une copie au bon endroit. Une personne passée en « PARTI » dans Personnel FTS perd ses accès.</div>
       </div>`;
     const $ = (id) => racine.querySelector("#" + id);
-    const statut = (t) => { const s = $("adStatut"); if (s) s.textContent = t; };
-    const valider = (nom, email, acces, sauf) => {
-      const e = mail(email);
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return "E-mail invalide.";
-      if (liste.some((p, i) => p.email === e && i !== sauf)) return "Cette adresse est déjà dans la liste.";
-      return null;
-    };
-    const sauver = async (nouvelle, message) => {
+    const statut = (t) => { messageStatut = t; const s = $("adStatut"); if (s) s.textContent = t; };
+    statut(messageStatut);
+    $("adVersPersonnel").onclick = () => { const bt = document.querySelector('.se-nav-btn[data-view="se-view-personnel"]'); if (bt) bt.click(); else location.href = "../supervision-encadrement/index.html#se-view-personnel"; };
+    racine.querySelectorAll("[data-suppr-ancien]").forEach((x) => (x.onclick = async () => {
+      const email = x.dataset.supprAncien;
+      if (!confirm(`Retirer ${aff(email)} de l'ancienne liste ?\nSans fiche ENCADREMENT dans Personnel FTS, cette adresse perdra l'accès aux dossiers internes à la vérification.`)) return;
       statut("Enregistrement…");
-      try { await enregistrerEncadrement(nouvelle); edition = null; statut("✅ " + message + " Mise à jour des accès…"); await lancer(); }
-      catch (e) { statut("❌ " + e.message); }
-    };
-    $("adAjouter").onclick = () => {
-      const p = { nom: $("adNouvNom").value.trim(), email: mail($("adNouvMail").value), acces: $("adNouvRole").value };
-      const err = valider(p.nom, p.email, p.acces, -1); if (err) return statut("⚠️ " + err);
-      sauver([...liste, p], `${aff(p.email)} ajouté(e) à l'encadrement.`);
-    };
-    racine.querySelectorAll("[data-edit]").forEach((x) => (x.onclick = () => { edition = Number(x.dataset.edit); rendre(); }));
-    racine.querySelectorAll("[data-annuler]").forEach((x) => (x.onclick = () => { edition = null; rendre(); }));
-    racine.querySelectorAll("[data-ok]").forEach((x) => (x.onclick = () => {
-      const i = Number(x.dataset.ok);
-      const p = { nom: $("adNom").value.trim(), email: mail($("adMail").value), acces: $("adRole").value };
-      const err = valider(p.nom, p.email, p.acces, i); if (err) return statut("⚠️ " + err);
-      sauver(liste.map((q, j) => (j === i ? p : q)), `${aff(p.email)} modifié(e).`);
-    }));
-    racine.querySelectorAll("[data-suppr]").forEach((x) => (x.onclick = () => {
-      const p = liste[Number(x.dataset.suppr)];
-      if (!confirm(`Retirer ${aff(p.email)} de l'encadrement ?\nIl/elle perdra l'accès aux dossiers internes (REFERENTIEL, ADMINISTRATIF, rapports…) à la prochaine vérification.`)) return;
-      sauver(liste.filter((q) => q !== p), `${aff(p.email)} retiré(e) de l'encadrement.`);
+      try {
+        await enregistrerEncadrement(encadrement.liste.filter((q) => q.email !== email));
+        messageStatut = `✅ ${aff(email)} retiré(e) de l'ancienne liste. Mise à jour des accès en cours…`;
+        rendre();
+        await lancer();
+        messageStatut = `✅ ${aff(email)} retiré(e) de l'ancienne liste. Accès mis à jour.`; rendre();
+      } catch (e) { statut("❌ " + e.message); }
     }));
     $("adVerifier").onclick = () => lancer();
     const ret = $("adRetirer");
@@ -419,22 +443,36 @@ const FTSAcces = (() => {
     };
   }
 
-  async function lancer(appliquerProposes = false) {
-    if (racine && !dernier) rendre();
-    try {
-      await verifier({ appliquerProposes });
-    } catch (e) {
-      dernier = null;
-      console.error("Accès Drive :", e);
-      alert("Vérification des accès impossible : " + e.message);
-    }
-    rendre();
+  let lancement = null;
+  function lancer(appliquerProposes = false) {
+    if (lancement) { aRefaire = true; rendre(); return lancement; }
+    lancement = (async () => {
+      let ap = appliquerProposes;
+      do {
+        aRefaire = false;
+        const p = verifier({ appliquerProposes: ap });
+        ap = false;
+        rendre();
+        try { await p; }
+        catch (e) { dernier = null; console.error("Accès Drive :", e); alert("Vérification des accès impossible : " + e.message); }
+        rendre();
+      } while (aRefaire);
+    })().finally(() => { lancement = null; rendre(); });
+    return lancement;
   }
 
   async function monter(conteneur) {
     racine = conteneur;
     if (!encadrement) { racine.innerHTML = '<div class="ad-vide">Chargement…</div>'; await chargerEncadrement().catch((e) => { encadrement = { spreadsheetId: null, liste: [] }; console.warn(e); }); }
-    const d = await droits().catch(() => ({ ok: false, email: "" }));
+    const d = await droits().catch(() => ({ ok: false, email: "", erreur: "?" }));
+    if (d.ok) await personnelLu().catch(() => false);
+    if (!d.ok && (d.pasConnecte || d.erreur)) {
+      racine.innerHTML = `<div class="se-panel ad-verrou"><div class="ad-verrou-ic">⏳</div><h2>${d.pasConnecte ? "Connexion Google en attente" : "Vérification du compte impossible"}</h2>
+        <p>${d.pasConnecte ? "Connecte-toi (bouton en bas à gauche), puis reviens sur « Accès Drive »." : "Google n'a pas répondu (" + esc(d.erreur) + "). Réessaie dans un instant."}</p>
+        <button type="button" class="ad-btn pri" id="adReessayer" style="margin-top:10px">Réessayer</button></div>`;
+      racine.querySelector("#adReessayer").onclick = () => monter(conteneur);
+      return;
+    }
     if (!d.ok) {
       racine.innerHTML = `<div class="se-panel ad-verrou"><div class="ad-verrou-ic">🔒</div><h2>Réservé à l'encadrement</h2>
         <p>Cet écran modifie les accès au Drive FTS. Il est réservé au propriétaire du Drive et aux personnes de l'encadrement en « Lecture + modification ».</p>
@@ -445,6 +483,6 @@ const FTSAcces = (() => {
     lancer();
   }
 
-  return { monter, verifier, resume, chargerEncadrement, droits, DOSSIERS };
+  return { monter, verifier, verifierAJour, resume, chargerEncadrement, droits, DOSSIERS };
 })();
 window.FTSAcces = FTSAcces;

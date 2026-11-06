@@ -534,7 +534,7 @@ html { font-size: 16px; }
   <!-- ─── PERSONNEL FTS (remplace Adresses Personnel) ────────────── -->
   <div class="se-view" id="se-view-personnel">
     <div class="se-page-title">Personnel FTS</div>
-    <div class="se-page-sub">Base unique de tout le personnel FTS. Nom, prénom, catégorie, poste et e-mail sont lus par les tablettes : noms proposés dans le rapport, et chef reconnu grâce à l'e-mail du compte Google de sa tablette. L'adresse 🔒 reste dans un fichier séparé, réservé à la Supervision. Renseigner l'e-mail d'un chef de chantier suffit : DOSSIER CHANTIER lui est partagé automatiquement en modification, et l'accès est retiré s'il passe en PARTI. Le dossier REFERENTIEL reste réservé à l'encadrement (les tablettes lisent une copie allégée).</div>
+    <div class="se-page-sub">Base unique de tout le personnel FTS. Nom, prénom, catégorie, poste et e-mail sont lus par les tablettes : noms proposés dans le rapport, et chef reconnu grâce à l'e-mail du compte Google de sa tablette. L'adresse 🔒 reste dans un fichier séparé, réservé à la Supervision. Renseigner l'e-mail d'un chef de chantier suffit : DOSSIER CHANTIER lui est partagé automatiquement en modification, et l'accès est retiré s'il passe en PARTI. Le dossier REFERENTIEL reste réservé à l'encadrement (les tablettes lisent une copie allégée). La catégorie <b>ENCADREMENT</b> (conducteurs, direction, bureau) n'apparaît jamais sur la tablette, au pointage ni au stock ; son « Accès Drive » décide de ce qu'elle voit dans le Drive FTS.</div>
 
     <div class="se-panel" id="psCreerPanel" hidden>
       <div class="se-panel-head"><h2>La base personnel n'existe pas encore</h2></div>
@@ -552,7 +552,8 @@ html { font-size: 16px; }
         <div><label>Prénom</label><input type="text" id="psPrenom" style="width:140px"></div>
         <div><label>Catégorie</label><select id="psCat"></select></div>
         <div><label>Poste habituel</label><select id="psPoste"></select></div>
-        <div><label>E-mail (compte tablette pour un chef)</label><input type="email" id="psMail" style="width:220px;text-transform:none"></div>
+        <div><label>E-mail (compte Google)</label><input type="email" id="psMail" style="width:220px;text-transform:none"></div>
+        <div id="psAccesBloc" hidden><label>Accès Drive</label><select id="psAcces"></select></div>
         <div style="flex:1;min-width:220px"><label>Adresse 🔒</label><input type="text" id="psAdr" placeholder="N°, rue, code postal, ville" style="width:100%;text-transform:none"></div>
         <button type="button" id="psAjouterBtn" class="pm-btn">+ Ajouter</button>
       </div>
@@ -579,7 +580,7 @@ html { font-size: 16px; }
       <p class="form-status" id="psStatus" style="padding:0 16px"></p>
       <div class="se-table-scroll">
         <table class="se-table pm-table">
-          <thead><tr><th>Nom</th><th>Prénom</th><th>Catégorie</th><th>Poste habituel</th><th>E-mail</th><th>Adresse 🔒</th><th>Statut</th><th></th></tr></thead>
+          <thead><tr><th>Nom</th><th>Prénom</th><th>Catégorie</th><th>Poste habituel</th><th>E-mail</th><th>Adresse 🔒</th><th>Accès Drive</th><th>Statut</th><th></th></tr></thead>
           <tbody id="psTbody"></tbody>
         </table>
       </div>
@@ -764,6 +765,8 @@ document.addEventListener("DOMContentLoaded", () => {
       b.classList.toggle("on", b.dataset.view === id && b.classList.contains("tab-btn"));
     });
     document.querySelectorAll(".se-view").forEach((v) => v.classList.toggle("active", v.id === id));
+    // La vue affichée reste dans l'adresse : un rechargement (Ctrl+F5) revient au même écran.
+    try { history.replaceState(null, "", id === "se-view-overview" ? location.pathname + location.search : "#" + id); } catch (e) {}
     $("pageTitle").textContent = TITRES_VUES[id] || "Supervision";
     $("mobileTitle").textContent = id === "se-view-overview" ? "Supervision" : (TITRES_VUES[id] || "Supervision");
     $("searchBox").style.visibility = id === "se-view-overview" ? "visible" : "hidden";
@@ -1791,6 +1794,10 @@ document.addEventListener("DOMContentLoaded", () => {
 .ps-cat.MICROPIEUX { background: #E8F0FF; color: #2155C4; }
 .ps-cat.PIEUX { background: #F3E8FF; color: #7A2EC2; }
 .ps-cat.LES-DEUX { background: #E8F5EC; color: #27AE60; }
+.ps-cat.ENCADREMENT { background: #2B2F36; color: var(--fts-yellow); }
+.ps-sep td { background: #222 !important; color: var(--fts-yellow); font-weight: 800; font-size: 0.68rem; letter-spacing: .06em; padding: 7px 12px !important; }
+.ps-acc { display: inline-block; font-size: 0.66rem; font-weight: 800; padding: 3px 7px; border-radius: 4px; white-space: nowrap; }
+.ps-acc.MODIFICATION { background: #E6F4EA; color: #1E8E4E; } .ps-acc.LECTURE { background: #E8F0FE; color: #2457C5; } .ps-acc.AUCUN { background: #F1F2F4; color: #888; }
 .ps-poste { display: inline-block; font-size: 0.68rem; font-weight: 800; padding: 3px 7px; border-radius: 4px; background: var(--bg); white-space: nowrap; }
 .ps-poste.chef { background: var(--fts-yellow); }
 .ps-mail { color: var(--text-sub); font-size: 0.8rem; }
@@ -1807,8 +1814,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   ["psNom", "psPrenom"].forEach((id) => $(id).addEventListener("input", () => { const el = $(id); const p = el.selectionStart; el.value = el.value.toUpperCase(); try { el.setSelectionRange(p, p); } catch (e) {} }));
   const opts = (liste, sel, vide) => (vide ? `<option value="">${vide}</option>` : "") + liste.map((v) => `<option ${v === sel ? "selected" : ""}>${esc(v)}</option>`).join("");
+  const postesPour = (cat) => (cat === "ENCADREMENT" ? FTSPersonnel.POSTES_ENCADREMENT : FTSPersonnel.POSTES_CHANTIER);
+  const optsAcces = (sel) => FTSPersonnel.ACCES.map((a) => `<option value="${a}" ${a === (sel || "MODIFICATION") ? "selected" : ""}>${esc(FTSPersonnel.ACCES_LIB[a])}</option>`).join("");
   $("psCat").innerHTML = opts(FTSPersonnel.CATEGORIES, "MICROPIEUX");
-  $("psPoste").innerHTML = opts(FTSPersonnel.POSTES, "", "— Aucun —");
+  $("psAcces").innerHTML = optsAcces("MODIFICATION");
+  function majFormCat() {
+    const cat = $("psCat").value, garde = $("psPoste").value;
+    $("psPoste").innerHTML = opts(postesPour(cat), postesPour(cat).includes(garde) ? garde : "", "— Aucun —");
+    $("psAccesBloc").hidden = cat !== "ENCADREMENT";
+  }
+  $("psCat").addEventListener("change", majFormCat);
+  majFormCat();
 
   const cleP = (p) => FTSPersonnel.cle(`${p.prenom} ${p.nom}`);
   function adresseDe(p) { return adresses.liste.find((a) => FTSPersonnel.cle(`${a.prenom} ${a.nom}`) === cleP(p)) || null; }
@@ -1839,10 +1855,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const visibles = personnes.filter((p) => partis || p.statut === "ACTIF");
     // Filtre simple : TOUTES / MICROPIEUX / PIEUX (une personne « LES DEUX »
     // apparaît dans les deux)
-    $("psCats").innerHTML = ["TOUTES", "MICROPIEUX", "PIEUX"].map((c) => `<span class="pm-chip ${c === filtreCat ? "on" : ""}" data-c="${esc(c)}">${esc(c)}</span>`).join("");
+    $("psCats").innerHTML = ["TOUTES", "MICROPIEUX", "PIEUX", "ENCADREMENT"].map((c) => `<span class="pm-chip ${c === filtreCat ? "on" : ""}" data-c="${esc(c)}">${esc(c)}</span>`).join("");
     $("psCats").querySelectorAll(".pm-chip").forEach((el) => el.addEventListener("click", () => { filtreCat = el.dataset.c; afficher(); }));
+    const enc = (p) => p.categorie === "ENCADREMENT";
     const liste = visibles.filter((p) =>
-      (filtreCat === "TOUTES" || p.categorie === filtreCat || p.categorie === "LES DEUX") &&
+      (filtreCat === "TOUTES" || p.categorie === filtreCat || (p.categorie === "LES DEUX" && filtreCat !== "ENCADREMENT")) &&
       (!q || `${p.nom} ${p.prenom} ${p.email}`.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().includes(q)));
     $("psCompteur").textContent = `${liste.length} affichée(s) · ${personnes.filter((p) => p.statut === "ACTIF").length} actives`;
     // Personnes de la liste d'adresses pas encore dans la base
@@ -1852,10 +1869,23 @@ document.addEventListener("DOMContentLoaded", () => {
       ? `⚠️ <b>${manquantes.length} personne(s)</b> de la liste d'adresses ne sont pas dans la base : ${manquantes.map((p) => esc(`${p.prenom} ${p.nom}`)).join(", ")}.` : "";
     $("psEmpty").hidden = liste.length > 0;
     if (!liste.length) $("psEmpty").textContent = "Personne ne correspond.";
-    $("psTbody").innerHTML = liste.map((p) => (enEdition === cleP(p) ? ligneEdition(p) : ligneVue(p))).join("");
+    // Encadrement en tête (dans l'ordre des postes), puis le personnel de chantier
+    const rangPoste = (p) => { const i = FTSPersonnel.POSTES_ENCADREMENT.indexOf(p.poste); return i < 0 ? 99 : i; };
+    const lEnc = liste.filter(enc).sort((a, b) => rangPoste(a) - rangPoste(b) || (a.nom + a.prenom).localeCompare(b.nom + b.prenom, "fr"));
+    const lChantier = liste.filter((p) => !enc(p));
+    const rendu = (p) => (enEdition === cleP(p) ? ligneEdition(p) : ligneVue(p));
+    const sep = (t) => `<tr class="ps-sep"><td colspan="9">${t}</td></tr>`;
+    $("psTbody").innerHTML = (lEnc.length && lChantier.length)
+      ? sep("ENCADREMENT — jamais proposé sur la tablette, au pointage ni au stock") + lEnc.map(rendu).join("") + sep("PERSONNEL CHANTIER") + lChantier.map(rendu).join("")
+      : lEnc.concat(lChantier).map(rendu).join("");
     $("psTbody").querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => { enEdition = b.dataset.edit; afficher(); }));
     $("psTbody").querySelectorAll("[data-annuler]").forEach((b) => b.addEventListener("click", () => { enEdition = null; afficher(); }));
     $("psTbody").querySelectorAll("[data-ok]").forEach((b) => b.addEventListener("click", () => enregistrerLigne(b.dataset.ok)));
+    $("psTbody").querySelectorAll("select.e-cat").forEach((sel) => sel.addEventListener("change", () => {
+      const tr = sel.closest("tr"), po = tr.querySelector(".e-poste"), garde = po.value, l = postesPour(sel.value);
+      po.innerHTML = opts(l, l.includes(garde) ? garde : "", "— Aucun —");
+      tr.querySelector(".e-acces").hidden = sel.value !== "ENCADREMENT";
+    }));
     $("psTbody").querySelectorAll("input.e-nom, input.e-prenom").forEach((el) => el.addEventListener("input", () => { const p = el.selectionStart; el.value = el.value.toUpperCase(); try { el.setSelectionRange(p, p); } catch (e) {} }));
   }
 
@@ -1867,6 +1897,7 @@ document.addEventListener("DOMContentLoaded", () => {
       <td>${p.poste ? `<span class="ps-poste ${p.poste === "CHEF DE CHANTIER" ? "chef" : ""}">${esc(p.poste)}</span>` : '<span style="color:#bbb">—</span>'}</td>
       <td class="ps-mail">${esc(p.email) || '<span style="color:#bbb">—</span>'}</td>
       <td class="ps-adr">${a && a.adresse ? esc(a.adresse) : '<span style="color:#bbb">—</span>'}</td>
+      <td>${p.categorie === "ENCADREMENT" ? `<span class="ps-acc ${esc(p.acces || "MODIFICATION")}">${esc(FTSPersonnel.ACCES_LIB[p.acces || "MODIFICATION"]).toUpperCase()}</span>` : '<span style="color:#bbb;font-size:0.75rem">— selon le poste</span>'}</td>
       <td><span class="pm-st ${p.statut === "ACTIF" ? "EN-SERVICE" : "VENDUE"}">${esc(p.statut)}</span></td>
       <td class="pm-act">${modifiable ? `<button type="button" data-edit="${esc(cleP(p))}">✏️ Modifier</button>` : ""}</td></tr>`;
   }
@@ -1876,9 +1907,10 @@ document.addEventListener("DOMContentLoaded", () => {
       <td><input type="text" class="e-nom" value="${esc(p.nom)}" style="width:120px"></td>
       <td><input type="text" class="e-prenom" value="${esc(p.prenom)}" style="width:110px"></td>
       <td><select class="e-cat">${opts(FTSPersonnel.CATEGORIES, p.categorie, "— À compléter —")}</select></td>
-      <td><select class="e-poste">${opts(FTSPersonnel.POSTES, p.poste, "— Aucun —")}</select></td>
+      <td><select class="e-poste">${opts(postesPour(p.categorie), p.poste, "— Aucun —")}</select></td>
       <td><input type="email" class="e-mail" value="${esc(p.email)}" style="width:190px"></td>
       <td><input type="text" class="e-adr ps-adr-in" value="${esc(a ? a.adresse : "")}" style="width:220px"></td>
+      <td><select class="e-acces" ${p.categorie === "ENCADREMENT" ? "" : "hidden"}>${optsAcces(p.acces)}</select></td>
       <td><select class="e-st">${opts(FTSPersonnel.STATUTS, p.statut)}</select></td>
       <td class="pm-act"><button type="button" data-annuler>Annuler</button><button type="button" class="ok" data-ok="${esc(cleP(p))}">Enregistrer</button></td></tr>`;
   }
@@ -1903,9 +1935,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const adr = await FTSSheets.listerAdresses().catch(() => null);
       if (adr) adresses = { spreadsheetId: adr.spreadsheetId, liste: adr.adresses };
       personnes = FTSPersonnel.toutes(); enEdition = null;
-      $("psStatus").textContent = "✅ " + message + " Mise à jour des accès Drive...";
+      $("psStatus").textContent = "✅ " + message + " Mise à jour des accès Drive en cours...";
       afficher();
-      await majAcces(message);
+      majAcces(message); // en arrière-plan : le formulaire se vide tout de suite
       return true;
     } catch (e) { $("psStatus").textContent = "❌ " + e.message; return false; }
   }
@@ -1916,7 +1948,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const d = await FTSAcces.droits().catch(() => ({ ok: false }));
       if (!d.ok) { if (message) $("psStatus").textContent = "✅ " + message; return; }
-      const b = await FTSAcces.verifier();
+      const b = await FTSAcces.verifierAJour();
       $("psStatus").textContent = (message ? "✅ " + message + " " : "🔒 ") + FTSAcces.resume(b);
     } catch (e) {
       $("psStatus").textContent = (message ? "✅ " + message + " " : "") + "⚠️ Accès Drive non mis à jour : " + e.message;
@@ -1928,13 +1960,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const tr = $("psTbody").querySelector(`tr[data-ligne="${CSS.escape(k)}"]`);
     const v = (c) => tr.querySelector(c).value;
     const ancienne = personnes.find((p) => cleP(p) === k);
-    const nouvelle = { nom: maj(v(".e-nom")), prenom: maj(v(".e-prenom")), categorie: v(".e-cat"), poste: v(".e-poste"), email: v(".e-mail"), statut: v(".e-st") };
+    const nouvelle = { nom: maj(v(".e-nom")), prenom: maj(v(".e-prenom")), categorie: v(".e-cat"), poste: v(".e-poste"), email: v(".e-mail"), statut: v(".e-st"), acces: v(".e-acces") };
     const adr = v(".e-adr").trim();
     sauver(personnes.map((p) => (cleP(p) === k ? nouvelle : p)), `${nouvelle.prenom} ${nouvelle.nom} modifié(e).`, () => enregistrerAdresse(ancienne, nouvelle, adr));
   }
 
   $("psAjouterBtn").addEventListener("click", async () => {
-    const p = { nom: maj($("psNom").value), prenom: maj($("psPrenom").value), categorie: $("psCat").value, poste: $("psPoste").value, email: $("psMail").value, statut: "ACTIF" };
+    const p = { nom: maj($("psNom").value), prenom: maj($("psPrenom").value), categorie: $("psCat").value, poste: $("psPoste").value, email: $("psMail").value, statut: "ACTIF", acces: $("psAcces").value };
     if (!p.nom || !p.prenom) { $("psAjoutStatus").textContent = "⚠️ Nom et prénom obligatoires."; return; }
     $("psAjoutStatus").textContent = "";
     const adr = $("psAdr").value.trim();

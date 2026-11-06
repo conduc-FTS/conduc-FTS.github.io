@@ -155,7 +155,10 @@ function destination_(f, place, dest, cacheChefs) {
     var m = nom.match(/^(\d{4})-(\d{2})-(\d{2})_/);
     if (!m) return null;
     var chef = chefDuRapport_(f, place.chantier, m, cacheChefs) || CHEF_INCONNU;
-    var dossier = sousDossier_(sousDossier_(dossierChef_(dest.rapports, chef), m[1]), m[2] + ' - ' + MOIS[Number(m[2]) - 1]);
+    var nomMois = m[2] + ' - ' + MOIS[Number(m[2]) - 1];
+    var dossier = sousDossier_(sousDossier_(dossierChef_(dest.rapports, chef), m[1]), nomMois);
+    // Chef retrouvé après coup : on retire l'ancienne copie de « _CHEF NON RECONNU »
+    if (chef !== CHEF_INCONNU) retirerCopieInconnue_(dest.rapports, m[1], nomMois, nom, f.getId());
     return { dossier: dossier, nom: nom };
   }
   if (module === 'SECURITE' && (place.chemin[1] || '').toUpperCase() === 'ACCUEIL SECURITE') {
@@ -186,6 +189,8 @@ function chefDuRapport_(f, chantier, m, cacheChefs) {
   var desc = String(f.getDescription() || '');
   var e = desc.match(/FTS-CHEF:\s*([^\n|]+)/);
   if (e && e[1].trim()) return e[1].trim().toUpperCase();
+  var parAdmin = chefParAdministratif_(f.getName());
+  if (parAdmin) return parAdmin;
   var id = chantier.getId();
   if (!cacheChefs[id]) cacheChefs[id] = lireChefsDuSuivi_(chantier);
   var dateFR = m[3] + '/' + m[2] + '/' + m[1];
@@ -199,21 +204,100 @@ function chefDuRapport_(f, chantier, m, cacheChefs) {
   return parDate.length === 1 ? parDate[0].chef : (parDate[0].chef || '');
 }
 
+/**
+ * Anciens rapports (avant le rapport v2, sans nom du chef dans le suivi) :
+ *  1. la tablette rangeait aussi une copie dans ADMINISTRATIF / {CHEF} /
+ *     RAPPORT JOURNALIER / RJ {année} → le nom du dossier donne le chef ;
+ *  2. sinon, parmi les personnes pointées ce jour-là (onglet Personnel), le
+ *     seul CHEF DE CHANTIER de la base Personnel FTS.
+ */
+var indexAdministratif_ = null;
+function chefParAdministratif_(nomFichier) {
+  if (!indexAdministratif_) {
+    indexAdministratif_ = {};
+    try {
+      var it = DriveApp.getRootFolder().getFoldersByName('ADMINISTRATIF');
+      if (it.hasNext()) {
+        var chefs = it.next().getFolders();
+        while (chefs.hasNext()) {
+          var dChef = chefs.next();
+          var rj = dChef.getFoldersByName('RAPPORT JOURNALIER');
+          while (rj.hasNext()) {
+            var annees = rj.next().getFolders();
+            while (annees.hasNext()) {
+              var fs = annees.next().getFiles();
+              while (fs.hasNext()) indexAdministratif_[fs.next().getName()] = dChef.getName().trim().toUpperCase();
+            }
+          }
+        }
+      }
+    } catch (e) { /* pas d'ADMINISTRATIF : tant pis */ }
+  }
+  return indexAdministratif_[nomFichier] || '';
+}
+
+var chefsBase_ = null;
+function chefsDeLaBase_() {
+  if (chefsBase_) return chefsBase_;
+  chefsBase_ = {};
+  try {
+    var ref = DriveApp.getRootFolder().getFoldersByName('REFERENTIEL');
+    if (!ref.hasNext()) return chefsBase_;
+    var it = ref.next().getFilesByName('Personnel FTS');
+    if (!it.hasNext()) return chefsBase_;
+    var feuille = SpreadsheetApp.openById(it.next().getId()).getSheetByName('Personnel');
+    var v = feuille ? feuille.getDataRange().getDisplayValues() : [];
+    for (var i = 1; i < v.length; i++) {
+      if (String(v[i][3]).toUpperCase() === 'CHEF DE CHANTIER') {
+        var nomComplet = (String(v[i][1]) + ' ' + String(v[i][0])).trim().toUpperCase();
+        chefsBase_[cleAtelier_(nomComplet)] = nomComplet;
+      }
+    }
+  } catch (e) {}
+  return chefsBase_;
+}
+
 function lireChefsDuSuivi_(chantier) {
   var res = {};
   try {
     var it = chantier.getFilesByName('Suivi ' + chantier.getName());
     if (!it.hasNext()) return res;
-    var feuille = SpreadsheetApp.openById(it.next().getId()).getSheetByName('Production');
-    if (!feuille) return res;
-    var valeurs = feuille.getDataRange().getDisplayValues();
+    var classeur = SpreadsheetApp.openById(it.next().getId());
+    var feuille = classeur.getSheetByName('Production');
+    var valeurs = feuille ? feuille.getDataRange().getDisplayValues() : [];
     for (var i = 1; i < valeurs.length; i++) {
       var r = valeurs[i];
       if (!r[0] || !r[4]) continue;
       (res[r[0]] = res[r[0]] || []).push({ chef: String(r[4]).trim().toUpperCase(), atelier: r[5] || '' });
     }
+    // Jours sans nom du chef : le seul chef de chantier pointé ce jour-là
+    var pers = classeur.getSheetByName('Personnel');
+    var vp = pers ? pers.getDataRange().getDisplayValues() : [];
+    var parJour = {};
+    var base = chefsDeLaBase_();
+    for (var j = 1; j < vp.length; j++) {
+      var nom = String(vp[j][1] || '').trim().toUpperCase();
+      if (vp[j][0] && base[cleAtelier_(nom)]) (parJour[vp[j][0]] = parJour[vp[j][0]] || {})[base[cleAtelier_(nom)]] = true;
+    }
+    Object.keys(parJour).forEach(function (d) {
+      var chefs = Object.keys(parJour[d]);
+      if (!res[d] && chefs.length === 1) res[d] = [{ chef: chefs[0], atelier: '', devine: true }];
+    });
   } catch (e) { /* suivi illisible : chef inconnu */ }
   return res;
+}
+
+/** Retire de « _CHEF NON RECONNU » la copie d'un original dont le chef vient d'être retrouvé. */
+function retirerCopieInconnue_(racine, annee, nomMois, nom, idSource) {
+  var it = racine.getFoldersByName(CHEF_INCONNU);
+  if (!it.hasNext()) return;
+  var a = it.next().getFoldersByName(annee); if (!a.hasNext()) return;
+  var mo = a.next().getFoldersByName(nomMois); if (!mo.hasNext()) return;
+  var fs = mo.next().getFilesByName(nom);
+  while (fs.hasNext()) {
+    var c = fs.next();
+    if (String(c.getDescription() || '').indexOf('FTS-SRC:' + idSource + ':') === 0) c.setTrashed(true);
+  }
 }
 
 function cleAtelier_(s) {

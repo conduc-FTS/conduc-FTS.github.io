@@ -14,7 +14,7 @@
  * toujours prendre la version la plus fraîche sans avoir à changer
  * ce numéro.
  */
-const CACHE_NAME = "fts-dashboard-v7";
+const CACHE_NAME = "fts-dashboard-v8";
 // Documents gardés hors ligne par le chef (onglet DOCUMENTS) : ce cache
 // n'est JAMAIS supprimé par une mise à jour de l'appli.
 const CACHE_DOCS = "fts-docs-v1";
@@ -30,6 +30,8 @@ const ASSETS = [
   "/js/sheets.js",
   "/js/documents.js",
   "/js/boite-envoi.js",
+  "/js/gmail.js",
+  "/js/stock.js",
   "/lib/jspdf/jspdf.umd.min.js",
   "/rapport/",
   "/rapport/index.html",

@@ -704,3 +704,43 @@ body {
 @media (max-width: 640px) {
   .ac-top-row { grid-template-columns: 1fr; }
 }
+
+/* ─── Stock de fin de mois (js/stock.js) ───────────────────────── */
+#stockBandeau:empty { display: none; }
+.stk { margin-top: 16px; border-radius: 14px; padding: 14px 16px; display: flex; align-items: center; gap: 14px; border: 2px solid #F5A800; background: #FFF8E1; cursor: pointer; }
+.stk .ic { font-size: 30px; flex: none; }
+.stk b { display: block; font-size: 15px; color: var(--text-main); }
+.stk .t { display: block; font-size: 12.5px; color: #7A5200; margin-top: 2px; line-height: 1.35; }
+.stk .go { margin-left: auto; background: #F5A800; color: #1E1E1E; font-weight: 800; border-radius: 10px; padding: 11px 16px; font-size: 14px; white-space: nowrap; flex: none; }
+.stk .go.sec { background: #fff; border: 1px solid var(--border); color: var(--text-main); padding: 9px 14px; font-size: 13px; }
+.stk.rap { border-width: 1px; background: #FFFBEB; }
+.stk.retard { border-color: #C0392B; background: #FDECEA; }
+.stk.retard .t { color: #8E2A20; }
+.stk.retard .go { background: #C0392B; color: #fff; }
+.stk.ok { border-color: #3FAE63; background: #EAF6EE; }
+.stk.ok .t { color: #1E5E36; }
+.stk.ok.att { border-color: #E8B923; background: #FEF8E4; }
+.stk.ok.att .t { color: #7A5200; }
+.stk-pop { max-width: 720px; }
+.stk-pop .pop-h small { display: block; color: var(--fts-yellow); font-weight: 600; font-size: 12.5px; margin-top: 2px; }
+.stk-info { background: #FEF8E4; border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-bottom: 10px; }
+.stk-sec { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--text-sub); margin: 4px 0 8px; }
+.stk-sec small { font-weight: 600; letter-spacing: 0; }
+.stk-row { display: flex; align-items: center; gap: 14px; padding: 4px 0; }
+.stk-row .n { flex: 1; font-size: 15px; font-weight: 700; }
+.stk-row .n small { display: block; color: var(--text-sub); font-weight: 500; font-size: 12px; }
+.stk-st { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #fff; }
+.stk-st button { width: 46px; height: 44px; border: 0; background: #F5F6F8; font-size: 22px; font-weight: 700; color: var(--text-main); cursor: pointer; touch-action: manipulation; }
+.stk-st button:active { background: #E7E9ED; }
+.stk-st input { width: 58px; height: 44px; border: 0; text-align: center; font-size: 19px; font-weight: 800; font-family: inherit; color: var(--text-main); }
+.stk-tb { width: 100%; border-collapse: collapse; }
+.stk-tb th { font-size: 11px; color: var(--text-sub); text-transform: uppercase; padding: 4px 6px; text-align: center; }
+.stk-tb th:first-child, .stk-tb td:first-child { text-align: left; }
+.stk-tb td { padding: 4px 6px; border-top: 1px solid #EEF0F3; text-align: center; }
+.stk-tb td:first-child { font-weight: 800; font-size: 15px; white-space: nowrap; }
+.stk-pop textarea { width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 10px; font-family: inherit; font-size: 14px; min-height: 50px; box-sizing: border-box; }
+.stk-f { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+.stk-f .m { color: var(--text-sub); font-size: 12px; flex: 1; }
+.stk-b { border: 1px solid var(--border); background: #fff; border-radius: 10px; padding: 12px 18px; font-weight: 700; font-size: 15px; cursor: pointer; font-family: inherit; }
+.stk-b.p { background: var(--fts-yellow); border-color: var(--fts-yellow); }
+@media (max-width: 600px) { .stk { flex-wrap: wrap; } .stk .go { margin-left: 0; } .stk-st button { width: 38px; } .stk-st input { width: 44px; } }

@@ -248,6 +248,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ─── Carte chantier + objectif + activité ────────────────────
   function rendreCarteChantier() {
+    if (window.FTSStock) FTSStock.rendre();
     const actif = getChantierActif();
     const carte = $("chantierCard");
     if (!actif) {
@@ -375,6 +376,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!getChantierActif() || getChantierActif().id !== actif.id) return; // chantier changé entre-temps
       const nouveau = {
         typeChantier: meta.typeChantier || "",
+        techniques: FTSDrive.techniquesChantier ? FTSDrive.techniquesChantier(meta) : [],
         micropieuxPrevus: meta.micropieuxPrevus || 0,
         dureeChantier: meta.dureeChantier || 0,
         avancement: avancement || (cache && cache.avancement) || null,
@@ -422,6 +424,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   if (window.FTSNotifications) FTSNotifications.init();
   if (window.FTSBoiteEnvoi) FTSBoiteEnvoi.demarrer();
+  // Stock de fin de mois : bandeau sous les applications (js/stock.js)
+  if (window.FTSStock) FTSStock.monter($("stockBandeau"), {
+    getChantierActif,
+    toast,
+    // secours si le compte de la tablette n'est pas dans Personnel FTS
+    techniquesChantier: () => {
+      const a = getChantierActif();
+      const c = a && lireJSON(PREFIXE_ACCUEIL + a.id, null);
+      return c ? (c.techniques && c.techniques.length ? c.techniques : (c.typeChantier ? [c.typeChantier] : null)) : null;
+    },
+  });
 
   // Lien « Choisis ton chantier » du rapport journalier (/index.html#chantiers)
   if (window.location.hash === "#chantiers") {

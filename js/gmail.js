@@ -88,7 +88,32 @@ const FTSGmail = (() => {
     return res.json();
   }
 
-  return { envoyerAvecPieceJointe };
+  /** Mail texte simple, sans pièce jointe. */
+  async function envoyerTexte({ to, subject, body }) {
+    const mime = [
+      `From: me`,
+      `To: ${to.join(", ")}`,
+      `Subject: ${encodeHeader(subject)}`,
+      `MIME-Version: 1.0`,
+      `Content-Type: text/plain; charset=UTF-8`,
+      `Content-Transfer-Encoding: 8bit`,
+      ``,
+      body,
+    ].join("\r\n");
+    const encoded = btoa(unescape(encodeURIComponent(mime))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+    const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+      method: "POST",
+      headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({ raw: encoded }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Erreur envoi mail (${res.status})`);
+    }
+    return res.json();
+  }
+
+  return { envoyerAvecPieceJointe, envoyerTexte };
 })();
 
 // Exposition explicite sur window : une déclaration top-level en const/let

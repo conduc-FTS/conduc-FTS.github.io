@@ -32,6 +32,8 @@ const FTSSheets = (() => {
   const ONGLET_HORAIRES = "Horaires";
   const ONGLET_PANNES = "Pannes";
   const ONGLET_ARRETS = "Arrets";
+  // Stock de fin de mois (tablette) : une ligne par article compté
+  const ONGLET_STOCK = "Stock";
 
   /**
    * Remplace fetch() pour tous les appels Sheets/Drive de ce module.
@@ -132,6 +134,7 @@ const FTSSheets = (() => {
     [ONGLET_HORAIRES]: ["Date", "Aller depuis", "Départ aller", "Arrivée chantier", "Route aller (h)", "Départ chantier", "Retour vers", "Arrivée retour", "Route retour (h)", "Atelier"],
     [ONGLET_PANNES]: ["Date", "Machine", "Durée (h)", "Observations", "Atelier"],
     [ONGLET_ARRETS]: ["Date", "Motif", "Durée (h)", "Observations", "Atelier"],
+    [ONGLET_STOCK]: ["Mois", "Date du comptage", "Article", "Diamètre", "Longueur", "Quantité", "Compté par", "Remarque", "Enregistré le"],
   };
 
   // ── Ateliers ─────────────────────────────────────────────────────
@@ -716,6 +719,45 @@ const FTSSheets = (() => {
     return out;
   }
 
+  /**
+   * Stock de fin de mois d'un chantier (onglet Stock du suivi).
+   * Un nouvel envoi pour le même mois REMPLACE le précédent (correction).
+   * @param {string} mois  "MM/AAAA"
+   * @param {Array<{article, diametre, longueur, quantite}>} lignes
+   */
+  async function enregistrerStock(chantierFolderId, chantierName, { mois, dateComptage, lignes, comptePar, remarque }) {
+    const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
+    const existantes = await lireOnglet(spreadsheetId, ONGLET_STOCK).catch(() => []);
+    const aSupprimer = existantes.map((r, i) => (String(r[0] || "").replace(/^'/, "") === mois ? i + 2 : null)).filter(Boolean).sort((a, b) => b - a);
+    if (aSupprimer.length) {
+      const sheetId = await getSheetId(spreadsheetId, ONGLET_STOCK);
+      if (sheetId != null) {
+        await fetchAvecRetry(`${API_BASE}/${spreadsheetId}:batchUpdate`, {
+          method: "POST",
+          headers: { ...authHeader(), "Content-Type": "application/json" },
+          body: JSON.stringify({ requests: aSupprimer.map((row) => ({ deleteDimension: { range: { sheetId, dimension: "ROWS", startIndex: row - 1, endIndex: row } } })) }),
+        });
+      }
+    }
+    const maintenant = new Date();
+    const le = `${String(maintenant.getDate()).padStart(2, "0")}/${String(maintenant.getMonth() + 1).padStart(2, "0")}/${maintenant.getFullYear()} ${String(maintenant.getHours()).padStart(2, "0")}:${String(maintenant.getMinutes()).padStart(2, "0")}`;
+    const valeurs = lignes.map((l) => [`'${mois}`, forcerTexteDate(dateComptage), l.article, l.diametre ? `'${l.diametre}` : "", l.longueur || "", Number(l.quantite) || 0, comptePar || "", remarque || "", `'${le}`]);
+    if (valeurs.length) await ajouterLignes(spreadsheetId, ONGLET_STOCK, valeurs);
+    return spreadsheetId;
+  }
+
+  /** Lignes du stock déjà enregistré pour ce mois (null si aucun). */
+  async function lireStock(chantierFolderId, chantierName, mois) {
+    const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
+    const rows = await lireOnglet(spreadsheetId, ONGLET_STOCK).catch(() => []);
+    const du = rows.filter((r) => String(r[0] || "").replace(/^'/, "") === mois);
+    if (!du.length) return null;
+    return {
+      dateComptage: du[0][1] || "", comptePar: du[0][6] || "", remarque: du[0][7] || "", enregistreLe: String(du[0][8] || "").replace(/^'/, ""),
+      lignes: du.map((r) => ({ article: r[2] || "", diametre: String(r[3] || "").replace(/^'/, ""), longueur: r[4] || "", quantite: Number(String(r[5] || "0").replace(",", ".")) || 0 })),
+    };
+  }
+
   function parseDateFR(s) {
     const [j, m, a] = (s || "").split("/");
     // new Date(année, mois, jour) avec des nombres est TOUJOURS interprété
@@ -1044,6 +1086,8 @@ const FTSSheets = (() => {
     calculerResume,
     chargerDonneesSupervision,
     lirePannesArrets,
+    enregistrerStock,
+    lireStock,
     parseDateFR,
     verifierPieuxDejaRealises,
     listerPointageToutesChantiers,

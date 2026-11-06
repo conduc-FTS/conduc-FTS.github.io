@@ -32,6 +32,7 @@ const FTSShell = (() => {
     { id: "se-view-acces", ic: "🔐", label: "Accès Drive", href: SUP + "#se-view-acces" },
     { grp: "CHANTIERS" },
     { id: "se-view-archives", ic: "🗄️", label: "Archives", href: SUP + "#se-view-archives" },
+    { id: "se-view-documents", ic: "📁", label: "Documents", href: SUP + "#se-view-documents" },
   ];
 
   let opts = {};

@@ -369,6 +369,7 @@ html { font-size: 16px; }
     <button type="button" class="se-nav-btn" data-view="se-view-acces"><span class="ic">🔐</span>Accès Drive</button>
     <div class="sv-grp">CHANTIERS</div>
     <button type="button" class="se-nav-btn" data-view="se-view-archives"><span class="ic">🗄️</span>Archives</button>
+    <button type="button" class="se-nav-btn" data-view="se-view-documents"><span class="ic">📁</span>Documents</button>
   </nav>
   <div class="sv-acct">
     <div class="sv-av" id="userAvatar">?</div>
@@ -553,6 +554,7 @@ html { font-size: 16px; }
         <div><label>Catégorie</label><select id="psCat"></select></div>
         <div><label>Poste habituel</label><select id="psPoste"></select></div>
         <div><label>E-mail (compte Google)</label><input type="email" id="psMail" style="width:220px;text-transform:none"></div>
+        <div><label>Téléphone</label><input type="tel" id="psTel" placeholder="06 12 34 56 78" style="width:140px"></div>
         <div id="psAccesBloc" hidden><label>Accès Drive</label><select id="psAcces"></select></div>
         <div style="flex:1;min-width:220px"><label>Adresse 🔒</label><input type="text" id="psAdr" placeholder="N°, rue, code postal, ville" style="width:100%;text-transform:none"></div>
         <button type="button" id="psAjouterBtn" class="pm-btn">+ Ajouter</button>
@@ -580,12 +582,18 @@ html { font-size: 16px; }
       <p class="form-status" id="psStatus" style="padding:0 16px"></p>
       <div class="se-table-scroll">
         <table class="se-table pm-table">
-          <thead><tr><th>Nom</th><th>Prénom</th><th>Catégorie</th><th>Poste habituel</th><th>E-mail</th><th>Adresse 🔒</th><th>Accès Drive</th><th>Statut</th><th></th></tr></thead>
+          <thead><tr><th>Nom</th><th>Prénom</th><th>Catégorie</th><th>Poste habituel</th><th>E-mail · Téléphone</th><th>Adresse 🔒</th><th>Accès Drive</th><th>Statut</th><th></th></tr></thead>
           <tbody id="psTbody"></tbody>
         </table>
       </div>
       <div class="se-empty-state" id="psEmpty" hidden></div>
     </div>
+  </div>
+
+  <!-- ─── DOCUMENTS (js/documents-bureau.js) ──────────────────── -->
+  <div class="se-view" id="se-view-documents">
+    <div class="se-page-title">Documents</div>
+    <div id="documentsBureau"></div>
   </div>
 
   <!-- ─── ACCÈS DRIVE (js/acces-drive.js) ──────────────────────── -->
@@ -722,6 +730,7 @@ html { font-size: 16px; }
 <script src="../js/parc-materiel.js"></script>
 <script src="../js/personnel.js"></script>
 <script src="../js/acces-drive.js"></script>
+<script src="../js/documents-bureau.js"></script>
 <script src="../js/ateliers.js"></script>
 <script src="../js/statistiques.js"></script>
 <script>
@@ -751,7 +760,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ─── Navigation (barre latérale + barre d'onglets mobile) ─────────
   const TITRES_VUES = {
     "se-view-overview": "Vue d'ensemble", "se-view-stats": "Statistiques", "se-view-personnel": "Personnel FTS",
-    "se-view-parc": "Parc matériel", "se-view-acces": "Accès Drive", "se-view-archives": "Archives", "se-view-adresses": "Adresses Personnel",
+    "se-view-parc": "Parc matériel", "se-view-acces": "Accès Drive", "se-view-archives": "Archives", "se-view-documents": "Documents", "se-view-adresses": "Adresses Personnel",
   };
 
   function fermerMenuMobile() { document.body.classList.remove("menu-ouvert"); }
@@ -775,6 +784,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (id === "se-view-stats") chargerStatsAvancement();
     if (id === "se-view-adresses") chargerAdresses();
     if (id === "se-view-acces" && window.FTSAcces) FTSAcces.monter($("accesDrive"));
+    if (id === "se-view-documents" && window.FTSDocsBureau) FTSDocsBureau.monter($("documentsBureau"), { obtenirDonnees: (forcer) => obtenirDonnees(forcer) });
     fermerMenuMobile();
     window.scrollTo(0, 0);
   }
@@ -1801,6 +1811,7 @@ document.addEventListener("DOMContentLoaded", () => {
 .ps-poste { display: inline-block; font-size: 0.68rem; font-weight: 800; padding: 3px 7px; border-radius: 4px; background: var(--bg); white-space: nowrap; }
 .ps-poste.chef { background: var(--fts-yellow); }
 .ps-mail { color: var(--text-sub); font-size: 0.8rem; }
+.ps-tel { margin-top: 2px; } .ps-tel a { color: var(--anthracite); text-decoration: none; font-weight: 600; white-space: nowrap; }
 .ps-adr { font-size: 0.8rem; max-width: 260px; }
 .pm-table input[type=email], #se-view-personnel .ps-adr-in { text-transform: none; }
 </style>
@@ -1860,7 +1871,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const enc = (p) => p.categorie === "ENCADREMENT";
     const liste = visibles.filter((p) =>
       (filtreCat === "TOUTES" || p.categorie === filtreCat || (p.categorie === "LES DEUX" && filtreCat !== "ENCADREMENT")) &&
-      (!q || `${p.nom} ${p.prenom} ${p.email}`.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().includes(q)));
+      (!q || `${p.nom} ${p.prenom} ${p.email} ${(p.telephone || "").replace(/ /g, "")}`.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().includes(q)));
     $("psCompteur").textContent = `${liste.length} affichée(s) · ${personnes.filter((p) => p.statut === "ACTIF").length} actives`;
     // Personnes de la liste d'adresses pas encore dans la base
     const manquantes = modifiable ? FTSPersonnel.manquantesDepuisAdresses(adresses.liste) : [];
@@ -1895,7 +1906,7 @@ document.addEventListener("DOMContentLoaded", () => {
       <td><b>${esc(p.nom)}</b></td><td>${esc(p.prenom)}</td>
       <td>${p.categorie ? `<span class="ps-cat ${p.categorie.replace(" ", "-")}">${esc(p.categorie)}</span>` : '<span class="ps-cat" style="background:#FEF3E2;color:#B26A00">À COMPLÉTER</span>'}</td>
       <td>${p.poste ? `<span class="ps-poste ${p.poste === "CHEF DE CHANTIER" ? "chef" : ""}">${esc(p.poste)}</span>` : '<span style="color:#bbb">—</span>'}</td>
-      <td class="ps-mail">${esc(p.email) || '<span style="color:#bbb">—</span>'}</td>
+      <td class="ps-mail">${esc(p.email) || '<span style="color:#bbb">—</span>'}${p.telephone ? `<div class="ps-tel"><a href="tel:${esc(p.telephone.replace(/ /g, ""))}">📞 ${esc(p.telephone)}</a></div>` : ""}</td>
       <td class="ps-adr">${a && a.adresse ? esc(a.adresse) : '<span style="color:#bbb">—</span>'}</td>
       <td>${p.categorie === "ENCADREMENT" ? `<span class="ps-acc ${esc(p.acces || "MODIFICATION")}">${esc(FTSPersonnel.ACCES_LIB[p.acces || "MODIFICATION"]).toUpperCase()}</span>` : '<span style="color:#bbb;font-size:0.75rem">— selon le poste</span>'}</td>
       <td><span class="pm-st ${p.statut === "ACTIF" ? "EN-SERVICE" : "VENDUE"}">${esc(p.statut)}</span></td>
@@ -1908,7 +1919,7 @@ document.addEventListener("DOMContentLoaded", () => {
       <td><input type="text" class="e-prenom" value="${esc(p.prenom)}" style="width:110px"></td>
       <td><select class="e-cat">${opts(FTSPersonnel.CATEGORIES, p.categorie, "— À compléter —")}</select></td>
       <td><select class="e-poste">${opts(postesPour(p.categorie), p.poste, "— Aucun —")}</select></td>
-      <td><input type="email" class="e-mail" value="${esc(p.email)}" style="width:190px"></td>
+      <td><input type="email" class="e-mail" value="${esc(p.email)}" style="width:190px" placeholder="E-mail"><input type="tel" class="e-tel" value="${esc(p.telephone || "")}" style="width:190px;margin-top:4px" placeholder="Téléphone"></td>
       <td><input type="text" class="e-adr ps-adr-in" value="${esc(a ? a.adresse : "")}" style="width:220px"></td>
       <td><select class="e-acces" ${p.categorie === "ENCADREMENT" ? "" : "hidden"}>${optsAcces(p.acces)}</select></td>
       <td><select class="e-st">${opts(FTSPersonnel.STATUTS, p.statut)}</select></td>
@@ -1926,7 +1937,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function sauver(nouvelles, message, adresseAction) {
-    const erreurs = FTSPersonnel.verifier(nouvelles.map((p) => ({ ...p, nom: maj(p.nom), prenom: maj(p.prenom), email: String(p.email || "").trim().toLowerCase() })));
+    const erreurs = FTSPersonnel.verifier(nouvelles.map((p) => ({ ...p, nom: maj(p.nom), prenom: maj(p.prenom), email: String(p.email || "").trim().toLowerCase(), telephone: FTSPersonnel.formatTel(p.telephone) })));
     if (erreurs.length) { $("psStatus").textContent = "⚠️ " + erreurs.join(" "); return false; }
     $("psStatus").textContent = "Enregistrement...";
     try {
@@ -1960,18 +1971,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const tr = $("psTbody").querySelector(`tr[data-ligne="${CSS.escape(k)}"]`);
     const v = (c) => tr.querySelector(c).value;
     const ancienne = personnes.find((p) => cleP(p) === k);
-    const nouvelle = { nom: maj(v(".e-nom")), prenom: maj(v(".e-prenom")), categorie: v(".e-cat"), poste: v(".e-poste"), email: v(".e-mail"), statut: v(".e-st"), acces: v(".e-acces") };
+    const nouvelle = { nom: maj(v(".e-nom")), prenom: maj(v(".e-prenom")), categorie: v(".e-cat"), poste: v(".e-poste"), email: v(".e-mail"), statut: v(".e-st"), acces: v(".e-acces"), telephone: v(".e-tel") };
     const adr = v(".e-adr").trim();
     sauver(personnes.map((p) => (cleP(p) === k ? nouvelle : p)), `${nouvelle.prenom} ${nouvelle.nom} modifié(e).`, () => enregistrerAdresse(ancienne, nouvelle, adr));
   }
 
   $("psAjouterBtn").addEventListener("click", async () => {
-    const p = { nom: maj($("psNom").value), prenom: maj($("psPrenom").value), categorie: $("psCat").value, poste: $("psPoste").value, email: $("psMail").value, statut: "ACTIF", acces: $("psAcces").value };
+    const p = { nom: maj($("psNom").value), prenom: maj($("psPrenom").value), categorie: $("psCat").value, poste: $("psPoste").value, email: $("psMail").value, statut: "ACTIF", acces: $("psAcces").value, telephone: $("psTel").value };
     if (!p.nom || !p.prenom) { $("psAjoutStatus").textContent = "⚠️ Nom et prénom obligatoires."; return; }
     $("psAjoutStatus").textContent = "";
     const adr = $("psAdr").value.trim();
     if (await sauver(personnes.concat([p]), `${p.prenom} ${p.nom} ajouté(e).`, () => enregistrerAdresse(null, p, adr))) {
-      ["psNom", "psPrenom", "psMail", "psAdr"].forEach((id) => { $(id).value = ""; });
+      ["psNom", "psPrenom", "psMail", "psTel", "psAdr"].forEach((id) => { $(id).value = ""; });
     }
   });
   $("psCreerBtn").addEventListener("click", async () => {

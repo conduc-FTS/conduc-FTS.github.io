@@ -3,7 +3,8 @@
  *
  * Classeur « Personnel FTS » (onglet Personnel), rangé dans le dossier
  * REFERENTIEL (partagé en LECTURE SEULE avec les chefs) :
- *   Nom · Prénom · Catégorie · Poste habituel · E-mail · Statut · Accès Drive
+ *   Nom · Prénom · Catégorie · Poste habituel · E-mail · Statut · Accès Drive · Téléphone
+ *   (le téléphone n'est pas copié sur les tablettes)
  *
  * Catégorie ENCADREMENT (conducteurs, direction, bureau) : jamais proposée
  * sur la tablette, au pointage ni au stock ; la colonne « Accès Drive »
@@ -24,7 +25,7 @@ const FTSPersonnel = (() => {
   const DOSSIER = "REFERENTIEL";
   const NOM_CLASSEUR = "Personnel FTS";
   const ONGLET = "Personnel";
-  const EN_TETE = ["Nom", "Prénom", "Catégorie", "Poste habituel", "E-mail", "Statut", "Accès Drive"];
+  const EN_TETE = ["Nom", "Prénom", "Catégorie", "Poste habituel", "E-mail", "Statut", "Accès Drive", "Téléphone"];
   const EN_TETE_TABLETTE = EN_TETE.slice(0, 6);
   const CACHE_KEY = "fts_personnel_cache";
 
@@ -43,6 +44,16 @@ const FTSPersonnel = (() => {
     return "MODIFICATION"; // vide = lecture + modification (valeur par défaut de l'encadrement)
   }
   const estEncadrement = (p) => p.categorie === "ENCADREMENT";
+  // Téléphone : « 06 12 34 56 78 » (ou +33 6 12 34 56 78 → 06 12 34 56 78) ; autre format gardé tel quel
+  function formatTel(v) {
+    let t = String(v == null ? "" : v).trim();
+    if (!t) return "";
+    let c = t.replace(/[\s.\-()\/]/g, "");
+    if (/^(\+33|0033)\d{9}$/.test(c)) c = "0" + c.slice(-9);
+    if (/^\d{9}$/.test(c) && /^[1-9]/.test(c)) c = "0" + c; // zéro perdu par le tableur
+    return /^0\d{9}$/.test(c) ? c.replace(/(\d{2})(?=\d)/g, "$1 ") : t;
+  }
+  const telValide = (t) => !t || /^0\d( \d{2}){4}$/.test(t) || /^\+\d[\d ]{6,}$/.test(t);
   const STATUTS = ["ACTIF", "PARTI"];
 
   // Liste de départ : les chefs de chantier connus (e-mail à compléter
@@ -124,7 +135,7 @@ const FTSPersonnel = (() => {
         }
         return depuisCache(false);
       }
-      const res = await fetchAvecRetry(`${SHEETS_API}/${f.id}/values/${encodeURIComponent(ONGLET + "!A2:G")}`, { headers: authHeader() });
+      const res = await fetchAvecRetry(`${SHEETS_API}/${f.id}/values/${encodeURIComponent(ONGLET + "!A2:H")}`, { headers: authHeader() });
       if (!res.ok) throw new Error(`Lecture de la base personnel : ${res.status}`);
       const lignes = (await res.json()).values || [];
       etat = {
@@ -132,6 +143,7 @@ const FTSPersonnel = (() => {
           nom: majuscules(r[0]), prenom: majuscules(r[1]), categorie: majuscules(r[2]),
           poste: majuscules(r[3]), email: String(r[4] || "").trim().toLowerCase(), statut: majuscules(r[5]) || "ACTIF",
           acces: lireAcces(r[6], majuscules(r[2])),
+          telephone: formatTel(r[7]),
         })),
         source: "sheet", spreadsheetId: f.id,
         modifiable: !(f.capabilities && f.capabilities.canEdit === false),
@@ -159,6 +171,7 @@ const FTSPersonnel = (() => {
       }
       if (p.categorie && !CATEGORIES.includes(p.categorie)) erreurs.push(`${nomComplet(p)} : catégorie inconnue.`);
       if (p.poste && !POSTES.includes(p.poste)) erreurs.push(`${nomComplet(p)} : poste inconnu.`);
+      if (!telValide(p.telephone)) erreurs.push(`Téléphone invalide pour ${nomComplet(p)} (ex : 06 12 34 56 78).`);
       if (!STATUTS.includes(p.statut)) erreurs.push(`${nomComplet(p)} : statut inconnu.`);
       if (p.categorie === "ENCADREMENT" && p.poste && !POSTES_ENCADREMENT.includes(p.poste)) erreurs.push(`${nomComplet(p)} : « ${p.poste} » n'est pas un poste d'encadrement.`);
       if (p.categorie !== "ENCADREMENT" && POSTES_ENCADREMENT.includes(p.poste)) erreurs.push(`${nomComplet(p)} : le poste « ${p.poste} » demande la catégorie ENCADREMENT.`);
@@ -170,6 +183,7 @@ const FTSPersonnel = (() => {
     return {
       nom: majuscules(p.nom), prenom: majuscules(p.prenom), categorie: majuscules(p.categorie),
       poste: majuscules(p.poste), email: String(p.email || "").trim().toLowerCase(), statut: majuscules(p.statut) || "ACTIF",
+      telephone: formatTel(p.telephone),
       acces: majuscules(p.categorie) === "ENCADREMENT" ? (ACCES.includes(p.acces) ? p.acces : "MODIFICATION") : "",
     };
   }
@@ -179,7 +193,7 @@ const FTSPersonnel = (() => {
     if (!res.ok) throw new Error(`Écriture de la base personnel : ${res.status}`);
     res = await fetchAvecRetry(`${SHEETS_API}/${spreadsheetId}/values/${encodeURIComponent(ONGLET + "!A1")}?valueInputOption=RAW`, {
       method: "PUT", headers: { ...authHeader(), "Content-Type": "application/json" },
-      body: JSON.stringify({ values: [EN_TETE, ...personnes.map((p) => [p.nom, p.prenom, p.categorie, p.poste, p.email, p.statut, p.categorie === "ENCADREMENT" ? ACCES_LIB[p.acces || "MODIFICATION"] : ""])] }),
+      body: JSON.stringify({ values: [EN_TETE, ...personnes.map((p) => [p.nom, p.prenom, p.categorie, p.poste, p.email, p.statut, p.categorie === "ENCADREMENT" ? ACCES_LIB[p.acces || "MODIFICATION"] : "", p.telephone || ""])] }),
     });
     if (!res.ok) throw new Error(`Écriture de la base personnel : ${res.status}`);
   }
@@ -331,7 +345,7 @@ const FTSPersonnel = (() => {
   }
 
   return {
-    CATEGORIES, POSTES, POSTES_CHANTIER, POSTES_ENCADREMENT, ACCES, ACCES_LIB, STATUTS, DEFAUT, NOM_CLASSEUR,
+    formatTel, CATEGORIES, POSTES, POSTES_CHANTIER, POSTES_ENCADREMENT, ACCES, ACCES_LIB, STATUTS, DEFAUT, NOM_CLASSEUR,
     encadrement, estEncadrement,
     charger, creer, enregistrer, verifier, publierListeTablette, manquantesDepuisAdresses, synchroniserPartages, toutes, actifs, chefs, parEmail, parNom, nomComplet, cle, majuscules,
     source: () => etat.source,

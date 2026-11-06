@@ -225,33 +225,68 @@ const FTSPersonnel = (() => {
   }
 
   /**
-   * Partage automatique du dossier REFERENTIEL (Supervision) : chaque
-   * personne ACTIVE avec un e-mail reçoit l'accès en LECTURE, sans e-mail
-   * de notification ; une personne PARTIE perd son accès. Les accès
-   * propriétaire / éditeur ne sont jamais touchés.
+   * Accès Drive calculés à partir de la base (Supervision) :
+   *  - REFERENTIEL (et ses fichiers) : ENCADREMENT UNIQUEMENT. Toute personne
+   *    de la base qui y a un accès en lecture/commentaire le perd (les
+   *    tablettes lisent la copie « _LISTES TABLETTE » de DOSSIER CHANTIER).
+   *  - DOSSIER CHANTIER : chaque CHEF DE CHANTIER ACTIF avec un e-mail reçoit
+   *    l'accès en modification (sans e-mail de notification) ; une personne
+   *    PARTIE perd son accès.
+   * Les accès propriétaire et ceux des personnes absentes de la base
+   * (encadrement) ne sont jamais touchés.
    * @returns {Promise<{ajoutes:string[], retires:string[], erreurs:string[], total:number}>}
    */
+  async function lirePermissions(fileId) {
+    const res = await fetchAvecRetry(`${DRIVE_API}/files/${fileId}/permissions?fields=permissions(id,emailAddress,role,type)&supportsAllDrives=true`, { headers: authHeader() });
+    if (!res.ok) throw new Error(`Lecture des partages : ${res.status}`);
+    return new Map(((await res.json()).permissions || []).filter((p) => p.type === "user" && p.emailAddress).map((p) => [p.emailAddress.toLowerCase(), p]));
+  }
+  async function retirerPermission(fileId, permId) {
+    const r = await fetchAvecRetry(`${DRIVE_API}/files/${fileId}/permissions/${permId}?supportsAllDrives=true`, { method: "DELETE", headers: authHeader() });
+    return r.ok;
+  }
   async function synchroniserPartages() {
-    const dossierId = await FTSDrive.findOrCreateFolder(DOSSIER, null);
-    const res = await fetchAvecRetry(`${DRIVE_API}/files/${dossierId}/permissions?fields=permissions(id,emailAddress,role,type)&supportsAllDrives=true`, { headers: authHeader() });
-    if (!res.ok) throw new Error(`Lecture des partages de ${DOSSIER} : ${res.status}`);
-    const perms = (await res.json()).permissions || [];
-    const lecteurs = new Map(perms.filter((p) => p.type === "user" && p.emailAddress).map((p) => [p.emailAddress.toLowerCase(), p]));
     const bilan = { ajoutes: [], retires: [], erreurs: [], total: 0 };
-    for (const p of etat.personnes) {
-      if (!p.email) continue;
-      const deja = lecteurs.get(p.email);
-      if (p.statut === "ACTIF") {
+    const avecMail = etat.personnes.filter((p) => p.email);
+
+    // 1. REFERENTIEL : on retire les personnes de la base (lecteur / commentateur)
+    const refId = await FTSDrive.findOrCreateFolder(DOSSIER, null);
+    const cibles = [refId];
+    try {
+      const q = encodeURIComponent(`'${refId}' in parents and trashed = false`);
+      const rf = await fetchAvecRetry(`${DRIVE_API}/files?q=${q}&fields=files(id)&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true`, { headers: authHeader() });
+      if (rf.ok) ((await rf.json()).files || []).forEach((f) => cibles.push(f.id));
+    } catch (e) { /* le dossier suffit */ }
+    for (const id of cibles) {
+      const perms = await lirePermissions(id).catch(() => new Map());
+      for (const p of avecMail) {
+        const deja = perms.get(p.email);
+        if (deja && (deja.role === "reader" || deja.role === "commenter")) {
+          if (await retirerPermission(id, deja.id)) { if (!bilan.retires.includes(p.email + " (REFERENTIEL)")) bilan.retires.push(p.email + " (REFERENTIEL)"); }
+          else bilan.erreurs.push(`${p.email} (REFERENTIEL)`);
+        }
+      }
+    }
+
+    // 2. DOSSIER CHANTIER : chefs actifs en modification, partis retirés
+    const chantierId = await FTSDrive.getRootFolder("DOSSIER CHANTIER");
+    const perms = await lirePermissions(chantierId);
+    for (const p of avecMail) {
+      const deja = perms.get(p.email);
+      const chefActif = p.statut === "ACTIF" && p.poste === "CHEF DE CHANTIER";
+      if (chefActif) {
         bilan.total++;
-        if (deja) continue;
-        const r = await fetchAvecRetry(`${DRIVE_API}/files/${dossierId}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, {
-          method: "POST", headers: { ...authHeader(), "Content-Type": "application/json" },
-          body: JSON.stringify({ role: "reader", type: "user", emailAddress: p.email }),
-        });
+        if (deja && (deja.role === "writer" || deja.role === "owner" || deja.role === "organizer" || deja.role === "fileOrganizer")) continue;
+        const r = deja
+          ? await fetchAvecRetry(`${DRIVE_API}/files/${chantierId}/permissions/${deja.id}?supportsAllDrives=true`, { method: "PATCH", headers: { ...authHeader(), "Content-Type": "application/json" }, body: JSON.stringify({ role: "writer" }) })
+          : await fetchAvecRetry(`${DRIVE_API}/files/${chantierId}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, {
+              method: "POST", headers: { ...authHeader(), "Content-Type": "application/json" },
+              body: JSON.stringify({ role: "writer", type: "user", emailAddress: p.email }),
+            });
         if (r.ok) bilan.ajoutes.push(p.email); else bilan.erreurs.push(`${p.email} (${r.status})`);
-      } else if (deja && deja.role === "reader") {
-        const r = await fetchAvecRetry(`${DRIVE_API}/files/${dossierId}/permissions/${deja.id}?supportsAllDrives=true`, { method: "DELETE", headers: authHeader() });
-        if (r.ok) bilan.retires.push(p.email); else bilan.erreurs.push(`${p.email} (${r.status})`);
+      } else if (p.statut !== "ACTIF" && deja && deja.role !== "owner") {
+        if (await retirerPermission(chantierId, deja.id)) bilan.retires.push(p.email + " (DOSSIER CHANTIER)");
+        else bilan.erreurs.push(`${p.email} (DOSSIER CHANTIER)`);
       }
     }
     return bilan;

@@ -513,12 +513,12 @@ html { font-size: 16px; }
   <!-- ─── PERSONNEL FTS (remplace Adresses Personnel) ────────────── -->
   <div class="se-view" id="se-view-personnel">
     <div class="se-page-title">Personnel FTS</div>
-    <div class="se-page-sub">Base unique de tout le personnel FTS. Nom, prénom, catégorie, poste et e-mail sont lus par les tablettes : noms proposés dans le rapport, et chef reconnu grâce à l'e-mail du compte Google de sa tablette. L'adresse 🔒 reste dans un fichier séparé, réservé à la Supervision. Renseigner un e-mail suffit : le dossier REFERENTIEL (parc matériel + personnel) est partagé automatiquement en lecture avec cette adresse, et l'accès est retiré si la personne passe en PARTI.</div>
+    <div class="se-page-sub">Base unique de tout le personnel FTS. Nom, prénom, catégorie, poste et e-mail sont lus par les tablettes : noms proposés dans le rapport, et chef reconnu grâce à l'e-mail du compte Google de sa tablette. L'adresse 🔒 reste dans un fichier séparé, réservé à la Supervision. Renseigner l'e-mail d'un chef de chantier suffit : DOSSIER CHANTIER lui est partagé automatiquement en modification, et l'accès est retiré s'il passe en PARTI. Le dossier REFERENTIEL reste réservé à l'encadrement (les tablettes lisent une copie allégée).</div>
 
     <div class="se-panel" id="psCreerPanel" hidden>
       <div class="se-panel-head"><h2>La base personnel n'existe pas encore</h2></div>
       <div style="padding:16px;font-size:0.88rem;line-height:1.6">
-        Elle sera créée dans le dossier <b>REFERENTIEL</b> (déjà partagé en lecture seule avec les chefs), avec les chefs de chantier connus et les personnes déjà saisies dans Adresses Personnel. Les adresses ne sont pas copiées : elles restent dans leur fichier.
+        Elle sera créée dans le dossier <b>REFERENTIEL</b> (réservé à l'encadrement), avec les chefs de chantier connus et les personnes déjà saisies dans Adresses Personnel. Les adresses ne sont pas copiées : elles restent dans leur fichier.
         <div style="margin-top:12px"><button type="button" class="se-export-btn" id="psCreerBtn">Créer la base personnel</button></div>
         <p class="form-status" id="psCreerStatus"></p>
       </div>
@@ -575,7 +575,7 @@ html { font-size: 16px; }
       <div class="se-panel-head"><h2>Le parc matériel n'existe pas encore</h2></div>
       <div style="padding:16px;font-size:0.88rem;line-height:1.6">
         Il sera créé dans le dossier <b>REFERENTIEL</b> de ce Drive, à partir de la liste du service matériel (<span id="parcNbDefaut"></span> machines, vérifiée avec Clément).
-        Ensuite, partage le dossier <b>REFERENTIEL</b> <u>en lecture seule</u> avec les chefs : ils verront la liste sur la tablette sans pouvoir la modifier.
+        Le dossier <b>REFERENTIEL</b> reste réservé à l'encadrement : les tablettes lisent une copie allégée (« _LISTES TABLETTE » dans DOSSIER CHANTIER), mise à jour à chaque enregistrement.
         <div style="margin-top:12px"><button type="button" class="se-export-btn" id="parcCreerBtn">Créer le parc matériel</button></div>
         <p class="form-status" id="parcCreerStatus"></p>
       </div>
@@ -1745,7 +1745,7 @@ document.addEventListener("DOMContentLoaded", () => {
     $("parcCreerStatus").textContent = "Création en cours...";
     try {
       await FTSParc.creerDepuisListeDeDepart();
-      $("parcCreerStatus").textContent = "✅ Parc créé dans REFERENTIEL. Pense à partager ce dossier en lecture seule avec les chefs.";
+      $("parcCreerStatus").textContent = "✅ Parc créé dans REFERENTIEL. Les tablettes le reçoivent via « _LISTES TABLETTE ».";
       await charger(true);
     } catch (e) { $("parcCreerStatus").textContent = "❌ " + e.message; }
   });
@@ -1792,6 +1792,8 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const [r, adr] = await Promise.all([FTSPersonnel.charger(), FTSSheets.listerAdresses().catch((e) => { console.warn(e); return null; })]);
       FTSPersonnel.publierListeTablette().catch((e) => console.warn("Listes tablette :", e));
+      // Une fois par ouverture de la page : accès Drive remis en ordre
+      if (!accesVerifies && r && r.source === "sheet" && r.modifiable) { accesVerifies = true; setTimeout(() => majAcces(""), 0); }
       if (adr) adresses = { spreadsheetId: adr.spreadsheetId, liste: adr.adresses };
       modifiable = r.source === "sheet" && r.modifiable !== false;
       $("psCreerPanel").hidden = r.existe !== false;
@@ -1872,22 +1874,31 @@ document.addEventListener("DOMContentLoaded", () => {
       const adr = await FTSSheets.listerAdresses().catch(() => null);
       if (adr) adresses = { spreadsheetId: adr.spreadsheetId, liste: adr.adresses };
       personnes = FTSPersonnel.toutes(); enEdition = null;
-      $("psStatus").textContent = "✅ " + message + " Mise à jour des accès au dossier REFERENTIEL...";
+      $("psStatus").textContent = "✅ " + message + " Mise à jour des accès Drive...";
       afficher();
-      // Accès en lecture au dossier REFERENTIEL selon les e-mails renseignés
-      try {
-        const b = await FTSPersonnel.synchroniserPartages();
-        const morceaux = [];
-        if (b.ajoutes.length) morceaux.push(`accès donné à ${b.ajoutes.join(", ")}`);
-        if (b.retires.length) morceaux.push(`accès retiré à ${b.retires.join(", ")}`);
-        if (b.erreurs.length) morceaux.push(`⚠️ partage impossible pour ${b.erreurs.join(", ")}`);
-        $("psStatus").textContent = "✅ " + message + ` REFERENTIEL partagé en lecture avec ${b.total} personne(s)` + (morceaux.length ? " : " + morceaux.join(" ; ") + "." : ".");
-      } catch (e) {
-        $("psStatus").textContent = "✅ " + message + " ⚠️ Partage du dossier REFERENTIEL non mis à jour : " + e.message;
-      }
+      await majAcces(message);
       return true;
     } catch (e) { $("psStatus").textContent = "❌ " + e.message; return false; }
   }
+
+  // Accès Drive selon la base : DOSSIER CHANTIER pour les chefs actifs,
+  // REFERENTIEL réservé à l'encadrement (voir FTSPersonnel.synchroniserPartages)
+  function texteAcces(b) {
+    const morceaux = [];
+    if (b.ajoutes.length) morceaux.push(`accès DOSSIER CHANTIER donné à ${b.ajoutes.join(", ")}`);
+    if (b.retires.length) morceaux.push(`accès retiré : ${b.retires.join(", ")}`);
+    if (b.erreurs.length) morceaux.push(`⚠️ partage impossible pour ${b.erreurs.join(", ")}`);
+    return `DOSSIER CHANTIER partagé avec ${b.total} chef(s) · REFERENTIEL réservé à l'encadrement` + (morceaux.length ? " — " + morceaux.join(" ; ") + "." : ".");
+  }
+  async function majAcces(message) {
+    try {
+      const b = await FTSPersonnel.synchroniserPartages();
+      $("psStatus").textContent = (message ? "✅ " + message + " " : "🔒 ") + texteAcces(b);
+    } catch (e) {
+      $("psStatus").textContent = (message ? "✅ " + message + " " : "") + "⚠️ Accès Drive non mis à jour : " + e.message;
+    }
+  }
+  let accesVerifies = false;
 
   function enregistrerLigne(k) {
     const tr = $("psTbody").querySelector(`tr[data-ligne="${CSS.escape(k)}"]`);

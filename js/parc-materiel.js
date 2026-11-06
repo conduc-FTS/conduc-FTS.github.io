@@ -14,6 +14,11 @@
  * réseau), on utilise la dernière copie connue (cache de la tablette),
  * puis à défaut la liste de départ ci-dessous : le rapport n'est jamais
  * bloqué.
+ *
+ * Foreuses : longueur de tube maximale en course standard et en course
+ * raccourcie (colonnes G et H), utilisée par la fiche de préparation de
+ * chantier. Le classeur contient aussi les paramètres de préparation
+ * (onglets « Percages platines », « Ciments », « Parametres prepa »).
  */
 const FTSParc = (() => {
   const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
@@ -22,7 +27,15 @@ const FTSParc = (() => {
   const NOM_CLASSEUR = "Parc materiel FTS";
   const ONGLET_PARC = "Parc";
   const ONGLET_LOC = "Location";
-  const EN_TETE_PARC = ["N° machine", "Nom chantier", "Désignation complète", "Catégorie", "Chef attitré", "Statut"];
+  const EN_TETE_PARC = ["N° machine", "Nom chantier", "Désignation complète", "Catégorie", "Chef attitré", "Statut",
+    "Tube max course standard (m)", "Tube max course raccourcie (m)"];
+  const ONGLET_PERCAGES = "Percages platines";
+  const ONGLET_CIMENTS = "Ciments";
+  const ONGLET_PARAMS = "Parametres prepa";
+  const CACHE_PREPA = "fts_parametres_prepa_cache";
+  const CATEGORIE_FOREUSE = "FOREUSES MICROPIEUX";
+  // Longueurs de tube utilisées chez FTS (le 2 m est abandonné)
+  const LONGUEURS_TUBE = [3, 1.5, 1];
   const CACHE_KEY = "fts_parc_materiel_cache";
 
   const CATEGORIES = [
@@ -91,7 +104,25 @@ const FTSParc = (() => {
     ["PH15-JEFF", "PH15 JEFF", "TEC SYSTEM PH15 JEFF CORBELLA", "POMPES", "JEFF CORBELLA", "EN SERVICE"],
     ["PH15-ROMAIN", "PH15 ROMAIN", "TEC SYSTEM PH15 ROMAIN SEREMPIOUQUE", "POMPES", "ROMAIN SEREMPIOUQUE", "EN SERVICE"],
     ["TMD-PAT", "MALAXEUR TMD+PAT", "TEC SYSTEM TMD+PAT", "MALAXEURS", "", "EN SERVICE"]
-  ].map(([numero, nom, designation, categorie, chef, statut]) => ({ numero, nom, designation, categorie, chef, statut }));
+  ].map(([numero, nom, designation, categorie, chef, statut]) => ({ numero, nom, designation, categorie, chef, statut, ...tubesDefaut(numero) }));
+
+  // Tube max par foreuse : [course standard, course raccourcie] (validé par Clément le 06/11/2026)
+  function tubesDefaut(numero) {
+    const t = {
+      "01DCH100": [3, ""], "01MD1500": [3, ""], "01MC15": [3, ""], "01MC6": [3, 1.5], "01MC8": [3, 1.5],
+      "01T41": [1.5, ""], "02T41": [1.5, ""], "01T46": [1.5, ""], "01FUTURO": [1.5, 1], "02FUTURO": [1.5, 1],
+      "01GEO205": [1.5, ""],
+    }[numero] || ["", ""];
+    return { tubeStd: t[0], tubeRac: t[1] };
+  }
+
+  // Paramètres de la fiche de préparation de chantier (tous modifiables dans la Supervision)
+  const PREPA_DEFAUT = {
+    percages: [[16, 20], [20, 25], [25, 30], [28, 35], [32, 40], [40, 45]].map(([barre, percage]) => ({ barre, percage })),
+    ciments: [{ type: "32.5", sac: 35, sacsPalette: 42 }, { type: "PM/ES", sac: 25, sacsPalette: "" }],
+    dosage: 1200,
+    surconso: 20,
+  };
 
   const LOCATION_DEFAUT = [
     "FUTURO ELEC", "BUGGY", "TELESCO 6M", "TELESCO 7M", "TELESCO 9M", "TELESCO 10M", "TELESCO 12M",
@@ -117,6 +148,7 @@ const FTSParc = (() => {
   };
 
   let etat = { machines: DEFAUT.slice(), location: LOCATION_DEFAUT.slice(), source: "defaut", spreadsheetId: null };
+  let prepa = copiePrepa(PREPA_DEFAUT);
 
   // ── Outils ──────────────────────────────────────────────────────
   function majuscules(s) { return String(s == null ? "" : s).trim().replace(/\s+/g, " ").toUpperCase(); }
@@ -125,6 +157,30 @@ const FTSParc = (() => {
     return majuscules(s).normalize("NFD").replace(/[̀-ͯ]/g, "").split(" ").sort().join(" ");
   }
   function sansAccent(s) { return majuscules(s).normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+  // Nombre saisi à la française (« 1,5 ») ou vide
+  function nombre(v) {
+    if (v === "" || v == null) return "";
+    const n = parseFloat(String(v).replace(",", ".").trim());
+    return Number.isFinite(n) ? n : "";
+  }
+  function copiePrepa(p) {
+    return {
+      percages: (p.percages || []).map((x) => ({ ...x })), ciments: (p.ciments || []).map((x) => ({ ...x })),
+      dosage: p.dosage, surconso: p.surconso,
+    };
+  }
+  /** Ligne du classeur → machine. Ancien classeur sans colonnes tubes : valeurs de départ. */
+  function ligneVersMachine(r, avecTubes) {
+    const numero = majuscules(r[0]);
+    const tubes = avecTubes ? { tubeStd: nombre(r[6]), tubeRac: nombre(r[7]) } : tubesDefaut(numero);
+    return {
+      numero, nom: majuscules(r[1] || r[0]), designation: majuscules(r[2]),
+      categorie: majuscules(r[3]) || "DIVERS", chef: majuscules(r[4]), statut: majuscules(r[5]) || "EN SERVICE", ...tubes,
+    };
+  }
+  function machineVersLigne(m) {
+    return [m.numero, m.nom, m.designation, m.categorie, m.chef, m.statut, m.tubeStd === "" ? "" : m.tubeStd, m.tubeRac === "" ? "" : m.tubeRac];
+  }
 
   async function fetchAvecRetry(url, options, tentativesMax = 4) {
     let rep;
@@ -194,14 +250,12 @@ const FTSParc = (() => {
         const fichier = await trouverClasseur();
         if (fichier) {
           const [lignesParc, lignesLoc] = await Promise.all([
-            lireValeurs(fichier.id, `${ONGLET_PARC}!A2:F`),
+            lireValeurs(fichier.id, `${ONGLET_PARC}!A1:H`),
             lireValeurs(fichier.id, `${ONGLET_LOC}!A2:A`).catch(() => []),
           ]);
+          const avecTubes = (lignesParc[0] || []).length >= 7;
           etat = {
-            machines: lignesParc.filter((r) => r[0]).map((r) => ({
-              numero: majuscules(r[0]), nom: majuscules(r[1] || r[0]), designation: majuscules(r[2]),
-              categorie: majuscules(r[3]) || "DIVERS", chef: majuscules(r[4]), statut: majuscules(r[5]) || "EN SERVICE",
-            })),
+            machines: lignesParc.slice(1).filter((r) => r[0]).map((r) => ligneVersMachine(r, avecTubes)),
             location: lignesLoc.map((r) => majuscules(r[0])).filter(Boolean),
             source: "sheet",
             spreadsheetId: fichier.id,
@@ -216,10 +270,7 @@ const FTSParc = (() => {
         if (lp && lp.length) {
           const ll = (await FTSDrive.lireListeTablette("Location").catch(() => null)) || [];
           etat = {
-            machines: lp.filter((r) => r[0]).map((r) => ({
-              numero: majuscules(r[0]), nom: majuscules(r[1] || r[0]), designation: majuscules(r[2]),
-              categorie: majuscules(r[3]) || "DIVERS", chef: majuscules(r[4]), statut: majuscules(r[5]) || "EN SERVICE",
-            })),
+            machines: lp.filter((r) => r[0] && majuscules(r[0]) !== "N° MACHINE").map((r) => ligneVersMachine(r, r.length >= 7 || lp.some((x) => x.length >= 7))),
             location: ll.map((r) => majuscules(r[0])).filter(Boolean),
             source: "liste", spreadsheetId: null, modifiable: false,
           };
@@ -253,7 +304,7 @@ const FTSParc = (() => {
       method: "POST", headers: { ...authHeader(), "Content-Type": "application/json" },
       body: JSON.stringify({
         properties: { title: NOM_CLASSEUR },
-        sheets: [{ properties: { title: ONGLET_PARC } }, { properties: { title: ONGLET_LOC } }],
+        sheets: [ONGLET_PARC, ONGLET_LOC, ONGLET_PERCAGES, ONGLET_CIMENTS, ONGLET_PARAMS].map((title) => ({ properties: { title } })),
       }),
     });
     if (!res.ok) {
@@ -266,6 +317,7 @@ const FTSParc = (() => {
     });
     etat = { machines: DEFAUT.slice(), location: LOCATION_DEFAUT.slice(), source: "sheet", spreadsheetId, modifiable: true };
     await enregistrer(etat.machines, etat.location);
+    await enregistrerParametresPrepa(PREPA_DEFAUT);
     return spreadsheetId;
   }
 
@@ -284,6 +336,10 @@ const FTSParc = (() => {
       if (km && vusNom.has(km)) erreurs.push(`Le nom chantier « ${m.nom} » est déjà pris par ${vusNom.get(km)}.`);
       vusNum.set(kn, true); if (km) vusNom.set(km, m.numero);
       if (!STATUTS.includes(m.statut)) erreurs.push(`${m.numero} : statut inconnu « ${m.statut} ».`);
+      [["tubeStd", "course standard"], ["tubeRac", "course raccourcie"]].forEach(([k, lib]) => {
+        const v = nombre(m[k]);
+        if (v !== "" && !LONGUEURS_TUBE.includes(v)) erreurs.push(`${m.numero} : tube ${lib} de ${v} m inconnu (3 / 1,5 / 1 m).`);
+      });
     });
     return erreurs;
   }
@@ -292,12 +348,13 @@ const FTSParc = (() => {
     const propres = machines.map((m) => ({
       numero: majuscules(m.numero), nom: majuscules(m.nom), designation: majuscules(m.designation),
       categorie: majuscules(m.categorie) || "DIVERS", chef: majuscules(m.chef), statut: majuscules(m.statut) || "EN SERVICE",
+      tubeStd: nombre(m.tubeStd), tubeRac: nombre(m.tubeRac),
     })).sort((a, b) => a.numero.localeCompare(b.numero));
     const erreurs = verifier(propres);
     if (erreurs.length) throw new Error(erreurs.join(" "));
     const loc = [...new Set((location || []).map(majuscules).filter(Boolean))];
     if (!etat.spreadsheetId) throw new Error("Parc matériel non créé.");
-    await remplacerOnglet(etat.spreadsheetId, ONGLET_PARC, [EN_TETE_PARC, ...propres.map((m) => [m.numero, m.nom, m.designation, m.categorie, m.chef, m.statut])]);
+    await remplacerOnglet(etat.spreadsheetId, ONGLET_PARC, [EN_TETE_PARC, ...propres.map(machineVersLigne)]);
     await remplacerOnglet(etat.spreadsheetId, ONGLET_LOC, [["Type de matériel de location"], ...loc.map((l) => [l])]);
     etat.machines = propres;
     etat.location = loc;
@@ -310,10 +367,120 @@ const FTSParc = (() => {
     if (etat.source !== "sheet" || !FTSDrive.ecrireListeTablette) return false;
     const cle = "fts_listes_pub_parc";
     try { if (!forcer && Date.now() - Number(localStorage.getItem(cle) || 0) < 24 * 3600 * 1000) return false; } catch (e) {}
-    await FTSDrive.ecrireListeTablette("Machines", [EN_TETE_PARC, ...etat.machines.map((m) => [m.numero, m.nom, m.designation, m.categorie, m.chef, m.statut])]);
+    await FTSDrive.ecrireListeTablette("Machines", [EN_TETE_PARC, ...etat.machines.map(machineVersLigne)]);
     await FTSDrive.ecrireListeTablette("Location", [["Type de matériel de location"], ...etat.location.map((l) => [l])]);
     try { localStorage.setItem(cle, String(Date.now())); } catch (e) {}
     return true;
+  }
+
+  // ── Paramètres de la préparation de chantier ───────────────────
+  async function ongletsExistants(spreadsheetId) {
+    const res = await fetchAvecRetry(`${SHEETS_API}/${spreadsheetId}?fields=sheets.properties.title`, { headers: authHeader() });
+    if (!res.ok) throw new Error(`Lecture du parc matériel : ${res.status}`);
+    return ((await res.json()).sheets || []).map((x) => x.properties.title);
+  }
+  async function assurerOnglets(spreadsheetId, titres) {
+    const existants = await ongletsExistants(spreadsheetId);
+    const manquants = titres.filter((t) => !existants.includes(t));
+    if (!manquants.length) return;
+    const res = await fetchAvecRetry(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, {
+      method: "POST", headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({ requests: manquants.map((title) => ({ addSheet: { properties: { title } } })) }),
+    });
+    if (!res.ok) throw new Error(`Création des onglets de préparation : ${res.status}`);
+  }
+
+  /**
+   * Charge les paramètres de préparation (perçages, ciments, dosage,
+   * surconsommation). Onglets absents → valeurs de départ.
+   * À appeler après charger() (il faut l'identifiant du classeur).
+   */
+  async function chargerParametresPrepa() {
+    if (etat.source === "sheet" && etat.spreadsheetId && connecte()) {
+      try {
+        const existants = await ongletsExistants(etat.spreadsheetId);
+        const p = copiePrepa(PREPA_DEFAUT);
+        if (existants.includes(ONGLET_PERCAGES)) {
+          const l = await lireValeurs(etat.spreadsheetId, `${ONGLET_PERCAGES}!A2:B`);
+          p.percages = l.map((r) => ({ barre: nombre(r[0]), percage: nombre(r[1]) })).filter((x) => x.barre !== "");
+        }
+        if (existants.includes(ONGLET_CIMENTS)) {
+          const l = await lireValeurs(etat.spreadsheetId, `${ONGLET_CIMENTS}!A2:C`);
+          p.ciments = l.filter((r) => String(r[0] || "").trim()).map((r) => ({ type: String(r[0]).trim(), sac: nombre(r[1]), sacsPalette: nombre(r[2]) }));
+        }
+        if (existants.includes(ONGLET_PARAMS)) {
+          const l = await lireValeurs(etat.spreadsheetId, `${ONGLET_PARAMS}!A2:B`);
+          l.forEach((r) => {
+            const k = sansAccent(r[0]);
+            if (k.startsWith("DOSAGE")) p.dosage = nombre(r[1]);
+            if (k.startsWith("SURCONSOMMATION")) p.surconso = nombre(r[1]);
+          });
+        }
+        prepa = p;
+        try { localStorage.setItem(CACHE_PREPA, JSON.stringify(prepa)); } catch (e) {}
+        return copiePrepa(prepa);
+      } catch (e) {
+        console.warn("Paramètres de préparation : lecture impossible, copie locale utilisée.", e);
+      }
+    }
+    try { const c = JSON.parse(localStorage.getItem(CACHE_PREPA) || "null"); if (c) prepa = c; } catch (e) {}
+    return copiePrepa(prepa);
+  }
+
+  function verifierParametresPrepa(p) {
+    const erreurs = [];
+    const vus = new Set();
+    (p.percages || []).forEach((x) => {
+      const b = nombre(x.barre), pc = nombre(x.percage);
+      if (b === "" || pc === "") erreurs.push("Perçages : chaque ligne doit avoir un Ø de barre et un perçage.");
+      else if (pc <= b) erreurs.push(`Perçages : le perçage (${pc} mm) doit être plus grand que la barre Ø${b}.`);
+      if (b !== "" && vus.has(b)) erreurs.push(`Perçages : la barre Ø${b} est en double.`);
+      vus.add(b);
+    });
+    const types = new Set();
+    (p.ciments || []).forEach((c) => {
+      const t = String(c.type || "").trim().toUpperCase();
+      if (!t) erreurs.push("Ciments : chaque ligne doit avoir un type.");
+      if (t && types.has(t)) erreurs.push(`Ciments : le type ${c.type} est en double.`);
+      types.add(t);
+      if (nombre(c.sac) === "" || nombre(c.sac) <= 0) erreurs.push(`Ciments : poids du sac manquant pour ${c.type || "une ligne"}.`);
+      if (c.sacsPalette !== "" && c.sacsPalette != null && !(nombre(c.sacsPalette) > 0)) erreurs.push(`Ciments : nombre de sacs par palette invalide pour ${c.type}.`);
+    });
+    if (!(nombre(p.dosage) > 0)) erreurs.push("Le dosage ciment doit être un nombre positif.");
+    const sc = nombre(p.surconso);
+    if (sc === "" || sc < 0 || sc > 200) erreurs.push("La surconsommation doit être comprise entre 0 et 200 %.");
+    return [...new Set(erreurs)];
+  }
+
+  async function enregistrerParametresPrepa(p) {
+    const erreurs = verifierParametresPrepa(p);
+    if (erreurs.length) throw new Error(erreurs.join(" "));
+    if (!etat.spreadsheetId) throw new Error("Parc matériel non créé.");
+    const propre = {
+      percages: p.percages.map((x) => ({ barre: nombre(x.barre), percage: nombre(x.percage) })).sort((a, b) => a.barre - b.barre),
+      ciments: p.ciments.map((c) => ({ type: String(c.type).trim().toUpperCase(), sac: nombre(c.sac), sacsPalette: nombre(c.sacsPalette) })),
+      dosage: nombre(p.dosage), surconso: nombre(p.surconso),
+    };
+    await assurerOnglets(etat.spreadsheetId, [ONGLET_PERCAGES, ONGLET_CIMENTS, ONGLET_PARAMS]);
+    await remplacerOnglet(etat.spreadsheetId, ONGLET_PERCAGES, [["Ø barre (mm)", "Perçage platine (mm)"], ...propre.percages.map((x) => [x.barre, x.percage])]);
+    await remplacerOnglet(etat.spreadsheetId, ONGLET_CIMENTS, [["Type de ciment", "Poids du sac (kg)", "Sacs par palette"], ...propre.ciments.map((c) => [c.type, c.sac, c.sacsPalette])]);
+    await remplacerOnglet(etat.spreadsheetId, ONGLET_PARAMS, [["Paramètre", "Valeur"], ["Dosage ciment (kg/m3)", propre.dosage], ["Surconsommation par défaut (%)", propre.surconso]]);
+    prepa = propre;
+    try { localStorage.setItem(CACHE_PREPA, JSON.stringify(prepa)); } catch (e) {}
+    return copiePrepa(prepa);
+  }
+
+  function parametresPrepa() { return copiePrepa(prepa); }
+  /** Perçage de platine pour une barre (mm), ou "" si la barre n'est pas dans la table */
+  function percagePour(diamBarre) {
+    const d = nombre(diamBarre);
+    const t = prepa.percages.find((x) => x.barre === d);
+    return t ? t.percage : "";
+  }
+  /** Longueurs de tube max d'une foreuse : { standard, raccourcie } (en m, "" si non renseigné) */
+  function tubesMachine(m) {
+    if (typeof m === "string") m = parNumero(m) || parNom(m);
+    return m ? { standard: nombre(m.tubeStd), raccourcie: nombre(m.tubeRac) } : { standard: "", raccourcie: "" };
   }
 
   // ── Lecture pour les modules ────────────────────────────────────
@@ -366,6 +533,8 @@ const FTSParc = (() => {
     charger, creerDepuisListeDeDepart, enregistrer, verifier, publierListeTablette,
     toutes, location, source, disponibles, parNumero, parNom, kitDuChef, estLocation, libelleComplet,
     resoudreAncienNom, majuscules,
+    CATEGORIE_FOREUSE, LONGUEURS_TUBE, PREPA_DEFAUT, nombre, tubesMachine,
+    chargerParametresPrepa, parametresPrepa, enregistrerParametresPrepa, verifierParametresPrepa, percagePour,
   };
 })();
 

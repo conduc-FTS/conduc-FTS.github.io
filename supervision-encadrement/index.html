@@ -647,7 +647,7 @@ html { font-size: 16px; }
       <p class="form-status" id="pmStatus" style="padding:0 16px"></p>
       <div class="se-table-scroll">
         <table class="se-table pm-table">
-          <thead><tr><th>N° machine</th><th>Nom chantier<br><span class="pm-sub">rapport, pointage</span></th><th>Désignation complète<br><span class="pm-sub">service matériel</span></th><th>Catégorie</th><th>Chef attitré</th><th>Statut</th><th></th></tr></thead>
+          <thead><tr><th>N° machine</th><th>Nom chantier<br><span class="pm-sub">rapport, pointage</span></th><th>Désignation complète<br><span class="pm-sub">service matériel</span></th><th>Catégorie</th><th>Tube max<br><span class="pm-sub">standard · raccourcie</span></th><th>Chef attitré</th><th>Statut</th><th></th></tr></thead>
           <tbody id="pmTbody"></tbody>
         </table>
       </div>
@@ -661,6 +661,29 @@ html { font-size: 16px; }
         <div class="pm-form" style="padding:12px 0 0"><input type="text" id="pmLocNouveau" placeholder="ex : TELESCO 14M" style="width:240px"><button type="button" id="pmLocAjouterBtn" class="pm-btn">+ Ajouter un type</button></div>
         <p class="se-page-sub" style="margin:8px 0 0">Le chef peut aussi taper un nom libre : il sera marqué LOC.</p>
       </div>
+    </div>
+
+    <div class="se-panel" id="ppPanel">
+      <div class="se-panel-head"><h2>Paramètres de la préparation de chantier</h2></div>
+      <div class="pp-grille">
+        <div>
+          <h3 class="pp-titre">Perçage des platines <span class="pm-sub">barre seule → platine percée</span></h3>
+          <table class="se-table pm-table pp-table"><thead><tr><th>Ø barre (mm)</th><th>Perçage (mm)</th><th></th></tr></thead><tbody id="ppPercages"></tbody></table>
+          <button type="button" class="pp-ajout" id="ppAjoutPercage">+ Ajouter une barre</button>
+        </div>
+        <div>
+          <h3 class="pp-titre">Ciments</h3>
+          <table class="se-table pm-table pp-table"><thead><tr><th>Type</th><th>Sac (kg)</th><th>Sacs / palette</th><th></th></tr></thead><tbody id="ppCiments"></tbody></table>
+          <button type="button" class="pp-ajout" id="ppAjoutCiment">+ Ajouter un ciment</button>
+          <h3 class="pp-titre" style="margin-top:18px">Calcul du ciment</h3>
+          <div class="pm-form" style="padding:0">
+            <div><label>Dosage (kg/m³)</label><input type="text" id="ppDosage" inputmode="decimal" style="width:110px"></div>
+            <div><label>Surconsommation par défaut (%)</label><input type="text" id="ppSurconso" inputmode="decimal" style="width:110px"></div>
+          </div>
+          <p class="se-page-sub" style="margin:8px 0 0">Valeurs proposées sur chaque fiche de préparation, modifiables chantier par chantier.</p>
+        </div>
+      </div>
+      <div class="pp-pied"><p class="form-status" id="ppStatus" style="margin:0;flex:1"></p><button type="button" class="pm-btn" id="ppEnregistrer">Enregistrer les paramètres</button></div>
     </div>
   </div>
 
@@ -1662,6 +1685,22 @@ document.addEventListener("DOMContentLoaded", () => {
 .pm-act { white-space: nowrap; text-align: right; }
 .pm-act button { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 9px; font-size: 0.78rem; cursor: pointer; margin-left: 4px; }
 .pm-act button.ok { background: var(--anthracite); color: #fff; border-color: var(--anthracite); }
+.pm-tube { white-space: nowrap; font-weight: 700; }
+#se-view-parc .pm-table td:nth-child(3) { max-width: 170px; }
+#se-view-parc .pm-table:not(.pp-table) td:nth-child(6) { max-width: 120px; }
+#se-view-parc .pm-table .pm-tag { white-space: normal; }
+#se-view-parc .pm-table:not(.pp-table) th, #se-view-parc .pm-table:not(.pp-table) td { padding-left: 10px; padding-right: 10px; }
+.pm-tube .rac { display: block; color: var(--text-sub); font-weight: 600; font-size: 0.78rem; }
+.pm-tube.vide { color: #B26A00; font-weight: 600; }
+.pp-grille { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 24px; padding: 16px; }
+.pp-table { min-width: 0; }
+.pp-titre { font-size: 0.9rem; margin: 0 0 8px; }
+.pp-table td { padding: 5px 8px; }
+.pp-table input { width: 100%; min-width: 60px; }
+.pp-table .x { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; cursor: pointer; color: #C0392B; }
+.pp-ajout { margin-top: 8px; background: #fff; border: 1px dashed var(--border); border-radius: 8px; padding: 7px 12px; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+.pp-pied { display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--border); }
+@media (max-width: 900px) { .pp-grille { grid-template-columns: 1fr; } }
 </style>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -1680,6 +1719,17 @@ document.addEventListener("DOMContentLoaded", () => {
   function listeChefs() { return [...new Set(CHEFS.concat(machines.map((m) => m.chef).filter(Boolean)))].sort(); }
   function optionsChefs(sel) { return `<option value="">— AUCUN —</option>` + listeChefs().map((c) => `<option ${c === sel ? "selected" : ""}>${esc(c)}</option>`).join(""); }
   function optionsStatuts(sel) { return FTSParc.STATUTS.map((s) => `<option ${s === sel ? "selected" : ""}>${s}</option>`).join(""); }
+  const frNb = (n) => String(n).replace(".", ",");
+  function optionsTube(sel, libVide) {
+    const v = FTSParc.nombre(sel);
+    return `<option value="" ${v === "" ? "selected" : ""}>${libVide}</option>` + FTSParc.LONGUEURS_TUBE.map((l) => `<option value="${l}" ${l === v ? "selected" : ""}>${frNb(l)} m</option>`).join("");
+  }
+  function celluleTubes(m) {
+    if (m.categorie !== FTSParc.CATEGORIE_FOREUSE) return '<span style="color:#bbb">—</span>';
+    const t = FTSParc.tubesMachine(m);
+    if (t.standard === "") return '<span class="pm-tube vide">à renseigner</span>';
+    return `<span class="pm-tube">${frNb(t.standard)} m${t.raccourcie !== "" ? `<span class="rac">raccourcie ${frNb(t.raccourcie)} m</span>` : ""}</span>`;
+  }
 
   async function charger(forcer = false) {
     const empty = $("pmEmpty");
@@ -1695,6 +1745,7 @@ document.addEventListener("DOMContentLoaded", () => {
       $("parcNbDefaut").textContent = FTSParc.DEFAUT.length;
       $("parcAjoutPanel").hidden = !modifiable;
       machines = FTSParc.toutes(); location = FTSParc.location(); chargeA = Date.now();
+      chargerParametres();
       $("pmStatus").textContent = modifiable ? "" : (r.existe === false ? "Aperçu de la liste de départ : crée le parc pour pouvoir la modifier." : "Lecture seule : ce compte ne peut pas modifier le parc.");
       afficher();
     } catch (e) {
@@ -1731,7 +1782,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function ligneVue(m) {
     return `<tr>
       <td class="pm-num">${esc(m.numero)}</td><td><b>${esc(m.nom)}</b></td><td style="color:var(--text-sub)">${esc(m.designation)}</td>
-      <td><span class="pm-tag">${esc(m.categorie)}</span></td><td>${esc(m.chef) || '<span style="color:#bbb">—</span>'}</td>
+      <td><span class="pm-tag">${esc(m.categorie)}</span></td><td>${celluleTubes(m)}</td><td>${esc(m.chef) || '<span style="color:#bbb">—</span>'}</td>
       <td><span class="pm-st ${m.statut.replace(" ", "-")}">${esc(m.statut)}</span></td>
       <td class="pm-act">${modifiable ? `<button type="button" data-edit="${esc(m.numero)}">✏️ Modifier</button>` : ""}</td></tr>`;
   }
@@ -1741,6 +1792,7 @@ document.addEventListener("DOMContentLoaded", () => {
       <td><input type="text" class="e-nom" value="${esc(m.nom)}" style="width:170px"></td>
       <td><input type="text" class="e-des" value="${esc(m.designation)}" style="width:100%;min-width:200px"></td>
       <td><select class="e-cat">${optionsCategories(m.categorie)}</select></td>
+      <td style="white-space:nowrap"><select class="e-ts" title="Course standard">${optionsTube(m.tubeStd, "—")}</select> <select class="e-tr" title="Course raccourcie">${optionsTube(m.tubeRac, "aucune")}</select></td>
       <td><select class="e-chef">${optionsChefs(m.chef)}</select></td>
       <td><select class="e-st">${optionsStatuts(m.statut)}</select></td>
       <td class="pm-act"><button type="button" data-annuler>Annuler</button><button type="button" class="ok" data-ok="${esc(m.numero)}">Enregistrer</button></td></tr>`;
@@ -1767,13 +1819,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const v = (c) => tr.querySelector(c).value;
     const nouvelles = machines.map((m) => m.numero !== numero ? m : {
       ...m, nom: maj(v(".e-nom")), designation: maj(v(".e-des")), categorie: v(".e-cat"), chef: v(".e-chef"), statut: v(".e-st"),
+      tubeStd: FTSParc.nombre(v(".e-ts")), tubeRac: FTSParc.nombre(v(".e-tr")),
     });
     sauver(nouvelles, location, `${numero} modifiée.`);
   }
 
   $("pmAjouterBtn").addEventListener("click", async () => {
     const m = { numero: maj($("pmNum").value), nom: maj($("pmNom").value), designation: maj($("pmDes").value) || maj($("pmNom").value),
-      categorie: $("pmCat").value, chef: $("pmChef").value, statut: "EN SERVICE" };
+      categorie: $("pmCat").value, chef: $("pmChef").value, statut: "EN SERVICE", tubeStd: "", tubeRac: "" };
     if (!m.numero || !m.nom) { $("pmAjoutStatus").textContent = "⚠️ N° machine et nom chantier obligatoires."; return; }
     $("pmAjoutStatus").textContent = "";
     if (await sauver(machines.concat([m]), location, `${m.numero} ajoutée.`)) { ["pmNum", "pmNom", "pmDes"].forEach((id) => { $(id).value = ""; }); }
@@ -1792,6 +1845,45 @@ document.addEventListener("DOMContentLoaded", () => {
       await charger(true);
     } catch (e) { $("parcCreerStatus").textContent = "❌ " + e.message; }
   });
+  // ── Paramètres de la préparation de chantier ──
+  let pp = FTSParc.parametresPrepa();
+  async function chargerParametres() {
+    $("ppStatus").textContent = "Chargement des paramètres...";
+    try { pp = await FTSParc.chargerParametresPrepa(); $("ppStatus").textContent = ""; }
+    catch (e) { $("ppStatus").textContent = "❌ " + e.message; }
+    afficherParametres();
+  }
+  function lireParametresEcran() {
+    const val = (el) => el.value.trim();
+    return {
+      percages: [...$("ppPercages").querySelectorAll("tr")].map((tr) => ({ barre: FTSParc.nombre(val(tr.querySelector(".b"))), percage: FTSParc.nombre(val(tr.querySelector(".p"))) })),
+      ciments: [...$("ppCiments").querySelectorAll("tr")].map((tr) => ({ type: val(tr.querySelector(".t")), sac: FTSParc.nombre(val(tr.querySelector(".s"))), sacsPalette: FTSParc.nombre(val(tr.querySelector(".n"))) })),
+      dosage: FTSParc.nombre($("ppDosage").value), surconso: FTSParc.nombre($("ppSurconso").value),
+    };
+  }
+  function afficherParametres() {
+    const dis = modifiable ? "" : "disabled";
+    const nb = (n) => n === "" || n == null ? "" : frNb(n);
+    $("ppPercages").innerHTML = pp.percages.map((x, i) => `<tr><td><input type="text" class="b" inputmode="decimal" value="${nb(x.barre)}" ${dis}></td><td><input type="text" class="p" inputmode="decimal" value="${nb(x.percage)}" ${dis}></td><td>${modifiable ? `<button type="button" class="x" data-dp="${i}" title="Retirer">✕</button>` : ""}</td></tr>`).join("");
+    $("ppCiments").innerHTML = pp.ciments.map((c, i) => `<tr><td><input type="text" class="t" value="${esc(c.type)}" ${dis}></td><td><input type="text" class="s" inputmode="decimal" value="${nb(c.sac)}" ${dis}></td><td><input type="text" class="n" inputmode="decimal" value="${nb(c.sacsPalette)}" placeholder="à renseigner" ${dis}></td><td>${modifiable ? `<button type="button" class="x" data-dc="${i}" title="Retirer">✕</button>` : ""}</td></tr>`).join("");
+    $("ppDosage").value = nb(pp.dosage); $("ppSurconso").value = nb(pp.surconso);
+    $("ppDosage").disabled = $("ppSurconso").disabled = !modifiable;
+    ["ppAjoutPercage", "ppAjoutCiment", "ppEnregistrer"].forEach((id) => { $(id).hidden = !modifiable; });
+    $("ppPercages").querySelectorAll("[data-dp]").forEach((b) => b.addEventListener("click", () => { pp = lireParametresEcran(); pp.percages.splice(Number(b.dataset.dp), 1); afficherParametres(); }));
+    $("ppCiments").querySelectorAll("[data-dc]").forEach((b) => b.addEventListener("click", () => { pp = lireParametresEcran(); pp.ciments.splice(Number(b.dataset.dc), 1); afficherParametres(); }));
+  }
+  $("ppAjoutPercage").addEventListener("click", () => { pp = lireParametresEcran(); pp.percages.push({ barre: "", percage: "" }); afficherParametres(); });
+  $("ppAjoutCiment").addEventListener("click", () => { pp = lireParametresEcran(); pp.ciments.push({ type: "", sac: "", sacsPalette: "" }); afficherParametres(); });
+  $("ppEnregistrer").addEventListener("click", async () => {
+    const p = lireParametresEcran();
+    const erreurs = FTSParc.verifierParametresPrepa(p);
+    if (erreurs.length) { $("ppStatus").textContent = "⚠️ " + erreurs.join(" "); return; }
+    $("ppStatus").textContent = "Enregistrement...";
+    try { pp = await FTSParc.enregistrerParametresPrepa(p); afficherParametres(); $("ppStatus").textContent = "✅ Paramètres enregistrés."; }
+    catch (e) { $("ppStatus").textContent = "❌ " + e.message; }
+  });
+  afficherParametres();
+
   $("pmRecherche").addEventListener("input", afficher);
   $("pmInactifs").addEventListener("change", afficher);
   $("refreshParcBtn").addEventListener("click", () => charger(true));

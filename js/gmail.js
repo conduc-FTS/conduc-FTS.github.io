@@ -113,7 +113,59 @@ const FTSGmail = (() => {
     return res.json();
   }
 
-  return { envoyerAvecPieceJointe, envoyerTexte };
+  /**
+   * Mail avec copie et plusieurs pièces jointes (PDF, images...).
+   * @param {Object} opts
+   * @param {string[]} opts.to
+   * @param {string[]} [opts.cc]
+   * @param {string} opts.subject
+   * @param {string} opts.body  texte brut
+   * @param {{blob: Blob, fileName: string, mimeType?: string}[]} [opts.attachments]
+   */
+  async function envoyer({ to, cc, subject, body, attachments }) {
+    const boundary = "FTSboundary" + Date.now();
+    const lignes = [
+      `From: me`,
+      `To: ${to.join(", ")}`,
+      ...(cc && cc.length ? [`Cc: ${cc.join(", ")}`] : []),
+      `Subject: ${encodeHeader(subject)}`,
+      `MIME-Version: 1.0`,
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      ``,
+      `--${boundary}`,
+      `Content-Type: text/plain; charset=UTF-8`,
+      `Content-Transfer-Encoding: 8bit`,
+      ``,
+      body,
+      ``,
+    ];
+    for (const pj of attachments || []) {
+      const type = pj.mimeType || pj.blob.type || "application/octet-stream";
+      const nom = String(pj.fileName).replace(/"/g, "");
+      lignes.push(
+        `--${boundary}`,
+        `Content-Type: ${type}; name="${nom}"`,
+        `Content-Transfer-Encoding: base64`,
+        `Content-Disposition: attachment; filename="${nom}"`,
+        ``,
+        await blobToBase64(pj.blob),
+      );
+    }
+    lignes.push(`--${boundary}--`);
+    // Point d'envoi « upload » : accepte les gros mails (jusqu'à 35 Mo, plan d'accès en PDF compris)
+    const res = await fetch("https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=media", {
+      method: "POST",
+      headers: { ...authHeader(), "Content-Type": "message/rfc822" },
+      body: new Blob([lignes.join("\r\n")], { type: "message/rfc822" }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Erreur envoi mail (${res.status})`);
+    }
+    return res.json();
+  }
+
+  return { envoyerAvecPieceJointe, envoyerTexte, envoyer };
 })();
 
 // Exposition explicite sur window : une déclaration top-level en const/let

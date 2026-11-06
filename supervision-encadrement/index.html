@@ -1275,7 +1275,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const fmtD = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
     tbody.innerHTML = lignes.map((l) => {
       const r = l.r;
-      const url = `../preparation/index.html?id=${encodeURIComponent(l.id)}&name=${encodeURIComponent(l.nomComplet)}`;
+      const url = `../preparation/index.html?id=${encodeURIComponent(l.id)}&name=${encodeURIComponent(l.nomComplet)}${l.etat === "modifiee" ? "#envoi" : ""}`;
       const envoi = r && r.envoi && r.envoi.indice ? `Ind ${escapeHtmlSE(r.envoi.indice)}${r.envoi.le ? " · " + escapeHtmlSE(new Date(r.envoi.le).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })) : ""}` : "—";
       return `<tr data-url="${escapeHtmlSE(url)}">
         <td class="c-nom"><span class="sv-code">${escapeHtmlSE(l.code)}</span><span class="sv-nom">${escapeHtmlSE(l.nom)}</span></td>

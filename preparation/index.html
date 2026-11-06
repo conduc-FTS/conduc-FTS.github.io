@@ -70,6 +70,9 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .fp-page td { border: 1px solid #000; padding: 2px 5px; text-align: center; vertical-align: middle; height: 17px; overflow: hidden; overflow-wrap: anywhere; line-height: 1.2; }
 .fp-page td.v { height: 21px; }
 .fp-page .g { background: #c8c8c8; font-weight: bold; }
+.fp-page { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+/* Changements d'un nouvel indice (après l'indice 1) : case jaune, écriture noire */
+.fp-page td.maj, .fp-page tr.maj td, .fp-divers.maj .c { background: #FFFF00 !important; color: #000 !important; }
 .fp-page .lbl { font-weight: bold; text-align: left; }
 .fp-page .gauche { text-align: left; }
 .fp-page .u { text-decoration: underline; }
@@ -105,7 +108,20 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   #printZone { display: block !important; }
   #printZone .fp-page { width: auto; min-height: 0; padding: 0; margin: 0; box-shadow: none; }
 }
-@media (max-width: 900px) { .pr-grid, .pr-grid.deux { grid-template-columns: 1fr; } }
+/* Envoi */
+.pe-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 0 16px; }
+.pe-pj { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.pe-pj .i { font-size: 1.4rem; } .pe-pj .t { flex: 1; min-width: 0; } .pe-pj .t b { display: block; overflow-wrap: anywhere; }
+.pe-pj small { display: block; color: var(--text-sub); font-size: .76rem; }
+.pe-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 14px 18px; }
+.pe-lien { border: none; background: none; color: #2A5DBF; font: inherit; font-size: .74rem; cursor: pointer; padding: 0 0 0 6px; }
+.pe-chg { margin: 0; padding-left: 18px; font-size: .86rem; } .pe-chg li { margin: 3px 0; }
+.pe-et { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: .8rem; font-weight: 700; background: var(--bg); }
+.pe-et.envoyee { background: #EAF6EE; color: #1D6E3E; } .pe-et.modifiee { background: #EAF1FE; color: #2A5DBF; }
+#envMessage { font-family: inherit; font-size: .88rem; line-height: 1.45; }
+#pdfZone { position: fixed; left: -30000px; top: 0; }
+#pdfZone .fp-page { box-shadow: none; min-height: 0; }
+@media (max-width: 900px) { .pr-grid, .pr-grid.deux, .pe-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -118,6 +134,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
     <button type="button" data-t="Fournitures">4 · Fournitures</button>
     <button type="button" data-t="Remarques">5 · Remarques</button>
     <button type="button" data-t="Fiche">6 · Fiche à imprimer</button>
+    <button type="button" data-t="Envoi">7 · Envoi <span class="n" id="nEnvoi" hidden></span></button>
   </div>
   <p class="sv-status" id="prStatus">Chargement…</p>
 
@@ -167,8 +184,9 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <div class="sv-f"><label>Compresseur</label><input type="text" data-k="materiel.compresseur" list="dlCompresseur"></div>
         <div class="sv-f"><label>Groupe électrogène</label><input type="text" data-k="materiel.groupe" list="dlGroupe"></div>
         <div class="sv-f"><label>Pelle</label><input type="text" data-k="materiel.pelle" list="dlPelle"></div>
-        <div class="sv-f" id="boxPelle"><label>Pelle : livraison</label><input type="text" data-k="materiel.pelleLivraison" placeholder="ex : la veille, le 08/10…"></div>
-        <div></div>
+        <div class="sv-f" id="boxPelle"><label>Pelle : livraison le</label><input type="text" data-k="materiel.pelleLivraison" list="dlLivraison" placeholder="date ou ex : 2e jour du chantier"></div>
+        <div class="sv-f" id="boxGodet"><label>&nbsp;</label><label class="chkline" style="padding:6px 0 0"><input type="checkbox" data-k="materiel.godet"> Godet avec l'élévateur</label></div>
+        <div class="full pr-note w" id="noteGodet" hidden>⚠️ Godet coché mais aucun élévateur choisi.</div>
         <div class="full pr-note ok" id="noteAdblue" hidden>✓ Compresseur choisi : AD-BLUE ajouté automatiquement sur la fiche.</div>
       </div>
     </section>
@@ -259,10 +277,57 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
       <div style="padding:14px"><div class="fp-zone"><div class="fp-page" id="fichePage"></div></div></div>
     </section>
   </div>
+
+  <!-- 7 · ENVOI -->
+  <div class="sv-tab" id="tabEnvoi">
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Où en est la fiche</h2></div>
+      <div class="pr-kpi" id="envKpi"></div>
+    </section>
+    <div class="pe-grid">
+      <section class="sv-card">
+        <div class="sv-ch"><h2>Mail</h2><span class="s">envoyé depuis ta boîte Gmail · tout est modifiable</span></div>
+        <div class="pr-grid deux">
+          <div class="sv-f full"><label>Destinataires</label><input type="text" id="envA" autocomplete="off"></div>
+          <div class="sv-f full"><label>Copie <i>(facultatif)</i></label><input type="text" id="envCc" autocomplete="off" placeholder="adresse@fts-btp.fr"></div>
+          <div class="sv-f"><label>Indice envoyé</label><input type="text" id="envIndice" inputmode="numeric"></div>
+          <div class="sv-f" style="align-self:end"><span class="pr-note" id="envIndiceNote"></span></div>
+          <div class="sv-f full"><label>Objet</label><input type="text" id="envObjet"></div>
+          <div class="sv-f full"><label>Message <button type="button" class="pe-lien" id="envRegen">↺ refaire le texte</button></label><textarea id="envMessage" rows="14"></textarea></div>
+        </div>
+      </section>
+      <div>
+        <section class="sv-card">
+          <div class="sv-ch"><h2>Pièces jointes</h2></div>
+          <div style="padding:14px 18px">
+            <div class="pe-pj"><span class="i">📄</span><div class="t"><b id="envNomPdf">Fiche</b><small>générée depuis l'onglet 6 au moment de l'envoi</small></div><button type="button" class="sv-btn" id="envApercu">Aperçu</button></div>
+            <div class="pe-pj"><span class="i">🗺️</span><div class="t"><b id="envPlanNom">Plan d'accès</b><small id="envPlanInfo">facultatif · PDF ou image</small></div>
+              <button type="button" class="sv-btn" id="envPlanRetirer" hidden>Retirer</button>
+              <label class="sv-btn" style="cursor:pointer">Joindre…<input type="file" id="envPlan" accept="application/pdf,image/*" hidden></label></div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.86rem;font-weight:600;padding:4px 0 0"><input type="checkbox" id="envDrive" checked> Copier aussi dans le dossier PREPARATION du Drive</label>
+          </div>
+        </section>
+        <section class="sv-card">
+          <div class="sv-ch"><h2 id="envChgTitre">Changements</h2></div>
+          <div style="padding:12px 18px 16px" id="envChg"></div>
+        </section>
+      </div>
+    </div>
+    <section class="sv-card"><div class="pe-actions">
+      <span class="sv-mstatus" id="envStatus"></span><span class="sv-sp"></span>
+      <button type="button" class="sv-btn" id="envTelecharger">⬇️ Télécharger le PDF</button>
+      <button type="button" class="sv-btn pri" id="envEnvoyer">✉️ Envoyer</button>
+    </div></section>
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Historique des envois</h2></div>
+      <div style="overflow-x:auto"><table class="sv-tbl"><thead><tr><th>Indice</th><th>Envoyé le</th><th>Par</th><th>Destinataires</th><th>Plan d'accès</th><th>PDF</th></tr></thead><tbody id="envHist"></tbody></table></div>
+    </section>
+  </div>
 </div>
 
 <datalist id="dlConducteurs"></datalist><datalist id="dlChefs"></datalist><datalist id="dlInjection"></datalist><datalist id="dlPresse"></datalist>
 <datalist id="dlElevateur"></datalist><datalist id="dlCompresseur"></datalist><datalist id="dlGroupe"></datalist><datalist id="dlPelle"></datalist>
+<datalist id="dlLivraison"><option>1er jour du chantier</option><option>2e jour du chantier</option><option>3e jour du chantier</option><option>la veille du chantier</option></datalist>
 <datalist id="dlEssais"><option>Aucun</option><option>1 essai prévu</option><option>2 essais prévus</option><option>3 essais prévus</option></datalist>
 <datalist id="dlOutils"><option>MFT 4"</option><option>MFT 5"</option><option>MFT 6"</option><option>MFT 8"</option><option>MFT 12"</option><option>TRICONE</option><option>FISHTAIL</option><option>TRILAME 73</option><option>TRILAME 88,9</option><option>TRILAME 114</option><option>TRILAME 127</option><option>TRILAME 139,7</option><option>TRILAME 177,8</option><option>TARIERE</option></datalist>
 
@@ -290,6 +355,9 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <script src="../js/parc-materiel.js"></script>
 <script src="../js/personnel.js"></script>
 <script src="../js/preparation.js"></script>
+<script src="../js/gmail.js"></script>
+<script src="../lib/jspdf/jspdf.umd.min.js"></script>
+<script src="../lib/html2canvas/html2canvas.min.js"></script>
 <script src="../js/supervision-shell.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -350,13 +418,22 @@ document.addEventListener("DOMContentLoaded", () => {
       majDependances(k);
     });
   });
+  let pelleAvant = null; // pelle déjà renseignée au chargement : on ne recoche pas le godet
   function majDependances(k) {
     if (k === "infos.dateConnue") $("boxDate").hidden = !prep.infos.dateConnue;
     if (k === "equipe.chef") majTel();
     if (k === "materiel.foreuse") { remplirReglages(); majTubeMax(); afficherNdc(); }
     if (k === "materiel.reglage") { majTubeMax(); afficherNdc(); }
     if (k === "materiel.compresseur") $("noteAdblue").hidden = !prep.materiel.compresseur.trim();
-    if (k === "materiel.pelle") $("boxPelle").hidden = !prep.materiel.pelle.trim();
+    if (k === "materiel.pelle" || k === "materiel.godet" || k === "materiel.elevateur") {
+      const pelle = !!prep.materiel.pelle.trim();
+      // Une pelle sur le chantier : en général il faut le godet avec l'élévateur (coché d'office, décochable)
+      if (k === "materiel.pelle" && pelle && !pelleAvant && !prep.materiel.godet) { prep.materiel.godet = true; const ch = document.querySelector('[data-k="materiel.godet"]'); if (ch) ch.checked = true; }
+      if (k === "materiel.pelle") pelleAvant = pelle;
+      $("boxPelle").hidden = !pelle;
+      $("boxGodet").hidden = !pelle && !prep.materiel.godet;
+      $("noteGodet").hidden = !(prep.materiel.godet && !prep.materiel.elevateur.trim());
+    }
   }
 
   function marquerSale() {
@@ -382,6 +459,7 @@ document.addEventListener("DOMContentLoaded", () => {
           FTSPersonnel.charger({ rapide: true }).catch(() => {}),
         ]);
         meta = m || {};
+        FTSAuth.getUserInfo().then((i) => { if (i) { nomMoi = i.name || i.email || ""; if ($("tabEnvoi").classList.contains("on") && !msgTouche) afficherEnvoi(); } }).catch(() => {});
         pp = await FTSParc.chargerParametresPrepa().catch(() => FTSParc.parametresPrepa());
         prep = P.normaliser(enreg, meta);
         if (!enreg) {
@@ -400,8 +478,11 @@ document.addEventListener("DOMContentLoaded", () => {
         $("etatSave").classList.remove("sale");
         remplirListes();
         remplirChamps();
+        pelleAvant = !!prep.materiel.pelle.trim();
         ["infos.dateConnue", "equipe.chef", "materiel.foreuse", "materiel.compresseur", "materiel.pelle"].forEach(majDependances);
         afficherNdc();
+        majOngletEnvoi();
+        if ($("tabEnvoi").classList.contains("on")) afficherEnvoi();
         $("prStatus").textContent = "";
       } catch (e) {
         console.error(e);
@@ -417,6 +498,7 @@ document.addEventListener("DOMContentLoaded", () => {
     $("btnEnregistrer").disabled = true;
     $("etatSave").textContent = "Enregistrement…";
     try {
+      if (prep.envoi) prep.envoi.modifieApres = estModifiee();
       const { data: r, meta: m } = await P.enregistrer(chantierId, prep);
       prep.majLe = r.majLe;
       if (m) { meta = m; majCacheSupervision(m); }
@@ -424,6 +506,7 @@ document.addEventListener("DOMContentLoaded", () => {
       $("etatSave").textContent = `Enregistrée le ${new Date(r.majLe).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}`;
       $("etatSave").classList.remove("sale");
       FTSShell.toast("✅ Préparation enregistrée dans le dossier PREPARATION du chantier");
+      if ($("tabEnvoi").classList.contains("on")) afficherEnvoi();
     } catch (e) {
       $("etatSave").textContent = "❌ " + e.message;
     } finally { $("btnEnregistrer").disabled = false; }
@@ -768,24 +851,25 @@ document.addEventListener("DOMContentLoaded", () => {
   // ─── Fiche imprimée ────────────────────────────────────────────
   function dateFr(iso) { const [a, m, j] = String(iso || "").split("-"); return a && m && j ? `${j}/${m}/${a}` : ""; }
   function dashRows(lignes, nbMin) {
-    const out = lignes.map((cells) => `<tr>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`);
+    const out = lignes.map((l) => { const cells = Array.isArray(l) ? l : l.c; return `<tr${l.maj ? ' class="maj"' : ""}>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`; });
     while (out.length < nbMin) out.push(`<tr><td></td><td></td><td></td></tr>`);
     return out.join("");
   }
   // Hauteur utile d'une page A4 (297 mm − 2 × 10 mm de marge), en pixels écran
   const HAUTEUR_A4 = 277 * 96 / 25.4;
-  function afficherFiche() {
-    const page = $("fichePage");
+  function afficherFiche(page = $("fichePage")) {
+    const interactif = page.id === "fichePage";
     const style = getComputedStyle(page);
     const pad = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
     // Niveaux : 0 normal · 1 lignes plus basses · 2 moins de lignes vides · 3 très serré · 4 sans ligne vide
     for (let n = 0; n <= 4; n++) {
-      dessinerFiche(n);
+      dessinerFiche(n, page);
       page.classList.toggle("serre1", n === 1 || n === 2);
       page.classList.toggle("serre2", n >= 3);
       if (page.scrollHeight - pad <= HAUTEUR_A4 || n === 4) break;
     }
-    const div = $("fpDivers");
+    const div = interactif ? page.querySelector("#fpDivers") : null;
+    if (!interactif) page.querySelectorAll("[contenteditable]").forEach((x) => { x.removeAttribute("contenteditable"); x.removeAttribute("id"); });
     if (div) div.addEventListener("input", () => {
       prep.remarques.divers = div.innerText.replace(/\n$/, "");
       const champ = document.querySelector('[data-k="remarques.divers"]');
@@ -793,7 +877,7 @@ document.addEventListener("DOMContentLoaded", () => {
       marquerSale();
     });
   }
-  function dessinerFiche(niveau) {
+  function dessinerFiche(niveau, cible) {
     const c = calcul();
     const q = (cle, n) => Math.max(0, n + marge(cle));
     const chef = FTSPersonnel.parNom(prep.equipe.chef);
@@ -803,10 +887,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const ci = c.ciment;
     const premiere = nombre(prep.ciment.premiereLivraison);
     const pal = (v) => (v === "" ? "?" : `${v} Pal`);
-    const platines = c.platines.map((p) => [`${q(P.cleArticle("platine", p), p.qte)} u`, esc(p.section), esc(p.coiffe)]);
-    const centreurs = c.centreurs.map((p) => [`${q(P.cleArticle("centreur", p), p.qte)} u`, `Ø ${fr(p.forage)}`, `Ø ${fr(p.d)}`]);
-    const tubes = P.tubesFiche(c, prep).map((t) => [`${t.qte} u`, `Ø ${t.d.toFixed(1)}${t.pastille ? " PASTILLÉ" : ""}`, `${t.l.toFixed(1)} ML`]);
-    const barres = c.barres.map((b) => [`${q(P.cleArticle("barre", b), b.qte)} u`, `${esc(b.type)} Ø ${fr(b.d)}`, `${b.l === "" ? "" : Number(b.l).toFixed(1) + " ML"}`]);
+    const S = surlignage();
+    // Ciment autre que le 32.5 habituel : toujours en jaune, dès l'indice 1
+    const cimentSpecial = String(prep.ciment.type || "").replace(",", ".").replace(/\s+/g, "") !== "32.5";
+    const J = (...cles) => (cles.some((k) => S.cles.has(k)) ? " maj" : ""); // classe « maj » si changé
+    const tdJ = (cls, ...cles) => { const x = `${cls}${J(...cles)}`.trim(); return x ? ` class="${x}"` : ""; };
+    const platines = c.platines.map((p) => ({ maj: J(kPl(p)), c: [`${q(P.cleArticle("platine", p), p.qte)} u`, esc(p.section), esc(p.coiffe)] }));
+    const centreurs = c.centreurs.map((p) => ({ maj: J(kCe(p)), c: [`${q(P.cleArticle("centreur", p), p.qte)} u`, `Ø ${fr(p.forage)}`, `Ø ${fr(p.d)}`] }));
+    const tubes = P.tubesFiche(c, prep).map((t) => ({ maj: J(kTu(t)), c: [`${t.qte} u`, `Ø ${t.d.toFixed(1)}${t.pastille ? " PASTILLÉ" : ""}`, `${t.l.toFixed(1)} ML`] }));
+    const barres = c.barres.map((b) => ({ maj: J(kBa(b)), c: [`${q(P.cleArticle("barre", b), b.qte)} u`, `${esc(b.type)} Ø ${fr(b.d)}`, `${b.l === "" ? "" : Number(b.l).toFixed(1) + " ML"}`] }));
     const L = (n) => (n || n === 0 ? n : "");
     // Bas de page : même nombre de lignes à gauche et à droite → les traits sont alignés
     // Lignes vides pour compléter au stylo : réduites si la fiche est longue (niveau de resserrage)
@@ -819,57 +908,57 @@ document.addEventListener("DOMContentLoaded", () => {
     if (niveau < 3 && droite < gauche) nTu += gauche - droite;
     const nCe2 = nCe + (niveau < 3 ? Math.max(0, droite - gauche) : 0);
     const cg = (...w) => `<colgroup>${w.map((x) => `<col style="width:${x}%">`).join("")}</colgroup>`;
-    $("fichePage").innerHTML = `
+    cible.innerHTML = `
 <div class="fp-top">
   <div><img src="../assets/logo-fts.png" alt="FTS" style="height:18mm;width:auto;display:block;margin-bottom:3mm">
-    <table>${cg(50, 50)}<tr><td class="g">Indice :</td><td><b>${esc(L(prep.indice))}</b></td></tr></table></div>
+    <table>${cg(50, 50)}<tr><td class="g">Indice :</td><td${S.cles.size ? ' class="maj"' : ""}><b>${esc(L(S.indice))}</b></td></tr></table></div>
   <div><table>${cg(40, 60)}
     <tr><td class="g">N° DOSSIER :</td><td><b>${esc(code)}</b></td></tr>
     <tr><td class="g">CHANTIER :</td><td class="fp-petit">${esc(nom)}</td></tr>
-    <tr><td class="g">CONDUCTEUR DE TRAVAUX :</td><td>${esc(inf.conducteur)}</td></tr>
-    <tr><td class="g">ÉQUIPE :</td><td><b>${esc(prep.equipe.chef)}</b></td></tr>
-    <tr><td class="g">TÉL. CHEF :</td><td>${esc(tel)}</td></tr>
+    <tr><td class="g">CONDUCTEUR DE TRAVAUX :</td><td${tdJ("", "Conducteur de travaux")}>${esc(inf.conducteur)}</td></tr>
+    <tr><td class="g">ÉQUIPE :</td><td${tdJ("", "Équipe")}><b>${esc(prep.equipe.chef)}</b></td></tr>
+    <tr><td class="g">TÉL. CHEF :</td><td${tdJ("", "Équipe")}>${esc(tel)}</td></tr>
   </table></div>
 </div>
 <div class="fp-cols">
   <div>
     <table>${cg(46, 54)}
-      <tr><td class="g lbl" rowspan="2">ADRESSE :</td><td class="gauche">${esc(inf.adresse)}</td></tr>
-      <tr><td class="gauche">${esc(inf.commune)}</td></tr>
-      <tr><td class="g lbl" style="white-space:nowrap;font-size:9.5px">PRISE DU MATÉRIEL :</td><td>${esc(inf.priseMateriel)}</td></tr>
+      <tr><td class="g lbl" rowspan="2">ADRESSE :</td><td${tdJ("gauche", "Adresse")}>${esc(inf.adresse)}</td></tr>
+      <tr><td${tdJ("gauche", "Commune")}>${esc(inf.commune)}</td></tr>
+      <tr><td class="g lbl" style="white-space:nowrap;font-size:9.5px">PRISE DU MATÉRIEL :</td><td${tdJ("", "Prise du matériel")}>${esc(inf.priseMateriel)}</td></tr>
     </table>
     <div class="red">MATERIEL DE CHANTIER</div>
     <table>${cg(50, 50)}
-      <tr><td class="g">FOREUSE :</td><td class="g">INJECTION :</td></tr><tr><td class="v">${esc(foreuse ? foreuse.designation || foreuse.nom : ma.foreuse)}</td><td class="v">${esc(ma.injection)}</td></tr>
-      <tr><td class="g">PRESSE :</td><td class="g">CUVE GNR :</td></tr><tr><td class="v">${esc(ma.presse)}</td><td class="v">${esc(ma.cuveGnr)}</td></tr>
-      <tr><td class="g">CUVE A EAU :</td><td class="g">CAISSE FLEXIBLE :</td></tr><tr><td class="v">${esc(ma.cuveEau)}</td><td class="v">${esc(ma.caisseFlexible)}</td></tr>
+      <tr><td class="g">FOREUSE :</td><td class="g">INJECTION :</td></tr><tr><td${tdJ("v", "Foreuse")}>${esc(foreuse ? foreuse.designation || foreuse.nom : ma.foreuse)}</td><td${tdJ("v", "Injection")}>${esc(ma.injection)}</td></tr>
+      <tr><td class="g">PRESSE :</td><td class="g">CUVE GNR :</td></tr><tr><td${tdJ("v", "Presse")}>${esc(ma.presse)}</td><td${tdJ("v", "Cuve GNR")}>${esc(ma.cuveGnr)}</td></tr>
+      <tr><td class="g">CUVE A EAU :</td><td class="g">CAISSE FLEXIBLE :</td></tr><tr><td${tdJ("v", "Cuve à eau")}>${esc(ma.cuveEau)}</td><td${tdJ("v", "Caisse flexible")}>${esc(ma.caisseFlexible)}</td></tr>
     </table>
     <div class="red">LOCATION</div>
     <table>${cg(50, 50)}
-      <tr><td class="g">ÉLÉVATEUR :</td><td class="g">COMPRESSEUR :</td></tr><tr><td class="v">${esc(ma.elevateur)}</td><td class="v">${esc(ma.compresseur)}${ma.compresseur.trim() ? ' <span class="fp-adblue">+ AD-BLUE</span>' : ""}</td></tr>
-      <tr><td class="g fp-petit">GROUPE ÉLECTROGÈNE :</td><td class="g">PELLE :</td></tr><tr><td class="v">${esc(ma.groupe)}</td><td class="v">${esc(ma.pelle)}${ma.pelle.trim() && ma.pelleLivraison ? ` <span class="fp-petit">(livr. ${esc(ma.pelleLivraison)})</span>` : ""}</td></tr>
+      <tr><td class="g">ÉLÉVATEUR :</td><td class="g">COMPRESSEUR :</td></tr><tr><td${tdJ("v", "Élévateur", "Godet élévateur")}>${esc(ma.elevateur)}${ma.godet ? ' <span class="fp-adblue">+ GODET</span>' : ""}</td><td${tdJ("v", "Compresseur")}>${esc(ma.compresseur)}${ma.compresseur.trim() ? ' <span class="fp-adblue">+ AD-BLUE</span>' : ""}</td></tr>
+      <tr><td class="g fp-petit">GROUPE ÉLECTROGÈNE :</td><td class="g">PELLE :</td></tr><tr><td${tdJ("v", "Groupe électrogène")}>${esc(ma.groupe)}</td><td${tdJ("v", "Pelle", "Livraison pelle")}>${esc(ma.pelle)}${ma.pelle.trim() && ma.pelleLivraison ? ` <span class="fp-petit">(livraison : ${esc(ma.pelleLivraison)})</span>` : ""}</td></tr>
     </table>
     <div class="red">MATERIAUX</div>
     <table>${cg(25, 25, 50)}<tr><td class="g" colspan="3">CIMENT :</td></tr><tr><td colspan="2">Total chantier</td><td>1ère livraison</td></tr>
-      <tr><td class="v"><b>${pal(ci.palettes)}</b></td><td class="v">${esc(prep.ciment.type)}</td><td class="v"><b>${pal(premiere === "" ? ci.palettes : premiere)}</b></td></tr></table>
+      <tr><td${tdJ("v", "Ciment total")}><b>${pal(ci.palettes)}</b></td><td${tdJ(cimentSpecial ? "v maj" : "v", "Type de ciment")}>${esc(prep.ciment.type)}</td><td${tdJ("v", "Ciment 1ère livraison", premiere === "" ? "Ciment total" : "")}><b>${pal(premiere === "" ? ci.palettes : premiere)}</b></td></tr></table>
   </div>
   <div class="fp-droite">
-    <table>${cg(50, 50)}<tr><td class="g lbl" colspan="2">DATE INTERVENTION ET DURÉE :</td></tr><tr><td class="v">${inf.dateConnue && inf.date ? `<b>${dateFr(inf.date)}</b>` : "<b>À DÉFINIR</b>"}</td><td class="v">${esc(L(inf.duree))} ${esc(inf.dureeUnite)}</td></tr></table>
+    <table>${cg(50, 50)}<tr><td class="g lbl" colspan="2">DATE INTERVENTION ET DURÉE :</td></tr><tr><td${tdJ("v", "Date d'intervention")}>${inf.dateConnue && inf.date ? `<b>${dateFr(inf.date)}</b>` : "<b>À DÉFINIR</b>"}</td><td${tdJ("v", "Durée")}>${esc(L(inf.duree))} ${esc(inf.dureeUnite)}</td></tr></table>
     <div class="esp"></div>
     <table>${cg(42, 58)}
       <tr><td class="g lbl u" colspan="2">REMARQUES</td></tr>
-      <tr><td class="lbl v">Objectif forage :</td><td class="v">${re.objectif !== "" ? esc(re.objectif) + " U micropieux / jour (minimum)" : ""}</td></tr>
-      <tr><td class="lbl v">Micropieu(x) d'essai :</td><td class="v">${esc(re.essais)}</td></tr>
-      <tr><td class="lbl v">IMPLANTATION :</td><td class="v">${esc(re.implantation)}</td></tr>
-      <tr><td class="lbl v">ÉVACUATION DES BOUES :</td><td class="v">${esc(re.boues)}</td></tr>
-      <tr><td class="lbl v">ÉVACUATION DES DÉCHETS :</td><td class="v">${esc(re.dechets)}</td></tr>
-      <tr><td class="lbl v">NDC :</td><td class="v fp-petit">${prep.ndc.indice ? "Ind " + esc(prep.ndc.indice) : ""}${prep.ndc.ddc ? (prep.ndc.indice ? " — " : "") + esc(prep.ndc.ddc) : ""}</td></tr>
+      <tr><td class="lbl v">Objectif forage :</td><td${tdJ("v", "Objectif forage")}>${re.objectif !== "" ? esc(re.objectif) + " U micropieux / jour (minimum)" : ""}</td></tr>
+      <tr><td class="lbl v">Micropieu(x) d'essai :</td><td${tdJ("v", "Micropieu(x) d'essai")}>${esc(re.essais)}</td></tr>
+      <tr><td class="lbl v">IMPLANTATION :</td><td${tdJ("v", "Implantation")}>${esc(re.implantation)}</td></tr>
+      <tr><td class="lbl v">ÉVACUATION DES BOUES :</td><td${tdJ("v", "Évacuation des boues")}>${esc(re.boues)}</td></tr>
+      <tr><td class="lbl v">ÉVACUATION DES DÉCHETS :</td><td${tdJ("v", "Évacuation des déchets")}>${esc(re.dechets)}</td></tr>
+      <tr><td class="lbl v">NDC :</td><td${tdJ("v fp-petit", "NDC")}>${prep.ndc.indice ? "Ind " + esc(prep.ndc.indice) : ""}${prep.ndc.ddc ? (prep.ndc.indice ? " — " : "") + esc(prep.ndc.ddc) : ""}</td></tr>
     </table>
     <div class="esp"></div>
     <table>${cg(70, 30)}<tr><td class="g">OUTILS DE FORAGE :</td><td class="g">Ø (mm)</td></tr>
-      <tr><td>${esc(re.outil)}</td><td>${esc(re.outilDiam)}</td></tr>
+      <tr><td${tdJ("", "Outil de forage")}>${esc(re.outil)}</td><td${tdJ("", "Outil de forage")}>${esc(re.outilDiam)}</td></tr>
       <tr><td></td><td></td></tr></table>
-    <div class="fp-divers"><div class="t">DIVERS :</div><div class="c" id="fpDivers" contenteditable="true" spellcheck="true">${esc(re.divers)}</div></div>
+    <div class="fp-divers${J("Divers")}"><div class="t">DIVERS :</div><div class="c" id="fpDivers" contenteditable="true" spellcheck="true">${esc(re.divers)}</div></div>
   </div>
 </div>
 <div class="fp-bas">
@@ -901,6 +990,262 @@ document.addEventListener("DOMContentLoaded", () => {
     window.print();
   });
 
+  // ─── Envoi (fiche PDF + plan d'accès par mail) ─────────────────
+  let plan = null;                       // { blob, nom, type } — plan d'accès joint à la main
+  let objetTouche = false, msgTouche = false, destTouche = false, indiceTouche = false;
+  let nomMoi = "";
+  /** Relevé de ce qui est imprimé sur la fiche : sert à repérer les changements entre deux envois */
+  const kPl = (p) => `Platines ${p.section} ${String(p.coiffe).toLowerCase()}`;
+  const kCe = (p) => `Pointes Ø ${fr(p.forage)} tube Ø ${fr(p.d)}`;
+  const kTu = (t) => `Tubes Ø ${t.d.toFixed(1)}${t.pastille ? " pastillés" : ""} x ${t.l.toFixed(1)} ML`;
+  const kBa = (b) => `Barres ${b.type} Ø ${fr(b.d)}${b.l === "" ? "" : " x " + Number(b.l).toFixed(1) + " ML"}`;
+  let indicePdf = null; // indice imposé pendant la création du PDF
+  /** Indice imprimé sur la fiche et cases à surligner en jaune (changements depuis le dernier envoi) */
+  function surlignage() {
+    const e = prep.envoi;
+    if (!e) return { indice: indicePdf != null ? indicePdf : prep.indice, cles: new Set() };
+    const cles = P.clesChangees(e.recap, recap());
+    const indice = indicePdf != null ? indicePdf : cles.size ? P.prochainIndice(prep, true) : prep.indice;
+    // Renvoi au même indice : on garde le surlignage de cet indice
+    if (String(indice) === String(e.indice)) return { indice, cles: new Set(e.surligne || []) };
+    return { indice, cles };
+  }
+  function recap() {
+    const c = calcul();
+    const q = (cle, n) => Math.max(0, n + marge(cle));
+    const inf = prep.infos, ma = prep.materiel, re = prep.remarques;
+    const r = [], vus = new Map();
+    const add = (k, v) => {
+      const n = (vus.get(k) || 0) + 1; vus.set(k, n);
+      r.push([n > 1 ? `${k} (${n})` : k, v == null ? "" : String(v).trim()]);
+    };
+    const ci = c.ciment, premiere = nombre(prep.ciment.premiereLivraison);
+    add("Date d'intervention", inf.dateConnue && inf.date ? dateFr(inf.date) : "À DÉFINIR");
+    add("Durée", inf.duree === "" || inf.duree == null ? "" : `${typeof inf.duree === "number" ? fr(inf.duree) : inf.duree} ${inf.dureeUnite}`);
+    add("Équipe", prep.equipe.chef); add("Conducteur de travaux", inf.conducteur);
+    add("Adresse", inf.adresse); add("Commune", inf.commune); add("Prise du matériel", inf.priseMateriel);
+    add("Foreuse", ma.foreuse); add("Injection", ma.injection); add("Presse", ma.presse); add("Cuve GNR", ma.cuveGnr);
+    add("Cuve à eau", ma.cuveEau); add("Caisse flexible", ma.caisseFlexible); add("Élévateur", ma.elevateur);
+    add("Compresseur", ma.compresseur); add("Groupe électrogène", ma.groupe); add("Pelle", ma.pelle);
+    add("Livraison pelle", ma.pelle.trim() ? ma.pelleLivraison : "");
+    add("Godet élévateur", ma.godet ? "oui" : "");
+    add("Ciment total", ci.palettes === "" ? "" : `${ci.palettes} Pal`); add("Type de ciment", prep.ciment.type);
+    add("Ciment 1ère livraison", premiere === "" ? "" : `${premiere} Pal`);
+    add("Objectif forage", re.objectif); add("Micropieu(x) d'essai", re.essais); add("Implantation", re.implantation);
+    add("Évacuation des boues", re.boues); add("Évacuation des déchets", re.dechets);
+    add("NDC", [prep.ndc.indice ? "Ind " + prep.ndc.indice : "", prep.ndc.ddc].filter(Boolean).join(" — "));
+    add("Outil de forage", [re.outil, re.outilDiam ? "Ø " + re.outilDiam : ""].filter(Boolean).join(" "));
+    add("Divers", re.divers);
+    c.platines.forEach((p) => add(kPl(p), `${q(P.cleArticle("platine", p), p.qte)} u`));
+    c.centreurs.forEach((p) => add(kCe(p), `${q(P.cleArticle("centreur", p), p.qte)} u`));
+    P.tubesFiche(c, prep).forEach((t) => add(kTu(t), `${t.qte} u`));
+    c.barres.forEach((b) => add(kBa(b), `${q(P.cleArticle("barre", b), b.qte)} u`));
+    return r;
+  }
+  function changements() {
+    if (!prep.envoi) return [];
+    return P.comparer(prep.envoi.recap, recap()).map((l) => (/^Divers :/.test(l) ? "Divers : texte modifié" : l));
+  }
+  function estModifiee() { return !!prep.envoi && changements().length > 0; }
+  function majOngletEnvoi() {
+    const b = $("nEnvoi");
+    const mod = estModifiee();
+    b.hidden = !prep.envoi;
+    b.textContent = prep.envoi ? (mod ? "à renvoyer" : "Ind " + prep.envoi.indice) : "";
+  }
+  function indiceEnvoi() { const v = $("envIndice").value.trim(); return nombre(v) === "" ? v : nombre(v); }
+  function texteObjet(n) {
+    const e = prep.envoi;
+    const ar = e && String(e.indice) !== String(n) ? ` (annule et remplace l'indice ${e.indice})` : "";
+    return `${code} ${nom} - Fiche de préparation de chantier - Indice ${n}${ar}`;
+  }
+  function texteMessage(n) {
+    const e = prep.envoi, inf = prep.infos;
+    const ar = e && String(e.indice) !== String(n) ? `, qui annule et remplace l'indice ${e.indice}` : "";
+    const lignes = ["Bonjour,", "",
+      `Vous trouverez ci-joint la fiche de préparation du chantier ${code} ${nom}, indice ${n}${ar}${plan ? ", ainsi que le plan d'accès" : ""}.`];
+    const chg = changements();
+    if (e && chg.length) lignes.push("", `Changements depuis l'indice ${e.indice} :`, ...chg.map((l) => "- " + l));
+    const duree = inf.duree === "" || inf.duree == null ? "" : ` pour ${typeof inf.duree === "number" ? fr(inf.duree) : inf.duree} ${String(inf.dureeUnite).toLowerCase()}`;
+    const equipe = prep.equipe.chef ? `, équipe de ${prep.equipe.chef}` : "";
+    lignes.push("", inf.dateConnue && inf.date ? `Intervention prévue le ${dateFr(inf.date)}${duree}${equipe}.` : `Date d'intervention encore à définir${equipe}.`);
+    lignes.push("", "Bonne journée,", inf.conducteur || nomMoi || "");
+    return lignes.join("\n");
+  }
+  function afficherEnvoi() {
+    if (!pret) return;
+    const e = prep.envoi;
+    const mod = estModifiee();
+    if (!indiceTouche) $("envIndice").value = P.prochainIndice(prep, mod);
+    const n = indiceEnvoi();
+    const etat = !e ? "encours" : mod ? "modifiee" : "envoyee";
+    const libEtat = { encours: "Pas encore envoyée", envoyee: "Envoyée, à jour", modifiee: "Modifiée après envoi" }[etat];
+    const leFr = (iso) => new Date(iso).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+    $("envKpi").innerHTML = `<div><span>État</span><b><span class="pe-et ${etat}">${libEtat}</span></b></div>
+      <div><span>Dernier envoi</span><b>${e ? `Indice ${esc(e.indice)}` : "—"}</b><span>${e ? esc(leFr(e.le)) + (e.par ? " · " + esc(e.par) : "") : "jamais envoyée"}</span></div>
+      <div><span>Prochain envoi</span><b>Indice ${esc(n)}</b><span>${e && String(e.indice) !== String(n) ? `annule et remplace l'indice ${esc(e.indice)}` : e ? "même indice (renvoi)" : "premier envoi"}</span></div>`;
+    $("envIndiceNote").textContent = !e ? "Premier envoi de la fiche." : mod ? `La fiche a changé depuis l'indice ${e.indice} : nouvel indice.` : `Rien n'a changé depuis l'indice ${e.indice}.`;
+    $("envIndiceNote").className = "pr-note" + (e && !mod ? "" : " ok");
+    if (!destTouche) $("envA").value = (e && e.a && e.a.length ? e.a : P.DESTINATAIRES).join(" ; ");
+    if (!destTouche && e && e.cc) $("envCc").value = e.cc.join(" ; ");
+    if (!objetTouche) $("envObjet").value = texteObjet(n);
+    if (!msgTouche) $("envMessage").value = texteMessage(n);
+    $("envNomPdf").textContent = P.nomPdf(code, n);
+    $("envPlanNom").textContent = plan ? plan.nom : "Plan d'accès";
+    $("envPlanInfo").textContent = plan ? `${(plan.blob.size / 1024 / 1024).toFixed(1).replace(".", ",")} Mo · sera joint au mail` : (e ? "facultatif · déjà envoyé avec un indice précédent ?" : "facultatif, mais en général joint au premier envoi");
+    $("envPlanRetirer").hidden = !plan;
+    const chg = changements();
+    $("envChgTitre").textContent = e ? `Changements depuis l'indice ${e.indice}` : "Changements";
+    $("envChg").innerHTML = !e ? `<p class="pr-note">Premier envoi : rien à comparer.</p>`
+      : chg.length ? `<ul class="pe-chg">${chg.map((l) => `<li>${esc(l)}</li>`).join("")}</ul><p style="font-size:.76rem;color:var(--text-sub);margin:8px 0 0">La liste est reprise dans le message ; tu peux la retoucher.</p>`
+      : `<p class="pr-note">Aucun changement depuis le dernier envoi.</p>`;
+    const h = (e && e.historique) || [];
+    $("envHist").innerHTML = h.length ? h.slice().reverse().map((x) => `<tr><td><b>${esc(x.indice)}</b></td><td>${esc(leFr(x.le))}</td><td>${esc(x.par || "")}</td>
+      <td>${esc((x.a || []).concat((x.cc || []).map((c) => "cc " + c)).join(", "))}</td><td>${x.plan ? "oui" : "—"}</td>
+      <td>${x.pdf && x.pdf.lien ? `<a href="${esc(x.pdf.lien)}" target="_blank" rel="noopener">Ouvrir</a>` : "—"}</td></tr>`).join("")
+      : `<tr><td colspan="6" style="color:var(--text-sub)">Aucun envoi pour l'instant.</td></tr>`;
+    $("envEnvoyer").textContent = `✉️ Envoyer l'indice ${n}`;
+    majOngletEnvoi();
+  }
+  $("envIndice").addEventListener("input", () => { indiceTouche = true; afficherEnvoi(); });
+  ["envA", "envCc"].forEach((id) => $(id).addEventListener("input", () => { destTouche = true; }));
+  $("envObjet").addEventListener("input", () => { objetTouche = true; });
+  $("envMessage").addEventListener("input", () => { msgTouche = true; });
+  $("envRegen").addEventListener("click", () => { objetTouche = msgTouche = false; afficherEnvoi(); });
+  $("envPlan").addEventListener("change", (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    ev.target.value = "";
+    if (!f) return;
+    if (f.size > 20 * 1024 * 1024) { $("envStatus").textContent = "❌ Plan d'accès trop lourd (20 Mo maximum)."; return; }
+    plan = { blob: f, nom: f.name, type: f.type || "application/octet-stream" };
+    afficherEnvoi();
+  });
+  $("envPlanRetirer").addEventListener("click", () => { plan = null; afficherEnvoi(); });
+
+  /** Génère le PDF A4 de la fiche, avec l'indice donné (sans toucher à l'écran) */
+  async function genererPdf(indice) {
+    if (!window.html2canvas || !window.jspdf) throw new Error("Outils PDF non chargés : recharge la page.");
+    const sauve = prep.indice;
+    prep.indice = indice; indicePdf = indice;
+    let zone = $("pdfZone");
+    if (!zone) { zone = document.createElement("div"); zone.id = "pdfZone"; document.body.appendChild(zone); }
+    zone.innerHTML = `<div class="fp-page" style="padding:0"></div>`;
+    const page = zone.firstChild;
+    try {
+      afficherFiche(page);
+      await Promise.all([...page.querySelectorAll("img")].map((im) => (im.complete ? null : new Promise((ok) => { im.onload = im.onerror = ok; }))));
+      const canvas = await html2canvas(page, { scale: 3, backgroundColor: "#ffffff", logging: false });
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+      const L = 190, H = 277, M = 10;
+      const pxParMm = canvas.width / L;
+      const hauteurMm = canvas.height / pxParMm;
+      // Une page en général ; si la fiche est très longue, la suite part sur une 2e page
+      for (let y = 0, i = 0; y < hauteurMm - 0.5; y += H, i++) {
+        const hMm = Math.min(H, hauteurMm - y);
+        const morceau = document.createElement("canvas");
+        morceau.width = canvas.width; morceau.height = Math.round(hMm * pxParMm);
+        const ctx = morceau.getContext("2d");
+        ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, morceau.width, morceau.height);
+        ctx.drawImage(canvas, 0, Math.round(y * pxParMm), canvas.width, morceau.height, 0, 0, canvas.width, morceau.height);
+        if (i > 0) doc.addPage();
+        doc.addImage(morceau.toDataURL("image/jpeg", 0.92), "JPEG", M, M, L, hMm);
+      }
+      doc.setProperties({ title: `${code} - Fiche de préparation - Indice ${indice}` });
+      return doc.output("blob");
+    } finally {
+      prep.indice = sauve; indicePdf = null;
+      zone.innerHTML = "";
+    }
+  }
+  function boutonsEnvoi(actif) { ["envEnvoyer", "envTelecharger", "envApercu"].forEach((id) => { $(id).disabled = !actif; }); }
+  $("envApercu").addEventListener("click", async () => {
+    if (!pret) return;
+    const w = window.open("", "_blank");
+    boutonsEnvoi(false); $("envStatus").textContent = "Préparation de l'aperçu…";
+    try {
+      const url = URL.createObjectURL(await genererPdf(indiceEnvoi()));
+      if (w) w.location.href = url; else window.open(url, "_blank");
+      $("envStatus").textContent = "";
+    } catch (e) { if (w) w.close(); $("envStatus").textContent = "❌ " + e.message; }
+    finally { boutonsEnvoi(true); }
+  });
+  $("envTelecharger").addEventListener("click", async () => {
+    if (!pret) return;
+    boutonsEnvoi(false); $("envStatus").textContent = "Création du PDF…";
+    try {
+      const blob = await genererPdf(indiceEnvoi());
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = P.nomPdf(code, indiceEnvoi());
+      document.body.appendChild(a); a.click(); a.remove();
+      $("envStatus").textContent = "PDF téléchargé : à ranger dans le réseau FTS.";
+    } catch (e) { $("envStatus").textContent = "❌ " + e.message; }
+    finally { boutonsEnvoi(true); }
+  });
+
+  async function envoyerFiche() {
+    if (!pret) return;
+    const st = $("envStatus");
+    const a = P.adresses($("envA").value), cc = P.adresses($("envCc").value);
+    const mauvaises = a.concat(cc).filter((x) => !P.adresseValide(x));
+    if (!a.length) { st.textContent = "❌ Indique au moins un destinataire."; return; }
+    if (mauvaises.length) { st.textContent = "❌ Adresse incorrecte : " + mauvaises.join(", "); return; }
+    const n = indiceEnvoi();
+    if (n === "") { st.textContent = "❌ Indique l'indice à envoyer."; return; }
+    const objet = $("envObjet").value.trim(), message = $("envMessage").value;
+    if (!objet) { st.textContent = "❌ L'objet du mail est vide."; return; }
+    const e = prep.envoi;
+    const avertir = [];
+    if (!e && !plan) avertir.push("Pas de plan d'accès joint (en général il part avec le premier envoi).");
+    if (e && String(e.indice) === String(n)) avertir.push(`Même indice que le dernier envoi (${e.indice}).`);
+    if (!confirm(`Envoyer la fiche indice ${n} à :\n${a.join("\n")}${cc.length ? "\ncopie : " + cc.join(", ") : ""}${avertir.length ? "\n\n⚠️ " + avertir.join("\n⚠️ ") : ""}`)) return;
+
+    boutonsEnvoi(false);
+    const nomPdf = P.nomPdf(code, n);
+    let pdf;
+    try {
+      st.textContent = "Création du PDF…";
+      pdf = await genererPdf(n);
+      st.textContent = "Envoi du mail…";
+      const pj = [{ blob: pdf, fileName: nomPdf, mimeType: "application/pdf" }];
+      if (plan) pj.push({ blob: plan.blob, fileName: P.nomFichier(plan.nom) || "plan-acces", mimeType: plan.type });
+      await FTSGmail.envoyer({ to: a, cc, subject: objet, body: message, attachments: pj });
+    } catch (err) {
+      console.error(err);
+      st.textContent = "❌ Mail non envoyé : " + err.message;
+      boutonsEnvoi(true);
+      return;
+    }
+    // Le mail est parti : copie Drive puis mise à jour de la fiche
+    let lien = null, noteDrive = "";
+    if ($("envDrive").checked) {
+      st.textContent = "Copie dans le Drive…";
+      try {
+        const dossier = await FTSDrive.findOrCreateFolder(P.NOM_DOSSIER, chantierId);
+        const f = await FTSDrive.uploadFile(pdf, nomPdf, "application/pdf", dossier, { remplacerSiExiste: true });
+        lien = { id: f.id, lien: f.webViewLink || "" };
+        if (plan) {
+          const ext = (plan.nom.match(/\.[A-Za-z0-9]+$/) || [""])[0].toLowerCase();
+          await FTSDrive.uploadFile(plan.blob, `${P.nomFichier(code)}_Plan-acces_Ind${P.nomFichier(n)}${ext}`, plan.type, dossier, { remplacerSiExiste: true });
+        }
+      } catch (err) { console.warn(err); noteDrive = " (copie Drive non faite : " + err.message + ")"; }
+    }
+    indicePdf = n; const surligne = [...surlignage().cles]; indicePdf = null;
+    const maintenant = new Date().toISOString();
+    const entree = { indice: n, le: maintenant, par: nomMoi, a, cc, plan: plan ? plan.nom : "", pdf: lien, changements: changements() };
+    prep.indice = n;
+    prep.envoi = { indice: n, le: maintenant, par: nomMoi, a, cc, recap: recap(), surligne, modifieApres: false, historique: [...((e && e.historique) || []), entree] };
+    plan = null; objetTouche = msgTouche = destTouche = indiceTouche = false;
+    remplirChamps();
+    marquerSale();
+    await enregistrer();
+    afficherEnvoi();
+    st.textContent = sale ? `⚠️ Mail envoyé, mais la fiche n'est pas enregistrée : clique sur Enregistrer.${noteDrive}` : `✅ Indice ${n} envoyé à ${a.join(", ")}${noteDrive}`;
+    FTSShell.toast(`✉️ Fiche indice ${n} envoyée`);
+    boutonsEnvoi(true);
+  }
+  $("envEnvoyer").addEventListener("click", envoyerFiche);
+
   // ─── Onglets ───────────────────────────────────────────────────
   function ouvrirOnglet(t) {
     document.querySelectorAll("#prTabs button").forEach((b) => b.classList.toggle("on", b.dataset.t === t));
@@ -908,10 +1253,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (t === "Fournitures") afficherFournitures();
     if (t === "Fiche") afficherFiche();
     if (t === "Ndc") afficherNdc();
+    if (t === "Envoi") afficherEnvoi();
   }
   document.querySelectorAll("#prTabs button").forEach((b) => b.addEventListener("click", () => ouvrirOnglet(b.dataset.t)));
 
   $("fCode").value = code; $("fNom").value = nom;
+  if (location.hash === "#envoi") ouvrirOnglet("Envoi");
   if (window.FTSAuth && FTSAuth.isSignedIn()) charger();
 });
 </script>

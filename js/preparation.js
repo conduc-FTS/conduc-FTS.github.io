@@ -400,7 +400,7 @@ const FTSPreparation = (() => {
       equipe: { chef: "" },
       materiel: {
         foreuse: "", reglage: "standard", injection: "", presse: "", cuveGnr: "OUI", cuveEau: "1", caisseFlexible: "",
-        elevateur: "", compresseur: "", groupe: "", pelle: "", pelleLivraison: "",
+        elevateur: "", compresseur: "", groupe: "", pelle: "", pelleLivraison: "", godet: false,
       },
       remarques: { objectif: "", essais: "Aucun", implantation: "A NOTRE CHARGE", boues: "NON", dechets: "A NOTRE CHARGE", outil: "", outilDiam: "", divers: "" },
       ndc: { indice: "", ddc: "", forage: 250, pieux: [], longParDiam: {}, note: "" },
@@ -425,7 +425,47 @@ const FTSPreparation = (() => {
       tubesManuels: Array.isArray(p.tubesManuels) ? p.tubesManuels : [],
       ciment: { ...base.ciment, ...(p.ciment || {}) },
       marges: { ...(p.marges || {}) },
+      envoi: p.envoi && p.envoi.indice ? { historique: [], recap: [], ...p.envoi } : null,
     };
+  }
+
+  // ── Envoi (lot 3a) ──────────────────────────────────────────────
+  const DESTINATAIRES = ["m.delarche@fts-btp.fr", "e.doux@fts-btp.fr"];
+  /** Liste d'adresses saisie (séparées par ; , espace ou retour ligne) */
+  function adresses(texte) {
+    return String(texte || "").split(/[;,\s]+/).map((x) => x.trim()).filter(Boolean);
+  }
+  const adresseValide = (a) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a);
+  /** Nom de fichier sans accent ni caractère interdit */
+  function nomFichier(t) {
+    return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  }
+  function nomPdf(code, indice) { return `${nomFichier(code)}_Fiche-preparation_Ind${nomFichier(indice)}.pdf`; }
+  /** Indice proposé pour le prochain envoi */
+  function prochainIndice(prep, modifiee) {
+    const e = prep.envoi;
+    if (!e || !e.indice) return prep.indice === "" || prep.indice == null ? 1 : prep.indice;
+    if (!modifiee) return e.indice;
+    const n = Number(e.indice);
+    return Number.isFinite(n) ? n + 1 : e.indice;
+  }
+  /**
+   * Changements entre deux relevés de la fiche ([libellé, valeur] dans l'ordre de la fiche).
+   * @returns {string[]} lignes « libellé : avant → après »
+   */
+  function comparer(avant, apres) {
+    const a = new Map((avant || []).map(([k, v]) => [k, v]));
+    const b = new Map((apres || []).map(([k, v]) => [k, v]));
+    const vide = (v) => v == null || v === "";
+    const out = [];
+    for (const [k, v] of b) {
+      const old = a.get(k);
+      if (!a.has(k) || vide(old)) { if (!vide(v)) out.push(`${k} : ${v}${a.has(k) ? "" : " (ajouté)"}`); }
+      else if (vide(v)) out.push(`${k} : supprimé (était ${old})`);
+      else if (String(old) !== String(v)) out.push(`${k} : ${v} au lieu de ${old}`);
+    }
+    for (const [k, old] of a) if (!b.has(k) && !vide(old)) out.push(`${k} : supprimé (était ${old})`);
+    return out;
   }
 
   // ── Drive ───────────────────────────────────────────────────────
@@ -475,6 +515,17 @@ const FTSPreparation = (() => {
     return { data, meta };
   }
 
+  /** Libellés du nouveau relevé qui ont changé (ou sont nouveaux) : cases à surligner sur la fiche */
+  function clesChangees(avant, apres) {
+    const a = new Map((avant || []).map(([k, v]) => [k, v == null ? "" : String(v)]));
+    const out = new Set();
+    for (const [k, v] of apres || []) {
+      const val = v == null ? "" : String(v);
+      if (a.has(k) ? a.get(k) !== val : val !== "") out.add(k);
+    }
+    return out;
+  }
+
   return {
     NOM_DOSSIER, NOM_FICHIER, TYPES_BARRE, DIAMETRES_TUBE, COULEURS_TUBE, CHAMPS, ORDRE_A5,
     nombre, fr, arrondi, majuscules, compareReperes, couleurTube, cleRep,
@@ -482,6 +533,7 @@ const FTSPreparation = (() => {
     calculer, cleArticle, diametresPresents, tubesFiche,
     analyserCollage, lirePieux, fusionner,
     nouvellePreparation, normaliser, lire, enregistrer, resume,
+    DESTINATAIRES, adresses, adresseValide, nomFichier, nomPdf, prochainIndice, comparer, clesChangees,
   };
 })();
 

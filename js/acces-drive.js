@@ -238,9 +238,18 @@ const FTSAcces = (() => {
       if (!a.auto && !inclureProposes) continue;
       try {
         let r;
-        if (a.type === "ajout") r = await req(`${DRIVE}/files/${a.fileId}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, { method: "POST", body: JSON.stringify({ role: a.role, type: "user", emailAddress: a.email }) });
-        else if (a.type === "role") r = await req(`${DRIVE}/files/${a.fileId}/permissions/${a.permId}?supportsAllDrives=true`, { method: "PATCH", body: JSON.stringify({ role: a.role }) });
-        else if (a.type === "retrait") r = await req(`${DRIVE}/files/${a.fileId}/permissions/${a.permId}?supportsAllDrives=true`, { method: "DELETE" });
+        const poser = (role) => req(`${DRIVE}/files/${a.fileId}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, { method: "POST", body: JSON.stringify({ role, type: "user", emailAddress: a.email }) });
+        if (a.type === "ajout") r = await poser(a.role);
+        else if (a.type === "role") {
+          r = await req(`${DRIVE}/files/${a.fileId}/permissions/${a.permId}?supportsAllDrives=true`, { method: "PATCH", body: JSON.stringify({ role: a.role }) });
+          // Accès hérité du dossier parent (déjà retiré plus haut, ou non
+          // modifiable ici) : on pose un accès direct avec le bon rôle.
+          if (r && (r.status === 404 || r.status === 403)) r = await poser(a.role);
+        } else if (a.type === "retrait") {
+          r = await req(`${DRIVE}/files/${a.fileId}/permissions/${a.permId}?supportsAllDrives=true`, { method: "DELETE" });
+          // 404 : l'accès venait du dossier parent et a déjà disparu avec lui.
+          if (r && r.status === 404) { faits.push({ ...a, herite: true }); continue; }
+        }
         else if (a.type === "dossier") {
           const id = await FTSDrive.createFolder(a.nomDossier, a.parentId);
           r = await req(`${DRIVE}/files/${id}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, { method: "POST", body: JSON.stringify({ role: "reader", type: "user", emailAddress: a.email }) });
@@ -264,8 +273,20 @@ const FTSAcces = (() => {
     enCours = (async () => {
       const d = await droits();
       if (!d.ok) throw new Error("réservé à l'encadrement (lecture + modification)");
-      const plan = await analyser();
-      const res = await executer(plan, !!options.appliquerProposes);
+      let plan = await analyser();
+      let res = await executer(plan, !!options.appliquerProposes);
+      // Un retrait sur un dossier parent change les accès hérités des
+      // sous-dossiers : on refait un passage pour finir le travail proprement.
+      if (res.erreurs.length || res.faits.some((x) => x.type === "retrait" || x.type === "role")) {
+        await new Promise((ok) => setTimeout(ok, 2500));
+        plan = await analyser();
+        // Dossiers créés au 1er passage : la recherche Drive peut mettre
+        // quelques secondes à les voir, on ne les recrée surtout pas.
+        const crees = new Set(res.faits.filter((x) => x.type === "dossier").map((x) => x.parentId + "/" + x.nomDossier));
+        plan.actions = plan.actions.filter((x) => !(x.type === "dossier" && crees.has(x.parentId + "/" + x.nomDossier)));
+        const res2 = await executer(plan, !!options.appliquerProposes);
+        res = { faits: res.faits.filter((x) => !x.herite).concat(res2.faits.filter((x) => !x.herite)), erreurs: res2.erreurs, partagesBloques: res.partagesBloques + res2.partagesBloques };
+      } else res.faits = res.faits.filter((x) => !x.herite);
       const proposes = options.appliquerProposes ? [] : plan.actions.filter((a) => !a.auto);
       dernier = { le: new Date(), plan, ...res, proposes };
       return dernier;

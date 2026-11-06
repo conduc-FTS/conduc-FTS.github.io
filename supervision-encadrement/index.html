@@ -779,7 +779,12 @@ document.addEventListener("DOMContentLoaded", () => {
       throw new Error("Connecte-toi d'abord.");
     }
     promesseChargement = (async () => {
-      const chantiers = await FTSDrive.listChantiersAvecMeta();
+      const brut = await FTSDrive.listChantiersAvecMeta();
+      // Montants encore dans les descriptions des dossiers → classeur Marchés
+      // (encadrement), en arrière-plan, une seule fois par chantier.
+      const aMigrer = brut.filter((c) => c.montantsDansDescription).map((c) => ({ id: c.id, name: c.name, meta: c.metaBrute }));
+      if (aMigrer.length) FTSDrive.migrerMontants(aMigrer).then((n) => n && console.info(`Montants de ${n} chantier(s) déplacés dans le classeur Marchés.`)).catch((e) => console.warn("Migration des montants :", e));
+      const chantiers = brut.map((c) => ({ id: c.id, name: c.name, meta: c.meta }));
       const suivis = await FTSSheets.chargerDonneesSupervision(chantiers);
       donnees = { savedAt: Date.now(), chantiers, suivis };
       donneesFraiches = true;
@@ -1640,6 +1645,8 @@ document.addEventListener("DOMContentLoaded", () => {
     empty.hidden = false; empty.textContent = "Chargement...";
     try {
       const r = await FTSParc.charger();
+      // Copie allégée pour les tablettes (au plus une fois par jour, et à chaque enregistrement)
+      FTSParc.publierListeTablette().catch((e) => console.warn("Listes tablette :", e));
       modifiable = r.source === "sheet" && r.modifiable !== false;
       $("parcCreerPanel").hidden = r.existe !== false;
       $("parcNbDefaut").textContent = FTSParc.DEFAUT.length;
@@ -1784,6 +1791,7 @@ document.addEventListener("DOMContentLoaded", () => {
     empty.hidden = false; empty.textContent = "Chargement...";
     try {
       const [r, adr] = await Promise.all([FTSPersonnel.charger(), FTSSheets.listerAdresses().catch((e) => { console.warn(e); return null; })]);
+      FTSPersonnel.publierListeTablette().catch((e) => console.warn("Listes tablette :", e));
       if (adr) adresses = { spreadsheetId: adr.spreadsheetId, liste: adr.adresses };
       modifiable = r.source === "sheet" && r.modifiable !== false;
       $("psCreerPanel").hidden = r.existe !== false;

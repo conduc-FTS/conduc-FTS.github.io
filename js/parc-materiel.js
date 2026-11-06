@@ -210,7 +210,22 @@ const FTSParc = (() => {
           ecrireCache();
           return { source: "sheet", existe: true, modifiable: etat.modifiable };
         }
-        // Classeur introuvable : pas encore créé, ou pas partagé avec ce compte
+        // Classeur introuvable : pas partagé avec ce compte (tablette) → copie
+        // allégée « _LISTES TABLETTE » publiée par la Supervision
+        const lp = FTSDrive.lireListeTablette ? await FTSDrive.lireListeTablette("Machines").catch(() => null) : null;
+        if (lp && lp.length) {
+          const ll = (await FTSDrive.lireListeTablette("Location").catch(() => null)) || [];
+          etat = {
+            machines: lp.filter((r) => r[0]).map((r) => ({
+              numero: majuscules(r[0]), nom: majuscules(r[1] || r[0]), designation: majuscules(r[2]),
+              categorie: majuscules(r[3]) || "DIVERS", chef: majuscules(r[4]), statut: majuscules(r[5]) || "EN SERVICE",
+            })),
+            location: ll.map((r) => majuscules(r[0])).filter(Boolean),
+            source: "liste", spreadsheetId: null, modifiable: false,
+          };
+          ecrireCache();
+          return { source: "liste", existe: true, modifiable: false };
+        }
         const c = lireCache();
         if (c && c.machines && c.machines.length) {
           etat = { machines: c.machines, location: c.location || [], source: "cache", spreadsheetId: null };
@@ -287,6 +302,18 @@ const FTSParc = (() => {
     etat.machines = propres;
     etat.location = loc;
     ecrireCache();
+    await publierListeTablette(true).catch((e) => console.warn("Listes tablette (machines) non mises à jour :", e));
+  }
+
+  /** Copie allégée pour les tablettes (DOSSIER CHANTIER / _LISTES TABLETTE). */
+  async function publierListeTablette(forcer = false) {
+    if (etat.source !== "sheet" || !FTSDrive.ecrireListeTablette) return false;
+    const cle = "fts_listes_pub_parc";
+    try { if (!forcer && Date.now() - Number(localStorage.getItem(cle) || 0) < 24 * 3600 * 1000) return false; } catch (e) {}
+    await FTSDrive.ecrireListeTablette("Machines", [EN_TETE_PARC, ...etat.machines.map((m) => [m.numero, m.nom, m.designation, m.categorie, m.chef, m.statut])]);
+    await FTSDrive.ecrireListeTablette("Location", [["Type de matériel de location"], ...etat.location.map((l) => [l])]);
+    try { localStorage.setItem(cle, String(Date.now())); } catch (e) {}
+    return true;
   }
 
   // ── Lecture pour les modules ────────────────────────────────────
@@ -336,7 +363,7 @@ const FTSParc = (() => {
 
   return {
     CATEGORIES, STATUTS, CATEGORIES_MASQUEES_RAPPORT, DEFAUT, LOCATION_DEFAUT, DOSSIER, NOM_CLASSEUR,
-    charger, creerDepuisListeDeDepart, enregistrer, verifier,
+    charger, creerDepuisListeDeDepart, enregistrer, verifier, publierListeTablette,
     toutes, location, source, disponibles, parNumero, parNom, kitDuChef, estLocation, libelleComplet,
     resoudreAncienNom, majuscules,
   };

@@ -842,8 +842,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   majNomChefSignature();
   initChoixMachine();
-  chargerParcPuisKit();
-  chargerPersonnelEtChef();
+  // Après FTSAuth.init() (plus bas) : sinon la session Google n'est pas encore
+  // restaurée et le parc / le personnel venaient toujours de la copie locale.
+  setTimeout(() => { chargerParcPuisKit(); chargerPersonnelEtChef(); }, 0);
 
 
   // Horaires : bascules DÉPÔT / DOMICILE + calcul des temps de route
@@ -998,7 +999,7 @@ async function chargerParcPuisKit() {
   const src = document.getElementById('parcSource');
   try {
     const r = await FTSParc.charger();
-    src.textContent = r.source === 'sheet' ? '' :
+    src.textContent = (r.source === 'sheet' || r.source === 'liste') ? '' :
       r.source === 'cache' ? 'Liste du parc : copie enregistrée sur la tablette (parc en ligne inaccessible).' :
       'Liste du parc : liste de départ (le parc matériel n\'est pas encore partagé avec ce compte).';
   } catch (e) {

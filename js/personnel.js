@@ -89,7 +89,22 @@ const FTSPersonnel = (() => {
     if (!connecte()) return depuisCache(null);
     try {
       const f = await trouverClasseur();
-      if (!f) return depuisCache(false);
+      if (!f) {
+        // Pas d'accès au référentiel (tablette) → copie allégée publiée par la Supervision
+        const lp = FTSDrive.lireListeTablette ? await FTSDrive.lireListeTablette("Personnes").catch(() => null) : null;
+        if (lp && lp.length) {
+          etat = {
+            personnes: lp.filter((r) => r[0] || r[1]).map((r) => ({
+              nom: majuscules(r[0]), prenom: majuscules(r[1]), categorie: majuscules(r[2]),
+              poste: majuscules(r[3]), email: String(r[4] || "").trim().toLowerCase(), statut: majuscules(r[5]) || "ACTIF",
+            })),
+            source: "liste", spreadsheetId: null, modifiable: false,
+          };
+          ecrireCache();
+          return { source: "liste", existe: true, modifiable: false };
+        }
+        return depuisCache(false);
+      }
       const res = await fetchAvecRetry(`${SHEETS_API}/${f.id}/values/${encodeURIComponent(ONGLET + "!A2:F")}`, { headers: authHeader() });
       if (!res.ok) throw new Error(`Lecture de la base personnel : ${res.status}`);
       const lignes = (await res.json()).values || [];
@@ -154,6 +169,17 @@ const FTSPersonnel = (() => {
     await ecrireTout(etat.spreadsheetId, propres);
     etat.personnes = propres;
     ecrireCache();
+    await publierListeTablette(true).catch((e) => console.warn("Listes tablette (personnes) non mises à jour :", e));
+  }
+
+  /** Copie allégée pour les tablettes : personnes ACTIVES (nom, prénom, catégorie, poste, e-mail). */
+  async function publierListeTablette(forcer = false) {
+    if (etat.source !== "sheet" || !window.FTSDrive || !FTSDrive.ecrireListeTablette) return false;
+    const cle = "fts_listes_pub_perso";
+    try { if (!forcer && Date.now() - Number(localStorage.getItem(cle) || 0) < 24 * 3600 * 1000) return false; } catch (e) {}
+    await FTSDrive.ecrireListeTablette("Personnes", [EN_TETE, ...etat.personnes.filter((p) => p.statut === "ACTIF").map((p) => [p.nom, p.prenom, p.categorie, p.poste, p.email, p.statut])]);
+    try { localStorage.setItem(cle, String(Date.now())); } catch (e) {}
+    return true;
   }
 
   /**
@@ -246,7 +272,7 @@ const FTSPersonnel = (() => {
 
   return {
     CATEGORIES, POSTES, STATUTS, DEFAUT, NOM_CLASSEUR,
-    charger, creer, enregistrer, verifier, manquantesDepuisAdresses, synchroniserPartages, toutes, actifs, chefs, parEmail, parNom, nomComplet, cle, majuscules,
+    charger, creer, enregistrer, verifier, publierListeTablette, manquantesDepuisAdresses, synchroniserPartages, toutes, actifs, chefs, parEmail, parNom, nomComplet, cle, majuscules,
     source: () => etat.source,
   };
 })();

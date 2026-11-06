@@ -161,16 +161,215 @@ const FTSDrive = (() => {
    * chantiers en cours.
    */
   async function getMetadonneesChantier(chantierId) {
-    const res = await fetchAvecRetry(`${API_BASE}/files/${chantierId}?fields=description`, {
-      headers: authHeader(),
-    });
+    const [res, marches] = await Promise.all([
+      fetchAvecRetry(`${API_BASE}/files/${chantierId}?fields=description`, { headers: authHeader() }),
+      lireMarches().catch(() => new Map()),
+    ]);
     if (!res.ok) return {};
     const data = await res.json();
-    try {
-      return data.description ? JSON.parse(data.description) : {};
-    } catch (e) {
-      return {};
+    return appliquerMontants(chantierId, parseMetadonnees(data.description), marches);
+  }
+
+  // ─── Montants des marchés : réservés à l'encadrement ───────────
+  // Le montant vendu et les montants des avenants ne sont PAS stockés dans
+  // la description du dossier chantier (lisible par les chefs qui ont accès
+  // au dossier), mais dans le classeur « Marchés FTS » du dossier
+  // REFERENTIEL (encadrement). Lecture / écriture transparentes : get/set
+  // des métadonnées fusionnent / séparent les montants automatiquement.
+  // Un compte sans accès au classeur (tablette) obtient simplement des
+  // métadonnées sans montants.
+  const DOSSIER_REFERENTIEL = "REFERENTIEL";
+  const NOM_MARCHES = "Marchés FTS";
+  const ONGLET_MARCHES = "Marches";
+  const EN_TETE_MARCHES = ["ID dossier", "Chantier", "Montant vendu HT", "Montants avenants (JSON)", "Mis à jour"];
+  const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
+  const CLE_MARCHES = "fts_id_marches";
+  let marchesCache = null, marchesA = 0, marchesPromesse = null;
+
+  function lireMemoMarches() {
+    try { const m = JSON.parse(localStorage.getItem(CLE_MARCHES) || "null"); return m && m.compte === compteActuel() ? m : null; } catch (e) { return null; }
+  }
+  function ecrireMemoMarches(m) { try { localStorage.setItem(CLE_MARCHES, JSON.stringify({ compte: compteActuel(), ...m })); } catch (e) {} }
+
+  /** id du classeur Marchés (null si inaccessible). creer = le créer dans REFERENTIEL s'il manque. */
+  async function idClasseurMarches(creer = false) {
+    const memo = lireMemoMarches();
+    if (memo && memo.id) return memo.id;
+    if (memo && memo.absent && !creer && Date.now() - memo.absent < 6 * 3600 * 1000) return null;
+    const q = encodeURIComponent(`name = '${escapeForQuery(NOM_MARCHES)}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`);
+    const res = await fetchAvecRetry(`${API_BASE}/files?q=${q}&fields=files(id,capabilities/canEdit)&spaces=drive&includeItemsFromAllDrives=true&supportsAllDrives=true`, { headers: authHeader() });
+    if (!res.ok) throw new Error(`Recherche du classeur Marchés : ${res.status}`);
+    const f = ((await res.json()).files || [])[0];
+    if (f) { ecrireMemoMarches({ id: f.id }); return f.id; }
+    if (!creer) { ecrireMemoMarches({ absent: Date.now() }); return null; }
+    const refId = await findOrCreateFolder(DOSSIER_REFERENTIEL, null);
+    const rc = await fetchAvecRetry(SHEETS_API, {
+      method: "POST", headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({ properties: { title: NOM_MARCHES }, sheets: [{ properties: { title: ONGLET_MARCHES } }] }),
+    });
+    if (!rc.ok) throw new Error(`Création du classeur Marchés : ${rc.status}`);
+    const { spreadsheetId } = await rc.json();
+    await fetchAvecRetry(`${API_BASE}/files/${spreadsheetId}?addParents=${refId}&removeParents=root&fields=id`, { method: "PATCH", headers: authHeader() });
+    await ecrireToutMarches(spreadsheetId, new Map());
+    ecrireMemoMarches({ id: spreadsheetId });
+    return spreadsheetId;
+  }
+
+  /** Map idDossier → { name, montantVendu, avenants:{idAvenant: montant} } (vide si inaccessible). */
+  async function lireMarches(forcer = false) {
+    if (!forcer && marchesCache && Date.now() - marchesA < 60000) return marchesCache;
+    if (marchesPromesse) return marchesPromesse;
+    marchesPromesse = (async () => {
+      const id = await idClasseurMarches(false);
+      const map = new Map();
+      if (id) {
+        const res = await fetchAvecRetry(`${SHEETS_API}/${id}/values/${encodeURIComponent(ONGLET_MARCHES + "!A2:E")}`, { headers: authHeader() });
+        if (res.status === 404 || res.status === 403) { ecrireMemoMarches({ absent: Date.now() }); }
+        else if (res.ok) {
+          ((await res.json()).values || []).forEach((r) => {
+            if (!r[0]) return;
+            let av = {};
+            try { av = r[3] ? JSON.parse(r[3]) : {}; } catch (e) {}
+            const mv = String(r[2] == null ? "" : r[2]).replace(/\s/g, "").replace(",", ".");
+            map.set(r[0], { name: r[1] || "", montantVendu: mv === "" ? undefined : Number(mv) || 0, avenants: av });
+          });
+        }
+      }
+      marchesCache = map; marchesA = Date.now();
+      return map;
+    })().finally(() => { marchesPromesse = null; });
+    return marchesPromesse;
+  }
+
+  async function ecrireToutMarches(spreadsheetId, map) {
+    const maintenant = new Date().toLocaleString("fr-FR");
+    const lignes = [...map.entries()].sort((a, b) => String(a[1].name).localeCompare(String(b[1].name)))
+      .map(([id, m]) => [id, m.name || "", m.montantVendu == null ? "" : m.montantVendu, JSON.stringify(m.avenants || {}), m.maj || maintenant]);
+    let res = await fetchAvecRetry(`${SHEETS_API}/${spreadsheetId}/values/${encodeURIComponent(ONGLET_MARCHES + "!A:Z")}:clear`, { method: "POST", headers: authHeader() });
+    if (!res.ok) throw new Error(`Écriture du classeur Marchés : ${res.status}`);
+    res = await fetchAvecRetry(`${SHEETS_API}/${spreadsheetId}/values/${encodeURIComponent(ONGLET_MARCHES + "!A1")}?valueInputOption=RAW`, {
+      method: "PUT", headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({ values: [EN_TETE_MARCHES, ...lignes] }),
+    });
+    if (!res.ok) throw new Error(`Écriture du classeur Marchés : ${res.status}`);
+  }
+
+  /** Enregistre les montants de plusieurs chantiers (relit, fusionne, réécrit) — une écriture à la fois. */
+  let fileMarches = Promise.resolve();
+  function enregistrerMarches(entrees) {
+    const p = fileMarches.then(() => enregistrerMarchesDirect(entrees));
+    fileMarches = p.catch(() => {});
+    return p;
+  }
+  async function enregistrerMarchesDirect(entrees) {
+    const id = await idClasseurMarches(true);
+    const map = new Map(await lireMarches(true));
+    const maintenant = new Date().toLocaleString("fr-FR");
+    entrees.forEach((e) => map.set(e.id, { name: e.name || (map.get(e.id) || {}).name || "", montantVendu: e.montantVendu, avenants: e.avenants || {}, maj: maintenant }));
+    await ecrireToutMarches(id, map);
+    marchesCache = map; marchesA = Date.now();
+  }
+
+  // ─── Listes pour la tablette ──────────────────────────────────
+  // Les référentiels (Parc matériel, Personnel FTS) restent réservés à
+  // l'encadrement dans REFERENTIEL. La tablette lit une COPIE ALLÉGÉE,
+  // le classeur « _LISTES TABLETTE » rangé dans DOSSIER CHANTIER (déjà
+  // accessible aux chefs), réécrite par la Supervision à chaque
+  // enregistrement d'un référentiel. Aucune adresse ni aucun montant dedans.
+  const NOM_LISTES = "_LISTES TABLETTE";
+  const CLE_LISTES = "fts_id_listes_tablette";
+  async function idListesTablette(creer = false) {
+    try { const m = JSON.parse(localStorage.getItem(CLE_LISTES) || "null"); if (m && m.compte === compteActuel() && m.id) return m.id; } catch (e) {}
+    const q = encodeURIComponent(`name = '${escapeForQuery(NOM_LISTES)}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`);
+    const res = await fetchAvecRetry(`${API_BASE}/files?q=${q}&fields=files(id)&spaces=drive&includeItemsFromAllDrives=true&supportsAllDrives=true`, { headers: authHeader() });
+    if (!res.ok) throw new Error(`Recherche des listes tablette : ${res.status}`);
+    let id = (((await res.json()).files || [])[0] || {}).id || null;
+    if (!id && creer) {
+      const racine = await getRootFolder(ROOT_DOSSIER_CHANTIER);
+      const rc = await fetchAvecRetry(SHEETS_API, {
+        method: "POST", headers: { ...authHeader(), "Content-Type": "application/json" },
+        body: JSON.stringify({ properties: { title: NOM_LISTES }, sheets: ["Machines", "Location", "Personnes"].map((t) => ({ properties: { title: t } })) }),
+      });
+      if (!rc.ok) throw new Error(`Création des listes tablette : ${rc.status}`);
+      id = (await rc.json()).spreadsheetId;
+      await fetchAvecRetry(`${API_BASE}/files/${id}?addParents=${racine}&removeParents=root&fields=id`, { method: "PATCH", headers: authHeader() });
     }
+    if (id) try { localStorage.setItem(CLE_LISTES, JSON.stringify({ compte: compteActuel(), id })); } catch (e) {}
+    return id;
+  }
+  /** Réécrit un onglet des listes tablette (lignes avec l'en-tête en premier). */
+  async function ecrireListeTablette(onglet, lignes) {
+    const id = await idListesTablette(true);
+    const meta = await fetchAvecRetry(`${SHEETS_API}/${id}?fields=sheets.properties.title`, { headers: authHeader() });
+    const titres = meta.ok ? ((await meta.json()).sheets || []).map((x) => x.properties.title) : [];
+    if (!titres.includes(onglet)) {
+      await fetchAvecRetry(`${SHEETS_API}/${id}:batchUpdate`, { method: "POST", headers: { ...authHeader(), "Content-Type": "application/json" }, body: JSON.stringify({ requests: [{ addSheet: { properties: { title: onglet } } }] }) });
+    }
+    let r = await fetchAvecRetry(`${SHEETS_API}/${id}/values/${encodeURIComponent(onglet + "!A:Z")}:clear`, { method: "POST", headers: authHeader() });
+    if (!r.ok) throw new Error(`Écriture des listes tablette : ${r.status}`);
+    r = await fetchAvecRetry(`${SHEETS_API}/${id}/values/${encodeURIComponent(onglet + "!A1")}?valueInputOption=RAW`, {
+      method: "PUT", headers: { ...authHeader(), "Content-Type": "application/json" }, body: JSON.stringify({ values: lignes }),
+    });
+    if (!r.ok) throw new Error(`Écriture des listes tablette : ${r.status}`);
+  }
+  /** Lignes d'un onglet des listes tablette (sans l'en-tête), ou null si absent. */
+  async function lireListeTablette(onglet) {
+    const id = await idListesTablette(false);
+    if (!id) return null;
+    const r = await fetchAvecRetry(`${SHEETS_API}/${id}/values/${encodeURIComponent(onglet + "!A2:F")}`, { headers: authHeader() });
+    if (r.status === 404) { try { localStorage.removeItem(CLE_LISTES); } catch (e) {} return null; }
+    if (!r.ok) return null;
+    return (await r.json()).values || [];
+  }
+
+  /** Copie de meta avec les montants du classeur Marchés (si connus). */
+  function appliquerMontants(chantierId, meta, marches) {
+    const m = marches && marches.get(chantierId);
+    if (!m) return meta;
+    const out = { ...meta };
+    if (m.montantVendu != null) out.montantVendu = m.montantVendu;
+    if (Array.isArray(out.avenants)) out.avenants = out.avenants.map((a) => (m.avenants && m.avenants[a.id] != null ? { ...a, montant: m.avenants[a.id] } : a));
+    return out;
+  }
+  /** Sépare la description publique (sans montants) et les montants. */
+  function separerMontants(meta) {
+    const publique = { ...meta };
+    const aMontants = meta.montantVendu != null || (Array.isArray(meta.avenants) && meta.avenants.some((a) => a.montant != null));
+    delete publique.montantVendu;
+    const avenants = {};
+    if (Array.isArray(meta.avenants)) {
+      publique.avenants = meta.avenants.map((a) => { const { montant, ...reste } = a; if (montant != null) avenants[a.id] = Number(montant) || 0; return reste; });
+    }
+    return { publique, montants: aMontants ? { montantVendu: meta.montantVendu == null ? undefined : Number(meta.montantVendu) || 0, avenants } : null };
+  }
+  const aMontantsDansDescription = (meta) => meta.montantVendu != null || (Array.isArray(meta.avenants) && meta.avenants.some((a) => a.montant != null));
+
+  /**
+   * Migration (une fois, encadrement) : sort les montants encore présents dans
+   * les descriptions des dossiers vers le classeur Marchés, puis réécrit les
+   * descriptions sans montants. Ne fait rien si le classeur n'est pas
+   * accessible en écriture.
+   * @param {Array<{id, name, meta}>} chantiers  meta = description brute
+   * @returns {Promise<number>} nombre de chantiers migrés
+   */
+  async function migrerMontants(chantiers) {
+    const aMigrer = (chantiers || []).filter((c) => c && c.meta && aMontantsDansDescription(c.meta));
+    if (!aMigrer.length) return 0;
+    const marches = await lireMarches(true);
+    const entrees = aMigrer.map((c) => {
+      const { montants } = separerMontants(c.meta);
+      const deja = marches.get(c.id);
+      // Si le classeur a déjà une valeur (saisie après la migration), elle gagne
+      return { id: c.id, name: c.name, montantVendu: deja && deja.montantVendu != null ? deja.montantVendu : montants.montantVendu, avenants: { ...montants.avenants, ...((deja && deja.avenants) || {}) } };
+    });
+    await enregistrerMarches(entrees);
+    for (const c of aMigrer) {
+      await fetchAvecRetry(`${API_BASE}/files/${c.id}?fields=id`, {
+        method: "PATCH", headers: { ...authHeader(), "Content-Type": "application/json" },
+        body: JSON.stringify({ description: JSON.stringify(separerMontants(c.meta).publique) }),
+      });
+    }
+    return aMigrer.length;
   }
 
   function parseMetadonnees(description) {
@@ -193,16 +392,27 @@ const FTSDrive = (() => {
    * liste) — au lieu d'une requête par chantier.
    */
   async function listChantiersAvecMeta() {
-    const chantiers = await listChantiers();
-    return chantiers.map((c) => ({ id: c.id, name: c.name, meta: parseMetadonnees(c.description) }));
+    const [chantiers, marches] = await Promise.all([listChantiers(), lireMarches().catch(() => new Map())]);
+    return chantiers.map((c) => {
+      const brute = parseMetadonnees(c.description);
+      return { id: c.id, name: c.name, meta: appliquerMontants(c.id, brute, marches), montantsDansDescription: aMontantsDansDescription(brute), metaBrute: brute };
+    });
   }
 
   async function setMetadonneesChantier(chantierId, metadonnees) {
-    await fetchAvecRetry(`${API_BASE}/files/${chantierId}?fields=id`, {
+    const { publique, montants } = separerMontants(metadonnees || {});
+    const res = await fetchAvecRetry(`${API_BASE}/files/${chantierId}?fields=id,name`, {
       method: "PATCH",
       headers: { ...authHeader(), "Content-Type": "application/json" },
-      body: JSON.stringify({ description: JSON.stringify(metadonnees) }),
+      body: JSON.stringify({ description: JSON.stringify(publique) }),
     });
+    if (montants) {
+      // Rien à réécrire si les montants n'ont pas changé (archivage, clôture…)
+      const connus = (await lireMarches().catch(() => new Map())).get(chantierId);
+      if (connus && connus.montantVendu === montants.montantVendu && JSON.stringify(connus.avenants || {}) === JSON.stringify(montants.avenants || {})) return;
+      const nom = res.ok ? ((await res.json()).name || "") : "";
+      await enregistrerMarches([{ id: chantierId, name: nom, montantVendu: montants.montantVendu, avenants: montants.avenants }]);
+    }
   }
 
   async function createFolder(name, parentId) {
@@ -785,6 +995,11 @@ const FTSDrive = (() => {
     downloadFileBlob,
     getMetadonneesChantier,
     setMetadonneesChantier,
+    lireMarches,
+    appliquerMontants,
+    ecrireListeTablette,
+    lireListeTablette,
+    migrerMontants,
     listChantiersAvecMeta,
     parseMetadonnees,
     techniquesChantier,

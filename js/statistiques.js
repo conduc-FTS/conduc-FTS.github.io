@@ -105,6 +105,9 @@ const FTSStats = (() => {
           try { archives = await FTSDrive.listChantiersArchives(); } catch (e) { console.warn("Statistiques : archives illisibles", e); archives = null; }
         }
         if (archives) {
+          // Montants encore dans la description des dossiers archivés → Marchés
+          const aMigrer = archives.map((a) => ({ id: a.id, name: a.name, meta: FTSDrive.parseMetadonnees(a.description) }));
+          FTSDrive.migrerMontants(aMigrer).catch((e) => console.warn("Migration des montants (archives) :", e));
           const manquants = archives.filter((a) => !cache.ids[a.id]);
           if (manquants.length) {
             const suivis = await FTSSheets.chargerDonneesSupervision(manquants.map((a) => ({ id: a.id, name: a.name })));
@@ -126,7 +129,9 @@ const FTSStats = (() => {
           return { id: c.id, name: c.name, meta: c.meta || {}, materiel: s.materiel || [], production: s.production || [], pannes: (pa[c.id] || {}).pannes || [], arrets: (pa[c.id] || {}).arrets || [], archive: false };
         });
         const vus = new Set(actifs.map((c) => c.id));
-        const arch = Object.entries(cache.ids).filter(([id]) => !vus.has(id)).map(([id, c]) => ({ id, ...c, archive: true }));
+        // Montants : toujours ceux du classeur Marchés (encadrement)
+        const marches = await FTSDrive.lireMarches().catch(() => new Map());
+        const arch = Object.entries(cache.ids).filter(([id]) => !vus.has(id)).map(([id, c]) => ({ id, ...c, meta: FTSDrive.appliquerMontants(id, c.meta || {}, marches), archive: true }));
         await refs;
         jeu = { chargeA: Date.now(), chantiers: [...actifs, ...arch].map(analyser), complet: !!connecte };
       } catch (e) {

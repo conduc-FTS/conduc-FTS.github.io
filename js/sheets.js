@@ -976,24 +976,33 @@ const FTSSheets = (() => {
   }
 
   // ─── Adresses Personnel (global, hors chantier) ────────────────
-  // Un seul classeur pour toute l'entreprise, rangé dans ADMINISTRATIF —
-  // sert de base au calcul de distance domicile-chantier. Modifiable
-  // uniquement depuis la Supervision (jamais exposé sur la tablette).
+  // Un seul classeur pour toute l'entreprise, rangé dans REFERENTIEL
+  // (encadrement uniquement — jamais partagé avec les chefs) : sert de base
+  // au calcul de distance domicile-chantier. Anciennement dans ADMINISTRATIF :
+  // s'il y est encore, il est déplacé automatiquement dans REFERENTIEL.
   const NOM_CLASSEUR_ADRESSES = "Adresses Personnel FTS";
   const ONGLET_ADRESSES = "Adresses";
   const EN_TETE_ADRESSES = ["Nom", "Prénom", "Adresse"];
+  let idFeuilleAdresses = null;
 
   async function getOuCreerFeuilleAdresses() {
     if (!window.FTSDrive) throw new Error("FTSDrive indisponible.");
-    const administratifId = await FTSDrive.getRootFolder("ADMINISTRATIF");
-
-    const q = encodeURIComponent(
-      `name = '${NOM_CLASSEUR_ADRESSES}' and mimeType = 'application/vnd.google-apps.spreadsheet' and '${administratifId}' in parents and trashed = false`
-    );
-    const resFind = await fetchAvecRetry(`${DRIVE_API_BASE}/files?q=${q}&fields=files(id,name)&spaces=drive`, { headers: authHeader() });
+    if (idFeuilleAdresses) return idFeuilleAdresses;
+    const referentielId = await FTSDrive.findOrCreateFolder("REFERENTIEL", null);
+    const q = encodeURIComponent(`name = '${NOM_CLASSEUR_ADRESSES}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`);
+    const resFind = await fetchAvecRetry(`${DRIVE_API_BASE}/files?q=${q}&fields=files(id,name,parents)&spaces=drive`, { headers: authHeader() });
     if (!resFind.ok) throw new Error(`Erreur recherche feuille adresses : ${resFind.status}`);
-    const dataFind = await resFind.json();
-    if (dataFind.files && dataFind.files.length > 0) return dataFind.files[0].id;
+    const fichiers = (await resFind.json()).files || [];
+    const bonne = fichiers.find((f) => (f.parents || []).includes(referentielId));
+    if (bonne) return (idFeuilleAdresses = bonne.id);
+    if (fichiers.length) {
+      // Ancien emplacement (ADMINISTRATIF) : on le déplace dans REFERENTIEL
+      const f = fichiers[0];
+      const anciens = (f.parents || []).join(",");
+      const resMove = await fetchAvecRetry(`${DRIVE_API_BASE}/files/${f.id}?addParents=${referentielId}${anciens ? "&removeParents=" + anciens : ""}&fields=id,parents`, { method: "PATCH", headers: authHeader() });
+      if (!resMove.ok) console.warn("Adresses Personnel : déplacement vers REFERENTIEL impossible", resMove.status);
+      return (idFeuilleAdresses = f.id);
+    }
 
     const resCreate = await fetchAvecRetry(API_BASE, {
       method: "POST",
@@ -1010,12 +1019,12 @@ const FTSSheets = (() => {
     const created = await resCreate.json();
     const spreadsheetId = created.spreadsheetId;
 
-    await fetchAvecRetry(`${DRIVE_API_BASE}/files/${spreadsheetId}?addParents=${administratifId}&removeParents=root&fields=id,parents`, {
+    await fetchAvecRetry(`${DRIVE_API_BASE}/files/${spreadsheetId}?addParents=${referentielId}&removeParents=root&fields=id,parents`, {
       method: "PATCH", headers: authHeader(),
     });
 
     await ecrireValeurs(spreadsheetId, `${ONGLET_ADRESSES}!A1:C1`, [EN_TETE_ADRESSES]);
-    return spreadsheetId;
+    return (idFeuilleAdresses = spreadsheetId);
   }
 
   async function listerAdresses() {

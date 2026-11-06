@@ -223,7 +223,7 @@ document.addEventListener("DOMContentLoaded", () => {
           window.FTSParc ? FTSParc.charger({ rapide: true }).catch(() => {}) : null,
           window.FTSPersonnel ? FTSPersonnel.charger({ rapide: true }).catch(() => {}) : null,
         ]).then(() => { if (!enCours) { remplirListes(); afficher(); } });
-        const chantiers = await FTSDrive.listChantiersAvecMeta();
+        const chantiers = (await FTSDrive.listChantiersAvecMeta()).map((c) => ({ id: c.id, name: c.name, meta: c.meta }));
         const suivis = await FTSSheets.chargerDonneesSupervision(chantiers);
         donnees = { savedAt: Date.now(), chantiers, suivis };
         fraiches = true;

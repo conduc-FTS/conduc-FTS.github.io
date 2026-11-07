@@ -205,6 +205,14 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 @media (max-width: 1200px) { .pa-grid { grid-template-columns: 1fr; } .pa-side { max-width: 340px; } }
 
 /* Envoi */
+.pe-dp { display: flex; gap: 20px; align-items: flex-start; padding: 14px 18px 18px; }
+.pe-dp img { width: 150px; flex: none; box-shadow: 0 2px 10px rgba(0,0,0,.18); background: #fff; }
+.pe-dp-d { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+.pe-dp-d label { display: flex; align-items: baseline; gap: 8px; font-size: .9rem; cursor: pointer; }
+.pe-dp-d label span { font-size: .78rem; color: var(--text-sub); }
+.pe-dp-s { font-size: .78rem; color: var(--text-sub); }
+.pe-dp-b { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+#tabEnvoi #dpPlanLigne[hidden] { display: none; }
 .pe-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 0 16px; }
 .pe-pj { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
 .pe-pj .i { font-size: 1.4rem; } .pe-pj .t { flex: 1; min-width: 0; } .pe-pj .t b { display: block; overflow-wrap: anywhere; }
@@ -407,11 +415,6 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
       <div class="sv-ch"><h2>Fiche de préparation de chantier</h2><span class="s">même présentation que la fiche Excel · clique dans DIVERS pour écrire directement · la fiche se resserre toute seule pour tenir sur une page A4</span><span class="sv-sp"></span><button type="button" class="sv-btn pri" id="btnImprimer">🖨️ Imprimer / PDF</button></div>
       <div style="padding:14px"><div class="fp-zone"><div class="fp-page" id="fichePage"></div></div></div>
     </section>
-    <section class="sv-card">
-      <div class="sv-ch"><h2>Page de garde du dossier papier</h2><span class="s">remplie depuis la fiche · cases à cocher à la main · à imprimer, ne part pas dans le mail</span><span class="sv-sp"></span>
-        <button type="button" class="sv-btn" id="pgApercu">🔍 Aperçu</button><button type="button" class="sv-btn" id="pgPdf">⬇️ PDF</button><button type="button" class="sv-btn pri" id="pgImprimer">🖨️ Imprimer</button></div>
-      <div style="padding:14px;display:flex;justify-content:center"><img id="pgMini" alt="Page de garde" style="width:300px;box-shadow:0 2px 10px rgba(0,0,0,.18);background:#fff"></div>
-    </section>
   </div>
 
   <!-- 7 · ENVOI -->
@@ -442,7 +445,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
               <button type="button" class="sv-btn" id="envPlanApercu" hidden>Aperçu</button>
               <button type="button" class="sv-btn" id="envPlanRetirer" hidden>Retirer</button>
               <label class="sv-btn" style="cursor:pointer" title="Joindre un autre fichier à la place du plan de l'étape 6">Autre fichier…<input type="file" id="envPlan" accept="application/pdf,image/*" hidden></label></div>
-            <label style="display:flex;align-items:center;gap:8px;font-size:.86rem;font-weight:600;padding:4px 0 0"><input type="checkbox" id="envDrive" checked> Copier aussi dans le dossier PREPARATION du Drive</label>
+            <p style="margin:4px 0 0;font-size:.82rem;color:var(--text-sub)">☁️ Copie automatique dans le Drive, dossier PREPARATION du chantier.</p>
           </div>
         </section>
         <section class="sv-card">
@@ -451,9 +454,22 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         </section>
       </div>
     </div>
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Dossier papier</h2><span class="s">à imprimer pour le dossier du chantier · ne part pas dans le mail</span></div>
+      <div class="pe-dp">
+        <img id="pgMini" alt="Page de garde">
+        <div class="pe-dp-d">
+          <label><input type="checkbox" id="dpGarde" checked> <b>Page de garde</b> <span>remplie depuis la fiche, cases à cocher à la main</span></label>
+          <label><input type="checkbox" id="dpFiche" checked> <b>Fiche de préparation</b> <span id="dpFicheInfo"></span></label>
+          <label id="dpPlanLigne"><input type="checkbox" id="dpPlan" checked> <b>Plan d'accès</b> <span>étape 6</span></label>
+          <div class="pe-dp-b"><button type="button" class="sv-btn" id="pgApercu">🔍 Aperçu</button><button type="button" class="sv-btn" id="pgPdf" title="Choisir où enregistrer (par exemple le dossier du réseau FTS)">💾 Enregistrer en PDF…</button><button type="button" class="sv-btn pri" id="pgImprimer">🖨️ Imprimer</button></div>
+          <span class="pe-dp-s" id="dpStatut">☁️ À l'impression ou à l'enregistrement, une copie est aussi rangée dans le Drive (dossier PREPARATION du chantier).</span>
+        </div>
+      </div>
+    </section>
     <section class="sv-card"><div class="pe-actions">
       <span class="sv-mstatus" id="envStatus"></span><span class="sv-sp"></span>
-      <button type="button" class="sv-btn" id="envTelecharger">⬇️ Télécharger le PDF</button>
+      <button type="button" class="sv-btn" id="envTelecharger" title="Enregistrer la fiche en PDF (par exemple dans le dossier du réseau FTS)">💾 Enregistrer la fiche en PDF…</button>
       <button type="button" class="sv-btn pri" id="envEnvoyer">✉️ Envoyer</button>
     </div></section>
     <section class="sv-card">
@@ -1710,25 +1726,59 @@ document.addEventListener("DOMContentLoaded", () => {
       conducteur: inf.conducteur, telConducteur: cond && cond.telephone ? cond.telephone : "", logoSrc: "../assets/logo-fts.png",
     });
   }
-  const nomPageGarde = () => `${P.nomFichier(code)}_Page-de-garde.pdf`;
+  const nomDossier = () => `${P.nomFichier(code)}_Dossier-papier.pdf`;
   async function majPageGarde() {
     try { const r = await pdfPageGarde(); $("pgMini").src = r.pages[0].img; } catch (e) { console.warn(e); }
+    const gen = planGenere();
+    $("dpPlanLigne").hidden = !gen;
+    $("dpFicheInfo").textContent = `indice ${indiceEnvoi()}`;
+  }
+  /** Dossier papier : les documents cochés, dans l'ordre, en un seul PDF */
+  async function pdfDossier() {
+    const pages = [];
+    if ($("dpGarde").checked) pages.push(...(await pdfPageGarde()).pages);
+    if ($("dpFiche").checked) { await genererPdf(indiceEnvoi()); pages.push(...pagesPdf); }
+    if ($("dpPlan").checked && planGenere()) pages.push(...(await pdfPlan()).pages);
+    if (!pages.length) throw new Error("Coche au moins un document.");
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+    pages.forEach((pg, i) => {
+      if (i) doc.addPage();
+      if (pg.pleinePage) doc.addImage(pg.img, "JPEG", 0, 0, 210, 297);
+      else doc.addImage(pg.img, "JPEG", 10, 10, 190, pg.hMm);
+    });
+    doc.setProperties({ title: `${code} - Dossier papier` });
+    return { blob: doc.output("blob"), pages };
   }
   $("pgApercu").addEventListener("click", async () => {
-    try { const r = await pdfPageGarde(); ouvrirApercu(r.blob, nomPageGarde(), r.pages); } catch (e) { erreur("Aperçu impossible", e.message); }
+    try { const r = await pdfDossier(); ouvrirApercu(r.blob, nomDossier(), r.pages); } catch (e) { erreur("Aperçu impossible", e.message); }
   });
+  const nomDossierInd = () => `${P.nomFichier(code)}_Dossier-papier_Ind${P.nomFichier(indiceEnvoi())}.pdf`;
+  /** Copie automatique du dossier papier dans le Drive, avec le compte rendu sous les boutons */
+  async function dossierVersDrive(blob, debut) {
+    const st = $("dpStatut");
+    st.textContent = `${debut} · copie dans le Drive…`;
+    try { await copierDrive(blob, nomDossierInd()); st.textContent = `${debut} · ☁️ copie rangée dans le Drive (PREPARATION) à ${heure()}`; }
+    catch (e) { st.textContent = `${debut} · ⚠️ copie Drive non faite : ${e.message}`; }
+  }
   $("pgPdf").addEventListener("click", async () => {
-    try { const r = await pdfPageGarde(); telecharger(r.blob, nomPageGarde()); } catch (e) { erreur("PDF non créé", e.message); }
+    try {
+      const d = await pdfDossier();
+      const r = await enregistrerSous(d.blob, nomDossierInd());
+      if (r === "annule") return;
+      await dossierVersDrive(d.blob, r === "ok" ? "✅ Dossier enregistré" : "✅ PDF téléchargé (dossier Téléchargements)");
+    } catch (e) { erreur("PDF non créé", e.message); }
   });
   $("pgImprimer").addEventListener("click", async () => {
     try {
-      const r = await pdfPageGarde();
+      const r = await pdfDossier();
       // Impression directe du PDF (cadre caché) ; sinon on l'ouvre pour l'imprimer depuis le lecteur
       const url = URL.createObjectURL(r.blob);
       let f = $("pgCadre");
       if (!f) { f = document.createElement("iframe"); f.id = "pgCadre"; f.style.cssText = "position:fixed;width:0;height:0;border:0;left:-9999px"; document.body.appendChild(f); }
       f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { window.open(url, "_blank"); } };
       f.src = url;
+      dossierVersDrive(r.blob, "🖨️ Envoyé à l'impression");
     } catch (e) { erreur("Impression impossible", e.message); }
   });
 
@@ -1853,6 +1903,7 @@ document.addEventListener("DOMContentLoaded", () => {
       <td>${x.pdf && x.pdf.lien ? `<a href="${esc(x.pdf.lien)}" target="_blank" rel="noopener">Ouvrir</a>` : "—"}</td></tr>`).join("")
       : `<tr><td colspan="6" style="color:var(--text-sub)">Aucun envoi pour l'instant.</td></tr>`;
     $("envEnvoyer").textContent = `✉️ Envoyer l'indice ${n}`;
+    majPageGarde();
     majOngletEnvoi();
   }
   $("envIndice").addEventListener("input", () => { indiceTouche = true; afficherEnvoi(); });
@@ -1915,6 +1966,32 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   function boutonsEnvoi(actif) { ["envEnvoyer", "envTelecharger", "envApercu"].forEach((id) => { $(id).disabled = !actif; }); }
+  /**
+   * « Enregistrer sous… » : fenêtre de choix du dossier (Chrome / Edge sur ordinateur) ;
+   * le navigateur se souvient du dernier dossier choisi (le dossier du réseau FTS).
+   * Sinon : téléchargement classique.
+   * @returns {Promise<"ok"|"annule"|"telecharge">}
+   */
+  async function enregistrerSous(blob, nomF) {
+    if (window.showSaveFilePicker) {
+      try {
+        const h = await window.showSaveFilePicker({ suggestedName: nomF, id: "fts-reseau-prepa", types: [{ description: "Document PDF", accept: { "application/pdf": [".pdf"] } }] });
+        const w = await h.createWritable(); await w.write(blob); await w.close();
+        return "ok";
+      } catch (e) {
+        if (e && e.name === "AbortError") return "annule";
+        console.warn("Enregistrer sous indisponible :", e);
+      }
+    }
+    telecharger(blob, nomF);
+    return "telecharge";
+  }
+  /** Copie d'un PDF dans le dossier PREPARATION du chantier (remplace le précédent du même nom) */
+  async function copierDrive(blob, nomF) {
+    const dossier = await FTSDrive.findOrCreateFolder(P.NOM_DOSSIER, chantierId);
+    return FTSDrive.uploadFile(blob, nomF, "application/pdf", dossier, { remplacerSiExiste: true });
+  }
+  const heure = () => new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   function telecharger(blob, nomF) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = nomF;
@@ -1973,9 +2050,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!pret) return;
     boutonsEnvoi(false); $("envStatus").textContent = "Création du PDF…";
     try {
+      const nomF = P.nomPdf(code, indiceEnvoi());
       const blob = await genererPdf(indiceEnvoi());
-      telecharger(blob, P.nomPdf(code, indiceEnvoi()));
-      $("envStatus").textContent = "PDF téléchargé : à ranger dans le réseau FTS.";
+      const r = await enregistrerSous(blob, nomF);
+      if (r === "annule") { $("envStatus").textContent = ""; return; }
+      $("envStatus").textContent = r === "ok" ? "✅ Fiche enregistrée · copie dans le Drive…" : "PDF téléchargé (dossier Téléchargements) · copie dans le Drive…";
+      try { await copierDrive(blob, nomF); $("envStatus").textContent = $("envStatus").textContent.replace("copie dans le Drive…", "copie rangée dans le Drive (PREPARATION)"); }
+      catch (e) { $("envStatus").textContent = $("envStatus").textContent.replace("copie dans le Drive…", "⚠️ copie Drive non faite : " + e.message); }
     } catch (e) { $("envStatus").textContent = ""; erreur("PDF non créé", e.message); }
     finally { boutonsEnvoi(true); }
   });
@@ -2030,7 +2111,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     // Le mail est parti : copie Drive puis mise à jour de la fiche
     let lien = null, noteDrive = "";
-    if ($("envDrive").checked) {
+    {
       st.textContent = "Copie dans le Drive…";
       try {
         const dossier = await FTSDrive.findOrCreateFolder(P.NOM_DOSSIER, chantierId);
@@ -2055,7 +2136,7 @@ document.addEventListener("DOMContentLoaded", () => {
     afficherEnvoi();
     st.textContent = sale ? `⚠️ Mail envoyé, mais la fiche n'est pas enregistrée : clique sur Enregistrer.${noteDrive}` : `✅ Indice ${n} envoyé à ${a.join(", ")}${noteDrive}`;
     if (sale) erreur("Mail envoyé, fiche non enregistrée", "Le mail est bien parti, mais la fiche n'a pas pu être enregistrée.", "Clique sur Enregistrer pour garder la trace de cet envoi.");
-    else FTSShell.toast(`✅ Indice ${n} envoyé${$("envDrive").checked && !noteDrive ? " · copie dans le Drive" : ""}`);
+    else FTSShell.toast(`✅ Indice ${n} envoyé${!noteDrive ? " · copie dans le Drive" : ""}`);
     boutonsEnvoi(true);
   }
   $("envEnvoyer").addEventListener("click", envoyerFiche);
@@ -2065,7 +2146,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("#prTabs button").forEach((b) => b.classList.toggle("on", b.dataset.t === t));
     document.querySelectorAll(".sv-tab").forEach((x) => x.classList.toggle("on", x.id === "tab" + t));
     if (t === "Fournitures") afficherFournitures();
-    if (t === "Fiche") { afficherFiche(); ficheVue = true; majPageGarde(); }
+    if (t === "Fiche") { afficherFiche(); ficheVue = true; }
     if (t === "Plan") afficherPlan();
     if (t === "Ndc") afficherNdc();
     if (t === "Envoi") afficherEnvoi();

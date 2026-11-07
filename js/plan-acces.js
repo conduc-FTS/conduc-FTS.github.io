@@ -286,16 +286,112 @@ const FTSPlanAcces = (() => {
     return { blob: doc.output("blob"), pages: [{ img, hMm: 297, pleinePage: true }] };
   }
 
+  // ── Cartes automatiques (IGN Géoplateforme, gratuit, sans clé) ────
+  // Vue de loin = Plan IGN, vue d'approche = photo aérienne ; centrées sur le point GPS.
+  const PLAN_IGN = { layer: "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2", fmt: "image/png" };
+  const PHOTO = { layer: "ORTHOIMAGERY.ORTHOPHOTOS", fmt: "image/jpeg" };
+  const ROUTES = { layer: "TRANSPORTNETWORKS.ROADS", fmt: "image/png" };
+  const NOMS = { layer: "GEOGRAPHICALNAMES.NAMES", fmt: "image/png" };
+  const COUCHES = {
+    plan: { calques: [PLAN_IGN], min: 6, max: 18, lib: "Plan" },
+    ortho: { calques: [PHOTO], min: 6, max: 19, lib: "Photo" },
+    mixte: { calques: [PHOTO, ROUTES, NOMS], min: 10, max: 18, lib: "Photo + rues" },
+  };
+  const AUTO_DEFAUT = [{ type: "plan", z: 11 }, { type: "mixte", z: 17 }];
+  const TAILLE_AUTO = { W: 1200, H: Math.round(1200 * VUES[0].h / VUES[0].l) };
+  /** Point GPS → pixels « monde » Web Mercator au zoom z (tuiles de 256 px) */
+  function versMonde(lat, lng, z) {
+    const n = 256 * Math.pow(2, z), r = (lat * Math.PI) / 180;
+    return [((lng + 180) / 360) * n, ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n];
+  }
+  const urlTuile = (c, z, x, y) => `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${c.layer}&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}&FORMAT=${encodeURIComponent(c.fmt)}`;
+  /**
+   * Carte centrée sur le point : assemble les tuiles IGN dans un canvas W × H.
+   * @returns {Promise<HTMLCanvasElement>}
+   */
+  async function carteIGN({ lat, lng, z, type, W = TAILLE_AUTO.W, H = TAILLE_AUTO.H }) {
+    const c = COUCHES[type] || COUCHES.plan;
+    const [cx, cy] = versMonde(lat, lng, z);
+    const x0 = cx - W / 2, y0 = cy - H / 2;
+    const cv = document.createElement("canvas");
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#e5e7eb"; ctx.fillRect(0, 0, W, H);
+    const n = Math.pow(2, z);
+    let ok = 0;
+    const tuile = (calque, tx, ty) => new Promise((fin) => {
+      const im = new Image();
+      im.crossOrigin = "anonymous";
+      im.onload = () => { ok++; fin(im); };
+      im.onerror = () => fin(null);
+      im.src = urlTuile(calque, z, ((tx % n) + n) % n, ty);
+    });
+    // Calques superposés dans l'ordre (photo, puis routes, puis noms des rues)
+    for (const calque of c.calques) {
+      const taches = [];
+      for (let tx = Math.floor(x0 / 256); tx <= Math.floor((x0 + W) / 256); tx++) {
+        for (let ty = Math.floor(y0 / 256); ty <= Math.floor((y0 + H) / 256); ty++) {
+          if (ty < 0 || ty >= n) continue;
+          taches.push(tuile(calque, tx, ty).then((im) => im && ctx.drawImage(im, Math.round(tx * 256 - x0), Math.round(ty * 256 - y0))));
+        }
+      }
+      await Promise.all(taches);
+    }
+    if (!ok) throw new Error("Carte IGN indisponible (connexion internet ?)");
+    // Mention obligatoire de la source
+    ctx.font = "bold 15px Arial, sans-serif";
+    const t = "© IGN – Géoplateforme", tw = ctx.measureText(t).width;
+    ctx.fillStyle = "rgba(255,255,255,.8)"; ctx.fillRect(W - tw - 14, H - 24, tw + 14, 24);
+    ctx.fillStyle = "#333"; ctx.textBaseline = "middle"; ctx.fillText(t, W - tw - 7, H - 12);
+    return cv;
+  }
+  /** Point de la carte automatique (u, v de 0 à 1) → coordonnées GPS */
+  function versGps(auto, u, v, W = TAILLE_AUTO.W, H = TAILLE_AUTO.H) {
+    const [cx, cy] = versMonde(auto.lat, auto.lng, auto.z), n = 256 * Math.pow(2, auto.z);
+    const x = cx - W / 2 + u * W, y = cy - H / 2 + v * H;
+    return { lat: (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) * 180) / Math.PI, lng: (x / n) * 360 - 180 };
+  }
+  /**
+   * Adresse → point GPS (géocodage IGN / Base Adresse Nationale, gratuit, sans clé).
+   * @returns {Promise<{lat, lng, label, precis: boolean}|null>}  precis = numéro ou rue trouvés
+   */
+  async function geocoder(adresse) {
+    const q = String(adresse || "").replace(/—/g, " ").trim();
+    if (q.length < 5) return null;
+    const res = await fetch(`https://data.geopf.fr/geocodage/search?q=${encodeURIComponent(q)}&limit=1`);
+    if (!res.ok) throw new Error(`Recherche d'adresse impossible (${res.status})`);
+    const f = ((await res.json()).features || [])[0];
+    if (!f || !f.geometry) return null;
+    const [lng, lat] = f.geometry.coordinates, pr = f.properties || {};
+    return { lat, lng, label: pr.label || q, score: pr.score || 0, precis: (pr.type === "housenumber" || pr.type === "street") && (pr.score || 0) >= 0.5 };
+  }
+  /**
+   * Recalcule la place des annotations quand la carte automatique change
+   * de point ou de zoom (elles restent au même endroit sur le terrain).
+   */
+  function deplacerAnnots(annots, avant, apres, W = TAILLE_AUTO.W, H = TAILLE_AUTO.H) {
+    const [ax, ay] = versMonde(avant.lat, avant.lng, avant.z), [bx, by] = versMonde(apres.lat, apres.lng, apres.z);
+    const k = Math.pow(2, apres.z - avant.z);
+    const conv = (u, v) => [((ax - W / 2 + u * W) * k - (bx - W / 2)) / W, ((ay - H / 2 + v * H) * k - (by - H / 2)) / H];
+    return annots.map((a) => {
+      if (a.t === "pin" && a.auto) return { ...a, u: 0.5, v: 0.5 };
+      const [u, v] = conv(a.u, a.v), b = { ...a, u, v };
+      if (a.u2 != null) { const [u2, v2] = conv(a.u2, a.v2); b.u2 = u2; b.v2 = v2; }
+      return b;
+    });
+  }
+
   /** Empreinte du plan : sert à savoir s'il a changé depuis le dernier envoi */
   function empreinte(plan) {
     if (!plan) return "";
     return JSON.stringify([plan.gps, plan.precision, plan.contact, plan.adresse, plan.instructions,
-      plan.vues.map((v) => [v.titre, v.fichierId, v.w, v.h, v.zoom, Math.round((v.cx || 0) * 1000), Math.round((v.cy || 0) * 1000), v.annots, v.version || 0])]);
+      plan.vues.map((v) => [v.titre, v.fichierId, v.w, v.h, v.zoom, Math.round((v.cx || 0) * 1000), Math.round((v.cy || 0) * 1000), v.annots, v.version || 0, v.auto || null])]);
   }
 
   return {
     ETIQUETTES, VUES, planVide, vueVide, normaliser, vide, aImage,
     lireGps, texteGps, urlItineraire, urlCarte, qrDataUrl,
+    COUCHES, AUTO_DEFAUT, TAILLE_AUTO, carteIGN, deplacerAnnots, versGps, geocoder,
     geometrie, versCadre, versImage, dessinerVue, cadres, pdf, chargerImage, empreinte,
   };
 })();

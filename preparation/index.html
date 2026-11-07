@@ -161,7 +161,9 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 #tabPlan [hidden], #tabEnvoi [hidden] { display: none !important; }
 .pa-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 0 16px; align-items: start; }
 .pa-gps { font-size: .76rem; margin-top: 4px; min-height: 1.1em; } .pa-gps.ok { color: #1D6E3E; } .pa-gps.ko { color: #B42318; }
-.pa-gps a { color: inherit; }
+.pa-gps a, .pa-gps button { color: #2A5DBF; }
+.pa-gps button { border: none; background: none; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; }
+.pa-gps.info { color: var(--text-sub); }
 .pa-qr { display: flex; gap: 12px; align-items: center; padding: 0 18px 16px; }
 .pa-qr img, .pa-qr-vide { width: 84px; height: 84px; border: 1px solid var(--border); border-radius: 6px; flex: none; }
 .pa-qr-vide { display: flex; align-items: center; justify-content: center; color: #c5c8cd; font-weight: 800; background: var(--bg); }
@@ -175,6 +177,14 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .pa-vue .t input:hover, .pa-vue .t input:focus { border-color: var(--border); background: #fff; }
 .pa-mb { border: 1px solid var(--border); background: #fff; border-radius: 7px; height: 28px; min-width: 28px; padding: 0 7px; font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
 .pa-mb:hover { border-color: #9CA3AF; }
+.pa-vue .t { flex-wrap: wrap; row-gap: 6px; }
+.pa-vue .t input { min-width: 120px; }
+.pa-img-btns { display: inline-flex; gap: 4px; flex: none; }
+.pa-img-btns[hidden] { display: none; }
+.pa-seg { flex: none; display: inline-flex; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+.pa-seg button { border: none; background: none; border-radius: 6px; padding: 3px 8px; font: inherit; font-size: .74rem; font-weight: 700; color: var(--text-sub); cursor: pointer; }
+.pa-seg button.on { background: #1d1d1f; color: #fff; }
+.pa-vue .auto-tag { font-size: .68rem; font-weight: 800; color: #1D6E3E; background: #EAF6EE; border-radius: 5px; padding: 1px 6px; }
 .pa-cadre { position: relative; outline: none; }
 .pa-cadre canvas { display: block; width: 100%; cursor: grab; touch-action: none; }
 .pa-cadre canvas.pose { cursor: crosshair; }
@@ -367,10 +377,10 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <section class="sv-card">
           <div class="sv-ch"><h2>Coordonnées</h2><span class="s">bandeau du haut du plan · facultatif</span></div>
           <div class="pr-grid deux">
-            <div class="sv-f"><label>Adresse <i>(reprise de l'étape 1, modifiable)</i></label><input type="text" id="paAdresse"></div>
+            <div class="sv-f"><label>Adresse</label><input type="text" id="paAdresse"><div class="pa-gps" id="paAdresseEtat"></div></div>
             <div class="sv-f"><label>Point GPS · colle les coordonnées ou le lien Google Maps</label><input type="text" id="paGps" placeholder="ex : 44.833328, -0.577580" autocomplete="off"><div class="pa-gps" id="paGpsEtat"></div></div>
             <div class="sv-f"><label>Précision du point</label><input type="text" id="paPrecision" placeholder="ex : entrée PL, portail sud"></div>
-            <div class="sv-f"><label>Contact sur place <i>(chef de l'étape 2, modifiable)</i></label><input type="text" id="paContact"></div>
+            <div class="sv-f"><label>Contact sur place</label><input type="text" id="paContact"><div class="pa-gps" id="paContactEtat"></div></div>
             <div class="sv-f full"><label>Instructions d'accès</label><textarea id="paInstructions" rows="2" placeholder="ex : entrée PL par l'allée des Sablons (portail sud), VL sur le parking visiteurs"></textarea></div>
           </div>
           <div class="pa-qr"><img id="paQr" alt="" hidden><div class="pa-qr-vide" id="paQrVide">QR</div><div><b>QR code généré automatiquement</b><span>Scanné avec un téléphone, il ouvre l'itinéraire Google Maps jusqu'au point GPS.</span></div></div>
@@ -1263,13 +1273,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function afficherPlan() {
     const pl = prep.plan;
-    $("paAdresse").value = pl.adresse || ""; $("paAdresse").placeholder = adresseDefaut() || "adresse du chantier";
-    $("paContact").value = pl.contact || ""; $("paContact").placeholder = contactDefaut() || "nom - téléphone";
+    $("paAdresse").value = planAdresse(); $("paAdresse").placeholder = "adresse du chantier";
+    $("paContact").value = planContact(); $("paContact").placeholder = "nom - téléphone";
+    majLiens();
     $("paGps").value = pl.gps || ""; $("paPrecision").value = pl.precision || ""; $("paInstructions").value = pl.instructions || "";
     majGps();
     $("paVues").innerHTML = pl.vues.map((v, i) => `<div class="pa-vue ${i === 2 ? "big" : ""}" data-v="${i}">
-      <div class="t"><span class="num">${i + 1} ·</span><input type="text" class="pa-titre" value="${esc(v.titre)}" title="Titre de la vue (modifiable)">
-        <span class="pa-img-btns" ${A.aImage(v) ? "" : "hidden"}><button type="button" class="pa-mb" data-z="-1" title="Dézoomer la capture">−</button><button type="button" class="pa-mb" data-z="1" title="Zoomer dans la capture">+</button></span>
+      <div class="t"><span class="num">${i + 1} ·</span><input type="text" class="pa-titre" value="${esc(v.titre)}" title="Titre de la vue (modifiable)">${v.auto ? `<span class="auto-tag" title="Carte IGN générée depuis le point GPS">AUTO</span>` : ""}
+        ${i < 2 && v.auto ? `<span class="pa-seg">${Object.entries(A.COUCHES).map(([k, c]) => `<button type="button" data-type="${k}" class="${v.auto.type === k ? "on" : ""}">${c.lib}</button>`).join("")}</span>` : ""}
+        ${i < 2 && !v.auto && gpsOk() ? `<button type="button" class="pa-mb" data-auto="1" title="Remplacer par la carte IGN centrée sur le point GPS">🗺️ Carte auto</button>` : ""}
+        <span class="pa-img-btns" ${A.aImage(v) ? "" : "hidden"}><button type="button" class="pa-mb" data-z="-1" title="${v.auto ? "Voir plus large" : "Dézoomer la capture"}">−</button><button type="button" class="pa-mb" data-z="1" title="${v.auto ? "Voir plus près" : "Zoomer dans la capture"}">+</button></span>
         <label class="pa-mb" style="display:flex;align-items:center;cursor:pointer" title="Choisir une image">📁<input type="file" accept="image/*" hidden class="pa-fichier"></label>
         <button type="button" class="pa-mb pa-retirer" title="Retirer l'image" ${A.aImage(v) ? "" : "hidden"}>✕</button></div>
       <div class="pa-aide" hidden></div>
@@ -1283,16 +1296,73 @@ document.addEventListener("DOMContentLoaded", () => {
       </div></div>`).join("");
     pl.vues.forEach((v, i) => dessinerVuePlan(i));
     majMiniBientot(true);
+    if (!pl.gps) pointDepuisAdresse();
+    lancerAuto();
   }
   function majGps() {
     const t = prep.plan.gps, g = A.lireGps(t), el = $("paGpsEtat");
     el.className = "pa-gps " + (t && !g ? "ko" : g ? "ok" : "");
-    el.innerHTML = !t ? "" : g ? `✓ ${A.texteGps(g)} · <a href="${A.urlCarte(g)}" target="_blank" rel="noopener">voir sur Google Maps</a>` : "Point non reconnu : colle « 44.833, -0.577 » ou le lien Google Maps.";
+    const adr = planAdresse();
+    const lienMaps = adr ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(adr)}" target="_blank" rel="noopener">ouvrir l'adresse dans Google Maps</a>, clic droit sur l'entrée du chantier, clique sur les coordonnées pour les copier, puis colle-les ici` : "";
+    el.innerHTML = !t ? (geoEnCours ? `<span style="color:var(--text-sub)">Recherche du point depuis l'adresse…</span>`
+        : geoInfo ? `<span style="color:#B42318">${esc(geoInfo)}</span>${lienMaps ? ` · ${lienMaps}.` : ""}`
+        : lienMaps ? `<span style="color:var(--text-sub)">Pas encore de point · ${lienMaps}.</span>` : "")
+      : g ? (prep.plan.gpsSource === "adresse"
+          ? `✓ Point trouvé depuis l'adresse « ${esc(prep.plan.gpsLabel || adr)} » · <b>vérifie-le</b> : fais glisser le repère rouge de la vue 2 sur l'entrée du chantier · <a href="${A.urlCarte(g)}" target="_blank" rel="noopener">voir sur Google Maps</a>`
+          : `✓ ${A.texteGps(g)}${prep.plan.gpsSource === "repere" ? " (repère déplacé sur la carte)" : ""} · <a href="${A.urlCarte(g)}" target="_blank" rel="noopener">voir sur Google Maps</a>`)
+      : "Point non reconnu : colle « 44.833, -0.577 » ou le lien Google Maps.";
     if (g) { $("paQr").src = A.qrDataUrl(A.urlItineraire(g), 300); $("paQr").hidden = false; $("paQrVide").hidden = true; }
     else { $("paQr").hidden = true; $("paQrVide").hidden = false; }
   }
+  // ── Point GPS trouvé depuis l'adresse (géocodage IGN, gratuit) ──
+  let geoEnCours = false, geoInfo = "", geoDerniere = "", minuterieGeo = null;
+  /** Si pas de point saisi à la main : on le cherche depuis l'adresse (à vérifier ensuite sur la carte) */
+  async function pointDepuisAdresse() {
+    const pl = prep.plan;
+    if (pl.gps && pl.gpsSource !== "adresse") return;
+    const adr = planAdresse();
+    if (!adr || adr === geoDerniere) return;
+    geoDerniere = adr; geoEnCours = true; geoInfo = ""; majGps();
+    try {
+      const r = await A.geocoder(adr);
+      if (!r) geoInfo = "Adresse introuvable : colle le point GPS.";
+      else if (!r.precis) geoInfo = `Adresse trop vague (« ${r.label} ») pour placer le point : colle le point GPS.`;
+      else {
+        pl.gps = A.texteGps(r); pl.gpsSource = "adresse"; pl.gpsLabel = r.label;
+        $("paGps").value = pl.gps;
+        marquerPlan();
+      }
+    } catch (e) { geoInfo = e.message; }
+    finally {
+      geoEnCours = false; majGps();
+      if ($("tabPlan").classList.contains("on") && prep.plan.gps) afficherPlan();
+    }
+  }
+  /** Adresse et contact : repris de la fiche ; on ne garde une valeur propre au plan que si elle est modifiée */
+  const DEFAUTS_PLAN = { adresse: adresseDefaut, contact: contactDefaut };
+  function majLiens() {
+    const adr = $("paAdresseEtat"), con = $("paContactEtat");
+    adr.className = "pa-gps info"; con.className = "pa-gps info";
+    adr.innerHTML = prep.plan.adresse ? `modifiée pour le plan · <button type="button" data-reprendre="adresse">reprendre celle de l'étape 1</button>` : adresseDefaut() ? "reprise de l'étape 1" : "à saisir (ou à l'étape 1)";
+    con.innerHTML = prep.plan.contact ? `modifié pour le plan · <button type="button" data-reprendre="contact">reprendre le chef de l'étape 2</button>`
+      : contactDefaut() ? "repris de l'étape 2 (chef et son téléphone)" : prep.equipe.chef ? "pas de téléphone pour ce chef dans Personnel FTS" : "choisis le chef à l'étape 2 pour le remplir";
+  }
   [["paAdresse", "adresse"], ["paContact", "contact"], ["paGps", "gps"], ["paPrecision", "precision"], ["paInstructions", "instructions"]].forEach(([id, k]) => {
-    $(id).addEventListener("input", () => { prep.plan[k] = $(id).value; if (k === "gps") majGps(); marquerPlan(); });
+    $(id).addEventListener("input", () => {
+      const v = $(id).value;
+      prep.plan[k] = DEFAUTS_PLAN[k] && v.trim() === DEFAUTS_PLAN[k]().trim() ? "" : v;
+      if (k === "gps") { prep.plan.gpsSource = v.trim() ? "manuel" : ""; geoInfo = ""; majGps(); clearTimeout(minuterieAuto); minuterieAuto = setTimeout(() => { lancerAuto(); if ($("tabPlan").classList.contains("on")) afficherPlan(); }, 900); }
+      if (DEFAUTS_PLAN[k]) majLiens();
+      if (k === "adresse" && (!prep.plan.gps || prep.plan.gpsSource === "adresse")) { clearTimeout(minuterieGeo); minuterieGeo = setTimeout(pointDepuisAdresse, 1200); }
+      marquerPlan();
+    });
+  });
+  $("tabPlan").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-reprendre]"); if (!b) return;
+    const k = b.dataset.reprendre;
+    prep.plan[k] = ""; $(k === "adresse" ? "paAdresse" : "paContact").value = DEFAUTS_PLAN[k]();
+    majLiens(); marquerPlan();
+    if (k === "adresse") pointDepuisAdresse();
   });
 
   /** Dessine une vue dans son cadre (ou la zone « coller une capture ») */
@@ -1306,7 +1376,10 @@ document.addEventListener("DOMContentLoaded", () => {
     carte.querySelector('[data-a="annuler"]') && (carte.querySelector('[data-a="annuler"]').disabled = !annulerPlan[i].length);
     if (!A.aImage(v)) {
       aide.hidden = true;
-      cadre.innerHTML = `<div class="pa-drop" style="height:calc(100% - 20px)"><span class="i">📋</span><b>Clique ici puis Ctrl + V</b><small>capture Google Maps, Géoportail ou photo · ou glisse une image</small></div>`;
+      const enCours = autoEnCours.has(i);
+      cadre.innerHTML = enCours ? `<div class="pa-drop" style="height:calc(100% - 20px)"><span class="i">🗺️</span><b>Carte en cours de création…</b><small>carte IGN centrée sur le point GPS</small></div>`
+        : i < 2 && !gpsOk() ? `<div class="pa-drop" style="height:calc(100% - 20px)"><span class="i">📍</span><b>Saisis le point GPS : la carte se fera toute seule</b><small>ou clique ici puis Ctrl + V pour coller ta propre capture</small></div>`
+        : `<div class="pa-drop" style="height:calc(100% - 20px)"><span class="i">📋</span><b>Clique ici puis Ctrl + V</b><small>capture Google Maps, Géoportail ou photo · ou glisse une image</small></div>`;
       return;
     }
     if (!im) { cadre.innerHTML = `<div class="pa-drop" style="height:calc(100% - 20px)"><span class="i">⏳</span><small>Chargement de l'image…</small></div>`; return; }
@@ -1401,7 +1474,20 @@ document.addEventListener("DOMContentLoaded", () => {
         if (Math.hypot(x2 - x1, y2 - y1) < 12) { v().annots.pop(); selPlan[i] = null; annulerPlan[i].pop(); }
         else outilsPlan[i] = null;
         marquerPlan();
-      } else if (glisse.mode === "deplace") { if (glisse.bouge) marquerPlan(); else annulerPlan[i].pop(); }
+      } else if (glisse.mode === "deplace") {
+        const a = v().annots[selPlan[i]];
+        if (glisse.bouge && a && a.t === "pin" && v().auto) {
+          // Sur une carte automatique, déplacer le repère déplace le point GPS : les deux cartes se recentrent
+          const g = A.versGps(v().auto, a.u, a.v);
+          prep.plan.gps = A.texteGps(g); prep.plan.gpsSource = "repere"; $("paGps").value = prep.plan.gps;
+          majGps(); marquerPlan();
+          FTSShell.toast("📍 Point GPS déplacé : les cartes se recentrent");
+          glisse = null;
+          setTimeout(lancerAuto, 50);
+          return;
+        }
+        if (glisse.bouge) marquerPlan(); else annulerPlan[i].pop();
+      }
       else if (glisse.mode === "pan" && glisse.bouge) marquerPlan();
       glisse = null;
       dessinerVuePlan(i);
@@ -1433,6 +1519,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const prec = annulerPlan[i].pop(); if (!prec) return;
       Object.assign(v, JSON.parse(prec)); selPlan[i] = null; marquerPlan(); dessinerVuePlan(i); return;
     }
+    const ty = e.target.closest("[data-type]");
+    if (ty && v.auto) { if (ty.dataset.type !== v.auto.type) genererAuto(i, { type: ty.dataset.type, z: v.auto.z }); return; }
+    if (e.target.closest("[data-auto]")) { genererAuto(i, A.AUTO_DEFAUT[i]); return; }
+    if (z && v.auto) { genererAuto(i, { z: v.auto.z + Number(z.dataset.z) }); return; }
     if (z) {
       memoriser(i);
       v.zoom = Math.max(1, Math.min(4, Math.round(((v.zoom || 1) + 0.25 * Number(z.dataset.z)) * 4) / 4));
@@ -1441,7 +1531,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target.closest(".pa-retirer")) {
       confirmer(`Retirer l'image de la vue ${i + 1} ?`, "Les étiquettes posées sur cette vue seront retirées aussi.", "Retirer", "rouge", "🗑️").then((oui) => {
         if (!oui) return;
-        imgsPlan[i] = null; prep.plan.vues[i] = { ...A.vueVide(i), titre: v.titre, fichierId: v.fichierId, retire: true };
+        // Vue 1 ou 2 retirée : on ne recrée pas la carte automatique toute seule (bouton « Carte auto » pour la remettre)
+        imgsPlan[i] = null; prep.plan.vues[i] = { ...A.vueVide(i), titre: v.titre, fichierId: v.fichierId, retire: true, sansAuto: i < 2 };
         annulerPlan[i] = []; selPlan[i] = null; outilsPlan[i] = null;
         marquerPlan(); afficherPlan();
       });
@@ -1485,6 +1576,51 @@ document.addEventListener("DOMContentLoaded", () => {
     if (A.aImage(prep.plan.vues[i])) { const libre = prep.plan.vues.findIndex((v) => !A.aImage(v)); if (libre >= 0 && document.activeElement && !document.activeElement.closest(`.pa-vue[data-v="${i}"]`)) i = libre; }
     prendreImage(i, it.getAsFile());
   });
+  // ── Cartes automatiques des vues 1 et 2 (IGN, depuis le point GPS) ──
+  const autoEnCours = new Set(), echecsAuto = {}; // échec pour un point donné : on ne réessaie pas en boucle
+  let minuterieAuto = null;
+  const gpsOk = () => !!A.lireGps(prep.plan && prep.plan.gps);
+  /** Crée (ou refait) la carte automatique de la vue i : point GPS au centre, repère rouge posé */
+  async function genererAuto(i, reglage) {
+    const g = A.lireGps(prep.plan.gps); if (!g) return;
+    const v = prep.plan.vues[i];
+    const avant = v.auto ? { ...v.auto } : null;
+    const r = { ...A.AUTO_DEFAUT[i], ...(v.auto || {}), ...(reglage || {}) };
+    const c = A.COUCHES[r.type];
+    r.z = Math.max(c.min, Math.min(c.max, r.z));
+    autoEnCours.add(i); dessinerVuePlan(i);
+    try {
+      const cv = await A.carteIGN({ lat: g.lat, lng: g.lng, z: r.z, type: r.type });
+      const blob = await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.88));
+      const img = await A.chargerImage(URL.createObjectURL(blob));
+      memoriser(i);
+      const apres = { type: r.type, z: r.z, lat: g.lat, lng: g.lng };
+      let annots = avant ? A.deplacerAnnots(v.annots, avant, apres) : v.annots.filter((a) => a.t !== "pin");
+      if (!annots.some((a) => a.t === "pin")) annots.push({ t: "pin", u: 0.5, v: 0.5, auto: true });
+      Object.assign(v, { w: img.width, h: img.height, zoom: 1, cx: 0.5, cy: 0.5, auto: apres, annots, version: (v.version || 0) + 1, retire: false, sansAuto: false });
+      imgsPlan[i] = { img, blob, sale: true };
+      marquerPlan();
+    } catch (e) {
+      console.warn(e);
+      echecsAuto[i] = `${g.lat},${g.lng}`;
+      FTSShell.toast(`⚠️ Vue ${i + 1} : ${e.message}. Tu peux coller une capture à la place.`);
+    } finally {
+      autoEnCours.delete(i);
+      if ($("tabPlan").classList.contains("on")) afficherPlan(); else majEtapes();
+    }
+  }
+  /** Vues 1 et 2 : carte automatique si elles sont vides (ou déjà automatiques et que le point a bougé) */
+  function lancerAuto() {
+    const g = A.lireGps(prep.plan.gps); if (!g) return;
+    [0, 1].forEach((i) => {
+      const v = prep.plan.vues[i];
+      if (autoEnCours.has(i) || v.sansAuto || echecsAuto[i] === `${g.lat},${g.lng}`) return;
+      const vide = !A.aImage(v);
+      const bouge = v.auto && (Math.abs(v.auto.lat - g.lat) > 1e-7 || Math.abs(v.auto.lng - g.lng) > 1e-7);
+      if (vide || bouge) genererAuto(i);
+    });
+  }
+
   /** Image collée / choisie : réduite (2400 px maxi, JPEG) puis affichée */
   async function prendreImage(i, fichier) {
     try {
@@ -1499,7 +1635,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const img = await A.chargerImage(URL.createObjectURL(blob));
       const v = prep.plan.vues[i];
       memoriser(i);
-      Object.assign(v, { w: img.width, h: img.height, zoom: 1, cx: 0.5, cy: 0.5, version: (v.version || 0) + 1, retire: false });
+      Object.assign(v, { w: img.width, h: img.height, zoom: 1, cx: 0.5, cy: 0.5, version: (v.version || 0) + 1, retire: false, auto: null });
       imgsPlan[i] = { img, blob, sale: true };
       // Vue de loin / d'approche : on propose tout de suite de poser le repère rouge
       if (i < 2 && !v.annots.some((a) => a.t === "pin")) outilsPlan[i] = "pin";

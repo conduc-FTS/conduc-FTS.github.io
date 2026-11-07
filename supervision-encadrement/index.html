@@ -112,7 +112,15 @@ html { font-size: 16px; }
 .pp-moi { display: flex; align-items: center; gap: 6px; background: #FFF8D6; border: 1px solid #F3DC7A; border-radius: 10px; padding: 5px 10px; font-size: .84rem; font-weight: 600; }
 .pp-moi select { border: none; background: transparent; font: inherit; font-weight: 800; cursor: pointer; }
 .pp-moi.vide { background: #FDECEC; border-color: #F5B5B5; }
-.pp-filtres { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 18px; border-bottom: 1px solid var(--border); }
+.pp-onglets { display: flex; gap: 4px; padding: 0 18px; border-bottom: 1px solid var(--border); }
+.pp-onglets button { border: none; background: none; padding: 15px 14px 12px; font: inherit; font-size: .95rem; font-weight: 700; color: var(--text-sub); border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; }
+.pp-onglets button.on { color: var(--anthracite); border-bottom-color: var(--fts-yellow); }
+.pp-onglets .n { font-size: .74rem; background: var(--bg); border-radius: 10px; padding: 1px 7px; margin-left: 5px; color: var(--text-main); }
+.pp-barre { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+.pp-select { border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; font-size: .84rem; font-family: inherit; background: #fff; }
+.pp-vide b { display: block; color: var(--text-main); margin-bottom: 4px; }
+.pp-vide .sv-btn { margin-top: 12px; }
+.sv-top .pp-moi[hidden] { display: none; }
 .pp-grp { display: flex; align-items: center; gap: 8px; }
 .pp-lab { font-size: .68rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-sub); margin-left: 6px; }
 .pp-filtres .sv-seg .n { font-size: .7rem; background: var(--bg); border-radius: 10px; padding: 1px 6px; margin-left: 3px; }
@@ -414,6 +422,7 @@ tr.pp-libre { background: #FFFCF0; }
     <div><h1 id="pageTitle">Vue d'ensemble</h1><div class="sv-date" id="topDate"></div></div>
     <span class="sv-sp"></span>
     <label class="sv-search" id="searchBox">🔍<input type="text" id="rechercheChantier" placeholder="Rechercher un chantier, un chef…"></label>
+    <label class="pp-moi" id="ppMoiBox" hidden title="Retenu sur cet ordinateur">👤 <select id="ppMoi"><option value="">Je suis… (choisir)</option></select></label>
     <span class="sv-sync" id="syncTop"><span class="dot"></span><span class="txt"></span></span>
     <button type="button" class="sv-btn" id="refreshVueEnsembleBtn" title="Recharger depuis Google">🔄</button>
     <button type="button" class="sv-btn pri" id="nouveauChantierBtn">+ Nouveau chantier</button>
@@ -720,27 +729,12 @@ tr.pp-libre { background: #FFFCF0; }
       <div class="sv-kpi clic" data-ppf="sansdate"><div class="ico">📅</div><div><div class="l">Date à définir</div><div class="v" id="ppKSansdate">—</div><div class="s">intervention non planifiée</div></div></div>
     </div>
     <section class="sv-panel">
-      <div class="sv-ph">
-        <h2>Chantiers à préparer</h2>
-        <label class="pp-moi">👤 Je suis <select id="ppMoi"><option value="">— choisir —</option></select></label>
-        <span class="sv-sp"></span>
-        <input type="text" id="ppRecherche" placeholder="🔍 Chantier, chef…" style="border:1px solid var(--border);border-radius:9px;padding:8px 10px;font-size:.84rem;width:200px;font-family:inherit">
+      <div class="pp-onglets" id="ppVue">
+        <button type="button" data-v="miens">Mes chantiers <span class="n" id="ppNMiens"></span></button>
+        <button type="button" data-v="nonattr">Non attribués <span class="n" id="ppNNonattr"></span></button>
+        <button type="button" data-v="tous">Tous <span class="n" id="ppNTous"></span></button>
       </div>
-      <div class="pp-filtres">
-        <div class="pp-grp"><span class="pp-lab">Voir</span>
-        <div class="sv-seg" id="ppVue">
-          <button type="button" data-v="miens">Mes chantiers <span class="n" id="ppNMiens"></span></button>
-          <button type="button" data-v="nonattr">Non attribués <span class="n" id="ppNNonattr"></span></button>
-          <button type="button" data-v="tous">Tous <span class="n" id="ppNTous"></span></button>
-        </div>
-        </div><div class="pp-grp"><span class="pp-lab">Technique</span>
-        <div class="sv-seg" id="ppTech">
-          <button type="button" data-tech="" class="on">Toutes</button>
-          <button type="button" data-tech="Micropieux">Micropieux</button>
-          <button type="button" data-tech="Pieux">Pieux</button>
-          <button type="button" data-tech="Battage">Battage</button>
-        </div>
-        </div><div class="pp-grp"><span class="pp-lab">État</span>
+      <div class="pp-barre">
         <div class="sv-seg" id="ppFiltres">
           <button type="button" data-f="tous" class="on">Tous</button>
           <button type="button" data-f="afaire">À faire</button>
@@ -748,7 +742,11 @@ tr.pp-libre { background: #FFFCF0; }
           <button type="button" data-f="modifiee">À renvoyer</button>
           <button type="button" data-f="envoyee">Envoyées</button>
         </div>
-</div>
+        <select id="ppTech" class="pp-select" aria-label="Technique">
+          <option value="">Toutes les techniques</option><option value="Micropieux">Micropieux</option><option value="Pieux">Pieux</option><option value="Battage">Battage</option>
+        </select>
+        <span class="sv-sp"></span>
+        <input type="text" id="ppRecherche" placeholder="🔍 Chantier, chef…" class="pp-select" style="width:210px">
       </div>
       <div class="se-table-scroll">
         <table class="sv-table">
@@ -876,10 +874,11 @@ document.addEventListener("DOMContentLoaded", () => {
     try { history.replaceState(null, "", id === "se-view-overview" ? location.pathname + location.search : "#" + id); } catch (e) {}
     $("pageTitle").textContent = TITRES_VUES[id] || "Supervision";
     $("mobileTitle").textContent = id === "se-view-overview" ? "Supervision" : (TITRES_VUES[id] || "Supervision");
-    $("searchBox").style.visibility = id === "se-view-overview" ? "visible" : "hidden";
+    $("searchBox").style.display = id === "se-view-overview" ? "" : "none"; // n'occupe plus de place sur les autres vues
     if (id === "se-view-overview") afficherVueEnsemble();
     if (id === "se-view-archives") chargerArchives();
     if (id === "se-view-preparation") chargerPreparation();
+    $("ppMoiBox").hidden = id !== "se-view-preparation";
     if (id === "se-view-stats") chargerStatsAvancement();
     if (id === "se-view-adresses") chargerAdresses();
     if (id === "se-view-acces" && window.FTSAcces) FTSAcces.monter($("accesDrive"));
@@ -1261,6 +1260,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (ppMoi && !noms.some((n) => clePersonne(n) === clePersonne(ppMoi))) noms.unshift(ppMoi);
     sel.innerHTML = `<option value="">— choisir —</option>` + [...new Set(noms)].map((n) => `<option ${clePersonne(n) === clePersonne(ppMoi) ? "selected" : ""}>${escapeHtmlSE(n)}</option>`).join("");
     sel.closest(".pp-moi").classList.toggle("vide", !ppMoi);
+    sel.options[0].textContent = "Je suis… (choisir)";
   }
   /** Conducteur d'un chantier : celui attribué au chantier, sinon celui de la fiche */
   const conducteurDe = (l) => (l.meta && l.meta.conducteur) || (l.r && l.r.conducteur) || "";
@@ -1313,7 +1313,7 @@ document.addEventListener("DOMContentLoaded", () => {
     $("ppNNonattr").textContent = tout.filter((l) => !conducteurDe(l)).length;
     $("ppNTous").textContent = tout.length;
     document.querySelectorAll("#ppVue button").forEach((b) => b.classList.toggle("on", b.dataset.v === ppVue));
-    document.querySelectorAll("#ppTech button").forEach((b) => b.classList.toggle("on", b.dataset.tech === ppTech));
+    $("ppTech").value = ppTech;
     // Vue (mes chantiers / non attribués / tous) et technique : s'appliquent aussi aux compteurs du haut
     const toutes = tout.filter((l) => {
       if (ppVue === "miens" && !estMien(l)) return false;
@@ -1333,7 +1333,14 @@ document.addEventListener("DOMContentLoaded", () => {
       return true;
     });
     empty.hidden = lignes.length > 0;
-    if (!lignes.length) empty.textContent = ppVue === "miens" && !ppMoi ? "Choisis ton nom dans « Je suis » pour voir tes chantiers." : ppVue === "miens" && !toutes.length ? "Aucun chantier attribué à ton nom : regarde dans « Non attribués »." : "Aucun chantier ne correspond à ce filtre.";
+    if (!lignes.length) {
+      const nNon = tout.filter((l) => !conducteurDe(l)).length;
+      const voirNon = nNon ? `<button type="button" class="sv-btn" data-voir="nonattr">Voir ${nNon > 1 ? `les ${nNon} non attribués` : "le non attribué"} →</button>` : "";
+      empty.classList.add("pp-vide");
+      empty.innerHTML = ppVue === "miens" && !ppMoi ? `<b>Qui es-tu ?</b>Choisis ton nom en haut de la page (👤) pour voir tes chantiers.`
+        : ppVue === "miens" && !toutes.length ? `<b>Aucun chantier à ton nom pour l'instant</b>${nNon ? `Va dans « Non attribués » et clique « + M'attribuer » sur tes chantiers.` : "Les chantiers créés apparaîtront ici dès qu'ils te seront attribués."}${voirNon ? `<div>${voirNon}</div>` : ""}`
+        : `<b>Aucun chantier ne correspond à ce filtre</b>Change l'état ou la technique, ou efface la recherche.`;
+    }
     const fmtD = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
     tbody.innerHTML = lignes.map((l) => {
       const r = l.r;
@@ -1369,9 +1376,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("#ppFiltres button").forEach((b) => b.addEventListener("click", () => { ppFiltre = b.dataset.f; afficherPreparation(); }));
   document.querySelectorAll("#se-view-preparation [data-ppf]").forEach((k) => k.addEventListener("click", () => { ppFiltre = k.dataset.ppf; afficherPreparation(); }));
   $("ppRecherche").addEventListener("input", afficherPreparation);
+  $("ppEmpty").addEventListener("click", (e) => { const b = e.target.closest("[data-voir]"); if (b) { ppVue = b.dataset.voir; ecrireLS(CLE_VUE, ppVue); afficherPreparation(); } });
   $("ppMoi").addEventListener("change", () => { ppMoi = $("ppMoi").value; ecrireLS(CLE_MOI, ppMoi); remplirMoi(); afficherPreparation(); });
   document.querySelectorAll("#ppVue button").forEach((b) => b.addEventListener("click", () => { ppVue = b.dataset.v; ecrireLS(CLE_VUE, ppVue); afficherPreparation(); }));
-  document.querySelectorAll("#ppTech button").forEach((b) => b.addEventListener("click", () => { ppTech = b.dataset.tech; afficherPreparation(); }));
+  $("ppTech").addEventListener("change", () => { ppTech = $("ppTech").value; afficherPreparation(); });
   function bulle(txt) {
     const b = document.createElement("div");
     b.textContent = txt;

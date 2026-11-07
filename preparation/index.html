@@ -109,7 +109,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   #printZone .fp-page { width: auto; min-height: 0; padding: 0; margin: 0; box-shadow: none; }
 }
 /* Parcours en étapes */
-.pr-steps { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); background: #fff; border-radius: 14px; padding: 16px 10px 12px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+.pr-steps { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); background: #fff; border-radius: 14px; padding: 16px 10px 12px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
 .pr-steps button { position: relative; border: none; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 4px; font-family: inherit; color: var(--text-main); }
 .pr-steps button:not([data-t="Envoi"])::after { content: ""; position: absolute; top: 16px; left: calc(50% + 21px); right: calc(-50% + 21px); height: 3px; border-radius: 2px; background: var(--border); }
 .pr-steps button.ok::after { background: #34C759; }
@@ -157,6 +157,43 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .pv .pg img { display: block; margin: 0 auto 14px; box-shadow: 0 2px 12px rgba(0,0,0,.4); background: #fff; max-width: none; }
 .pv .x { border: none; background: var(--bg); border-radius: 50%; width: 32px; height: 32px; cursor: pointer; }
 
+/* Plan d'accès */
+#tabPlan [hidden], #tabEnvoi [hidden] { display: none !important; }
+.pa-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 0 16px; align-items: start; }
+.pa-gps { font-size: .76rem; margin-top: 4px; min-height: 1.1em; } .pa-gps.ok { color: #1D6E3E; } .pa-gps.ko { color: #B42318; }
+.pa-gps a { color: inherit; }
+.pa-qr { display: flex; gap: 12px; align-items: center; padding: 0 18px 16px; }
+.pa-qr img, .pa-qr-vide { width: 84px; height: 84px; border: 1px solid var(--border); border-radius: 6px; flex: none; }
+.pa-qr-vide { display: flex; align-items: center; justify-content: center; color: #c5c8cd; font-weight: 800; background: var(--bg); }
+.pa-qr b { display: block; font-size: .88rem; } .pa-qr span { font-size: .78rem; color: var(--text-sub); }
+.pa-vues { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px 18px 18px; }
+.pa-vue { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #fff; min-width: 0; }
+.pa-vue.big { grid-column: 1 / -1; }
+.pa-vue .t { display: flex; align-items: center; gap: 6px; padding: 7px 8px 7px 10px; background: var(--bg); }
+.pa-vue .t .num { font-weight: 800; font-size: .84rem; }
+.pa-vue .t input { flex: 1; min-width: 60px; border: 1px solid transparent; background: transparent; font: inherit; font-weight: 700; font-size: .86rem; padding: 4px 6px; border-radius: 6px; }
+.pa-vue .t input:hover, .pa-vue .t input:focus { border-color: var(--border); background: #fff; }
+.pa-mb { border: 1px solid var(--border); background: #fff; border-radius: 7px; height: 28px; min-width: 28px; padding: 0 7px; font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.pa-mb:hover { border-color: #9CA3AF; }
+.pa-cadre { position: relative; outline: none; }
+.pa-cadre canvas { display: block; width: 100%; cursor: grab; touch-action: none; }
+.pa-cadre canvas.pose { cursor: crosshair; }
+.pa-cadre:focus-visible { box-shadow: inset 0 0 0 3px rgba(47,111,237,.45); }
+.pa-drop { margin: 10px; border: 2px dashed #cfd3d9; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--text-sub); text-align: center; cursor: pointer; padding: 10px; }
+.pa-drop .i { font-size: 1.6rem; } .pa-drop b { color: var(--text-main); } .pa-drop small { font-size: .76rem; }
+.pa-cadre.survol .pa-drop, .pa-cadre:focus .pa-drop { border-color: #E8B923; background: #FFFBEA; }
+.pa-aide { font-size: .76rem; color: #8A5A00; background: #FFF6D6; padding: 6px 10px; }
+.pa-outils { display: flex; gap: 5px; flex-wrap: wrap; padding: 8px; border-top: 1px solid var(--border); }
+.pa-chip { border: 1px solid #d6d9de; border-radius: 20px; padding: 4px 9px; font: inherit; font-size: .72rem; font-weight: 700; background: #fff; cursor: pointer; white-space: nowrap; }
+.pa-chip.on { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+.pa-chip.pin { color: #C8161D; } .pa-chip.pin.on { background: #C8161D; color: #fff; border-color: #C8161D; }
+.pa-chip:disabled { opacity: .4; cursor: default; }
+.pa-sep { flex: 1; }
+.pa-mini { margin: 14px; aspect-ratio: 210 / 297; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: flex; align-items: center; justify-content: center; }
+.pa-mini img { width: 100%; height: 100%; display: block; }
+.pa-mini-vide { padding: 20px; text-align: center; font-size: .8rem; color: var(--text-sub); }
+@media (max-width: 1200px) { .pa-grid { grid-template-columns: 1fr; } .pa-side { max-width: 340px; } }
+
 /* Envoi */
 .pe-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 0 16px; }
 .pe-pj { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
@@ -182,8 +219,9 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
     <button type="button" data-t="Ndc"><span class="ro">3</span><b>Note de calcul</b><small></small></button>
     <button type="button" data-t="Fournitures"><span class="ro">4</span><b>Fournitures</b><small></small></button>
     <button type="button" data-t="Remarques"><span class="ro">5</span><b>Remarques</b><small></small></button>
-    <button type="button" data-t="Fiche"><span class="ro">6</span><b>Fiche à imprimer</b><small></small></button>
-    <button type="button" data-t="Envoi"><span class="ro">7</span><b>Envoi</b><small></small></button>
+    <button type="button" data-t="Plan"><span class="ro">6</span><b>Plan d'accès</b><small></small></button>
+    <button type="button" data-t="Fiche"><span class="ro">7</span><b>Fiche à imprimer</b><small></small></button>
+    <button type="button" data-t="Envoi"><span class="ro">8</span><b>Envoi</b><small></small></button>
     <span id="nPieux" hidden></span><span id="nEnvoi" hidden></span>
   </div>
   <p class="sv-status" id="prStatus">Chargement…</p>
@@ -322,6 +360,37 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
     </section>
   </div>
 
+  <!-- 6 · PLAN D'ACCÈS -->
+  <div class="sv-tab" id="tabPlan">
+    <div class="pa-grid">
+      <div>
+        <section class="sv-card">
+          <div class="sv-ch"><h2>Coordonnées</h2><span class="s">bandeau du haut du plan · facultatif</span></div>
+          <div class="pr-grid deux">
+            <div class="sv-f"><label>Adresse <i>(reprise de l'étape 1, modifiable)</i></label><input type="text" id="paAdresse"></div>
+            <div class="sv-f"><label>Point GPS · colle les coordonnées ou le lien Google Maps</label><input type="text" id="paGps" placeholder="ex : 44.833328, -0.577580" autocomplete="off"><div class="pa-gps" id="paGpsEtat"></div></div>
+            <div class="sv-f"><label>Précision du point</label><input type="text" id="paPrecision" placeholder="ex : entrée PL, portail sud"></div>
+            <div class="sv-f"><label>Contact sur place <i>(chef de l'étape 2, modifiable)</i></label><input type="text" id="paContact"></div>
+            <div class="sv-f full"><label>Instructions d'accès</label><textarea id="paInstructions" rows="2" placeholder="ex : entrée PL par l'allée des Sablons (portail sud), VL sur le parking visiteurs"></textarea></div>
+          </div>
+          <div class="pa-qr"><img id="paQr" alt="" hidden><div class="pa-qr-vide" id="paQrVide">QR</div><div><b>QR code généré automatiquement</b><span>Scanné avec un téléphone, il ouvre l'itinéraire Google Maps jusqu'au point GPS.</span></div></div>
+        </section>
+        <section class="sv-card">
+          <div class="sv-ch"><h2>Vues</h2><span class="s">clique dans un cadre puis <b>Ctrl + V</b> pour coller une capture, ou glisse une image · 1 à 3 vues</span></div>
+          <div class="pa-vues" id="paVues"></div>
+        </section>
+      </div>
+      <div>
+        <section class="sv-card pa-side">
+          <div class="sv-ch"><h2>Aperçu du plan</h2></div>
+          <div class="pa-mini"><img id="paMini" alt=""><div class="pa-mini-vide" id="paMiniVide">Le plan apparaîtra ici dès qu'il y aura un point GPS ou une vue.</div></div>
+          <div style="display:flex;gap:8px;padding:0 14px 14px"><button type="button" class="sv-btn" id="paApercu" style="flex:1">🔍 Aperçu</button><button type="button" class="sv-btn" id="paPdf" style="flex:1">⬇️ PDF</button></div>
+        </section>
+        <section class="sv-card" style="padding:12px 16px;font-size:.82rem;color:var(--text-sub);line-height:1.45">📎 Le plan part avec la fiche à l'étape <b>Envoi</b> (premier envoi, ou quand il a changé) et il est copié dans le dossier PREPARATION.</section>
+      </div>
+    </div>
+  </div>
+
   <!-- 6 · FICHE -->
   <div class="sv-tab" id="tabFiche">
     <section class="sv-card">
@@ -354,8 +423,10 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
           <div style="padding:14px 18px">
             <div class="pe-pj"><span class="i">📄</span><div class="t"><b id="envNomPdf">Fiche</b><small>générée depuis l'onglet 6 au moment de l'envoi</small></div><button type="button" class="sv-btn" id="envApercu">Aperçu</button></div>
             <div class="pe-pj"><span class="i">🗺️</span><div class="t"><b id="envPlanNom">Plan d'accès</b><small id="envPlanInfo">facultatif · PDF ou image</small></div>
+              <label id="envPlanCoche" style="display:flex;align-items:center;gap:6px;font-size:.82rem;font-weight:700" hidden><input type="checkbox" id="envPlanJoindre"> joindre</label>
+              <button type="button" class="sv-btn" id="envPlanApercu" hidden>Aperçu</button>
               <button type="button" class="sv-btn" id="envPlanRetirer" hidden>Retirer</button>
-              <label class="sv-btn" style="cursor:pointer">Joindre…<input type="file" id="envPlan" accept="application/pdf,image/*" hidden></label></div>
+              <label class="sv-btn" style="cursor:pointer" title="Joindre un autre fichier à la place du plan de l'étape 6">Autre fichier…<input type="file" id="envPlan" accept="application/pdf,image/*" hidden></label></div>
             <label style="display:flex;align-items:center;gap:8px;font-size:.86rem;font-weight:600;padding:4px 0 0"><input type="checkbox" id="envDrive" checked> Copier aussi dans le dossier PREPARATION du Drive</label>
           </div>
         </section>
@@ -410,6 +481,8 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <script src="../js/gmail.js"></script>
 <script src="../lib/jspdf/jspdf.umd.min.js"></script>
 <script src="../lib/html2canvas/html2canvas.min.js"></script>
+<script src="../lib/qrcode/qrcode.js"></script>
+<script src="../js/plan-acces.js"></script>
 <script src="../js/supervision-shell.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -556,8 +629,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ─── Parcours en étapes ────────────────────────────────────────
-  const ETAPES = ["Infos", "Materiel", "Ndc", "Fournitures", "Remarques", "Fiche", "Envoi"];
-  const NOMS_ETAPES = { Infos: "Infos chantier", Materiel: "Matériel & équipe", Ndc: "Note de calcul", Fournitures: "Fournitures", Remarques: "Remarques", Fiche: "Fiche à imprimer", Envoi: "Envoi" };
+  const ETAPES = ["Infos", "Materiel", "Ndc", "Fournitures", "Remarques", "Plan", "Fiche", "Envoi"];
+  const NOMS_ETAPES = { Infos: "Infos chantier", Materiel: "Matériel & équipe", Ndc: "Note de calcul", Fournitures: "Fournitures", Remarques: "Remarques", Plan: "Plan d'accès", Fiche: "Fiche à imprimer", Envoi: "Envoi" };
   let ficheVue = false, minuterieEtapes = null;
   function etatsEtapes() {
     const inf = prep.infos, n = prep.ndc.pieux.length;
@@ -569,6 +642,10 @@ document.addEventListener("DOMContentLoaded", () => {
     e.Ndc = n ? ["ok", `${n} pieu${n > 1 ? "x" : ""}`] : ["", "à coller"];
     e.Fournitures = n && tubeMax() !== "" ? ["ok", "calculées"] : ["", n ? "foreuse à choisir" : "après la NDC"];
     e.Remarques = prep.remarques.objectif !== "" && prep.remarques.objectif != null ? ["ok", "complet"] : ["", "objectif à saisir"];
+    // Plan d'accès : facultatif, donc « fait » même vide
+    const pl = prep.plan, nbV = pl ? pl.vues.filter(FTSPlanAcces.aImage).length : 0;
+    if (pl && pl.gps && !FTSPlanAcces.lireGps(pl.gps)) e.Plan = ["att", "GPS illisible"];
+    else e.Plan = ["ok", nbV || (pl && pl.gps) ? `${nbV} vue${nbV > 1 ? "s" : ""}${pl.gps ? " · GPS" : ""}` : "facultatif"];
     e.Fiche = ficheVue || prep.envoi ? ["ok", "vérifiée"] : ["", "à vérifier"];
     if (!prep.envoi) e.Envoi = ["att", "pas envoyée"];
     else e.Envoi = estModifiee() ? ["att", "à renvoyer"] : ["ok", `indice ${prep.envoi.indice} envoyé`];
@@ -615,12 +692,17 @@ document.addEventListener("DOMContentLoaded", () => {
         FTSAuth.getUserInfo().then((i) => { if (i) { nomMoi = i.name || i.email || ""; if ($("tabEnvoi").classList.contains("on") && !msgTouche) afficherEnvoi(); } }).catch(() => {});
         pp = await FTSParc.chargerParametresPrepa().catch(() => FTSParc.parametresPrepa());
         prep = P.normaliser(enreg, meta);
+        prep.plan = FTSPlanAcces.normaliser(prep.plan);
+        if (!prep.plan.gps && meta.gps) prep.plan.gps = String(meta.gps);
         if (!enreg) {
           const adr = String(meta.adresse || "");
           const cp = adr.match(/^(.*?)[,\s]+(\d{5}\s+.+)$/);
           prep.infos.adresse = cp ? cp[1].trim() : adr;
           prep.infos.commune = cp ? cp[2].trim() : (meta.commune || "");
           prep.ciment.surconso = pp.surconso;
+          // Conducteur : celui attribué au chantier, sinon « Je suis » de cet ordinateur
+          let moi = ""; try { moi = localStorage.getItem("fts_je_suis") || ""; } catch (e) {}
+          prep.infos.conducteur = meta.conducteur || moi || "";
           if (meta.dureeChantier) prep.infos.duree = Number(meta.dureeChantier);
         }
         if (prep.ciment.surconso === "" || prep.ciment.surconso == null) prep.ciment.surconso = pp.surconso;
@@ -635,6 +717,8 @@ document.addEventListener("DOMContentLoaded", () => {
         ["infos.dateConnue", "equipe.chef", "materiel.foreuse", "materiel.compresseur", "materiel.pelle"].forEach(majDependances);
         afficherNdc();
         majEssai();
+        chargerImagesPlan();
+        if ($("tabPlan").classList.contains("on")) afficherPlan();
         majOngletEnvoi();
         if ($("tabEnvoi").classList.contains("on")) afficherEnvoi();
         $("prStatus").textContent = "";
@@ -653,6 +737,7 @@ document.addEventListener("DOMContentLoaded", () => {
     $("etatSave").textContent = "Enregistrement…";
     try {
       if (prep.envoi) prep.envoi.modifieApres = estModifiee();
+      await sauverImagesPlan();
       const { data: r, meta: m } = await P.enregistrer(chantierId, prep);
       prep.majLe = r.majLe;
       if (m) { meta = m; majCacheSupervision(m); }
@@ -1157,9 +1242,331 @@ document.addEventListener("DOMContentLoaded", () => {
     window.print();
   });
 
+  // ─── Plan d'accès (étape 6) ────────────────────────────────────
+  const A = FTSPlanAcces;
+  const imgsPlan = [null, null, null];      // { img, blob, sale } par vue
+  const outilsPlan = [null, null, null];    // outil choisi par vue : "lab:TEXTE" | "pin" | "fleche" | "zone" | "texte" | null
+  const selPlan = [null, null, null];       // annotation sélectionnée par vue
+  const annulerPlan = [[], [], []];         // pile d'annulation par vue
+  const boitesPlan = [[], [], []];
+  let vueActive = 0, minuterieMini = null, planChargeId = 0;
+  const adresseDefaut = () => [prep.infos.adresse, prep.infos.commune].filter((x) => String(x || "").trim()).join(" — ");
+  const contactDefaut = () => { const ch = prep.equipe.chef; const p = ch ? FTSPersonnel.parNom(ch) : null; return [ch, p && p.telephone].filter(Boolean).join(" - "); };
+  const planAdresse = () => prep.plan.adresse || adresseDefaut();
+  const planContact = () => prep.plan.contact || contactDefaut();
+  function marquerPlan() { marquerSale(); majMiniBientot(); }
+  function memoriser(i) {
+    const v = prep.plan.vues[i];
+    annulerPlan[i].push(JSON.stringify({ annots: v.annots, zoom: v.zoom, cx: v.cx, cy: v.cy }));
+    if (annulerPlan[i].length > 50) annulerPlan[i].shift();
+  }
+
+  function afficherPlan() {
+    const pl = prep.plan;
+    $("paAdresse").value = pl.adresse || ""; $("paAdresse").placeholder = adresseDefaut() || "adresse du chantier";
+    $("paContact").value = pl.contact || ""; $("paContact").placeholder = contactDefaut() || "nom - téléphone";
+    $("paGps").value = pl.gps || ""; $("paPrecision").value = pl.precision || ""; $("paInstructions").value = pl.instructions || "";
+    majGps();
+    $("paVues").innerHTML = pl.vues.map((v, i) => `<div class="pa-vue ${i === 2 ? "big" : ""}" data-v="${i}">
+      <div class="t"><span class="num">${i + 1} ·</span><input type="text" class="pa-titre" value="${esc(v.titre)}" title="Titre de la vue (modifiable)">
+        <span class="pa-img-btns" ${A.aImage(v) ? "" : "hidden"}><button type="button" class="pa-mb" data-z="-1" title="Dézoomer la capture">−</button><button type="button" class="pa-mb" data-z="1" title="Zoomer dans la capture">+</button></span>
+        <label class="pa-mb" style="display:flex;align-items:center;cursor:pointer" title="Choisir une image">📁<input type="file" accept="image/*" hidden class="pa-fichier"></label>
+        <button type="button" class="pa-mb pa-retirer" title="Retirer l'image" ${A.aImage(v) ? "" : "hidden"}>✕</button></div>
+      <div class="pa-aide" hidden></div>
+      <div class="pa-cadre" tabindex="0" style="aspect-ratio:${A.VUES[i].l} / ${A.VUES[i].h}"></div>
+      <div class="pa-outils" ${A.aImage(v) ? "" : "hidden"}>
+        ${i < 2 ? `<button type="button" class="pa-chip pin" data-o="pin">📍 Repère</button>` : ""}
+        ${A.ETIQUETTES.map((t) => `<button type="button" class="pa-chip" data-o="lab:${esc(t)}">${esc(t)}</button>`).join("")}
+        ${i === 2 ? `<button type="button" class="pa-chip pin" data-o="pin">📍 Repère</button>` : ""}
+        <button type="button" class="pa-chip" data-o="fleche">➜ Flèche</button><button type="button" class="pa-chip" data-o="zone">▭ Zone</button><button type="button" class="pa-chip" data-o="texte">T Texte</button>
+        <span class="pa-sep"></span><button type="button" class="pa-chip" data-a="annuler">↶ Annuler</button><button type="button" class="pa-chip" data-a="suppr">🗑 Supprimer</button>
+      </div></div>`).join("");
+    pl.vues.forEach((v, i) => dessinerVuePlan(i));
+    majMiniBientot(true);
+  }
+  function majGps() {
+    const t = prep.plan.gps, g = A.lireGps(t), el = $("paGpsEtat");
+    el.className = "pa-gps " + (t && !g ? "ko" : g ? "ok" : "");
+    el.innerHTML = !t ? "" : g ? `✓ ${A.texteGps(g)} · <a href="${A.urlCarte(g)}" target="_blank" rel="noopener">voir sur Google Maps</a>` : "Point non reconnu : colle « 44.833, -0.577 » ou le lien Google Maps.";
+    if (g) { $("paQr").src = A.qrDataUrl(A.urlItineraire(g), 300); $("paQr").hidden = false; $("paQrVide").hidden = true; }
+    else { $("paQr").hidden = true; $("paQrVide").hidden = false; }
+  }
+  [["paAdresse", "adresse"], ["paContact", "contact"], ["paGps", "gps"], ["paPrecision", "precision"], ["paInstructions", "instructions"]].forEach(([id, k]) => {
+    $(id).addEventListener("input", () => { prep.plan[k] = $(id).value; if (k === "gps") majGps(); marquerPlan(); });
+  });
+
+  /** Dessine une vue dans son cadre (ou la zone « coller une capture ») */
+  function dessinerVuePlan(i) {
+    const carte = $("paVues").querySelector(`.pa-vue[data-v="${i}"]`); if (!carte) return;
+    const cadre = carte.querySelector(".pa-cadre"), v = prep.plan.vues[i], im = imgsPlan[i];
+    const aide = carte.querySelector(".pa-aide");
+    const o = outilsPlan[i];
+    carte.querySelectorAll("[data-o]").forEach((b) => b.classList.toggle("on", b.dataset.o === o));
+    carte.querySelector('[data-a="suppr"]') && (carte.querySelector('[data-a="suppr"]').disabled = selPlan[i] == null);
+    carte.querySelector('[data-a="annuler"]') && (carte.querySelector('[data-a="annuler"]').disabled = !annulerPlan[i].length);
+    if (!A.aImage(v)) {
+      aide.hidden = true;
+      cadre.innerHTML = `<div class="pa-drop" style="height:calc(100% - 20px)"><span class="i">📋</span><b>Clique ici puis Ctrl + V</b><small>capture Google Maps, Géoportail ou photo · ou glisse une image</small></div>`;
+      return;
+    }
+    if (!im) { cadre.innerHTML = `<div class="pa-drop" style="height:calc(100% - 20px)"><span class="i">⏳</span><small>Chargement de l'image…</small></div>`; return; }
+    let cv = cadre.querySelector("canvas");
+    if (!cv) { cadre.innerHTML = "<canvas></canvas>"; cv = cadre.querySelector("canvas"); brancherCanvas(i, cv); }
+    const dpr = window.devicePixelRatio || 1;
+    const W = Math.max(50, Math.round(cadre.clientWidth * dpr)), H = Math.round(W * A.VUES[i].h / A.VUES[i].l);
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    boitesPlan[i] = A.dessinerVue(cv.getContext("2d"), im.img, v, W, H, W / A.VUES[i].l, { selection: selPlan[i] });
+    cv.classList.toggle("pose", !!o);
+    const aPin = v.annots.some((a) => a.t === "pin");
+    const txt = o === "pin" ? "Clique sur l'endroit du chantier pour poser le repère rouge." : o && o.startsWith("lab:") ? `Clique sur l'image pour poser « ${o.slice(4)} ».` : o === "fleche" || o === "zone" ? "Clique et fais glisser sur l'image." : o === "texte" ? "Clique sur l'image à l'endroit du texte." : i < 2 && !aPin ? "📍 Pose le repère rouge : clique sur « Repère » puis sur l'endroit du chantier." : "";
+    aide.hidden = !txt; aide.textContent = txt;
+  }
+  function xyCanvas(cv, e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; }
+  function touche(i, x, y) {
+    const b = boitesPlan[i] || [];
+    for (let k = b.length - 1; k >= 0; k--) {
+      const r = b[k]; if (!r) continue;
+      if (r.ligne) { // flèche : distance au segment
+        const [x1, y1, x2, y2] = r.ligne, dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy || 1;
+        const t = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / l2));
+        if (Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy)) < 12) return k;
+      } else if (x >= r[0] - 4 && x <= r[0] + r[2] + 4 && y >= r[1] - 4 && y <= r[1] + r[3] + 4) return k;
+    }
+    return null;
+  }
+  async function demanderTexte(titre, valeur) {
+    const t = await boite({ icone: "T", titre, html: "Le texte apparaîtra sur le plan (Entrée pour valider).", champ: { valeur: valeur || "", placeholder: "ex : PORTAIL SUD" }, boutons: [{ lib: "Annuler", val: null }, { lib: "OK", val: true, cls: "pri" }] });
+    return t == null ? null : String(t).trim().toUpperCase();
+  }
+  function brancherCanvas(i, cv) {
+    let glisse = null;
+    const v = () => prep.plan.vues[i];
+    const geo = () => A.geometrie(v(), cv.width, cv.height);
+    cv.addEventListener("pointerdown", async (e) => {
+      vueActive = i;
+      const g = geo(); if (!g) return;
+      const [x, y] = xyCanvas(cv, e), [u, w] = A.versImage(g, x, y), o = outilsPlan[i];
+      if (o === "pin" || (o && o.startsWith("lab:")) || o === "texte") {
+        let texte = o.startsWith("lab:") ? o.slice(4) : "";
+        if (o === "texte") { texte = await demanderTexte("Texte libre"); if (!texte) return; }
+        memoriser(i);
+        // Un seul repère par vue : le reposer le déplace
+        if (o === "pin") v().annots = v().annots.filter((a) => a.t !== "pin");
+        v().annots.push(o === "pin" ? { t: "pin", u, v: w } : { t: o === "texte" ? "texte" : "lab", texte, u, v: w });
+        selPlan[i] = v().annots.length - 1; outilsPlan[i] = null;
+        marquerPlan(); dessinerVuePlan(i); return;
+      }
+      cv.setPointerCapture(e.pointerId);
+      if (o === "fleche" || o === "zone") {
+        memoriser(i);
+        v().annots.push({ t: o, u, v: w, u2: u, v2: w });
+        selPlan[i] = v().annots.length - 1;
+        glisse = { mode: "trace", x, y };
+        dessinerVuePlan(i); return;
+      }
+      const k = touche(i, x, y);
+      if (k != null) {
+        memoriser(i);
+        selPlan[i] = k;
+        const a = v().annots[k];
+        glisse = { mode: "deplace", u, w, orig: { ...a } };
+      } else {
+        selPlan[i] = null;
+        glisse = { mode: "pan", x, y, cx: g.cx, cy: g.cy, g };
+      }
+      dessinerVuePlan(i);
+    });
+    cv.addEventListener("pointermove", (e) => {
+      if (!glisse) return;
+      const g = geo(); if (!g) return;
+      const [x, y] = xyCanvas(cv, e), [u, w] = A.versImage(g, x, y);
+      const a = v().annots[selPlan[i]];
+      if (glisse.mode === "trace" && a) { a.u2 = u; a.v2 = w; }
+      else if (glisse.mode === "deplace" && a) {
+        const du = u - glisse.u, dv = w - glisse.w;
+        a.u = glisse.orig.u + du; a.v = glisse.orig.v + dv;
+        if (a.u2 != null) { a.u2 = glisse.orig.u2 + du; a.v2 = glisse.orig.v2 + dv; }
+      } else if (glisse.mode === "pan") {
+        v().cx = glisse.cx - (x - glisse.x) / glisse.g.iw; v().cy = glisse.cy - (y - glisse.y) / glisse.g.ih;
+        const g2 = A.geometrie(v(), cv.width, cv.height); v().cx = g2.cx; v().cy = g2.cy;
+      }
+      glisse.bouge = true;
+      dessinerVuePlan(i);
+    });
+    const fin = () => {
+      if (!glisse) return;
+      if (glisse.mode === "trace") {
+        const a = v().annots[selPlan[i]];
+        const g = geo(), [x1, y1] = A.versCadre(g, a.u, a.v), [x2, y2] = A.versCadre(g, a.u2, a.v2);
+        if (Math.hypot(x2 - x1, y2 - y1) < 12) { v().annots.pop(); selPlan[i] = null; annulerPlan[i].pop(); }
+        else outilsPlan[i] = null;
+        marquerPlan();
+      } else if (glisse.mode === "deplace") { if (glisse.bouge) marquerPlan(); else annulerPlan[i].pop(); }
+      else if (glisse.mode === "pan" && glisse.bouge) marquerPlan();
+      glisse = null;
+      dessinerVuePlan(i);
+    };
+    cv.addEventListener("pointerup", fin);
+    cv.addEventListener("pointercancel", fin);
+    cv.addEventListener("dblclick", async (e) => {
+      const [x, y] = xyCanvas(cv, e), k = touche(i, x, y);
+      const a = k != null ? v().annots[k] : null;
+      if (!a || (a.t !== "lab" && a.t !== "texte")) return;
+      const t = await demanderTexte("Modifier le texte", a.texte);
+      if (!t) return;
+      memoriser(i); a.texte = t; marquerPlan(); dessinerVuePlan(i);
+    });
+  }
+  function supprimerSel(i) {
+    if (selPlan[i] == null) return;
+    memoriser(i); prep.plan.vues[i].annots.splice(selPlan[i], 1); selPlan[i] = null;
+    marquerPlan(); dessinerVuePlan(i);
+  }
+  $("paVues").addEventListener("click", (e) => {
+    const carte = e.target.closest(".pa-vue"); if (!carte) return;
+    const i = Number(carte.dataset.v), v = prep.plan.vues[i];
+    vueActive = i;
+    const o = e.target.closest("[data-o]"), a = e.target.closest("[data-a]"), z = e.target.closest("[data-z]");
+    if (o) { outilsPlan[i] = outilsPlan[i] === o.dataset.o ? null : o.dataset.o; selPlan[i] = null; dessinerVuePlan(i); return; }
+    if (a && a.dataset.a === "suppr") return supprimerSel(i);
+    if (a && a.dataset.a === "annuler") {
+      const prec = annulerPlan[i].pop(); if (!prec) return;
+      Object.assign(v, JSON.parse(prec)); selPlan[i] = null; marquerPlan(); dessinerVuePlan(i); return;
+    }
+    if (z) {
+      memoriser(i);
+      v.zoom = Math.max(1, Math.min(4, Math.round(((v.zoom || 1) + 0.25 * Number(z.dataset.z)) * 4) / 4));
+      marquerPlan(); dessinerVuePlan(i); return;
+    }
+    if (e.target.closest(".pa-retirer")) {
+      confirmer(`Retirer l'image de la vue ${i + 1} ?`, "Les étiquettes posées sur cette vue seront retirées aussi.", "Retirer", "rouge", "🗑️").then((oui) => {
+        if (!oui) return;
+        imgsPlan[i] = null; prep.plan.vues[i] = { ...A.vueVide(i), titre: v.titre, fichierId: v.fichierId, retire: true };
+        annulerPlan[i] = []; selPlan[i] = null; outilsPlan[i] = null;
+        marquerPlan(); afficherPlan();
+      });
+      return;
+    }
+    if (e.target.closest(".pa-drop")) carte.querySelector(".pa-cadre").focus();
+  });
+  $("paVues").addEventListener("input", (e) => {
+    if (!e.target.classList.contains("pa-titre")) return;
+    prep.plan.vues[Number(e.target.closest(".pa-vue").dataset.v)].titre = e.target.value; marquerPlan();
+  });
+  $("paVues").addEventListener("change", (e) => {
+    if (!e.target.classList.contains("pa-fichier")) return;
+    const f = e.target.files && e.target.files[0]; e.target.value = "";
+    if (f) prendreImage(Number(e.target.closest(".pa-vue").dataset.v), f);
+  });
+  $("paVues").addEventListener("focusin", (e) => { const c = e.target.closest(".pa-vue"); if (c) vueActive = Number(c.dataset.v); });
+  $("paVues").addEventListener("keydown", (e) => {
+    const c = e.target.closest(".pa-cadre"); if (!c) return;
+    const i = Number(c.closest(".pa-vue").dataset.v);
+    if ((e.key === "Delete" || e.key === "Backspace") && selPlan[i] != null) { e.preventDefault(); supprimerSel(i); }
+    if (e.key === "Escape") { outilsPlan[i] = null; selPlan[i] = null; dessinerVuePlan(i); }
+  });
+  ["dragover", "dragleave", "drop"].forEach((ev) => $("paVues").addEventListener(ev, (e) => {
+    const c = e.target.closest(".pa-cadre"); if (!c) return;
+    e.preventDefault();
+    c.classList.toggle("survol", ev === "dragover");
+    if (ev === "drop") {
+      const f = [...(e.dataTransfer.files || [])].find((x) => /^image\//.test(x.type));
+      if (f) prendreImage(Number(c.closest(".pa-vue").dataset.v), f);
+    }
+  }));
+  document.addEventListener("paste", (e) => {
+    if (!$("tabPlan").classList.contains("on")) return;
+    if (e.target.matches && e.target.matches("input, textarea")) return;
+    const it = [...((e.clipboardData && e.clipboardData.items) || [])].find((x) => /^image\//.test(x.type));
+    if (!it) return;
+    e.preventDefault();
+    // Vue choisie (dernier cadre cliqué) ; si elle a déjà une image et qu'une autre est vide, on remplit la vide
+    let i = vueActive;
+    if (A.aImage(prep.plan.vues[i])) { const libre = prep.plan.vues.findIndex((v) => !A.aImage(v)); if (libre >= 0 && document.activeElement && !document.activeElement.closest(`.pa-vue[data-v="${i}"]`)) i = libre; }
+    prendreImage(i, it.getAsFile());
+  });
+  /** Image collée / choisie : réduite (2400 px maxi, JPEG) puis affichée */
+  async function prendreImage(i, fichier) {
+    try {
+      const url = URL.createObjectURL(fichier);
+      const brute = await A.chargerImage(url);
+      const r = Math.min(1, 2400 / Math.max(brute.width, brute.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(brute.width * r); c.height = Math.round(brute.height * r);
+      const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(brute, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      const blob = await new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.88));
+      const img = await A.chargerImage(URL.createObjectURL(blob));
+      const v = prep.plan.vues[i];
+      memoriser(i);
+      Object.assign(v, { w: img.width, h: img.height, zoom: 1, cx: 0.5, cy: 0.5, version: (v.version || 0) + 1, retire: false });
+      imgsPlan[i] = { img, blob, sale: true };
+      // Vue de loin / d'approche : on propose tout de suite de poser le repère rouge
+      if (i < 2 && !v.annots.some((a) => a.t === "pin")) outilsPlan[i] = "pin";
+      vueActive = i;
+      marquerPlan(); afficherPlan();
+      FTSShell.toast(`Image ajoutée à la vue ${i + 1}`);
+    } catch (e) { erreur("Image non ajoutée", e.message); }
+  }
+  /** Images des vues : téléchargées depuis le dossier PREPARATION */
+  async function chargerImagesPlan() {
+    const id = ++planChargeId;
+    await Promise.all(prep.plan.vues.map(async (v, i) => {
+      if (!v.fichierId || imgsPlan[i]) return;
+      try {
+        const blob = await FTSDrive.downloadFileBlob(v.fichierId);
+        const img = await A.chargerImage(URL.createObjectURL(blob));
+        if (id !== planChargeId) return;
+        imgsPlan[i] = { img, blob, sale: false };
+        if (!v.w) { v.w = img.width; v.h = img.height; }
+        if ($("tabPlan").classList.contains("on")) dessinerVuePlan(i);
+      } catch (e) { console.warn(e); FTSShell.toast(`⚠️ Image de la vue ${i + 1} introuvable dans le Drive`); }
+    }));
+    majMiniBientot(true);
+  }
+  /** Enregistre dans PREPARATION les images nouvelles ou remplacées */
+  async function sauverImagesPlan() {
+    const aEnvoyer = prep.plan.vues.map((v, i) => i).filter((i) => (imgsPlan[i] && imgsPlan[i].sale) || prep.plan.vues[i].retire);
+    if (!aEnvoyer.length) return;
+    const dossier = await FTSDrive.findOrCreateFolder(P.NOM_DOSSIER, chantierId);
+    for (const i of aEnvoyer) {
+      const v = prep.plan.vues[i];
+      if (v.retire) { if (v.fichierId) await FTSDrive.deleteFile(v.fichierId).catch(() => {}); v.fichierId = ""; delete v.retire; continue; }
+      const f = await FTSDrive.uploadFile(imgsPlan[i].blob, `plan-acces-vue${i + 1}.jpg`, "image/jpeg", dossier, { remplacerSiExiste: true });
+      v.fichierId = f.id; imgsPlan[i].sale = false;
+    }
+  }
+  async function pdfPlan() {
+    return A.pdf({ plan: prep.plan, code, nom, adresse: planAdresse(), contact: planContact(), logoSrc: "../assets/logo-fts.png", images: imgsPlan.map((x) => (x ? x.img : null)) });
+  }
+  function majMiniBientot(vite) {
+    clearTimeout(minuterieMini);
+    minuterieMini = setTimeout(async () => {
+      if (!$("tabPlan").classList.contains("on")) return;
+      const vide = A.vide(prep.plan);
+      $("paMini").hidden = vide; $("paMiniVide").hidden = !vide;
+      if (vide) return;
+      try { const r = await pdfPlan(); $("paMini").src = r.pages[0].img; } catch (e) { console.warn(e); }
+    }, vite ? 50 : 700);
+  }
+  window.addEventListener("resize", () => { if ($("tabPlan").classList.contains("on")) prep.plan.vues.forEach((v, i) => dessinerVuePlan(i)); });
+  $("paApercu").addEventListener("click", async () => {
+    if (A.vide(prep.plan)) return erreur("Plan vide", "Ajoute au moins un point GPS ou une vue.");
+    try { const r = await pdfPlan(); ouvrirApercu(r.blob, `${P.nomFichier(code)}_Plan-acces.pdf`, r.pages); } catch (e) { erreur("Aperçu impossible", e.message); }
+  });
+  $("paPdf").addEventListener("click", async () => {
+    if (A.vide(prep.plan)) return erreur("Plan vide", "Ajoute au moins un point GPS ou une vue.");
+    try { const r = await pdfPlan(); telecharger(r.blob, `${P.nomFichier(code)}_Plan-acces.pdf`); } catch (e) { erreur("PDF non créé", e.message); }
+  });
+
   // ─── Envoi (fiche PDF + plan d'accès par mail) ─────────────────
   let plan = null;                       // { blob, nom, type } — plan d'accès joint à la main
-  let objetTouche = false, msgTouche = false, destTouche = false, indiceTouche = false;
+  let objetTouche = false, msgTouche = false, destTouche = false, indiceTouche = false, planJoindreTouche = false;
+  const planGenere = () => !!prep.plan && !FTSPlanAcces.vide(prep.plan);
+  const planModifie = () => !prep.envoi || FTSPlanAcces.empreinte(prep.plan) !== prep.envoi.planEmpreinte;
+  /** Plan joint au prochain envoi : fichier choisi à la main, sinon plan de l'étape 6 si coché */
+  const planJoint = () => !!plan || (planGenere() && $("envPlanJoindre").checked);
+  const nomPlan = (n) => `${P.nomFichier(code)}_Plan-acces_Ind${P.nomFichier(n)}.pdf`;
   let nomMoi = "";
   /** Relevé de ce qui est imprimé sur la fiche : sert à repérer les changements entre deux envois */
   const kPl = (p) => `Platines ${p.section} ${String(p.coiffe).toLowerCase()}`;
@@ -1225,7 +1632,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const e = prep.envoi, inf = prep.infos;
     const ar = e && String(e.indice) !== String(n) ? `, qui annule et remplace l'indice ${e.indice}` : "";
     const lignes = ["Bonjour,", "",
-      `Vous trouverez ci-joint la fiche de préparation du chantier ${code} ${nom}, indice ${n}${ar}${plan ? ", ainsi que le plan d'accès" : ""}.`];
+      `Vous trouverez ci-joint la fiche de préparation du chantier ${code} ${nom}, indice ${n}${ar}${planJoint() ? ", ainsi que le plan d'accès" : ""}.`];
     const chg = changements();
     if (e && chg.length) lignes.push("", `Changements depuis l'indice ${e.indice} :`, ...chg.map((l) => "- " + l));
     const duree = inf.duree === "" || inf.duree == null ? "" : ` pour ${typeof inf.duree === "number" ? fr(inf.duree) : inf.duree} ${String(inf.dureeUnite).toLowerCase()}`;
@@ -1250,11 +1657,17 @@ document.addEventListener("DOMContentLoaded", () => {
     $("envIndiceNote").className = "pr-note" + (e && !mod ? "" : " ok");
     if (!destTouche) $("envA").value = (e && e.a && e.a.length ? e.a : P.DESTINATAIRES).join(" ; ");
     if (!destTouche && e && e.cc) $("envCc").value = e.cc.join(" ; ");
+    // Plan de l'étape 6 : joint d'office au premier envoi ou s'il a changé depuis
+    const gen = planGenere();
+    if (!planJoindreTouche) $("envPlanJoindre").checked = gen && planModifie();
+    $("envPlanCoche").hidden = !!plan || !gen; $("envPlanApercu").hidden = !!plan || !gen;
     if (!objetTouche) $("envObjet").value = texteObjet(n);
     if (!msgTouche) $("envMessage").value = texteMessage(n);
     $("envNomPdf").textContent = P.nomPdf(code, n);
-    $("envPlanNom").textContent = plan ? plan.nom : "Plan d'accès";
-    $("envPlanInfo").textContent = plan ? `${(plan.blob.size / 1024 / 1024).toFixed(1).replace(".", ",")} Mo · sera joint au mail` : (e ? "facultatif · déjà envoyé avec un indice précédent ?" : "facultatif, mais en général joint au premier envoi");
+    $("envPlanNom").textContent = plan ? plan.nom : gen ? nomPlan(n) : "Plan d'accès";
+    $("envPlanInfo").textContent = plan ? `${(plan.blob.size / 1024 / 1024).toFixed(1).replace(".", ",")} Mo · sera joint au mail${gen ? " à la place du plan de l'étape 6" : ""}`
+      : gen ? `généré depuis l'étape 6 · ${!e ? "premier envoi" : planModifie() ? "modifié depuis le dernier envoi" : `inchangé depuis l'indice ${e.indice}`}`
+      : "pas de plan : à faire à l'étape 6 (facultatif) ou joins un fichier";
     $("envPlanRetirer").hidden = !plan;
     const chg = changements();
     $("envChgTitre").textContent = e ? `Changements depuis l'indice ${e.indice}` : "Changements";
@@ -1283,6 +1696,10 @@ document.addEventListener("DOMContentLoaded", () => {
     afficherEnvoi();
   });
   $("envPlanRetirer").addEventListener("click", () => { plan = null; afficherEnvoi(); });
+  $("envPlanJoindre").addEventListener("change", () => { planJoindreTouche = true; afficherEnvoi(); });
+  $("envPlanApercu").addEventListener("click", async () => {
+    try { const r = await pdfPlan(); ouvrirApercu(r.blob, nomPlan(indiceEnvoi()), r.pages); } catch (e) { erreur("Aperçu impossible", e.message); }
+  });
 
   /** Génère le PDF A4 de la fiche, avec l'indice donné (sans toucher à l'écran) */
   let pagesPdf = []; // images des pages du dernier PDF créé (aperçu)
@@ -1346,7 +1763,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const LARGEUR_A4 = 210 * 96 / 25.4; // largeur réelle d'une page A4 à 100 %
     let zoom = 1;
     const appliquer = () => {
-      imgs.forEach((im, i) => { im.style.width = `${Math.round(LARGEUR_A4 * 190 / 210 * zoom)}px`; im.style.padding = `${Math.round(10 * 96 / 25.4 * zoom)}px`; });
+      imgs.forEach((im, i) => {
+        const plein = pages[i] && pages[i].pleinePage;
+        im.style.width = `${Math.round(LARGEUR_A4 * (plein ? 1 : 190 / 210) * zoom)}px`;
+        im.style.padding = plein ? "0" : `${Math.round(10 * 96 / 25.4 * zoom)}px`;
+      });
       ov.querySelector(".zv").textContent = `${Math.round(zoom * 100)} %`;
     };
     const ajuster = () => { zoom = Math.max(0.3, Math.min(3, (zone.clientWidth - 40) / LARGEUR_A4)); appliquer(); };
@@ -1400,24 +1821,30 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!objet) return stop("Objet vide", "L'objet du mail est vide.");
     const e = prep.envoi;
     const avertir = [];
-    if (!e && !plan) avertir.push("Pas de plan d'accès joint (en général il part avec le premier envoi).");
+    if (!e && !planJoint()) avertir.push("Pas de plan d'accès joint (en général il part avec le premier envoi).");
     if (e && String(e.indice) === String(n)) avertir.push(`Même indice que le dernier envoi (${e.indice}).`);
     const ok = await boite({ icone: "✉️", titre: `Envoyer la fiche indice ${n} ?`,
       html: `Destinataires :<div class="dest">${a.map((x) => `<div>${esc(x)}</div>`).join("")}${cc.map((x) => `<div style="color:var(--text-sub)">copie : ${esc(x)}</div>`).join("")}</div>
-        Pièces jointes : fiche de préparation (PDF)${plan ? ` + plan d'accès (${esc(plan.nom)})` : ""}
+        Pièces jointes : fiche de préparation (PDF)${plan ? ` + plan d'accès (${esc(plan.nom)})` : planJoint() ? " + plan d'accès (PDF)" : ""}
         ${avertir.map((x) => `<div class="warn">⚠️ ${esc(x)}</div>`).join("")}`,
       boutons: [{ lib: "Annuler", val: false }, { lib: "Envoyer", val: true, cls: "pri" }] });
     if (ok !== true) return;
 
     boutonsEnvoi(false);
     const nomPdf = P.nomPdf(code, n);
-    let pdf;
+    let pdf, pdfPlanEnvoye = null;
     try {
       st.textContent = "Création du PDF…";
       pdf = await genererPdf(n);
       st.textContent = "Envoi du mail…";
       const pj = [{ blob: pdf, fileName: nomPdf, mimeType: "application/pdf" }];
       if (plan) pj.push({ blob: plan.blob, fileName: P.nomFichier(plan.nom) || "plan-acces", mimeType: plan.type });
+      else if (planJoint()) {
+        st.textContent = "Création du plan d'accès…";
+        pdfPlanEnvoye = (await pdfPlan()).blob;
+        pj.push({ blob: pdfPlanEnvoye, fileName: nomPlan(n), mimeType: "application/pdf" });
+      }
+      st.textContent = "Envoi du mail…";
       await FTSGmail.envoyer({ to: a, cc, subject: objet, body: message, attachments: pj });
     } catch (err) {
       console.error(err);
@@ -1439,15 +1866,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (plan) {
           const ext = (plan.nom.match(/\.[A-Za-z0-9]+$/) || [""])[0].toLowerCase();
           await FTSDrive.uploadFile(plan.blob, `${P.nomFichier(code)}_Plan-acces_Ind${P.nomFichier(n)}${ext}`, plan.type, dossier, { remplacerSiExiste: true });
-        }
+        } else if (pdfPlanEnvoye) await FTSDrive.uploadFile(pdfPlanEnvoye, nomPlan(n), "application/pdf", dossier, { remplacerSiExiste: true });
       } catch (err) { console.warn(err); noteDrive = " (copie Drive non faite : " + err.message + ")"; }
     }
     indicePdf = n; const surligne = [...surlignage().cles]; indicePdf = null;
     const maintenant = new Date().toISOString();
-    const entree = { indice: n, le: maintenant, par: nomMoi, a, cc, plan: plan ? plan.nom : "", pdf: lien, changements: changements() };
+    const entree = { indice: n, le: maintenant, par: nomMoi, a, cc, plan: plan ? plan.nom : pdfPlanEnvoye ? nomPlan(n) : "", pdf: lien, changements: changements() };
+    const planEmpreinte = pdfPlanEnvoye ? FTSPlanAcces.empreinte(prep.plan) : (e && e.planEmpreinte) || "";
     prep.indice = n;
-    prep.envoi = { indice: n, le: maintenant, par: nomMoi, a, cc, recap: recap(), surligne, modifieApres: false, historique: [...((e && e.historique) || []), entree] };
-    plan = null; objetTouche = msgTouche = destTouche = indiceTouche = false;
+    prep.envoi = { indice: n, le: maintenant, par: nomMoi, a, cc, recap: recap(), surligne, planEmpreinte, modifieApres: false, historique: [...((e && e.historique) || []), entree] };
+    plan = null; objetTouche = msgTouche = destTouche = indiceTouche = planJoindreTouche = false;
     remplirChamps();
     marquerSale();
     await enregistrer();
@@ -1465,6 +1893,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".sv-tab").forEach((x) => x.classList.toggle("on", x.id === "tab" + t));
     if (t === "Fournitures") afficherFournitures();
     if (t === "Fiche") { afficherFiche(); ficheVue = true; }
+    if (t === "Plan") afficherPlan();
     if (t === "Ndc") afficherNdc();
     if (t === "Envoi") afficherEnvoi();
     majEtapes();

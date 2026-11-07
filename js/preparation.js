@@ -534,6 +534,12 @@ const FTSPreparation = (() => {
     try {
       meta = await FTSDrive.getMetadonneesChantier(chantierId);
       meta = { ...meta, preparation: resume(data) };
+      // Le conducteur de la fiche devient le conducteur du chantier (liste « Mes chantiers »)
+      const cond = String((data.infos && data.infos.conducteur) || "").trim();
+      if (cond) meta.conducteur = cond;
+      // Point GPS du plan d'accès : gardé aussi sur le chantier
+      const gps = data.plan && data.plan.gps && typeof FTSPlanAcces !== "undefined" ? FTSPlanAcces.lireGps(data.plan.gps) : null;
+      if (gps) meta.gps = FTSPlanAcces.texteGps(gps);
       await FTSDrive.setMetadonneesChantier(chantierId, meta);
     } catch (e) {
       console.warn("Résumé de la préparation non écrit dans le chantier :", e);

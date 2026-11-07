@@ -109,6 +109,19 @@ html { font-size: 16px; }
 .pp-kpis .sv-kpi.clic { cursor: pointer; }
 .pp-et { font-weight: 800; font-size: 0.72rem; padding: 3px 9px; border-radius: 6px; white-space: nowrap; display: inline-block; }
 .pp-et.afaire { background: #FDECEA; color: #C0392B; } .pp-et.encours { background: #FFF3DC; color: #A15C00; }
+.pp-moi { display: flex; align-items: center; gap: 6px; background: #FFF8D6; border: 1px solid #F3DC7A; border-radius: 10px; padding: 5px 10px; font-size: .84rem; font-weight: 600; }
+.pp-moi select { border: none; background: transparent; font: inherit; font-weight: 800; cursor: pointer; }
+.pp-moi.vide { background: #FDECEC; border-color: #F5B5B5; }
+.pp-filtres { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 18px; border-bottom: 1px solid var(--border); }
+.pp-grp { display: flex; align-items: center; gap: 8px; }
+.pp-lab { font-size: .68rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-sub); margin-left: 6px; }
+.pp-filtres .sv-seg .n { font-size: .7rem; background: var(--bg); border-radius: 10px; padding: 1px 6px; margin-left: 3px; }
+.pp-tech { display: inline-block; font-size: .64rem; font-weight: 800; border-radius: 5px; padding: 1px 6px; margin: 2px 4px 0 0; }
+.pp-tech.Micropieux { background: #E8F0FE; color: #2A5DBF; } .pp-tech.Pieux { background: #F3E8FF; color: #7030A0; } .pp-tech.Battage { background: #E6F6EC; color: #1D6E3E; }
+.pp-attr { border: 1px dashed #c9ccd2; border-radius: 8px; background: #fff; padding: 4px 9px; font-size: .78rem; color: var(--text-sub); cursor: pointer; font-family: inherit; }
+.pp-attr:hover { border-color: #E8B923; color: var(--text-main); }
+tr.pp-libre { background: #FFFCF0; }
+.pp-avenir { font-size: .76rem; color: var(--text-sub); font-style: italic; }
 .pp-et.envoyee { background: #EAF6EE; color: #1D6E3E; } .pp-et.modifiee { background: #EAF1FE; color: #2A5DBF; }
 .pp-note { display: block; font-size: 0.72rem; color: var(--text-sub); margin-top: 3px; }
 .pp-def { font-weight: 800; color: #A15C00; }
@@ -709,6 +722,25 @@ html { font-size: 16px; }
     <section class="sv-panel">
       <div class="sv-ph">
         <h2>Chantiers à préparer</h2>
+        <label class="pp-moi">👤 Je suis <select id="ppMoi"><option value="">— choisir —</option></select></label>
+        <span class="sv-sp"></span>
+        <input type="text" id="ppRecherche" placeholder="🔍 Chantier, chef…" style="border:1px solid var(--border);border-radius:9px;padding:8px 10px;font-size:.84rem;width:200px;font-family:inherit">
+      </div>
+      <div class="pp-filtres">
+        <div class="pp-grp"><span class="pp-lab">Voir</span>
+        <div class="sv-seg" id="ppVue">
+          <button type="button" data-v="miens">Mes chantiers <span class="n" id="ppNMiens"></span></button>
+          <button type="button" data-v="nonattr">Non attribués <span class="n" id="ppNNonattr"></span></button>
+          <button type="button" data-v="tous">Tous <span class="n" id="ppNTous"></span></button>
+        </div>
+        </div><div class="pp-grp"><span class="pp-lab">Technique</span>
+        <div class="sv-seg" id="ppTech">
+          <button type="button" data-tech="" class="on">Toutes</button>
+          <button type="button" data-tech="Micropieux">Micropieux</button>
+          <button type="button" data-tech="Pieux">Pieux</button>
+          <button type="button" data-tech="Battage">Battage</button>
+        </div>
+        </div><div class="pp-grp"><span class="pp-lab">État</span>
         <div class="sv-seg" id="ppFiltres">
           <button type="button" data-f="tous" class="on">Tous</button>
           <button type="button" data-f="afaire">À faire</button>
@@ -716,9 +748,7 @@ html { font-size: 16px; }
           <button type="button" data-f="modifiee">À renvoyer</button>
           <button type="button" data-f="envoyee">Envoyées</button>
         </div>
-        <span class="sv-sp"></span>
-        <input type="text" id="ppRecherche" placeholder="🔍 Chantier, chef…" style="border:1px solid var(--border);border-radius:9px;padding:8px 10px;font-size:.84rem;width:200px;font-family:inherit">
-        <label class="sv-chk"><input type="checkbox" id="ppMiens"> Mes chantiers</label>
+</div>
       </div>
       <div class="se-table-scroll">
         <table class="sv-table">
@@ -727,7 +757,7 @@ html { font-size: 16px; }
         </table>
       </div>
       <div class="se-empty-state" id="ppEmpty" hidden></div>
-      <div class="sv-foot" id="ppPied">Chantiers micropieux / battage non terminés · un chantier sort de la liste quand il passe au statut Terminé.</div>
+      <div class="sv-foot" id="ppPied">Chantiers non terminés · un chantier sort de la liste quand il passe au statut Terminé · « Je suis » est retenu sur cet ordinateur.</div>
     </section>
   </div>
 
@@ -1217,13 +1247,30 @@ document.addEventListener("DOMContentLoaded", () => {
   // supplémentaire, mêmes données que la Vue d'ensemble.
   let nomUtilisateur = "";
   let ppFiltre = "tous";
+  let ppTech = "";
+  const CLE_MOI = "fts_je_suis", CLE_VUE = "fts_prepa_vue";
+  const lireLS = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
+  const ecrireLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+  let ppMoi = lireLS(CLE_MOI, "");
+  let ppVue = lireLS(CLE_VUE, "miens");
+  /** Conducteurs de travaux (Personnel FTS) pour le choix « Je suis » */
+  function remplirMoi() {
+    const sel = $("ppMoi");
+    let noms = [];
+    try { noms = FTSPersonnel.encadrement().filter((p) => /CONDUCTEUR/.test(`${p.poste || ""} ${p.fonctionEnc || ""}`)).map(FTSPersonnel.nomComplet); } catch (e) {}
+    if (ppMoi && !noms.some((n) => clePersonne(n) === clePersonne(ppMoi))) noms.unshift(ppMoi);
+    sel.innerHTML = `<option value="">— choisir —</option>` + [...new Set(noms)].map((n) => `<option ${clePersonne(n) === clePersonne(ppMoi) ? "selected" : ""}>${escapeHtmlSE(n)}</option>`).join("");
+    sel.closest(".pp-moi").classList.toggle("vide", !ppMoi);
+  }
+  /** Conducteur d'un chantier : celui attribué au chantier, sinon celui de la fiche */
+  const conducteurDe = (l) => (l.meta && l.meta.conducteur) || (l.r && l.r.conducteur) || "";
   const ETATS_PREPA = { afaire: "À faire", encours: "En cours", envoyee: "Envoyée", modifiee: "Modifiée après envoi" };
   const clePersonne = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().split(/[\s.]+/).filter(Boolean).sort().join(" ");
   function lignesPreparation(d) {
     return d.chantiers.filter((c) => {
       const meta = c.meta || {};
       const tech = FTSDrive.techniquesChantier(meta);
-      return meta.statutChantier !== "Termine" && (tech.includes("Micropieux") || tech.includes("Battage"));
+      return meta.statutChantier !== "Termine";
     }).map((c) => {
       const meta = c.meta || {};
       const r = meta.preparation || null;
@@ -1238,12 +1285,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const date = r && r.dateConnue && r.date ? new Date(r.date + "T00:00:00") : null;
       return {
         id: c.id, nomComplet: c.name, code: sp > 0 ? c.name.slice(0, sp) : c.name, nom: sp > 0 ? c.name.slice(sp + 1) : c.name,
-        etat, r, date, note: manque.join(" · "),
+        etat, r, date, note: manque.join(" · "), meta,
+        tech: FTSDrive.techniquesChantier(meta),
+        // Fiche de préparation micropieux : pas pour un chantier uniquement en pieux
+        avenir: !r && !FTSDrive.techniquesChantier(meta).some((t) => t === "Micropieux" || t === "Battage"),
       };
     }).sort((a, b) => (a.date && b.date ? a.date - b.date : a.date ? -1 : b.date ? 1 : a.code.localeCompare(b.code, "fr", { numeric: true })));
   }
   function majPastillePrepa(lignes) {
-    const n = lignes.filter((l) => l.etat === "afaire").length;
+    const n = lignes.filter((l) => l.etat === "afaire" && !l.avenir && (!ppMoi || ppVue !== "miens" || clePersonne(conducteurDe(l)) === clePersonne(ppMoi))).length;
     const pill = $("navPrepaPill");
     pill.hidden = !n; pill.textContent = n;
     try { localStorage.setItem("fts_prepa_a_faire", String(n)); } catch (e) {}
@@ -1255,42 +1305,57 @@ document.addEventListener("DOMContentLoaded", () => {
       empty.hidden = true;
       return;
     }
-    const toutes = lignesPreparation(donnees);
-    majPastillePrepa(toutes);
+    const tout = lignesPreparation(donnees);
+    majPastillePrepa(tout);
+    const moiK = clePersonne(ppMoi);
+    const estMien = (l) => moiK && clePersonne(conducteurDe(l)) === moiK;
+    $("ppNMiens").textContent = tout.filter(estMien).length;
+    $("ppNNonattr").textContent = tout.filter((l) => !conducteurDe(l)).length;
+    $("ppNTous").textContent = tout.length;
+    document.querySelectorAll("#ppVue button").forEach((b) => b.classList.toggle("on", b.dataset.v === ppVue));
+    document.querySelectorAll("#ppTech button").forEach((b) => b.classList.toggle("on", b.dataset.tech === ppTech));
+    // Vue (mes chantiers / non attribués / tous) et technique : s'appliquent aussi aux compteurs du haut
+    const toutes = tout.filter((l) => {
+      if (ppVue === "miens" && !estMien(l)) return false;
+      if (ppVue === "nonattr" && conducteurDe(l)) return false;
+      if (ppTech && !l.tech.includes(ppTech)) return false;
+      return true;
+    });
     $("ppKAfaire").textContent = toutes.filter((l) => l.etat === "afaire").length;
     $("ppKEncours").textContent = toutes.filter((l) => l.etat === "encours").length;
     $("ppKModifiee").textContent = toutes.filter((l) => l.etat === "modifiee").length;
     $("ppKSansdate").textContent = toutes.filter((l) => !l.date).length;
     document.querySelectorAll("#ppFiltres button").forEach((b) => b.classList.toggle("on", b.dataset.f === ppFiltre));
     const q = $("ppRecherche").value.trim().toLowerCase();
-    const moi = $("ppMiens").checked ? clePersonne(nomUtilisateur) : "";
     const lignes = toutes.filter((l) => {
       if (ppFiltre === "sansdate" ? !!l.date : ppFiltre !== "tous" && l.etat !== ppFiltre) return false;
-      if (moi && l.r && l.r.conducteur && clePersonne(l.r.conducteur) !== moi) return false;
       if (q && !`${l.code} ${l.nom} ${l.r ? l.r.chef : ""} ${l.r ? l.r.conducteur : ""}`.toLowerCase().includes(q)) return false;
       return true;
     });
     empty.hidden = lignes.length > 0;
-    if (!lignes.length) empty.textContent = toutes.length ? "Aucun chantier ne correspond à ce filtre." : "Aucun chantier micropieux en cours.";
+    if (!lignes.length) empty.textContent = ppVue === "miens" && !ppMoi ? "Choisis ton nom dans « Je suis » pour voir tes chantiers." : ppVue === "miens" && !toutes.length ? "Aucun chantier attribué à ton nom : regarde dans « Non attribués »." : "Aucun chantier ne correspond à ce filtre.";
     const fmtD = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
     tbody.innerHTML = lignes.map((l) => {
       const r = l.r;
       const url = `../preparation/index.html?id=${encodeURIComponent(l.id)}&name=${encodeURIComponent(l.nomComplet)}${l.etat === "modifiee" ? "#envoi" : ""}`;
       const envoi = r && r.envoi && r.envoi.indice ? `Ind ${escapeHtmlSE(r.envoi.indice)}${r.envoi.le ? " · " + escapeHtmlSE(new Date(r.envoi.le).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })) : ""}` : "—";
-      return `<tr data-url="${escapeHtmlSE(url)}">
-        <td class="c-nom"><span class="sv-code">${escapeHtmlSE(l.code)}</span><span class="sv-nom">${escapeHtmlSE(l.nom)}</span></td>
+      const cond = conducteurDe(l);
+      return `<tr data-url="${l.avenir ? "" : escapeHtmlSE(url)}" class="${cond ? "" : "pp-libre"}">
+        <td class="c-nom"><span class="sv-code">${escapeHtmlSE(l.code)}</span><span class="sv-nom">${escapeHtmlSE(l.nom)}</span><div>${l.tech.map((t) => `<span class="pp-tech ${escapeHtmlSE(t)}">${escapeHtmlSE(t.toUpperCase())}</span>`).join("")}</div></td>
         <td>${l.date ? `<b>${fmtD(l.date)}</b>` : '<span class="pp-def">À DÉFINIR</span>'}</td>
         <td class="sv-chef">${escapeHtmlSE((r && r.chef) || "—")}</td>
         <td class="r">${r && r.nbPieux ? r.nbPieux : "—"}</td>
-        <td><span class="pp-et ${l.etat}">${ETATS_PREPA[l.etat] || l.etat}</span>${l.note ? `<span class="pp-note">${escapeHtmlSE(l.note)}</span>` : ""}</td>
+        <td>${l.avenir ? '<span class="pp-avenir">Fiche pieux à venir</span>' : `<span class="pp-et ${l.etat}">${ETATS_PREPA[l.etat] || l.etat}</span>${l.note ? `<span class="pp-note">${escapeHtmlSE(l.note)}</span>` : ""}`}</td>
         <td style="white-space:nowrap">${envoi}</td>
-        <td style="color:var(--text-sub)">${escapeHtmlSE((r && r.conducteur) || "—")}</td>
-        <td class="r"><a class="sv-btn ${l.etat === "afaire" ? "pri" : ""}" style="padding:6px 12px;font-size:.8rem;text-decoration:none" href="${escapeHtmlSE(url)}">${l.etat === "afaire" ? "Créer la fiche" : "Ouvrir"}</a></td>
+        <td>${cond ? `<span style="color:var(--text-sub)">${escapeHtmlSE(cond)}</span>` : `<button type="button" class="pp-attr" data-attr="${escapeHtmlSE(l.id)}">+ ${ppMoi ? "M'attribuer" : "Attribuer"}</button>`}</td>
+        <td class="r">${l.avenir ? "" : `<a class="sv-btn ${l.etat === "afaire" ? "pri" : ""}" style="padding:6px 12px;font-size:.8rem;text-decoration:none" href="${escapeHtmlSE(url)}">${l.etat === "afaire" ? "Créer la fiche" : "Ouvrir"}</a>`}</td>
       </tr>`;
     }).join("");
   }
   async function chargerPreparation(forcer = false) {
+    remplirMoi();
     afficherPreparation();
+    if (window.FTSPersonnel && FTSAuth.isSignedIn && FTSAuth.isSignedIn()) FTSPersonnel.charger({ rapide: true }).then(remplirMoi).catch(() => {});
     if (!window.FTSAuth || !FTSAuth.isSignedIn()) {
       if (!donnees) { $("ppTbody").innerHTML = ""; $("ppEmpty").hidden = false; $("ppEmpty").textContent = "Connecte-toi pour afficher les chantiers."; }
       return;
@@ -1304,11 +1369,37 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("#ppFiltres button").forEach((b) => b.addEventListener("click", () => { ppFiltre = b.dataset.f; afficherPreparation(); }));
   document.querySelectorAll("#se-view-preparation [data-ppf]").forEach((k) => k.addEventListener("click", () => { ppFiltre = k.dataset.ppf; afficherPreparation(); }));
   $("ppRecherche").addEventListener("input", afficherPreparation);
-  $("ppMiens").addEventListener("change", afficherPreparation);
+  $("ppMoi").addEventListener("change", () => { ppMoi = $("ppMoi").value; ecrireLS(CLE_MOI, ppMoi); remplirMoi(); afficherPreparation(); });
+  document.querySelectorAll("#ppVue button").forEach((b) => b.addEventListener("click", () => { ppVue = b.dataset.v; ecrireLS(CLE_VUE, ppVue); afficherPreparation(); }));
+  document.querySelectorAll("#ppTech button").forEach((b) => b.addEventListener("click", () => { ppTech = b.dataset.tech; afficherPreparation(); }));
+  function bulle(txt) {
+    const b = document.createElement("div");
+    b.textContent = txt;
+    b.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1d1d1f;color:#fff;border-radius:12px;padding:11px 16px;font-weight:600;font-size:.9rem;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:9999";
+    document.body.appendChild(b); setTimeout(() => b.remove(), 3200);
+  }
+  /** Attribue un chantier au conducteur choisi dans « Je suis » (enregistré sur le chantier) */
+  async function attribuer(id, btn) {
+    if (!ppMoi) { $("ppMoi").focus(); bulle("Choisis d'abord ton nom dans « Je suis »"); return; }
+    btn.disabled = true; btn.textContent = "…";
+    try {
+      const meta = await FTSDrive.getMetadonneesChantier(id);
+      await FTSDrive.setMetadonneesChantier(id, { ...meta, conducteur: ppMoi });
+      const c = donnees && donnees.chantiers.find((x) => x.id === id);
+      if (c) { c.meta = { ...(c.meta || {}), conducteur: ppMoi }; ecrireCacheLocal(donnees); }
+      bulle(`✅ Chantier attribué à ${ppMoi}`);
+      afficherPreparation();
+    } catch (e) {
+      btn.disabled = false; btn.textContent = "+ M'attribuer";
+      bulle("❌ " + e.message);
+    }
+  }
   $("ppTbody").addEventListener("click", (e) => {
+    const at = e.target.closest("[data-attr]");
+    if (at) { attribuer(at.dataset.attr, at); return; }
     if (e.target.closest("a")) return;
     const tr = e.target.closest("tr[data-url]");
-    if (tr) window.location.href = tr.dataset.url;
+    if (tr && tr.dataset.url) window.location.href = tr.dataset.url;
   });
 
   async function chargerVueEnsemble(forcer = false) {

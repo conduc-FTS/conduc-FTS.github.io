@@ -402,7 +402,7 @@ const FTSPreparation = (() => {
         foreuse: "", reglage: "standard", injection: "", presse: "", cuveGnr: "OUI", cuveEau: "1", caisseFlexible: "",
         elevateur: "", compresseur: "", groupe: "", pelle: "", pelleLivraison: "", godet: false,
       },
-      remarques: { objectif: "", essais: "Aucun", implantation: "A NOTRE CHARGE", boues: "NON", dechets: "A NOTRE CHARGE", outil: "", outilDiam: "", divers: "" },
+      remarques: { objectif: "", essais: "Aucun", essaiOui: false, essaiNb: 1, implantation: "A NOTRE CHARGE", boues: "NON", dechets: "A NOTRE CHARGE", outil: "", outilDiam: "", divers: "" },
       ndc: { indice: "", ddc: "", forage: 250, pieux: [], longParDiam: {}, note: "" },
       pastilles: { actif: false, lignes: [] },
       tubesManuels: [],
@@ -419,7 +419,7 @@ const FTSPreparation = (() => {
       infos: { ...base.infos, ...(p.infos || {}) },
       equipe: { ...base.equipe, ...(p.equipe || {}) },
       materiel: { ...base.materiel, ...(p.materiel || {}) },
-      remarques: { ...base.remarques, ...(p.remarques || {}) },
+      remarques: essais({ ...base.remarques, ...(p.remarques || {}) }, p.remarques),
       ndc: { ...base.ndc, ...(p.ndc || {}), pieux: ((p.ndc && p.ndc.pieux) || []).map((x) => ({ ...pieuVide(), ...x })) },
       pastilles: { ...base.pastilles, ...(p.pastilles || {}) },
       tubesManuels: Array.isArray(p.tubesManuels) ? p.tubesManuels : [],
@@ -427,6 +427,33 @@ const FTSPreparation = (() => {
       marges: { ...(p.marges || {}) },
       envoi: p.envoi && p.envoi.indice ? { historique: [], recap: [], ...p.envoi } : null,
     };
+  }
+
+  /** Micropieux d'essai : interrupteur oui / non + nombre (anciennes fiches : déduit du texte) */
+  function essais(re, lu) {
+    if (!lu || lu.essaiOui == null) {
+      const m = String(re.essais || "").match(/(\d+)/);
+      re.essaiOui = !!m && Number(m[1]) > 0;
+      re.essaiNb = m ? Number(m[1]) || 1 : 1;
+    }
+    re.essaiNb = Math.max(1, Math.round(nombre(re.essaiNb) || 1));
+    re.essais = texteEssais(re);
+    return re;
+  }
+  function texteEssais(re) { return re && re.essaiOui ? `${Math.max(1, Math.round(nombre(re.essaiNb) || 1))} U` : "Aucun"; }
+  /** Épaisseur déjà utilisée dans la NDC pour ce diamètre (la plus fréquente, tube principal ou secondaire) */
+  function epaisseurPour(pieux, d) {
+    const v = nombre(d);
+    if (!(v > 0)) return "";
+    const compte = new Map();
+    (pieux || []).forEach((p) => {
+      [[p.tubeD, p.tubeE], [p.tubeSecD, p.tubeSecE]].forEach(([dd, ee]) => {
+        if (nombre(dd) === v && nombre(ee) > 0) compte.set(nombre(ee), (compte.get(nombre(ee)) || 0) + 1);
+      });
+    });
+    let best = "", n = 0;
+    compte.forEach((c, e) => { if (c > n) { best = e; n = c; } });
+    return best;
   }
 
   // ── Envoi (lot 3a) ──────────────────────────────────────────────
@@ -533,7 +560,7 @@ const FTSPreparation = (() => {
     calculer, cleArticle, diametresPresents, tubesFiche,
     analyserCollage, lirePieux, fusionner,
     nouvellePreparation, normaliser, lire, enregistrer, resume,
-    DESTINATAIRES, adresses, adresseValide, nomFichier, nomPdf, prochainIndice, comparer, clesChangees,
+    DESTINATAIRES, adresses, adresseValide, nomFichier, nomPdf, prochainIndice, comparer, clesChangees, texteEssais, epaisseurPour,
   };
 })();
 

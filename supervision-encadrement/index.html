@@ -1799,6 +1799,18 @@ document.addEventListener("DOMContentLoaded", () => {
   // ─── Démarrage ───────────────────────────────────────────────────
   donnees = lireCacheLocal(); // affichage immédiat de la dernière consultation
   afficherVueEnsemble();
+  // Fiche de préparation enregistrée / envoyée dans un autre onglet : elle met à jour
+  // la copie locale ; on reprend son résumé ici sans attendre un rechargement.
+  window.addEventListener("storage", (e) => {
+    if (e.key !== CLE_CACHE_LOCAL || !donnees) return;
+    const d = lireCacheLocal();
+    if (!d) return;
+    d.chantiers.forEach((c) => {
+      const x = donnees.chantiers.find((y) => y.id === c.id);
+      if (x && c.meta && c.meta.preparation) x.meta = { ...(x.meta || {}), preparation: c.meta.preparation };
+    });
+    afficherPreparation();
+  });
   if (window.FTSAuth) {
     FTSAuth.onAuthChange(majSession);
     FTSAuth.init();

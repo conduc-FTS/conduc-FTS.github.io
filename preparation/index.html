@@ -108,6 +108,55 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   #printZone { display: block !important; }
   #printZone .fp-page { width: auto; min-height: 0; padding: 0; margin: 0; box-shadow: none; }
 }
+/* Parcours en étapes */
+.pr-steps { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); background: #fff; border-radius: 14px; padding: 16px 10px 12px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+.pr-steps button { position: relative; border: none; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 4px; font-family: inherit; color: var(--text-main); }
+.pr-steps button:not([data-t="Envoi"])::after { content: ""; position: absolute; top: 16px; left: calc(50% + 21px); right: calc(-50% + 21px); height: 3px; border-radius: 2px; background: var(--border); }
+.pr-steps button.ok::after { background: #34C759; }
+.pr-steps .ro { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; background: #fff; border: 2px solid var(--border); color: var(--text-sub); position: relative; z-index: 1; transition: .15s; }
+.pr-steps button.ok .ro { background: #34C759; border-color: #34C759; color: #fff; }
+.pr-steps button.att .ro { border-color: #F5A623; color: #B86E00; }
+.pr-steps button.on .ro { background: var(--fts-yellow, #FDCA01); border-color: var(--fts-yellow, #FDCA01); color: #000; box-shadow: 0 0 0 5px rgba(253,202,1,.25); }
+.pr-steps b { font-size: .8rem; margin-top: 7px; }
+.pr-steps small { font-size: .72rem; color: var(--text-sub); margin-top: 2px; min-height: 1em; }
+.pr-steps button.att small { color: #B86E00; }
+.pr-steps button:hover .ro { border-color: #9CA3AF; }
+.pr-nav { display: flex; align-items: center; gap: 10px; padding: 4px 0 18px; }
+.pr-nav .sv-btn { padding: 10px 16px; }
+/* Micropieu d'essai */
+.pr-essai { display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; background: #fff; }
+.pr-essai .t { flex: 1; } .pr-essai .t b { display: block; font-size: .9rem; } .pr-essai .t span { font-size: .76rem; color: var(--text-sub); }
+.pr-stp { display: flex; align-items: center; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+.pr-stp button { border: none; background: var(--bg); width: 34px; height: 34px; font-size: 1.1rem; cursor: pointer; }
+.pr-stp span { width: 40px; text-align: center; font-weight: 700; }
+/* Fenêtres maison */
+.pb-ov { position: fixed; inset: 0; background: rgba(20,20,25,.45); display: flex; align-items: center; justify-content: center; z-index: 9000; padding: 20px; animation: pbIn .12s ease-out; }
+@keyframes pbIn { from { opacity: 0; } }
+.pb { background: #fff; border-radius: 18px; box-shadow: 0 20px 50px rgba(0,0,0,.3); width: 460px; max-width: 100%; overflow: hidden; }
+.pb .hd { display: flex; gap: 12px; align-items: center; padding: 20px 22px 6px; }
+.pb .ic { width: 42px; height: 42px; flex: none; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; background: #FFF6D6; }
+.pb .ic.r { background: #FDECEC; } .pb .ic.v { background: #EAF6EE; }
+.pb h4 { margin: 0; font-size: 1.05rem; }
+.pb .ct { padding: 6px 22px 4px; color: #374151; line-height: 1.5; font-size: .92rem; }
+.pb .dest { background: var(--bg); border-radius: 10px; padding: 8px 12px; margin: 8px 0; } .pb .dest div { padding: 2px 0; overflow-wrap: anywhere; }
+.pb .warn { background: #FFF6D6; border-radius: 10px; padding: 9px 12px; color: #7A5300; font-size: .86rem; margin-top: 8px; }
+.pb .err { background: #FDECEC; border-radius: 10px; padding: 9px 12px; color: #9B1C1C; font-size: .86rem; margin-top: 8px; }
+.pb input.champ { width: 100%; border: 1px solid #d6d9de; border-radius: 9px; padding: 9px 11px; font: inherit; margin-top: 8px; }
+.pb .ft { display: flex; gap: 10px; justify-content: flex-end; padding: 16px 22px 20px; }
+.pb .ft .sv-btn { padding: 10px 18px; }
+.sv-btn.noir { background: #1d1d1f; border-color: #1d1d1f; color: #fff; }
+.sv-btn.rouge { background: #C0392B; border-color: #C0392B; color: #fff; }
+/* Aperçu PDF */
+.pv { background: #fff; border-radius: 16px; width: min(1100px, 100%); height: min(92vh, 1200px); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+.pv .tb { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.pv .tb b { flex: 1; overflow-wrap: anywhere; }
+.pv .zb { display: flex; align-items: center; gap: 4px; background: var(--bg); border-radius: 10px; padding: 3px; }
+.pv .zb button { border: none; background: #fff; border-radius: 7px; width: 32px; height: 30px; font-size: 1rem; cursor: pointer; }
+.pv .zb span { width: 54px; text-align: center; font-weight: 700; font-size: .84rem; }
+.pv .pg { flex: 1; background: #525659; overflow: auto; padding: 18px; text-align: center; }
+.pv .pg img { display: block; margin: 0 auto 14px; box-shadow: 0 2px 12px rgba(0,0,0,.4); background: #fff; max-width: none; }
+.pv .x { border: none; background: var(--bg); border-radius: 50%; width: 32px; height: 32px; cursor: pointer; }
+
 /* Envoi */
 .pe-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 0 16px; }
 .pe-pj { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
@@ -127,14 +176,15 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <body>
 
 <div id="svPage">
-  <div class="sv-tabs" id="prTabs">
-    <button type="button" class="on" data-t="Infos">1 · Infos chantier</button>
-    <button type="button" data-t="Materiel">2 · Matériel &amp; équipe</button>
-    <button type="button" data-t="Ndc">3 · Note de calcul <span class="n" id="nPieux">0</span></button>
-    <button type="button" data-t="Fournitures">4 · Fournitures</button>
-    <button type="button" data-t="Remarques">5 · Remarques</button>
-    <button type="button" data-t="Fiche">6 · Fiche à imprimer</button>
-    <button type="button" data-t="Envoi">7 · Envoi <span class="n" id="nEnvoi" hidden></span></button>
+  <div class="pr-steps" id="prTabs">
+    <button type="button" class="on" data-t="Infos"><span class="ro">1</span><b>Infos chantier</b><small></small></button>
+    <button type="button" data-t="Materiel"><span class="ro">2</span><b>Matériel &amp; équipe</b><small></small></button>
+    <button type="button" data-t="Ndc"><span class="ro">3</span><b>Note de calcul</b><small></small></button>
+    <button type="button" data-t="Fournitures"><span class="ro">4</span><b>Fournitures</b><small></small></button>
+    <button type="button" data-t="Remarques"><span class="ro">5</span><b>Remarques</b><small></small></button>
+    <button type="button" data-t="Fiche"><span class="ro">6</span><b>Fiche à imprimer</b><small></small></button>
+    <button type="button" data-t="Envoi"><span class="ro">7</span><b>Envoi</b><small></small></button>
+    <span id="nPieux" hidden></span><span id="nEnvoi" hidden></span>
   </div>
   <p class="sv-status" id="prStatus">Chargement…</p>
 
@@ -260,7 +310,9 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
       <div class="sv-ch"><h2>Remarques</h2><span class="s">mêmes rubriques que la fiche actuelle</span></div>
       <div class="pr-grid deux">
         <div class="sv-f"><label>Objectif forage (U micropieux par jour minimum)</label><input type="text" data-k="remarques.objectif" inputmode="numeric"></div>
-        <div class="sv-f"><label>Micropieu(x) d'essai</label><input type="text" data-k="remarques.essais" list="dlEssais"></div>
+        <div class="sv-f"><label>Micropieu(x) d'essai</label>
+          <div class="pr-essai"><button type="button" class="pr-sw" id="swEssai" aria-label="Micropieu d'essai"></button><div class="t"><b id="essaiTitre">Non</b><span id="essaiSous">la fiche imprime « Aucun »</span></div>
+            <div class="pr-stp" id="essaiStp"><button type="button" data-d="-1">−</button><span id="essaiNb">1</span><button type="button" data-d="1">+</button></div></div></div>
         <div class="sv-f"><label>Implantation</label><select data-k="remarques.implantation"><option>A NOTRE CHARGE</option><option>A LEUR CHARGE</option></select></div>
         <div class="sv-f"><label>Évacuation des boues</label><select data-k="remarques.boues"><option>NON</option><option>OUI</option><option>A NOTRE CHARGE</option><option>A LEUR CHARGE</option></select></div>
         <div class="sv-f"><label>Évacuation des déchets</label><select data-k="remarques.dechets"><option>A NOTRE CHARGE</option><option>A LEUR CHARGE</option></select></div>
@@ -374,6 +426,43 @@ document.addEventListener("DOMContentLoaded", () => {
   const esc = (s) => FTSShell.esc(s);
   const fr = P.fr, nombre = P.nombre;
 
+  // ─── Fenêtres maison (remplacent confirm / alert / prompt du navigateur) ───
+  /**
+   * @param {object} o  { icone, ton: ""|"r"|"v", titre, html, champ: {valeur, placeholder}, boutons: [{lib, val, cls}] }
+   * @returns {Promise<any>}  la valeur du bouton cliqué (ou du champ), null si fermé
+   */
+  function boite(o) {
+    return new Promise((ok) => {
+      const ov = document.createElement("div");
+      ov.className = "pb-ov";
+      const boutons = o.boutons || [{ lib: "OK", val: true, cls: "pri" }];
+      ov.innerHTML = `<div class="pb" role="dialog" aria-modal="true">
+        <div class="hd"><div class="ic ${o.ton || ""}">${o.icone || "ℹ️"}</div><h4>${esc(o.titre || "")}</h4></div>
+        <div class="ct">${o.html || ""}${o.champ ? `<input type="text" class="champ" value="${esc(o.champ.valeur || "")}" placeholder="${esc(o.champ.placeholder || "")}">` : ""}</div>
+        <div class="ft">${boutons.map((b, i) => `<button type="button" class="sv-btn ${b.cls || ""}" data-b="${i}">${esc(b.lib)}</button>`).join("")}</div></div>`;
+      const champ = ov.querySelector(".champ");
+      const fermer = (v) => { document.removeEventListener("keydown", clavier, true); ov.remove(); ok(v); };
+      const valider = (b) => fermer(champ && b.val === true ? champ.value : b.val);
+      function clavier(e) {
+        if (e.key === "Escape") { e.preventDefault(); fermer(null); }
+        if (e.key === "Enter" && (champ || document.activeElement === document.body)) { e.preventDefault(); valider(boutons[boutons.length - 1]); }
+      }
+      ov.addEventListener("click", (e) => {
+        if (e.target === ov) return fermer(null);
+        const b = e.target.closest("[data-b]");
+        if (b) valider(boutons[Number(b.dataset.b)]);
+      });
+      document.addEventListener("keydown", clavier, true);
+      document.body.appendChild(ov);
+      (champ || ov.querySelector(".ft .sv-btn:last-child")).focus();
+      if (champ) champ.select();
+    });
+  }
+  const confirmer = (titre, html, lib = "Confirmer", cls = "pri", icone = "❓") =>
+    boite({ icone, titre, html, boutons: [{ lib: "Annuler", val: false }, { lib, val: true, cls }] }).then((v) => v === true);
+  const erreur = (titre, message, conseil) =>
+    boite({ icone: "⛔", ton: "r", titre, html: `${esc(message)}${conseil ? `<div class="err">${esc(conseil)}</div>` : ""}`, boutons: [{ lib: "Fermer", val: true, cls: "noir" }] });
+
   let prep = P.nouvellePreparation();
   let meta = {};
   let pret = false, sale = false, chargementEnCours = null;
@@ -438,11 +527,75 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function marquerSale() {
     sale = true;
+    majEtapesBientot();
     $("etatSave").textContent = "Modifications non enregistrées";
     $("etatSave").classList.add("sale");
     $("btnEnregistrer").disabled = !pret;
   }
   window.addEventListener("beforeunload", (e) => { if (sale) { e.preventDefault(); e.returnValue = ""; } });
+
+  // ─── Micropieu d'essai : interrupteur + nombre ──────────────────
+  function majEssai() {
+    const re = prep.remarques;
+    $("swEssai").classList.toggle("on", !!re.essaiOui);
+    $("essaiTitre").textContent = re.essaiOui ? "Oui" : "Non";
+    $("essaiSous").textContent = re.essaiOui ? `la fiche imprime « ${P.texteEssais(re)} »` : "la fiche imprime « Aucun »";
+    $("essaiStp").hidden = !re.essaiOui;
+    $("essaiNb").textContent = re.essaiNb;
+  }
+  $("swEssai").addEventListener("click", () => {
+    prep.remarques.essaiOui = !prep.remarques.essaiOui;
+    prep.remarques.essais = P.texteEssais(prep.remarques);
+    majEssai(); marquerSale();
+  });
+  $("essaiStp").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-d]"); if (!b) return;
+    prep.remarques.essaiNb = Math.max(1, (Number(prep.remarques.essaiNb) || 1) + Number(b.dataset.d));
+    prep.remarques.essais = P.texteEssais(prep.remarques);
+    majEssai(); marquerSale();
+  });
+
+  // ─── Parcours en étapes ────────────────────────────────────────
+  const ETAPES = ["Infos", "Materiel", "Ndc", "Fournitures", "Remarques", "Fiche", "Envoi"];
+  const NOMS_ETAPES = { Infos: "Infos chantier", Materiel: "Matériel & équipe", Ndc: "Note de calcul", Fournitures: "Fournitures", Remarques: "Remarques", Fiche: "Fiche à imprimer", Envoi: "Envoi" };
+  let ficheVue = false, minuterieEtapes = null;
+  function etatsEtapes() {
+    const inf = prep.infos, n = prep.ndc.pieux.length;
+    const e = {};
+    const manque = [!inf.adresse && "adresse", !inf.conducteur && "conducteur"].filter(Boolean);
+    e.Infos = manque.length ? ["", `manque : ${manque.join(", ")}`] : ["ok", "complet"];
+    const m2 = [!prep.equipe.chef && "chef", !prep.materiel.foreuse && "foreuse"].filter(Boolean);
+    e.Materiel = m2.length ? ["", `manque : ${m2.join(", ")}`] : ["ok", "complet"];
+    e.Ndc = n ? ["ok", `${n} pieu${n > 1 ? "x" : ""}`] : ["", "à coller"];
+    e.Fournitures = n && tubeMax() !== "" ? ["ok", "calculées"] : ["", n ? "foreuse à choisir" : "après la NDC"];
+    e.Remarques = prep.remarques.objectif !== "" && prep.remarques.objectif != null ? ["ok", "complet"] : ["", "objectif à saisir"];
+    e.Fiche = ficheVue || prep.envoi ? ["ok", "vérifiée"] : ["", "à vérifier"];
+    if (!prep.envoi) e.Envoi = ["att", "pas envoyée"];
+    else e.Envoi = estModifiee() ? ["att", "à renvoyer"] : ["ok", `indice ${prep.envoi.indice} envoyé`];
+    return e;
+  }
+  function majEtapes() {
+    if (!pret) return;
+    const e = etatsEtapes();
+    document.querySelectorAll("#prTabs button").forEach((b, i) => {
+      const [cls, txt] = e[b.dataset.t] || ["", ""];
+      const on = b.classList.contains("on");
+      b.classList.toggle("ok", cls === "ok" && !on);
+      b.classList.toggle("att", cls === "att" && !on);
+      b.querySelector(".ro").textContent = cls === "ok" && !on ? "✓" : String(i + 1);
+      b.querySelector("small").textContent = on && cls !== "ok" ? "en cours" : txt;
+    });
+  }
+  function majEtapesBientot() { clearTimeout(minuterieEtapes); minuterieEtapes = setTimeout(majEtapes, 400); }
+  // Boutons « étape précédente / suivante » en bas de chaque étape
+  ETAPES.forEach((t, i) => {
+    const tab = $("tab" + t); if (!tab) return;
+    const nav = document.createElement("div");
+    nav.className = "pr-nav";
+    nav.innerHTML = `${i > 0 ? `<button type="button" class="sv-btn" data-aller="${ETAPES[i - 1]}">← ${esc(NOMS_ETAPES[ETAPES[i - 1]])}</button>` : ""}<span class="sv-sp" style="flex:1"></span>${i < ETAPES.length - 1 ? `<button type="button" class="sv-btn pri" data-aller="${ETAPES[i + 1]}">Étape suivante : ${esc(NOMS_ETAPES[ETAPES[i + 1]])} →</button>` : ""}`;
+    tab.appendChild(nav);
+    nav.addEventListener("click", (ev) => { const b = ev.target.closest("[data-aller]"); if (b) { ouvrirOnglet(b.dataset.aller); window.scrollTo({ top: 0, behavior: "smooth" }); } });
+  });
 
   // ─── Chargement ────────────────────────────────────────────────
   async function charger() {
@@ -481,6 +634,7 @@ document.addEventListener("DOMContentLoaded", () => {
         pelleAvant = !!prep.materiel.pelle.trim();
         ["infos.dateConnue", "equipe.chef", "materiel.foreuse", "materiel.compresseur", "materiel.pelle"].forEach(majDependances);
         afficherNdc();
+        majEssai();
         majOngletEnvoi();
         if ($("tabEnvoi").classList.contains("on")) afficherEnvoi();
         $("prStatus").textContent = "";
@@ -502,10 +656,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const { data: r, meta: m } = await P.enregistrer(chantierId, prep);
       prep.majLe = r.majLe;
       if (m) { meta = m; majCacheSupervision(m); }
+      else FTSShell.toast("⚠️ Fiche enregistrée, mais la liste de la Supervision n'a pas pu être mise à jour");
       sale = false;
       $("etatSave").textContent = `Enregistrée le ${new Date(r.majLe).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}`;
       $("etatSave").classList.remove("sale");
       FTSShell.toast("✅ Préparation enregistrée dans le dossier PREPARATION du chantier");
+      majEtapes();
       if ($("tabEnvoi").classList.contains("on")) afficherEnvoi();
     } catch (e) {
       $("etatSave").textContent = "❌ " + e.message;
@@ -671,6 +827,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const regle = P.longueurRetenue({ ...p, longMain: "" }, prep.ndc.longParDiam).L;
       if (v !== "" && v === regle) v = "";
     }
+    // Diamètre saisi à la main : on reprend l'épaisseur de ce diamètre déjà présente dans la NDC
+    if ((f === "tubeD" || f === "tubeSecD") && v !== "") {
+      const ep = P.epaisseurPour(prep.ndc.pieux.filter((x, j) => j !== i), v);
+      const fe = f === "tubeD" ? "tubeE" : "tubeSecE";
+      if (ep !== "" && ep !== p[fe]) { p[fe] = ep; FTSShell.toast(`Épaisseur ${fr(ep)} mm reprise des autres pieux en Ø${fr(v)}`); }
+      if (f === "tubeSecD") { const el = tr.querySelector('[data-f="tubeSecE"]'); if (el) el.value = p.tubeSecE === "" ? "" : fr(p.tubeSecE); }
+    }
     if (f === "barreD" && v === "") { p.barreType = ""; p.barreL = ""; }
     if (f === "barreD" && v !== "" && !p.barreType) p.barreType = "GEWI";
     p[f] = v;
@@ -683,22 +846,25 @@ document.addEventListener("DOMContentLoaded", () => {
     const i = Number(tr.dataset.i);
     if (e.target.matches("[data-raz]")) { prep.ndc.pieux[i].longMain = ""; marquerSale(); tr.querySelector('[data-f="longMain"]').value = ""; majLigne(tr, prep.ndc.pieux[i]); }
     if (e.target.matches("[data-suppr]")) {
-      if (!confirm(`Supprimer le pieu ${prep.ndc.pieux[i].rep} ?`)) return;
-      prep.ndc.pieux.splice(i, 1); marquerSale(); afficherNdc();
+      confirmer(`Supprimer le pieu ${prep.ndc.pieux[i].rep} ?`, "Il sera retiré de la note de calcul et des fournitures.", "Supprimer", "rouge", "🗑️").then((oui) => {
+        if (!oui) return;
+        prep.ndc.pieux.splice(i, 1); marquerSale(); afficherNdc();
+      });
     }
   });
   $("fRecherche").addEventListener("input", afficherPieux);
-  $("fTypeBarreTous").addEventListener("change", () => {
+  $("fTypeBarreTous").addEventListener("change", async () => {
     const t = $("fTypeBarreTous").value; if (!t) return;
+    $("fTypeBarreTous").value = "";
     const concernes = prep.ndc.pieux.filter((p) => nombre(p.barreD) > 0);
-    if (concernes.length && confirm(`Mettre ${t} sur les ${concernes.length} pieux qui ont une barre ? Tu pourras encore changer un pieu à la main (chantier panaché).`)) {
+    if (!concernes.length) return;
+    if (await confirmer(`Mettre ${t} sur tout le chantier ?`, `${concernes.length} pieux ont une barre. Tu pourras encore changer un pieu à la main (chantier panaché).`, `Mettre ${t}`)) {
       concernes.forEach((p) => { p.barreType = t; }); marquerSale(); afficherPieux();
     }
-    $("fTypeBarreTous").value = "";
   });
-  $("btnAjoutPieu").addEventListener("click", () => {
-    const rep = prompt("Repère du nouveau pieu (ex : Mp25, MpG1) :");
-    if (!rep || !rep.trim()) return;
+  $("btnAjoutPieu").addEventListener("click", async () => {
+    const rep = await boite({ icone: "➕", titre: "Ajouter un pieu", html: "Repère du nouveau pieu, tel qu'écrit dans la NDC :", champ: { placeholder: "ex : Mp25, MpG1" }, boutons: [{ lib: "Annuler", val: null }, { lib: "Ajouter", val: true, cls: "pri" }] });
+    if (!rep || !String(rep).trim()) return;
     if (prep.ndc.pieux.some((x) => P.cleRep(x.rep) === P.cleRep(rep))) { FTSShell.toast(`⚠️ Le repère ${rep} existe déjà.`); return; }
     const dernier = prep.ndc.pieux[prep.ndc.pieux.length - 1];
     const p = dernier ? { ...dernier, rep: rep.trim(), longMain: "" } : { ...P.pieuVide(), rep: rep.trim(), forage: prep.ndc.forage };
@@ -707,8 +873,9 @@ document.addEventListener("DOMContentLoaded", () => {
     marquerSale(); afficherNdc();
     FTSShell.toast(`${rep.trim()} ajouté (valeurs reprises du pieu précédent, à corriger).`);
   });
-  $("btnViderNdc").addEventListener("click", () => {
-    if (!prep.ndc.pieux.length || !confirm("Retirer tous les pieux de la note de calcul ?")) return;
+  $("btnViderNdc").addEventListener("click", async () => {
+    if (!prep.ndc.pieux.length) return;
+    if (!(await confirmer("Vider la note de calcul ?", `Les ${prep.ndc.pieux.length} pieux seront retirés. Les longueurs par diamètre sont gardées.`, "Vider", "rouge", "🗑️"))) return;
     prep.ndc.pieux = []; marquerSale(); afficherNdc();
   });
 
@@ -797,11 +964,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   $("collerTexte").addEventListener("input", () => { collage = null; analyser(); });
   document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener("change", analyser));
-  $("collerValider").addEventListener("click", () => {
+  $("collerValider").addEventListener("click", async () => {
     if (!collage || !collage.res || !collage.res.pieux.length) return;
     const mode = modeCollage();
     const f = P.fusionner(prep.ndc.pieux, collage.res.pieux, mode);
-    if (mode === "remplacer" && f.retires.length && !confirm(`${f.retires.length} pieu(x) absent(s) du collage seront retirés. Continuer ?`)) return;
+    if (mode === "remplacer" && f.retires.length && !(await confirmer("Remplacer toute la NDC ?", `${f.retires.length} pieu(x) absent(s) du collage seront retirés : ${esc(f.retires.slice(0, 12).map((x) => x.rep || x).join(", "))}${f.retires.length > 12 ? "…" : ""}`, "Remplacer", "pri", "📋"))) return;
     prep.ndc.pieux = f.pieux;
     const forages = collage.res.pieux.map((p) => nombre(p.forage)).filter((x) => x > 0);
     if (forages.length) prep.ndc.forage = forages[0];
@@ -948,7 +1115,7 @@ document.addEventListener("DOMContentLoaded", () => {
     <table>${cg(42, 58)}
       <tr><td class="g lbl u" colspan="2">REMARQUES</td></tr>
       <tr><td class="lbl v">Objectif forage :</td><td${tdJ("v", "Objectif forage")}>${re.objectif !== "" ? esc(re.objectif) + " U micropieux / jour (minimum)" : ""}</td></tr>
-      <tr><td class="lbl v">Micropieu(x) d'essai :</td><td${tdJ("v", "Micropieu(x) d'essai")}>${esc(re.essais)}</td></tr>
+      <tr><td class="lbl v">Micropieu(x) d'essai :</td><td${tdJ("v", "Micropieu(x) d'essai")}>${esc(P.texteEssais(re))}</td></tr>
       <tr><td class="lbl v">IMPLANTATION :</td><td${tdJ("v", "Implantation")}>${esc(re.implantation)}</td></tr>
       <tr><td class="lbl v">ÉVACUATION DES BOUES :</td><td${tdJ("v", "Évacuation des boues")}>${esc(re.boues)}</td></tr>
       <tr><td class="lbl v">ÉVACUATION DES DÉCHETS :</td><td${tdJ("v", "Évacuation des déchets")}>${esc(re.dechets)}</td></tr>
@@ -1031,7 +1198,7 @@ document.addEventListener("DOMContentLoaded", () => {
     add("Godet élévateur", ma.godet ? "oui" : "");
     add("Ciment total", ci.palettes === "" ? "" : `${ci.palettes} Pal`); add("Type de ciment", prep.ciment.type);
     add("Ciment 1ère livraison", premiere === "" ? "" : `${premiere} Pal`);
-    add("Objectif forage", re.objectif); add("Micropieu(x) d'essai", re.essais); add("Implantation", re.implantation);
+    add("Objectif forage", re.objectif); add("Micropieu(x) d'essai", P.texteEssais(re)); add("Implantation", re.implantation);
     add("Évacuation des boues", re.boues); add("Évacuation des déchets", re.dechets);
     add("NDC", [prep.ndc.indice ? "Ind " + prep.ndc.indice : "", prep.ndc.ddc].filter(Boolean).join(" — "));
     add("Outil de forage", [re.outil, re.outilDiam ? "Ø " + re.outilDiam : ""].filter(Boolean).join(" "));
@@ -1047,12 +1214,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return P.comparer(prep.envoi.recap, recap()).map((l) => (/^Divers :/.test(l) ? "Divers : texte modifié" : l));
   }
   function estModifiee() { return !!prep.envoi && changements().length > 0; }
-  function majOngletEnvoi() {
-    const b = $("nEnvoi");
-    const mod = estModifiee();
-    b.hidden = !prep.envoi;
-    b.textContent = prep.envoi ? (mod ? "à renvoyer" : "Ind " + prep.envoi.indice) : "";
-  }
+  function majOngletEnvoi() { majEtapes(); }
   function indiceEnvoi() { const v = $("envIndice").value.trim(); return nombre(v) === "" ? v : nombre(v); }
   function texteObjet(n) {
     const e = prep.envoi;
@@ -1116,13 +1278,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const f = ev.target.files && ev.target.files[0];
     ev.target.value = "";
     if (!f) return;
-    if (f.size > 20 * 1024 * 1024) { $("envStatus").textContent = "❌ Plan d'accès trop lourd (20 Mo maximum)."; return; }
+    if (f.size > 20 * 1024 * 1024) { erreur("Plan d'accès trop lourd", "20 Mo maximum : réduis le fichier ou fais une capture."); return; }
     plan = { blob: f, nom: f.name, type: f.type || "application/octet-stream" };
     afficherEnvoi();
   });
   $("envPlanRetirer").addEventListener("click", () => { plan = null; afficherEnvoi(); });
 
   /** Génère le PDF A4 de la fiche, avec l'indice donné (sans toucher à l'écran) */
+  let pagesPdf = []; // images des pages du dernier PDF créé (aperçu)
   async function genererPdf(indice) {
     if (!window.html2canvas || !window.jspdf) throw new Error("Outils PDF non chargés : recharge la page.");
     const sauve = prep.indice;
@@ -1141,6 +1304,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const pxParMm = canvas.width / L;
       const hauteurMm = canvas.height / pxParMm;
       // Une page en général ; si la fiche est très longue, la suite part sur une 2e page
+      pagesPdf = [];
       for (let y = 0, i = 0; y < hauteurMm - 0.5; y += H, i++) {
         const hMm = Math.min(H, hauteurMm - y);
         const morceau = document.createElement("canvas");
@@ -1149,7 +1313,9 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, morceau.width, morceau.height);
         ctx.drawImage(canvas, 0, Math.round(y * pxParMm), canvas.width, morceau.height, 0, 0, canvas.width, morceau.height);
         if (i > 0) doc.addPage();
-        doc.addImage(morceau.toDataURL("image/jpeg", 0.92), "JPEG", M, M, L, hMm);
+        const img = morceau.toDataURL("image/jpeg", 0.92);
+        pagesPdf.push({ img, hMm });
+        doc.addImage(img, "JPEG", M, M, L, hMm);
       }
       doc.setProperties({ title: `${code} - Fiche de préparation - Indice ${indice}` });
       return doc.output("blob");
@@ -1159,15 +1325,54 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   function boutonsEnvoi(actif) { ["envEnvoyer", "envTelecharger", "envApercu"].forEach((id) => { $(id).disabled = !actif; }); }
+  function telecharger(blob, nomF) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = nomF;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  /** Aperçu du PDF dans une fenêtre, avec zoom (− / + / Ajuster) */
+  function ouvrirApercu(blob, nomF, pages) {
+    const ov = document.createElement("div");
+    ov.className = "pb-ov";
+    ov.innerHTML = `<div class="pv" role="dialog" aria-modal="true">
+      <div class="tb"><b>${esc(nomF)}</b>
+        <div class="zb"><button type="button" data-z="-1" title="Dézoomer">−</button><span class="zv">100 %</span><button type="button" data-z="1" title="Zoomer">+</button></div>
+        <button type="button" class="sv-btn" data-a="ajuster">Ajuster</button>
+        <button type="button" class="sv-btn" data-a="dl">⬇️ Télécharger</button>
+        <button type="button" class="x" data-a="x" title="Fermer">✕</button></div>
+      <div class="pg">${pages.map((p) => `<img src="${p.img}" alt="">`).join("")}</div></div>`;
+    document.body.appendChild(ov);
+    const zone = ov.querySelector(".pg"), imgs = [...ov.querySelectorAll(".pg img")];
+    const LARGEUR_A4 = 210 * 96 / 25.4; // largeur réelle d'une page A4 à 100 %
+    let zoom = 1;
+    const appliquer = () => {
+      imgs.forEach((im, i) => { im.style.width = `${Math.round(LARGEUR_A4 * 190 / 210 * zoom)}px`; im.style.padding = `${Math.round(10 * 96 / 25.4 * zoom)}px`; });
+      ov.querySelector(".zv").textContent = `${Math.round(zoom * 100)} %`;
+    };
+    const ajuster = () => { zoom = Math.max(0.3, Math.min(3, (zone.clientWidth - 40) / LARGEUR_A4)); appliquer(); };
+    const fermer = () => { document.removeEventListener("keydown", clavier, true); ov.remove(); };
+    function clavier(e) { if (e.key === "Escape") fermer(); if (e.key === "+" || e.key === "=") { zoom = Math.min(3, zoom + 0.25); appliquer(); } if (e.key === "-") { zoom = Math.max(0.3, zoom - 0.25); appliquer(); } }
+    document.addEventListener("keydown", clavier, true);
+    ov.addEventListener("click", (e) => {
+      if (e.target === ov) return fermer();
+      const z = e.target.closest("[data-z]");
+      if (z) { zoom = Math.max(0.3, Math.min(3, Math.round((zoom + 0.25 * Number(z.dataset.z)) * 4) / 4)); appliquer(); }
+      const a = e.target.closest("[data-a]");
+      if (a && a.dataset.a === "x") fermer();
+      if (a && a.dataset.a === "ajuster") ajuster();
+      if (a && a.dataset.a === "dl") telecharger(blob, nomF);
+    });
+    ajuster();
+  }
   $("envApercu").addEventListener("click", async () => {
     if (!pret) return;
-    const w = window.open("", "_blank");
     boutonsEnvoi(false); $("envStatus").textContent = "Préparation de l'aperçu…";
     try {
-      const url = URL.createObjectURL(await genererPdf(indiceEnvoi()));
-      if (w) w.location.href = url; else window.open(url, "_blank");
+      const n = indiceEnvoi();
+      const blob = await genererPdf(n);
       $("envStatus").textContent = "";
-    } catch (e) { if (w) w.close(); $("envStatus").textContent = "❌ " + e.message; }
+      ouvrirApercu(blob, P.nomPdf(code, n), pagesPdf);
+    } catch (e) { $("envStatus").textContent = ""; erreur("Aperçu impossible", e.message); }
     finally { boutonsEnvoi(true); }
   });
   $("envTelecharger").addEventListener("click", async () => {
@@ -1175,11 +1380,9 @@ document.addEventListener("DOMContentLoaded", () => {
     boutonsEnvoi(false); $("envStatus").textContent = "Création du PDF…";
     try {
       const blob = await genererPdf(indiceEnvoi());
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob); a.download = P.nomPdf(code, indiceEnvoi());
-      document.body.appendChild(a); a.click(); a.remove();
+      telecharger(blob, P.nomPdf(code, indiceEnvoi()));
       $("envStatus").textContent = "PDF téléchargé : à ranger dans le réseau FTS.";
-    } catch (e) { $("envStatus").textContent = "❌ " + e.message; }
+    } catch (e) { $("envStatus").textContent = ""; erreur("PDF non créé", e.message); }
     finally { boutonsEnvoi(true); }
   });
 
@@ -1188,17 +1391,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const st = $("envStatus");
     const a = P.adresses($("envA").value), cc = P.adresses($("envCc").value);
     const mauvaises = a.concat(cc).filter((x) => !P.adresseValide(x));
-    if (!a.length) { st.textContent = "❌ Indique au moins un destinataire."; return; }
-    if (mauvaises.length) { st.textContent = "❌ Adresse incorrecte : " + mauvaises.join(", "); return; }
+    const stop = (t, m) => { erreur(t, m); };
+    if (!a.length) return stop("Pas de destinataire", "Indique au moins une adresse dans Destinataires.");
+    if (mauvaises.length) return stop("Adresse incorrecte", `Vérifie : ${mauvaises.join(", ")}`);
     const n = indiceEnvoi();
-    if (n === "") { st.textContent = "❌ Indique l'indice à envoyer."; return; }
+    if (n === "") return stop("Indice manquant", "Indique l'indice à envoyer.");
     const objet = $("envObjet").value.trim(), message = $("envMessage").value;
-    if (!objet) { st.textContent = "❌ L'objet du mail est vide."; return; }
+    if (!objet) return stop("Objet vide", "L'objet du mail est vide.");
     const e = prep.envoi;
     const avertir = [];
     if (!e && !plan) avertir.push("Pas de plan d'accès joint (en général il part avec le premier envoi).");
     if (e && String(e.indice) === String(n)) avertir.push(`Même indice que le dernier envoi (${e.indice}).`);
-    if (!confirm(`Envoyer la fiche indice ${n} à :\n${a.join("\n")}${cc.length ? "\ncopie : " + cc.join(", ") : ""}${avertir.length ? "\n\n⚠️ " + avertir.join("\n⚠️ ") : ""}`)) return;
+    const ok = await boite({ icone: "✉️", titre: `Envoyer la fiche indice ${n} ?`,
+      html: `Destinataires :<div class="dest">${a.map((x) => `<div>${esc(x)}</div>`).join("")}${cc.map((x) => `<div style="color:var(--text-sub)">copie : ${esc(x)}</div>`).join("")}</div>
+        Pièces jointes : fiche de préparation (PDF)${plan ? ` + plan d'accès (${esc(plan.nom)})` : ""}
+        ${avertir.map((x) => `<div class="warn">⚠️ ${esc(x)}</div>`).join("")}`,
+      boutons: [{ lib: "Annuler", val: false }, { lib: "Envoyer", val: true, cls: "pri" }] });
+    if (ok !== true) return;
 
     boutonsEnvoi(false);
     const nomPdf = P.nomPdf(code, n);
@@ -1212,7 +1421,10 @@ document.addEventListener("DOMContentLoaded", () => {
       await FTSGmail.envoyer({ to: a, cc, subject: objet, body: message, attachments: pj });
     } catch (err) {
       console.error(err);
-      st.textContent = "❌ Mail non envoyé : " + err.message;
+      st.textContent = "";
+      const expire = /auth|token|connect|401|403|invalid credentials/i.test(err.message);
+      erreur("Le mail n'est pas parti", expire ? "La connexion à Google a expiré." : err.message,
+        expire ? "Reconnecte-toi puis clique à nouveau sur Envoyer. Rien n'a été envoyé ni modifié." : "Rien n'a été envoyé ni modifié. Réessaie dans un instant.");
       boutonsEnvoi(true);
       return;
     }
@@ -1241,7 +1453,8 @@ document.addEventListener("DOMContentLoaded", () => {
     await enregistrer();
     afficherEnvoi();
     st.textContent = sale ? `⚠️ Mail envoyé, mais la fiche n'est pas enregistrée : clique sur Enregistrer.${noteDrive}` : `✅ Indice ${n} envoyé à ${a.join(", ")}${noteDrive}`;
-    FTSShell.toast(`✉️ Fiche indice ${n} envoyée`);
+    if (sale) erreur("Mail envoyé, fiche non enregistrée", "Le mail est bien parti, mais la fiche n'a pas pu être enregistrée.", "Clique sur Enregistrer pour garder la trace de cet envoi.");
+    else FTSShell.toast(`✅ Indice ${n} envoyé${$("envDrive").checked && !noteDrive ? " · copie dans le Drive" : ""}`);
     boutonsEnvoi(true);
   }
   $("envEnvoyer").addEventListener("click", envoyerFiche);
@@ -1251,9 +1464,10 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("#prTabs button").forEach((b) => b.classList.toggle("on", b.dataset.t === t));
     document.querySelectorAll(".sv-tab").forEach((x) => x.classList.toggle("on", x.id === "tab" + t));
     if (t === "Fournitures") afficherFournitures();
-    if (t === "Fiche") afficherFiche();
+    if (t === "Fiche") { afficherFiche(); ficheVue = true; }
     if (t === "Ndc") afficherNdc();
     if (t === "Envoi") afficherEnvoi();
+    majEtapes();
   }
   document.querySelectorAll("#prTabs button").forEach((b) => b.addEventListener("click", () => ouvrirOnglet(b.dataset.t)));
 

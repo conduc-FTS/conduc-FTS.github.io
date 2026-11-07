@@ -406,6 +406,10 @@ const FTSDrive = (() => {
       headers: { ...authHeader(), "Content-Type": "application/json" },
       body: JSON.stringify({ description: JSON.stringify(publique) }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`Infos du chantier non enregistrées : ${(err.error && err.error.message) || res.status}`);
+    }
     if (montants) {
       // Rien à réécrire si les montants n'ont pas changé (archivage, clôture…)
       const connus = (await lireMarches().catch(() => new Map())).get(chantierId);

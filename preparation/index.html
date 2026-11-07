@@ -407,6 +407,11 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
       <div class="sv-ch"><h2>Fiche de préparation de chantier</h2><span class="s">même présentation que la fiche Excel · clique dans DIVERS pour écrire directement · la fiche se resserre toute seule pour tenir sur une page A4</span><span class="sv-sp"></span><button type="button" class="sv-btn pri" id="btnImprimer">🖨️ Imprimer / PDF</button></div>
       <div style="padding:14px"><div class="fp-zone"><div class="fp-page" id="fichePage"></div></div></div>
     </section>
+    <section class="sv-card">
+      <div class="sv-ch"><h2>Page de garde du dossier papier</h2><span class="s">remplie depuis la fiche · cases à cocher à la main · à imprimer, ne part pas dans le mail</span><span class="sv-sp"></span>
+        <button type="button" class="sv-btn" id="pgApercu">🔍 Aperçu</button><button type="button" class="sv-btn" id="pgPdf">⬇️ PDF</button><button type="button" class="sv-btn pri" id="pgImprimer">🖨️ Imprimer</button></div>
+      <div style="padding:14px;display:flex;justify-content:center"><img id="pgMini" alt="Page de garde" style="width:300px;box-shadow:0 2px 10px rgba(0,0,0,.18);background:#fff"></div>
+    </section>
   </div>
 
   <!-- 7 · ENVOI -->
@@ -493,6 +498,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <script src="../lib/html2canvas/html2canvas.min.js"></script>
 <script src="../lib/qrcode/qrcode.js"></script>
 <script src="../js/plan-acces.js"></script>
+<script src="../js/page-garde.js"></script>
 <script src="../js/supervision-shell.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -1695,6 +1701,37 @@ document.addEventListener("DOMContentLoaded", () => {
     try { const r = await pdfPlan(); telecharger(r.blob, `${P.nomFichier(code)}_Plan-acces.pdf`); } catch (e) { erreur("PDF non créé", e.message); }
   });
 
+  // ─── Page de garde du dossier papier ───────────────────────────
+  function pdfPageGarde() {
+    const inf = prep.infos;
+    const cond = FTSPersonnel.parNom(inf.conducteur);
+    return FTSPageGarde.pdf({
+      code, nom, adresse: inf.adresse, commune: inf.commune, equipe: prep.equipe.chef,
+      conducteur: inf.conducteur, telConducteur: cond && cond.telephone ? cond.telephone : "", logoSrc: "../assets/logo-fts.png",
+    });
+  }
+  const nomPageGarde = () => `${P.nomFichier(code)}_Page-de-garde.pdf`;
+  async function majPageGarde() {
+    try { const r = await pdfPageGarde(); $("pgMini").src = r.pages[0].img; } catch (e) { console.warn(e); }
+  }
+  $("pgApercu").addEventListener("click", async () => {
+    try { const r = await pdfPageGarde(); ouvrirApercu(r.blob, nomPageGarde(), r.pages); } catch (e) { erreur("Aperçu impossible", e.message); }
+  });
+  $("pgPdf").addEventListener("click", async () => {
+    try { const r = await pdfPageGarde(); telecharger(r.blob, nomPageGarde()); } catch (e) { erreur("PDF non créé", e.message); }
+  });
+  $("pgImprimer").addEventListener("click", async () => {
+    try {
+      const r = await pdfPageGarde();
+      // Impression directe du PDF (cadre caché) ; sinon on l'ouvre pour l'imprimer depuis le lecteur
+      const url = URL.createObjectURL(r.blob);
+      let f = $("pgCadre");
+      if (!f) { f = document.createElement("iframe"); f.id = "pgCadre"; f.style.cssText = "position:fixed;width:0;height:0;border:0;left:-9999px"; document.body.appendChild(f); }
+      f.onload = () => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { window.open(url, "_blank"); } };
+      f.src = url;
+    } catch (e) { erreur("Impression impossible", e.message); }
+  });
+
   // ─── Envoi (fiche PDF + plan d'accès par mail) ─────────────────
   let plan = null;                       // { blob, nom, type } — plan d'accès joint à la main
   let objetTouche = false, msgTouche = false, destTouche = false, indiceTouche = false, planJoindreTouche = false;
@@ -2028,7 +2065,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("#prTabs button").forEach((b) => b.classList.toggle("on", b.dataset.t === t));
     document.querySelectorAll(".sv-tab").forEach((x) => x.classList.toggle("on", x.id === "tab" + t));
     if (t === "Fournitures") afficherFournitures();
-    if (t === "Fiche") { afficherFiche(); ficheVue = true; }
+    if (t === "Fiche") { afficherFiche(); ficheVue = true; majPageGarde(); }
     if (t === "Plan") afficherPlan();
     if (t === "Ndc") afficherNdc();
     if (t === "Envoi") afficherEnvoi();

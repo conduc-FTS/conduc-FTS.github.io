@@ -425,7 +425,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
     </section>
     <div class="pe-grid">
       <section class="sv-card">
-        <div class="sv-ch"><h2>Mail</h2><span class="s">envoyé depuis ta boîte Gmail · tout est modifiable</span></div>
+        <div class="sv-ch"><h2>Mail</h2><span class="s" id="envModeTxt">envoyé depuis ta boîte Gmail · tout est modifiable</span></div>
         <div class="pr-grid deux">
           <div class="sv-f full"><label>Destinataires</label><input type="text" id="envA" autocomplete="off"></div>
           <div class="sv-f full"><label>Copie <i>(facultatif)</i></label><input type="text" id="envCc" autocomplete="off" placeholder="adresse@fts-btp.fr"></div>
@@ -510,6 +510,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <script src="../js/personnel.js"></script>
 <script src="../js/preparation.js"></script>
 <script src="../js/gmail.js"></script>
+<script src="../js/mail-envoi.js"></script>
 <script src="../lib/jspdf/jspdf.umd.min.js"></script>
 <script src="../lib/html2canvas/html2canvas.min.js"></script>
 <script src="../lib/qrcode/qrcode.js"></script>
@@ -2077,11 +2078,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const avertir = [];
     if (!e && !planJoint()) avertir.push("Pas de plan d'accès joint (en général il part avec le premier envoi).");
     if (e && String(e.indice) === String(n)) avertir.push(`Même indice que le dernier envoi (${e.indice}).`);
-    const ok = await boite({ icone: "✉️", titre: `Envoyer la fiche indice ${n} ?`,
+    // Envoi direct (Gmail) ou envoi de secours (mail Outlook pré-rempli)
+    let moiEmail = "";
+    try { const u = await FTSAuth.getUserInfo(); moiEmail = (u && u.email) || ""; } catch (err) {}
+    const parOutlook = FTSMail.mode(moiEmail || null) === "outlook";
+    const ok = await boite({ icone: "✉️", titre: parOutlook ? `Préparer le mail de l'indice ${n} ?` : `Envoyer la fiche indice ${n} ?`,
       html: `Destinataires :<div class="dest">${a.map((x) => `<div>${esc(x)}</div>`).join("")}${cc.map((x) => `<div style="color:var(--text-sub)">copie : ${esc(x)}</div>`).join("")}</div>
         Pièces jointes : fiche de préparation (PDF)${plan ? ` + plan d'accès (${esc(plan.nom)})` : planJoint() ? " + plan d'accès (PDF)" : ""}
-        ${avertir.map((x) => `<div class="warn">⚠️ ${esc(x)}</div>`).join("")}`,
-      boutons: [{ lib: "Annuler", val: false }, { lib: "Envoyer", val: true, cls: "pri" }] });
+        ${avertir.map((x) => `<div class="warn">⚠️ ${esc(x)}</div>`).join("")}
+        ${parOutlook ? `<div class="warn" style="background:#F1F5FD">📧 Ton compte n'a pas Gmail : le mail va s'ouvrir dans <b>Outlook</b>, depuis ton adresse pro, et les PDF seront téléchargés pour que tu les glisses dans le mail.</div>` : ""}`,
+      boutons: [{ lib: "Annuler", val: false }, { lib: parOutlook ? "Préparer le mail" : "Envoyer", val: true, cls: "pri" }] });
     if (ok !== true) return;
 
     boutonsEnvoi(false);
@@ -2098,8 +2104,18 @@ document.addEventListener("DOMContentLoaded", () => {
         pdfPlanEnvoye = (await pdfPlan()).blob;
         pj.push({ blob: pdfPlanEnvoye, fileName: nomPlan(n), mimeType: "application/pdf" });
       }
-      st.textContent = "Envoi du mail…";
-      await FTSGmail.envoyer({ to: a, cc, subject: objet, body: message, attachments: pj });
+      if (parOutlook) {
+        st.textContent = "Mail à finir dans Outlook…";
+        const parti = await envoiOutlook({ a, cc, objet, message, pj });
+        if (!parti) {
+          st.textContent = "Mail non envoyé : rien n'a été enregistré. Les PDF sont dans ton dossier Téléchargements.";
+          boutonsEnvoi(true);
+          return;
+        }
+      } else {
+        st.textContent = "Envoi du mail…";
+        await FTSGmail.envoyer({ to: a, cc, subject: objet, body: message, attachments: pj });
+      }
     } catch (err) {
       console.error(err);
       st.textContent = "";
@@ -2140,6 +2156,43 @@ document.addEventListener("DOMContentLoaded", () => {
     boutonsEnvoi(true);
   }
   $("envEnvoyer").addEventListener("click", envoyerFiche);
+
+  /**
+   * Envoi de secours (compte sans Gmail) : télécharge les pièces jointes,
+   * ouvre le mail pré-rempli dans Outlook, puis demande s'il est parti.
+   * @returns {Promise<boolean>} true si la personne confirme l'envoi
+   */
+  async function envoiOutlook({ a, cc, objet, message, pj }) {
+    pj.forEach((x) => telecharger(x.blob, x.fileName));
+    const liste = `<div class="dest">${pj.map((x) => `<div>📎 ${esc(x.fileName)}</div>`).join("")}</div>`;
+    let tronque = false;
+    let r = await boite({ icone: "📧", titre: "Dernière étape dans Outlook",
+      html: `Les pièces jointes sont téléchargées (dossier <b>Téléchargements</b>) :${liste}
+        1. Clique sur « Ouvrir le mail dans Outlook » : destinataires, objet et texte sont déjà remplis.<br>
+        2. Glisse les ${pj.length} fichier(s) ci-dessus dans le mail.<br>
+        3. Clique sur Envoyer dans Outlook, puis reviens ici.`,
+      boutons: [{ lib: "Annuler", val: false }, { lib: "📧 Ouvrir le mail dans Outlook", val: true, cls: "pri" }] });
+    if (r !== true) return false;
+    tronque = FTSMail.ouvrirOutlook({ to: a, cc, subject: objet, body: message }).tronque;
+    for (;;) {
+      r = await boite({ icone: "✉️", titre: "Le mail est-il parti ?",
+        html: `Confirme ici une fois le mail envoyé dans Outlook : l'indice sera alors enregistré comme envoyé et les PDF rangés dans le Drive.
+          ${tronque ? `<div class="warn">⚠️ Le texte était trop long pour être pré-rempli : il est copié, colle-le dans le mail avec <b>Ctrl+V</b>.</div>` : ""}
+          <div style="margin-top:8px;color:var(--text-sub);font-size:.85em">Outlook ne s'est pas ouvert ? Vérifie qu'Outlook est l'application de messagerie par défaut de l'ordinateur.</div>`,
+        boutons: [{ lib: "Pas envoyé", val: "non" }, { lib: "Rouvrir", val: "rouvrir" }, { lib: "✅ C'est envoyé", val: "oui", cls: "pri" }] });
+      if (r === "oui") return true;
+      if (r === "non") return false;
+      if (r === "rouvrir") tronque = FTSMail.ouvrirOutlook({ to: a, cc, subject: objet, body: message }).tronque;
+      // clic à côté de la fenêtre : on redemande, pour ne rien perdre
+    }
+  }
+  // Libellé de la carte Mail selon le compte connecté
+  (async () => {
+    try {
+      const u = window.FTSAuth && FTSAuth.isSignedIn() ? await FTSAuth.getUserInfo() : null;
+      if (u && u.email && FTSMail.mode(u.email) === "outlook") $("envModeTxt").textContent = "s'ouvrira dans Outlook depuis ton adresse pro · tout est modifiable";
+    } catch (e) {}
+  })();
 
   // ─── Onglets ───────────────────────────────────────────────────
   function ouvrirOnglet(t) {

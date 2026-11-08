@@ -13,11 +13,17 @@
  *      conducteurs : si un chef en a besoin, on désarchive le chantier) ;
  *  - dossiers INTERNES (ADMINISTRATIF, RAPPORTS PAR CHEF, ACCUEIL INTERIMAIRE,
  *    ACCUEIL SECURITE, FICHE MATERIEL, REFERENTIEL) : toute autre personne
- *    perd l'accès. Retrait automatique pour les personnes de Personnel FTS ;
- *    pour une adresse inconnue, retrait proposé (bouton) — jamais en silence ;
- *  - DOSSIER CHANTIER et ARCHIVES : les personnes extérieures (client, MOE,
- *    bureau d'études…) ne sont JAMAIS retirées ; seules les personnes PARTIES
- *    de Personnel FTS le sont ;
+ *    perd l'accès ;
+ *  - AUCUNE PERSONNE EXTÉRIEURE, nulle part (règle de Clément du 07/11/2026) :
+ *    FTS ne partage jamais le Drive avec un client, un MOE ou un BE, toute la
+ *    communication passe par le conducteur. Toute nouvelle personne est
+ *    d'abord ajoutée dans Personnel FTS par conduc.fts. Donc une adresse
+ *    inconnue de Personnel FTS (et de l'ancienne liste) est retirée
+ *    automatiquement, DOSSIER CHANTIER et ARCHIVES compris. Chaque retrait
+ *    est affiché dans le bilan ;
+ *  - garde-fous : rien n'est retiré si Personnel FTS est illisible ou vide,
+ *    ni pour plus de LIMITE_RETRAITS personnes d'un coup (souvent le signe d'une
+ *    erreur dans Personnel FTS) : ils sont alors proposés avec un bouton ;
  *  - le propriétaire n'est jamais touché ; couleurs des dossiers racine.
  *
  * FTSAcces.monter(conteneur) · FTSAcces.verifier({ appliquerProposes })
@@ -39,6 +45,7 @@ const FTSAcces = (() => {
     { nom: "FICHE MATERIEL", couleur: "#ff7537", interne: true },
     { nom: "REFERENTIEL", couleur: "#ac725e", interne: true },
   ];
+  const LIMITE_RETRAITS = 5; // personnes : au-delà, les retraits sont proposés et non faits d'office
   const RANG = { reader: 1, commenter: 1, writer: 2, fileOrganizer: 3, organizer: 3, owner: 4 };
 
   let racine = null;
@@ -169,6 +176,8 @@ const FTSAcces = (() => {
     if (!(await personnelLu())) throw new Error("base Personnel FTS illisible : aucun accès modifié");
     const personnes = FTSPersonnel.toutes();
     const base = new Map(personnes.filter((p) => p.email).map((p) => [mail(p.email), p]));
+    // Garde-fou : une base sans aucune adresse ferait tout retirer
+    if (!base.size) throw new Error("base Personnel FTS vide : aucun accès modifié");
     const chefs = personnes.filter((p) => p.statut === "ACTIF" && p.poste === "CHEF DE CHANTIER" && p.email);
     const chefsSansMail = personnes.filter((p) => p.statut === "ACTIF" && p.poste === "CHEF DE CHANTIER" && !p.email);
     const listeEnc = listeEncadrement();
@@ -192,7 +201,7 @@ const FTSAcces = (() => {
       perms.forEach((p) => {
         if (p.role === "owner" || enc.has(p.emailAddress) || autorises.has(p.emailAddress)) return;
         const connu = base.get(p.emailAddress);
-        retirer(dossier, id, p, connu ? `${connu.prenom} ${connu.nom} n'a pas à voir ce dossier` : "adresse inconnue de Personnel FTS et de l'Encadrement", !!connu);
+        retirer(dossier, id, p, connu ? `${connu.prenom} ${connu.nom} n'a pas à voir ce dossier` : "adresse inconnue de Personnel FTS", true);
       });
     }
 
@@ -210,12 +219,13 @@ const FTSAcces = (() => {
           else if (p.role !== "owner" && p.role !== d.chefs && !enc.has(p.emailAddress)) changer(d.nom, id, p, d.chefs, "chef de chantier");
         });
         // Personnes de la base : PARTIES retirées partout ; sur ARCHIVES, aucune
-        // personne de la base hors encadrement. Les extérieurs (client, MOE…)
-        // ne sont jamais touchés.
+        // personne de la base hors encadrement. Adresse inconnue de Personnel
+        // FTS (extérieur) : retirée aussi, FTS ne partage jamais le Drive.
         perms.forEach((p) => {
+          if (p.role === "owner" || enc.has(p.emailAddress)) return;
           const b = base.get(p.emailAddress);
-          if (!b || p.role === "owner" || enc.has(p.emailAddress)) return;
-          if (b.statut !== "ACTIF") retirer(d.nom, id, p, `${b.prenom} ${b.nom} est parti(e)`, true);
+          if (!b) retirer(d.nom, id, p, "adresse inconnue de Personnel FTS", true);
+          else if (b.statut !== "ACTIF") retirer(d.nom, id, p, `${b.prenom} ${b.nom} est parti(e)`, true);
           else if (!d.chefs) retirer(d.nom, id, p, `réservé aux conducteurs de travaux`, true);
         });
       } else {
@@ -269,7 +279,12 @@ const FTSAcces = (() => {
       const actuelle = r.ok ? ((await r.json()).folderColorRgb || "").toLowerCase() : "";
       if (actuelle !== d.couleur) couleurs.push({ id: racines[d.nom], couleur: d.couleur, nom: d.nom });
     }
-    return { actions, couleurs, partages, chefs, chefsSansMail, absents, nbEncadrement: listeEnc.length };
+    // Garde-fou : beaucoup de retraits d'un coup = probablement une erreur dans
+    // Personnel FTS (colonne vidée, adresses effacées…) → on demande d'abord.
+    const retraits = actions.filter((a) => a.type === "retrait" && a.auto);
+    const enMasse = new Set(retraits.map((a) => a.email)).size > LIMITE_RETRAITS;
+    if (enMasse) retraits.forEach((a) => { a.auto = false; a.raison += " (beaucoup de retraits d'un coup : à confirmer)"; });
+    return { actions, couleurs, partages, chefs, chefsSansMail, absents, nbEncadrement: listeEnc.length, enMasse };
   }
 
   async function executer(plan, inclureProposes) {
@@ -344,7 +359,7 @@ const FTSAcces = (() => {
   function resume(b) {
     const aj = b.faits.filter((a) => a.type !== "retrait").length, re = b.faits.filter((a) => a.type === "retrait").length;
     return `Accès Drive à jour : ${b.plan.chefs.length} chef(s) équipé(s)` + (aj ? ` · ${aj} accès donné(s)` : "") + (re ? ` · ${re} accès retiré(s)` : "") +
-      (b.proposes.length ? ` · ⚠️ ${b.proposes.length} accès à vérifier dans « Accès Drive »` : "") + (b.erreurs.length ? ` · ⚠️ ${b.erreurs.length} erreur(s)` : "") + ".";
+      (b.proposes.length ? ` · ⚠️ ${b.proposes.length} retraits en attente dans « Accès Drive »` : "") + (b.erreurs.length ? ` · ⚠️ ${b.erreurs.length} erreur(s)` : "") + ".";
   }
 
   // ─── Écran ─────────────────────────────────────────────────────
@@ -378,8 +393,8 @@ const FTSAcces = (() => {
         donnes.forEach((a) => { (parMail[a.email] = parMail[a.email] || []).push(`${a.dossier}${a.type === "dossier" ? " (dossier créé)" : ""} : ${roleLib(a.role || "reader")}`); });
         bilan += `<div class="ad-info">➕ <b>Fait à l'instant</b> :<ul>${Object.entries(parMail).map(([m, l]) => `<li><b>${esc(aff(m))}</b> — ${l.length > 3 ? `${l.length} dossiers` : esc(l.join(" · "))}</li>`).join("")}</ul></div>`;
       }
-      if (retires.length) bilan += `<div class="ad-warn">🧹 <b>Accès retirés</b> : ${retires.map((a) => `${esc(aff(a.email))} (${esc(a.dossier)})`).join(" · ")}</div>`;
-      if (b.proposes.length) bilan += `<div class="ad-alert">⚠️ <b>${b.proposes.length} accès à vérifier</b> — adresses inconnues de Personnel FTS et de l'Encadrement, sur des dossiers internes :<ul>${b.proposes.map((a) => `<li>${esc(aff(a.email))} — ${esc(a.dossier)} (${roleLib(a.ancien)})</li>`).join("")}</ul>Si ce sont des personnes de l'encadrement, ajoute-les dans Personnel FTS (catégorie ENCADREMENT) puis clique sur « Vérifier maintenant ». Sinon :<br><button type="button" class="ad-btn pri" id="adRetirer" style="margin-top:8px">Retirer ces ${b.proposes.length} accès</button></div>`;
+      if (retires.length) bilan += `<div class="ad-warn">🧹 <b>Accès retirés le ${b.le.toLocaleDateString("fr-FR")} à ${b.le.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</b> :<ul>${retires.map((a) => `<li><b>${esc(aff(a.email))}</b> — ${esc(a.dossier)} (${esc(a.raison)})</li>`).join("")}</ul></div>`;
+      if (b.proposes.length) bilan += `<div class="ad-alert">⚠️ <b>${b.proposes.length} retraits en attente</b> — c'est beaucoup d'un coup (plus de ${LIMITE_RETRAITS} personnes) : rien n'a été retiré, au cas où Personnel FTS contiendrait une erreur (adresses effacées, colonne vidée…).<ul>${b.proposes.slice(0, 30).map((a) => `<li>${esc(aff(a.email))} — ${esc(a.dossier)} (${roleLib(a.ancien)})</li>`).join("")}${b.proposes.length > 30 ? `<li>… et ${b.proposes.length - 30} autre(s)</li>` : ""}</ul>Vérifie Personnel FTS. Si tout est juste :<br><button type="button" class="ad-btn pri" id="adRetirer" style="margin-top:8px">Retirer ces ${b.proposes.length} accès</button></div>`;
       if (b.plan.chefsSansMail.length) bilan += `<div class="ad-warn">⚠️ <b>Chef(s) sans e-mail</b> : ${b.plan.chefsSansMail.map((p) => esc(`${p.nom} ${p.prenom}`)).join(", ")} — leur tablette n'a aucun accès tant que l'e-mail n'est pas renseigné dans Personnel FTS.</div>`;
       if (b.plan.absents.length) bilan += `<div class="ad-info">ℹ️ Dossiers pas encore créés : ${b.plan.absents.map(esc).join(", ")} (créés par le robot de recopie au besoin).</div>`;
       if (b.erreurs.length) bilan += `<div class="ad-alert">❌ ${b.erreurs.length} action(s) impossible(s) : ${b.erreurs.map((a) => `${esc(aff(a.email))} / ${esc(a.dossier)} (${esc(a.statut)})`).join(" · ")}</div>`;
@@ -387,7 +402,7 @@ const FTSAcces = (() => {
     const cellule = (d, qui) => {
       if (qui === "enc") return '<span class="ad-r r-mod">SELON LA LISTE</span>';
       if (qui === "chef") return d.chefs === "writer" ? badge("MOD") : d.chefs === "reader" ? badge("LEC") : d.chefs === "perso" ? badge("PERSO") : badge("NON");
-      return d.interne ? '<span class="ad-r r-non">RETIRÉE</span>' : '<span class="ad-sub">jamais retirée (client, MOE… partagés sur un chantier)</span>';
+      return '<span class="ad-r r-non">RETIRÉE</span>';
     };
     racine.innerHTML = `
       <div class="se-page-sub" style="margin-bottom:14px">Qui voit quoi dans le Drive FTS. Tout vient de Personnel FTS : les chefs (poste « Chef de chantier » + e-mail) et l'encadrement (catégorie « Encadrement » + e-mail + accès Drive). Vérifié à chaque ouverture de cette page.</div>
@@ -416,7 +431,7 @@ const FTSAcces = (() => {
         <div style="overflow:auto"><table class="ad-t"><thead><tr><th style="padding-left:20px">Dossier</th><th>Encadrement</th><th>Chefs de chantier</th><th>Toute autre personne</th></tr></thead><tbody>
           ${DOSSIERS.map((d) => `<tr><td style="padding-left:20px"><span class="ad-dot" style="background:${d.couleur}"></span><b>${d.nom}</b></td><td>${cellule(d, "enc")}</td><td>${cellule(d, "chef")}</td><td>${cellule(d, "autre")}</td></tr>`).join("")}
         </tbody></table></div>
-        <div class="ad-note">Les chefs n'ont pas besoin des dossiers centraux : leur tablette range tout dans le chantier, et le robot de recopie Google range une copie au bon endroit. Une personne passée en « PARTI » dans Personnel FTS perd ses accès.</div>
+        <div class="ad-note">Les chefs n'ont pas besoin des dossiers centraux : leur tablette range tout dans le chantier, et le robot de recopie Google range une copie au bon endroit. Une personne passée en « PARTI » dans Personnel FTS perd ses accès. <b>Aucune personne extérieure</b> (client, MOE, bureau d'études…) n'a accès au Drive : toute adresse absente de Personnel FTS est retirée. Un nouvel embauché doit d'abord être ajouté dans Personnel FTS.</div>
       </div>`;
     const $ = (id) => racine.querySelector("#" + id);
     const statut = (t) => { messageStatut = t; const s = $("adStatut"); if (s) s.textContent = t; };
@@ -437,7 +452,7 @@ const FTSAcces = (() => {
     $("adVerifier").onclick = () => lancer();
     const ret = $("adRetirer");
     if (ret) ret.onclick = async () => {
-      if (!confirm("Retirer l'accès à ces adresses inconnues sur les dossiers internes ?")) return;
+      if (!confirm("Retirer tous ces accès ?\nVérifie d'abord que Personnel FTS est juste : une personne absente de Personnel FTS perd son accès.")) return;
       ret.disabled = true; ret.textContent = "Retrait…";
       await lancer(true);
     };
@@ -483,6 +498,8 @@ const FTSAcces = (() => {
     lancer();
   }
 
-  return { monter, verifier, verifierAJour, resume, chargerEncadrement, droits, DOSSIERS };
+  // Outils partagés avec le contrôle de sécurité (js/controle-securite.js)
+  const outils = { mail, aff, cle, req, esc, listeEncadrement, personnelLu, chargerEncadrement: () => (encadrement ? Promise.resolve(encadrement) : chargerEncadrement()) };
+  return { monter, verifier, verifierAJour, resume, chargerEncadrement, droits, DOSSIERS, outils };
 })();
 window.FTSAcces = FTSAcces;

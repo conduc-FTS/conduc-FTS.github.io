@@ -364,6 +364,12 @@ tr.pp-libre { background: #FFFCF0; }
 .ad-alert ul,.ad-info ul{margin:6px 0 6px 18px;padding:0}
 .ad-note{font-size:.76rem;color:var(--text-sub);padding:10px 20px;border-top:1px solid var(--border);background:#FAFAFB;line-height:1.5}
 .ad-vide{padding:16px 20px;color:var(--text-sub)}
+/* Contrôle de sécurité (js/controle-securite.js) */
+.cs-kp{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}.cs-kp div{flex:1;min-width:170px;background:#F4F5F7;border-radius:10px;padding:10px 12px;font-size:.78rem;color:var(--text-sub)}.cs-kp b{display:block;font-size:20px;color:#1d1d1f}
+.cs-kp .red b{color:#B42318}.cs-kp .gr b{color:#1E8E4E}
+.cs-sec{margin:6px 0 16px}.cs-sec h3{font-size:.9rem;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+.r-red{background:#FDECEA;color:#B42318}.ad-btn.dang{color:#B42318}a.ad-btn{text-decoration:none;color:inherit;display:inline-block}
+.ad-warn ul{margin:6px 0 6px 18px;padding:0}
 .ad-verrou{max-width:560px;margin:40px auto;text-align:center;padding:34px 30px}.ad-verrou h2{margin:8px 0 10px;font-size:20px}.ad-verrou p{color:#4B5563;font-size:14px;line-height:1.5;margin:6px 0}.ad-verrou-ic{font-size:44px}
 </style>
 <style>
@@ -634,6 +640,7 @@ tr.pp-libre { background: #FFFCF0; }
   <div class="se-view" id="se-view-acces">
     <div class="se-page-title">Accès Drive</div>
     <div id="accesDrive"></div>
+    <div id="controleSecurite" style="margin-top:16px"></div>
   </div>
 
   <!-- ─── PARC MATÉRIEL ─────────────────────────────────────── -->
@@ -826,6 +833,7 @@ tr.pp-libre { background: #FFFCF0; }
 <script src="../js/parc-materiel.js"></script>
 <script src="../js/personnel.js"></script>
 <script src="../js/acces-drive.js"></script>
+<script src="../js/controle-securite.js"></script>
 <script src="../js/documents-bureau.js"></script>
 <script src="../js/ateliers.js"></script>
 <script src="../js/statistiques.js"></script>
@@ -882,6 +890,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (id === "se-view-stats") chargerStatsAvancement();
     if (id === "se-view-adresses") chargerAdresses();
     if (id === "se-view-acces" && window.FTSAcces) FTSAcces.monter($("accesDrive"));
+    if (id === "se-view-acces" && window.FTSControle) FTSControle.monter($("controleSecurite"));
     if (id === "se-view-documents" && window.FTSDocsBureau) FTSDocsBureau.monter($("documentsBureau"), { obtenirDonnees: (forcer) => obtenirDonnees(forcer) });
     fermerMenuMobile();
     window.scrollTo(0, 0);

@@ -364,6 +364,17 @@ tr.pp-libre { background: #FFFCF0; }
 .ad-alert ul,.ad-info ul{margin:6px 0 6px 18px;padding:0}
 .ad-note{font-size:.76rem;color:var(--text-sub);padding:10px 20px;border-top:1px solid var(--border);background:#FAFAFB;line-height:1.5}
 .ad-vide{padding:16px 20px;color:var(--text-sub)}
+/* Onglet Modules (js/acces-modules.js) */
+.am-tabs{display:flex;gap:6px;margin-bottom:14px}.am-tabs button{border:0;background:#fff;border-radius:9px;padding:9px 15px;font-weight:700;font-size:.86rem;color:#555;cursor:pointer;font-family:inherit;box-shadow:0 1px 2px rgba(0,0,0,.05)}.am-tabs button.on{background:#1d1d1f;color:#fff}
+#accesTabDrive[hidden],#accesTabModules[hidden]{display:none!important}
+.am-t th{text-align:center;white-space:normal;line-height:1.2;min-width:64px}.am-t td{text-align:center}.am-t .am-l{text-align:left;min-width:190px}.am-t .am-l small{display:block;color:var(--text-sub);font-size:.74rem;font-weight:400}
+.am-gh td{background:#F7F7F8;font-size:.68rem;letter-spacing:.06em;color:#9AA0AA;font-weight:800;text-align:left!important}
+.am-c{display:inline-block;width:22px;height:22px;border-radius:6px;border:1.5px solid #cfd3d9;background:#fff;vertical-align:middle;cursor:pointer;padding:0;position:relative}
+button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#1E7B34;border-color:#1E7B34}.am-c.on::after{content:"✓";color:#fff;font-size:13px;font-weight:800;position:absolute;left:5px;top:1px}
+.am-c.dif{outline:2px solid #E8B923;outline-offset:1px}
+.am-leg{display:flex;gap:18px;flex-wrap:wrap;font-size:.78rem;color:var(--text-sub);margin-top:12px;align-items:center}.am-leg .am-c{width:16px;height:16px;cursor:default;margin-right:4px}.am-leg .am-c.on::after{font-size:10px;left:3px;top:0}
+.am-voir{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#F4F5F7;border-radius:10px;padding:9px 12px;margin-top:12px;font-size:.82rem}.am-voir select{border:1px solid var(--border);border-radius:8px;padding:5px 8px;font-family:inherit}
+.am-ov{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:500;display:flex;align-items:center;justify-content:center}.am-md{background:#fff;border-radius:14px;padding:18px 20px;max-width:1260px;width:96%;max-height:88vh;overflow:auto}.am-md h3{margin:0 0 6px}.am-md p{color:var(--text-sub);margin:0 0 12px;font-size:.85rem}
 /* Contrôle de sécurité (js/controle-securite.js) */
 .cs-kp{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}.cs-kp div{flex:1;min-width:170px;background:#F4F5F7;border-radius:10px;padding:10px 12px;font-size:.78rem;color:var(--text-sub)}.cs-kp b{display:block;font-size:20px;color:#1d1d1f}
 .cs-kp .red b{color:#B42318}.cs-kp .gr b{color:#1E8E4E}
@@ -407,7 +418,7 @@ tr.pp-libre { background: #FFFCF0; }
     <div class="sv-grp">RÉFÉRENTIELS</div>
     <button type="button" class="se-nav-btn" data-view="se-view-personnel"><span class="ic">👥</span>Personnel FTS</button>
     <button type="button" class="se-nav-btn" data-view="se-view-parc"><span class="ic">🚜</span>Parc matériel</button>
-    <button type="button" class="se-nav-btn" data-view="se-view-acces"><span class="ic">🔐</span>Accès Drive</button>
+    <button type="button" class="se-nav-btn" data-view="se-view-acces"><span class="ic">🔐</span>Accès</button>
   </nav>
   <div class="sv-acct">
     <div class="sv-av" id="userAvatar">?</div>
@@ -638,9 +649,13 @@ tr.pp-libre { background: #FFFCF0; }
 
   <!-- ─── ACCÈS DRIVE (js/acces-drive.js) ──────────────────────── -->
   <div class="se-view" id="se-view-acces">
-    <div class="se-page-title">Accès Drive</div>
-    <div id="accesDrive"></div>
-    <div id="controleSecurite" style="margin-top:16px"></div>
+    <div class="se-page-title">Accès</div>
+    <div class="am-tabs" id="accesOnglets"><button type="button" class="on" data-t="drive">Dossiers Drive</button><button type="button" data-t="modules">Modules de la Supervision</button></div>
+    <div id="accesTabDrive">
+      <div id="accesDrive"></div>
+      <div id="controleSecurite" style="margin-top:16px"></div>
+    </div>
+    <div id="accesTabModules" hidden><div id="accesModules"></div></div>
   </div>
 
   <!-- ─── PARC MATÉRIEL ─────────────────────────────────────── -->
@@ -835,6 +850,7 @@ tr.pp-libre { background: #FFFCF0; }
 <script src="../js/modules.js"></script>
 <script src="../js/acces-drive.js"></script>
 <script src="../js/controle-securite.js"></script>
+<script src="../js/acces-modules.js"></script>
 <script src="../js/documents-bureau.js"></script>
 <script src="../js/ateliers.js"></script>
 <script src="../js/statistiques.js"></script>
@@ -865,7 +881,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ─── Navigation (barre latérale + barre d'onglets mobile) ─────────
   const TITRES_VUES = {
     "se-view-overview": "Vue d'ensemble", "se-view-stats": "Statistiques", "se-view-preparation": "Préparation de chantier", "se-view-personnel": "Personnel FTS",
-    "se-view-parc": "Parc matériel", "se-view-acces": "Accès Drive", "se-view-archives": "Archives", "se-view-documents": "Documents", "se-view-adresses": "Adresses Personnel",
+    "se-view-parc": "Parc matériel", "se-view-acces": "Accès", "se-view-archives": "Archives", "se-view-documents": "Documents", "se-view-adresses": "Adresses Personnel",
   };
 
   function fermerMenuMobile() { document.body.classList.remove("menu-ouvert"); }
@@ -892,6 +908,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (id === "se-view-adresses") chargerAdresses();
     if (id === "se-view-acces" && window.FTSAcces) FTSAcces.monter($("accesDrive"));
     if (id === "se-view-acces" && window.FTSControle) FTSControle.monter($("controleSecurite"));
+    if (id === "se-view-acces" && window.FTSAccesModules) FTSAccesModules.synchroniser();
+    if (id === "se-view-acces" && !$("accesTabModules").hidden && window.FTSAccesModules) FTSAccesModules.monter($("accesModules"));
     if (id === "se-view-documents" && window.FTSDocsBureau) FTSDocsBureau.monter($("documentsBureau"), { obtenirDonnees: (forcer) => obtenirDonnees(forcer) });
     fermerMenuMobile();
     window.scrollTo(0, 0);
@@ -900,6 +918,13 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".se-nav-btn[data-view], .tab-btn[data-view]").forEach((btn) => {
     btn.addEventListener("click", () => afficherVue(btn.dataset.view));
   });
+  // Page Accès : onglets Dossiers Drive / Modules de la Supervision
+  $("accesOnglets").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    $("accesOnglets").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+    $("accesTabDrive").hidden = b.dataset.t !== "drive";
+    $("accesTabModules").hidden = b.dataset.t !== "modules";
+    if (b.dataset.t === "modules" && window.FTSAccesModules) FTSAccesModules.monter($("accesModules"));
+  }));
   $("menuPlusBtn").addEventListener("click", () => document.body.classList.toggle("menu-ouvert"));
   $("menuBackdrop").addEventListener("click", fermerMenuMobile);
 

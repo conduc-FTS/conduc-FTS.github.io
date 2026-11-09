@@ -58,6 +58,65 @@ const FTSModules = (() => {
   const CREENT_CHANTIER = ["CONDUCTEUR DE TRAVAUX PRINCIPAL", "CONDUCTEUR DE TRAVAUX", "DIRECTRICE TRAVAUX", "DIRECTEUR TRAVAUX", "PRÉSIDENT", "PRÉSIDENT DIRECTEUR GÉNÉRAL"];
   const CACHE = "fts_modules_v1";
 
+  // ─── Réglages faits par conduc.fts (écran Accès › Modules) ─────────
+  // Classeur « Accès Supervision FTS », propriété de conduc.fts, rangé HORS
+  // de l'arborescence FTS (dans REFERENTIEL, l'encadrement en modification
+  // pourrait le modifier : Drive ne permet pas de restreindre sous un droit
+  // hérité). Partagé en LECTURE SEULE à l'encadrement. Deux onglets :
+  //  - « Postes » : Poste | un module par colonne (oui / vide)
+  //  - « Exceptions » : E-mail | Nom | un module par colonne (oui / non / vide = comme le poste)
+  const NOM_REGLAGES = "Accès Supervision FTS";
+  const CACHE_REGLAGES = "fts_modules_reglages_v1";
+  const API = "https://www.googleapis.com";
+  const ent = () => ({ Authorization: "Bearer " + FTSAuth.getToken() });
+  const OUI = (v) => /^(oui|x|1|true)$/i.test(String(v || "").trim());
+  const NON = (v) => /^(non|0|false)$/i.test(String(v || "").trim());
+
+  async function trouverReglages() {
+    for (const q of [`appProperties has { key='ftsRole' and value='accesSupervision' } and trashed = false`,
+      `name = '${NOM_REGLAGES}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`]) {
+      const r = await fetch(`${API}/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,ownedByMe,capabilities/canEdit)`, { headers: ent() });
+      if (!r.ok) throw new Error(`Recherche des réglages : ${r.status}`);
+      const f = ((await r.json()).files || [])[0];
+      if (f) return f;
+    }
+    return null;
+  }
+  /** Lit les réglages ; null si le classeur n'existe pas encore (défauts du code). */
+  async function lireReglages() {
+    const f = await trouverReglages();
+    if (!f) { try { localStorage.removeItem(CACHE_REGLAGES); } catch (e) {} return null; }
+    const r = await fetch(`${API.replace("www", "sheets")}/v4/spreadsheets/${f.id}/values:batchGet?ranges=Postes!A1:Z&ranges=Exceptions!A1:Z`, { headers: ent() });
+    if (!r.ok) throw new Error(`Lecture des réglages : ${r.status}`);
+    const [postes, exc] = ((await r.json()).valueRanges || []).map((v) => v.values || []);
+    const cols = (tete) => (tete || []).map((t) => (MODULES.find((m) => m.lib.toUpperCase() === String(t).trim().toUpperCase()) || {}).id || null);
+    const reg = { id: f.id, postes: {}, exceptions: {} };
+    if (postes && postes.length) {
+      const c = cols(postes[0]);
+      postes.slice(1).forEach((l) => { if (l[0]) reg.postes[String(l[0]).trim().toUpperCase()] = c.map((id, i) => (id && OUI(l[i]) ? id : null)).filter(Boolean); });
+    }
+    if (exc && exc.length) {
+      const c = cols(exc[0]);
+      exc.slice(1).forEach((l) => {
+        if (!l[0]) return;
+        const e = {};
+        c.forEach((id, i) => { if (id && OUI(l[i])) e[id] = true; else if (id && NON(l[i])) e[id] = false; });
+        reg.exceptions[mail(l[0])] = e;
+      });
+    }
+    try { localStorage.setItem(CACHE_REGLAGES, JSON.stringify(reg)); } catch (e) {}
+    return reg;
+  }
+  const reglagesCache = () => { try { return JSON.parse(localStorage.getItem(CACHE_REGLAGES) || "null"); } catch (e) { return null; } };
+
+  /** Modules d'une personne : défaut du poste (réglage ou code) puis ses exceptions. */
+  function modulesPour(poste, email, reg) {
+    const P = String(poste || "").toUpperCase();
+    const base = reg && reg.postes && reg.postes[P] ? reg.postes[P] : DEFAUTS[P] || DEFAUT_INCONNU;
+    const ex = (reg && reg.exceptions && reg.exceptions[mail(email)]) || {};
+    return TOUS.filter((m) => (m in ex ? ex[m] : base.includes(m)));
+  }
+
   // Gmail ignore les points : r.dupont@gmail.com = rdupont@gmail.com
   const mail = (s) => {
     const e = String(s || "").trim().toLowerCase();
@@ -108,7 +167,9 @@ const FTSModules = (() => {
       const enc = p && p.statut === "ACTIF" && (p.categorie === "ENCADREMENT" || !!p.fonctionEnc);
       if (!enc) return (etat = { statut: "refuse", email, personne: p ? { nom: p.nom, prenom: p.prenom } : null, poste: "", modules: [] });
       const poste = posteDe(p);
-      return (etat = { statut: "encadrement", email, personne: { nom: p.nom, prenom: p.prenom }, poste, modules: (DEFAUTS[poste] || DEFAUT_INCONNU).slice() });
+      let reg = null;
+      try { reg = await lireReglages(); } catch (e) { console.warn("Réglages des modules illisibles, dernière copie utilisée :", e); reg = reglagesCache(); }
+      return (etat = { statut: "encadrement", email, personne: { nom: p.nom, prenom: p.prenom }, poste, modules: modulesPour(poste, p.email, reg) });
     })();
     try { const r = await enCours; if (r.statut !== "inconnu") ecrireCache(r); return r; }
     finally { enCours = null; }
@@ -239,6 +300,6 @@ const FTSModules = (() => {
     return e;
   }
 
-  return { MODULES, DEFAUTS, appliquer, calculer, autorise: (m) => autoriseLien(m, etat), controler: (m) => controler(m, etat), filtrerMenu, moi, etat: () => etat, VUE_MODULE };
+  return { MODULES, DEFAUTS, DEFAUT_INCONNU, NOM_REGLAGES, trouverReglages, lireReglages, modulesPour, mail, appliquer, calculer, autorise: (m) => autoriseLien(m, etat), controler: (m) => controler(m, etat), filtrerMenu, moi, etat: () => etat, VUE_MODULE };
 })();
 if (typeof window !== "undefined") window.FTSModules = FTSModules;

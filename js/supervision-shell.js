@@ -33,7 +33,7 @@ const FTSShell = (() => {
     { grp: "RÉFÉRENTIELS" },
     { id: "se-view-personnel", ic: "👥", label: "Personnel FTS", href: SUP + "#se-view-personnel" },
     { id: "se-view-parc", ic: "🚜", label: "Parc matériel", href: SUP + "#se-view-parc" },
-    { id: "se-view-acces", ic: "🔐", label: "Accès Drive", href: SUP + "#se-view-acces" },
+    { id: "se-view-acces", ic: "🔐", label: "Accès", href: SUP + "#se-view-acces" },
   ];
   // Pastille (ex : nombre de fiches de préparation à faire), mémorisée par la Supervision
   function pastille(cle) {

@@ -305,39 +305,103 @@ const FTSPlanAcces = (() => {
     return [((lng + 180) / 360) * n, ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n];
   }
   const urlTuile = (c, z, x, y) => `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${c.layer}&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}&FORMAT=${encodeURIComponent(c.fmt)}`;
+  // ── Tuiles : mémoire + délai maxi ──
+  // Les serveurs IGN n'autorisent pas le navigateur à garder les tuiles :
+  // sans mémoire, chaque changement de zoom ou de type retéléchargeait
+  // tout. On les garde donc ici le temps de la session (≈ 1 000 tuiles).
+  const MEMOIRE_MAX = 1000, DELAI_TUILE = 4000, ABANDON_TUILE = 30000;
+  const memoireTuiles = new Map(); // url → Promise<Image|null> (chargement complet)
+  let premierPlanEnCours = 0;      // cartes demandées par l'utilisateur en cours
+  /** Chargement d'une tuile, gardé en mémoire (sans délai maxi, abandon à 30 s) */
+  function chargerTuile(url) {
+    if (memoireTuiles.has(url)) {
+      const p = memoireTuiles.get(url);
+      memoireTuiles.delete(url); memoireTuiles.set(url, p); // remonte en tête (plus récente)
+      return p;
+    }
+    const p = new Promise((fin) => {
+      const im = new Image();
+      im.crossOrigin = "anonymous";
+      const t = setTimeout(() => { im.onload = im.onerror = null; im.src = ""; fin(null); }, ABANDON_TUILE);
+      im.onload = () => { clearTimeout(t); fin(im); };
+      im.onerror = () => { clearTimeout(t); fin(null); };
+      im.src = url;
+    }).then((im) => { if (!im) memoireTuiles.delete(url); return im; }); // échec : on réessaiera plus tard
+    memoireTuiles.set(url, p);
+    while (memoireTuiles.size > MEMOIRE_MAX) memoireTuiles.delete(memoireTuiles.keys().next().value);
+    return p;
+  }
+  /**
+   * Tuile pour une carte affichée : une tuile lente ne bloque plus toute la
+   * carte, après 4 s on dessine sans elle (case grise). Elle continue de se
+   * charger en arrière-plan : au clic suivant, elle sera là.
+   */
+  function tuileUrl(url) {
+    return Promise.race([chargerTuile(url), new Promise((fin) => setTimeout(() => fin(null), DELAI_TUILE))]);
+  }
+  /** Liste des tuiles (par calque, dans l'ordre de superposition) d'une carte */
+  function tuilesCarte({ lat, lng, z, type, W, H }) {
+    const c = COUCHES[type] || COUCHES.plan;
+    const [cx, cy] = versMonde(lat, lng, z);
+    const x0 = cx - W / 2, y0 = cy - H / 2, n = Math.pow(2, z);
+    return { x0, y0, calques: c.calques.map((calque) => {
+      const l = [];
+      for (let tx = Math.floor(x0 / 256); tx <= Math.floor((x0 + W) / 256); tx++)
+        for (let ty = Math.floor(y0 / 256); ty <= Math.floor((y0 + H) / 256); ty++)
+          if (ty >= 0 && ty < n) l.push({ tx, ty, url: urlTuile(calque, z, ((tx % n) + n) % n, ty) });
+      return l;
+    }) };
+  }
+  // Préchargement discret des réglages voisins (zoom −/+ et autres types),
+  // pour que le prochain clic soit instantané. Il se met en pause dès que
+  // l'utilisateur demande une carte, et ne lance que 6 tuiles à la fois.
+  const filePrechargement = [];
+  let prechargementsActifs = 0;
+  function pomperPrechargement() {
+    while (!premierPlanEnCours && prechargementsActifs < 6 && filePrechargement.length) {
+      const url = filePrechargement.shift();
+      if (memoireTuiles.has(url)) continue;
+      prechargementsActifs++;
+      chargerTuile(url).then(() => { prechargementsActifs--; pomperPrechargement(); });
+    }
+  }
+  function precharger(o) {
+    const voisins = [{ ...o, z: o.z + 1 }, { ...o, z: o.z - 1 },
+      ...Object.keys(COUCHES).filter((t) => t !== o.type).map((t) => ({ ...o, type: t }))];
+    filePrechargement.length = 0;
+    voisins.forEach((v) => {
+      const cv = COUCHES[v.type];
+      if (v.z < cv.min || v.z > cv.max) return;
+      tuilesCarte(v).calques.forEach((l) => l.forEach((t) => filePrechargement.push(t.url)));
+    });
+    setTimeout(pomperPrechargement, 400);
+  }
   /**
    * Carte centrée sur le point : assemble les tuiles IGN dans un canvas W × H.
+   * Tous les calques sont chargés en même temps (avant : l'un après l'autre).
    * @returns {Promise<HTMLCanvasElement>}
    */
   async function carteIGN({ lat, lng, z, type, W = TAILLE_AUTO.W, H = TAILLE_AUTO.H }) {
-    const c = COUCHES[type] || COUCHES.plan;
-    const [cx, cy] = versMonde(lat, lng, z);
-    const x0 = cx - W / 2, y0 = cy - H / 2;
+    const { x0, y0, calques } = tuilesCarte({ lat, lng, z, type, W, H });
     const cv = document.createElement("canvas");
     cv.width = W; cv.height = H;
     const ctx = cv.getContext("2d");
     ctx.fillStyle = "#e5e7eb"; ctx.fillRect(0, 0, W, H);
-    const n = Math.pow(2, z);
     let ok = 0;
-    const tuile = (calque, tx, ty) => new Promise((fin) => {
-      const im = new Image();
-      im.crossOrigin = "anonymous";
-      im.onload = () => { ok++; fin(im); };
-      im.onerror = () => fin(null);
-      im.src = urlTuile(calque, z, ((tx % n) + n) % n, ty);
-    });
-    // Calques superposés dans l'ordre (photo, puis routes, puis noms des rues)
-    for (const calque of c.calques) {
-      const taches = [];
-      for (let tx = Math.floor(x0 / 256); tx <= Math.floor((x0 + W) / 256); tx++) {
-        for (let ty = Math.floor(y0 / 256); ty <= Math.floor((y0 + H) / 256); ty++) {
-          if (ty < 0 || ty >= n) continue;
-          taches.push(tuile(calque, tx, ty).then((im) => im && ctx.drawImage(im, Math.round(tx * 256 - x0), Math.round(ty * 256 - y0))));
-        }
-      }
-      await Promise.all(taches);
+    premierPlanEnCours++;
+    let images;
+    try {
+      images = await Promise.all(calques.map((l) => Promise.all(l.map((t) => tuileUrl(t.url)))));
+    } finally {
+      premierPlanEnCours--;
     }
+    // Calques superposés dans l'ordre (photo, puis routes, puis noms des rues)
+    calques.forEach((l, k) => l.forEach((t, j) => {
+      const im = images[k][j];
+      if (im) { ok++; ctx.drawImage(im, Math.round(t.tx * 256 - x0), Math.round(t.ty * 256 - y0)); }
+    }));
     if (!ok) throw new Error("Carte IGN indisponible (connexion internet ?)");
+    precharger({ lat, lng, z, type, W, H });
     // Mention obligatoire de la source
     ctx.font = "bold 15px Arial, sans-serif";
     const t = "© IGN – Géoplateforme", tw = ctx.measureText(t).width;

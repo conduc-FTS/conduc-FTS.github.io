@@ -655,7 +655,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const c = (donnees.chantiers || []).find((x) => x.id === e.chantierId) || {};
       FTSTrajets.calculer({ nom: e.cols[1], chantierId: e.chantierId, chantierName: e.chantierName, meta: c.meta, interim: e.cols[2] === "Intérim" }).then((r) => {
         if (!row.isConnected) return;
-        const approx = r.chantierApprox ? " · chantier situé à la commune (approx.)" : "";
+        const approx = r.lieuChantier ? ` · chantier placé à ${r.lieuChantier}${r.chantierApprox ? " (commune, approx.)" : ""}` : "";
         if (r.interim) {
           q("dom").className = "v att"; q("dom").textContent = "Intérimaire";
           q("domd").textContent = "Pas de calcul pour le personnel intérimaire";

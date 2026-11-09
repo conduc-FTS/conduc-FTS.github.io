@@ -31,10 +31,11 @@ const FTSTrajets = (() => {
   const ZONE_1A = { nom: "1A", lib: "dépôt" };
   const RAYON_DEPOT_KM = 0.5; // chantier au dépôt même
 
-  const CLE_CACHE = "fts_trajets_v1";
+  const CLE_CACHE = "fts_trajets_v2"; // v2 : choix des homonymes corrigé
   const sansAccent = (s) => String(s == null ? "" : s).trim().replace(/\s+/g, " ").toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const cleNom = (s) => sansAccent(s).split(" ").filter(Boolean).sort().join(" ");
 
+  try { localStorage.removeItem("fts_trajets_v1"); } catch (e) {}
   let cache = {};
   try { cache = JSON.parse(localStorage.getItem(CLE_CACHE)) || {}; } catch (e) { cache = {}; }
   const sauver = () => { try { localStorage.setItem(CLE_CACHE, JSON.stringify(cache)); } catch (e) {} };
@@ -69,16 +70,31 @@ const FTSTrajets = (() => {
     return m ? { lat: +m[1], lng: +m[2] } : null;
   }
 
+  /**
+   * Adresse → point (IGN / Base Adresse Nationale).
+   * Attention aux homonymes : « SARLAT » seul renvoie d'abord un lieu-dit
+   * « Sarlat » du Puy-de-Dôme. On lit donc 10 réponses et, parmi les mieux
+   * notées, on préfère : numéro / rue > commune > lieu-dit, puis le plus
+   * proche du dépôt (FTS travaille autour de Bordeaux).
+   */
+  const RANG_TYPE = { housenumber: 0, street: 1, municipality: 2, locality: 3 };
   async function geocoder(adresse) {
     const q = String(adresse || "").replace(/—/g, " ").trim();
     if (q.length < 3) return null;
     return memo("g|" + sansAccent(q), async () => {
-      const res = await fetch(`https://data.geopf.fr/geocodage/search?q=${encodeURIComponent(q)}&limit=1`);
+      const res = await fetch(`https://data.geopf.fr/geocodage/search?q=${encodeURIComponent(q)}&limit=10`);
       if (!res.ok) throw new Error(`Recherche d'adresse impossible (${res.status})`);
-      const f = ((await res.json()).features || [])[0];
-      if (!f || !f.geometry) return null;
-      const [lng, lat] = f.geometry.coordinates, pr = f.properties || {};
-      return { lat, lng, label: pr.label || q, precis: (pr.type === "housenumber" || pr.type === "street") && (pr.score || 0) >= 0.5 };
+      const feats = ((await res.json()).features || []).filter((f) => f && f.geometry);
+      if (!feats.length) return null;
+      const sc = (f) => (f.properties || {}).score || 0;
+      const meilleur = Math.max(...feats.map(sc));
+      const cand = feats.filter((f) => sc(f) >= meilleur - 0.15).map((f) => {
+        const [lng, lat] = f.geometry.coordinates, pr = f.properties || {};
+        return { lat, lng, pr, rang: RANG_TYPE[pr.type] ?? 4, dist: volOiseau(DEPOT, { lat, lng }) };
+      });
+      cand.sort((a, b) => a.rang - b.rang || a.dist - b.dist);
+      const c = cand[0];
+      return { lat: c.lat, lng: c.lng, label: c.pr.label || q, ville: c.pr.city || c.pr.name || "", precis: c.rang <= 1 && (c.pr.score || 0) >= 0.5 };
     });
   }
 
@@ -157,6 +173,7 @@ const FTSTrajets = (() => {
     try { pc = await pointChantier(meta); } catch (e) { out.zoneErr = out.domErr = "Adresse du chantier introuvable"; return out; }
     if (!pc) { out.zoneErr = out.domErr = "Adresse chantier manquante"; return out; }
     out.chantierApprox = !pc.precis;
+    out.lieuChantier = pc.source === "adresse" ? pc.ville || pc.label : "";
     out.zone = zoneDe(pc, chantierName);
     // Intérimaires : pas de km domicile → chantier (ni calcul, ni enregistrement)
     if (interim) { out.interim = true; return out; }

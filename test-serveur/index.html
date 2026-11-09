@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>FTS — Test serveur</title>
+<link rel="icon" type="image/png" sizes="192x192" href="../icon-dashboard-192.png">
+<link rel="stylesheet" href="../css/dashboard.css">
+<style>
+body { padding-bottom: 40px; }
+.ts-wrap { max-width: 860px; margin: 0 auto; padding: 22px 16px; }
+.ts-intro { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; font-size: 0.88rem; color: var(--text-sub); line-height: 1.5; margin-bottom: 16px; }
+.ts-intro b { color: var(--text-main); }
+.ts-step { background: #fff; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+.ts-step.off { opacity: .45; pointer-events: none; }
+.ts-head { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+.ts-num { width: 28px; height: 28px; border-radius: 50%; background: var(--anthracite); color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center; font-size: .85rem; flex: none; }
+.ts-step.ok .ts-num { background: #3FAE63; }
+.ts-step.ko .ts-num { background: #C0392B; }
+.ts-title { font-weight: 800; font-size: .95rem; }
+.ts-body { padding: 12px 18px 14px; font-size: .86rem; }
+.ts-body p { margin: 0 0 10px; color: var(--text-sub); }
+.ts-btn { border: 1px solid var(--fts-yellow); background: var(--fts-yellow); border-radius: 8px; padding: 9px 14px; font-weight: 700; font-size: .84rem; cursor: pointer; color: #1E1E1E; font-family: inherit; }
+.ts-btn.sec { background: #fff; border-color: var(--border); }
+.ts-btn.dang { background: #fff; border-color: #E6B0AA; color: #C0392B; }
+.ts-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ts-row input { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: .9rem; font-family: inherit; width: 160px; font-weight: 700; }
+.ts-res { margin-top: 10px; border-radius: 8px; padding: 8px 11px; font-size: .82rem; background: var(--bg); white-space: pre-wrap; }
+.ts-res:empty { display: none; }
+.ts-res.ok { background: #EAF6EE; color: #1D6E3E; }
+.ts-res.ko { background: #FDECEA; color: #A93226; }
+.ts-res.w { background: #FFF3DC; color: #8A5A00; }
+.ts-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 220px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+.ts-list li { padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: .82rem; display: flex; gap: 8px; align-items: center; }
+.ts-list li:last-child { border-bottom: none; }
+.ts-list li button { margin-left: auto; padding: 4px 10px; font-size: .76rem; }
+.ts-list li.sel { background: #FEF8E4; font-weight: 700; }
+.ts-bilan { background: var(--anthracite); color: #fff; border-radius: 12px; padding: 14px 18px; margin-top: 18px; }
+.ts-bilan pre { white-space: pre-wrap; font-size: .8rem; margin: 10px 0; color: #ddd; font-family: Consolas, monospace; }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-brand"><strong>FTS</strong>&nbsp;· Test d'écriture sur le serveur</div></header>
+
+<div class="ts-wrap">
+  <div class="ts-intro">
+    Page de <b>test uniquement</b>, à ouvrir dans <b>Chrome ou Edge sur un PC du bureau</b> qui voit le lecteur P:.<br>
+    Rien ne part sur internet : le navigateur lit et écrit directement sur le serveur, avec les droits de la session Windows.
+    Le test n'écrit que dans un dossier <b>_TEST_DASHBOARD</b> créé dans le chantier choisi, et le supprime à la fin.
+  </div>
+
+  <div class="ts-step" id="s1">
+    <div class="ts-head"><div class="ts-num">1</div><div class="ts-title">Navigateur compatible</div></div>
+    <div class="ts-body"><div class="ts-res" id="r1"></div></div>
+  </div>
+
+  <div class="ts-step off" id="s2">
+    <div class="ts-head"><div class="ts-num">2</div><div class="ts-title">Relier le dossier des chantiers</div></div>
+    <div class="ts-body">
+      <p>Clique, puis va dans <b>P:\PARTAGE\FTS\7 - TRAVAUX\7-1 - CHANTIERS EN COURS</b> et clique « Sélectionner un dossier ». Le navigateur demandera ensuite « Autoriser les modifications » : accepte.</p>
+      <div class="ts-row">
+        <button class="ts-btn" id="b2">Choisir le dossier…</button>
+        <button class="ts-btn sec" id="b2b" hidden>Reprendre le dossier mémorisé</button>
+      </div>
+      <div class="ts-res" id="r2"></div>
+    </div>
+  </div>
+
+  <div class="ts-step off" id="s3">
+    <div class="ts-head"><div class="ts-num">3</div><div class="ts-title">Retrouver le chantier par son code</div></div>
+    <div class="ts-body">
+      <p>Recherche les dossiers dont le nom commence par le code, avec ou sans espaces (« 26 FTS 099 » = « 26FTS099 »).</p>
+      <div class="ts-row"><input id="code" value="26FTS099"><button class="ts-btn" id="b3">Chercher</button></div>
+      <div class="ts-res" id="r3"></div>
+      <ul class="ts-list" id="l3" hidden></ul>
+    </div>
+  </div>
+
+  <div class="ts-step off" id="s4">
+    <div class="ts-head"><div class="ts-num">4</div><div class="ts-title">Lire les sous-dossiers du chantier</div></div>
+    <div class="ts-body"><div class="ts-res" id="r4"></div><ul class="ts-list" id="l4" hidden></ul></div>
+  </div>
+
+  <div class="ts-step off" id="s5">
+    <div class="ts-head"><div class="ts-num">5</div><div class="ts-title">Écrire puis relire un fichier test</div></div>
+    <div class="ts-body">
+      <p>Crée <b>_TEST_DASHBOARD</b> dans le chantier, y écrit un petit fichier texte et un petit PDF, puis les relit pour vérifier.</p>
+      <button class="ts-btn" id="b5">Lancer l'écriture</button>
+      <div class="ts-res" id="r5"></div>
+    </div>
+  </div>
+
+  <div class="ts-step off" id="s6">
+    <div class="ts-head"><div class="ts-num">6</div><div class="ts-title">Nettoyer</div></div>
+    <div class="ts-body">
+      <p>Va d'abord voir dans l'Explorateur que le dossier <b>_TEST_DASHBOARD</b> et ses 2 fichiers sont bien là. Ensuite, supprime-le d'ici.</p>
+      <button class="ts-btn dang" id="b6">Supprimer _TEST_DASHBOARD</button>
+      <div class="ts-res" id="r6"></div>
+    </div>
+  </div>
+
+  <div class="ts-bilan">
+    <strong>Bilan du test</strong> — copie-le et colle-le à Claude.
+    <pre id="bilan">—</pre>
+    <button class="ts-btn" id="bcopy">Copier le bilan</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const log = [];
+  let racine = null, chantier = null;
+  const TEST_DIR = "_TEST_DASHBOARD";
+
+  function bilan(ligne) {
+    log.push(new Date().toLocaleTimeString("fr-FR") + "  " + ligne);
+    $("bilan").textContent = log.join("\n");
+  }
+  function etat(n, ok, msg, cls) {
+    const s = $("s" + n);
+    s.classList.remove("ok", "ko");
+    if (ok === true) s.classList.add("ok");
+    if (ok === false) s.classList.add("ko");
+    const r = $("r" + n);
+    r.className = "ts-res " + (cls || (ok === true ? "ok" : ok === false ? "ko" : ""));
+    r.textContent = msg;
+    bilan("Étape " + n + " " + (ok === true ? "OK" : ok === false ? "ÉCHEC" : "…") + " — " + msg.replace(/\n/g, " | "));
+  }
+  function activer(n) { $("s" + n).classList.remove("off"); }
+  function erreur(e) {
+    if (!e) return "erreur inconnue";
+    if (e.name === "AbortError") return "annulé par l'utilisateur";
+    if (e.name === "NotAllowedError") return "autorisation refusée (" + e.message + ")";
+    if (e.name === "SecurityError") return "bloqué par le navigateur (" + e.message + ")";
+    if (e.name === "NoModificationAllowedError") return "écriture interdite : droits en lecture seule ? (" + e.message + ")";
+    return e.name + " : " + e.message;
+  }
+  const norm = s => s.toUpperCase().replace(/[\s_\-\.]/g, "");
+
+  // --- mémorisation du dossier (IndexedDB) ---
+  function idb() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open("fts-test-serveur", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("h");
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+  }
+  async function memoriser(h) {
+    try { const db = await idb(); db.transaction("h", "readwrite").objectStore("h").put(h, "racine"); } catch (e) {}
+  }
+  async function relire() {
+    try {
+      const db = await idb();
+      return await new Promise(res => {
+        const q = db.transaction("h").objectStore("h").get("racine");
+        q.onsuccess = () => res(q.result || null); q.onerror = () => res(null);
+      });
+    } catch (e) { return null; }
+  }
+
+  async function autoriser(h) {
+    const opt = { mode: "readwrite" };
+    if (await h.queryPermission(opt) === "granted") return true;
+    return (await h.requestPermission(opt)) === "granted";
+  }
+
+  async function sousDossiers(h) {
+    const out = [];
+    for await (const [nom, e] of h.entries()) if (e.kind === "directory") out.push([nom, e]);
+    return out.sort((a, b) => a[0].localeCompare(b[0], "fr", { numeric: true }));
+  }
+
+  async function brancher(h, source) {
+    if (!(await autoriser(h))) { etat(2, false, "Droit d'écriture refusé sur « " + h.name + " »."); return; }
+    racine = h; await memoriser(h);
+    const t0 = performance.now();
+    const liste = await sousDossiers(h);
+    const ms = Math.round(performance.now() - t0);
+    etat(2, true, (source === "memo" ? "Dossier mémorisé repris : « " : "Dossier relié : « ") + h.name + " »\n" +
+      liste.length + " sous-dossiers lus en " + ms + " ms.");
+    activer(3);
+  }
+
+  // Étape 1
+  const okApi = "showDirectoryPicker" in window;
+  const nav = /Edg\//.test(navigator.userAgent) ? "Edge" : /Chrome\//.test(navigator.userAgent) ? "Chrome" : "autre navigateur";
+  if (okApi && window.isSecureContext) {
+    etat(1, true, nav + " — accès aux dossiers disponible.");
+    activer(2);
+    relire().then(h => { if (h) $("b2b").hidden = false; });
+  } else {
+    etat(1, false, nav + " — accès aux dossiers indisponible. Ouvre cette page dans Chrome ou Edge sur ordinateur.");
+  }
+
+  // Étape 2
+  $("b2").onclick = async () => {
+    try {
+      const h = await window.showDirectoryPicker({ id: "fts-serveur", mode: "readwrite" });
+      await brancher(h, "choix");
+    } catch (e) { etat(2, false, erreur(e)); }
+  };
+  $("b2b").onclick = async () => {
+    try { const h = await relire(); if (h) await brancher(h, "memo"); }
+    catch (e) { etat(2, false, erreur(e)); }
+  };
+
+  // Étape 3
+  $("b3").onclick = async () => {
+    const code = norm($("code").value);
+    if (!code) return;
+    try {
+      const t0 = performance.now();
+      const liste = await sousDossiers(racine);
+      const trouves = liste.filter(([nom]) => { const n = norm(nom); return n.startsWith(code) && !/\d/.test(n.charAt(code.length)); });
+      const ms = Math.round(performance.now() - t0);
+      const ul = $("l3"); ul.innerHTML = ""; ul.hidden = !trouves.length;
+      if (!trouves.length) { etat(3, false, "Aucun dossier ne commence par " + code + " (" + liste.length + " dossiers parcourus en " + ms + " ms)."); return; }
+      etat(3, trouves.length === 1 ? true : null, trouves.length + " dossier(s) trouvé(s) en " + ms + " ms. Confirme le bon :", trouves.length === 1 ? "ok" : "w");
+      trouves.forEach(([nom, h]) => {
+        const li = document.createElement("li");
+        li.innerHTML = "📁 <span></span>";
+        li.querySelector("span").textContent = nom;
+        const b = document.createElement("button"); b.className = "ts-btn"; b.textContent = "C'est celui-là";
+        b.onclick = () => { [...ul.children].forEach(x => x.classList.remove("sel")); li.classList.add("sel"); choisir(nom, h); };
+        li.appendChild(b); ul.appendChild(li);
+      });
+    } catch (e) { etat(3, false, erreur(e)); }
+  };
+
+  // Étape 4
+  async function choisir(nom, h) {
+    chantier = h;
+    bilan("Chantier confirmé : " + nom);
+    activer(4);
+    try {
+      const liste = await sousDossiers(h);
+      const ul = $("l4"); ul.innerHTML = ""; ul.hidden = !liste.length;
+      liste.forEach(([n]) => { const li = document.createElement("li"); li.textContent = "📁 " + n; ul.appendChild(li); });
+      etat(4, true, liste.length + " sous-dossiers lus dans « " + nom + " ».");
+      bilan("Sous-dossiers : " + liste.map(x => x[0]).join(" ; "));
+      activer(5);
+    } catch (e) { etat(4, false, erreur(e)); }
+  }
+
+  // petit PDF valide d'une page
+  function petitPdf(texte) {
+    const t = texte.replace(/[()\\]/g, "");
+    const objs = [
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+      null,
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    ];
+    const flux = "BT /F1 14 Tf 60 780 Td (" + t + ") Tj ET";
+    objs[3] = "<< /Length " + flux.length + " >>\nstream\n" + flux + "\nendstream";
+    let pdf = "%PDF-1.4\n"; const off = [];
+    objs.forEach((o, i) => { off.push(pdf.length); pdf += (i + 1) + " 0 obj\n" + o + "\nendobj\n"; });
+    const x = pdf.length;
+    pdf += "xref\n0 " + (objs.length + 1) + "\n0000000000 65535 f \n" + off.map(o => String(o).padStart(10, "0") + " 00000 n \n").join("");
+    pdf += "trailer\n<< /Size " + (objs.length + 1) + " /Root 1 0 R >>\nstartxref\n" + x + "\n%%EOF";
+    return new Blob([pdf], { type: "application/pdf" });
+  }
+
+  async function ecrire(dir, nom, contenu) {
+    const f = await dir.getFileHandle(nom, { create: true });
+    const w = await f.createWritable();
+    await w.write(contenu); await w.close();
+    return (await f.getFile());
+  }
+
+  // Étape 5
+  $("b5").onclick = async () => {
+    try {
+      const t0 = performance.now();
+      const dir = await chantier.getDirectoryHandle(TEST_DIR, { create: true });
+      const stamp = new Date().toLocaleString("fr-FR");
+      const txt = "Test d'écriture FTS Dashboard\nDate : " + stamp + "\nNavigateur : " + nav + "\n";
+      const f1 = await ecrire(dir, "TEST_DASHBOARD.txt", txt);
+      const relu = await f1.text();
+      const f2 = await ecrire(dir, "TEST_DASHBOARD.pdf", petitPdf("Test FTS Dashboard - " + stamp));
+      const ms = Math.round(performance.now() - t0);
+      if (relu !== txt) { etat(5, false, "Fichier écrit mais contenu relu différent."); return; }
+      etat(5, true, "Dossier " + TEST_DIR + " créé, 2 fichiers écrits et relus en " + ms + " ms.\n" +
+        "TEST_DASHBOARD.txt (" + f1.size + " o) · TEST_DASHBOARD.pdf (" + f2.size + " o)");
+      activer(6);
+    } catch (e) { etat(5, false, erreur(e)); }
+  };
+
+  // Étape 6
+  $("b6").onclick = async () => {
+    try {
+      await chantier.removeEntry(TEST_DIR, { recursive: true });
+      etat(6, true, "Dossier " + TEST_DIR + " supprimé. Test terminé.");
+    } catch (e) {
+      etat(6, false, erreur(e) + "\nSi la suppression est refusée, supprime le dossier à la main dans l'Explorateur.");
+    }
+  };
+
+  $("bcopy").onclick = () => {
+    navigator.clipboard.writeText($("bilan").textContent).then(() => { $("bcopy").textContent = "Copié ✓"; setTimeout(() => $("bcopy").textContent = "Copier le bilan", 1500); });
+  };
+})();
+</script>
+</body>
+</html>

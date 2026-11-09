@@ -89,8 +89,8 @@ html { font-size: 16px; }
   width: 230px; background: var(--anthracite); color: #fff; display: flex; flex-direction: column;
   flex-shrink: 0; position: sticky; top: 0; height: 100vh; z-index: 40;
 }
-.sv-brand { display: flex; gap: 10px; align-items: center; padding: 18px 18px 12px; text-decoration: none; color: #fff; }
-.sv-brand img { width: 54px; height: 28px; object-fit: contain; background: #fff; border-radius: 6px; padding: 3px 5px; flex-shrink: 0; }
+.sv-brand { display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center; padding: 18px 18px 12px; text-decoration: none; color: #fff; }
+.sv-brand img { width: 80%; height: auto; object-fit: contain; background: #fff; border-radius: 8px; padding: 8px 12px; box-sizing: border-box; flex-shrink: 0; }
 .sv-brand b { font-size: 0.82rem; letter-spacing: 0.04em; display: block; }
 .sv-brand small { font-size: 0.68rem; color: #A8ABB2; }
 .sv-nav { flex: 1; padding: 4px 12px; overflow-y: auto; }
@@ -391,7 +391,7 @@ tr.pp-libre { background: #FFFCF0; }
 <aside class="sv-sidebar" id="sidebar">
   <a class="sv-brand" href="index.html">
     <img src="../assets/logo-fts.png" alt="FTS" width="54" height="28">
-    <div><b>SUPERVISION</b><small>Fondations &amp; Travaux Spéciaux</small></div>
+    <div><b>SUPERVISION</b></div>
   </a>
   <nav class="sv-nav" id="sidebarNav">
     <div class="sv-grp">PILOTAGE</div>

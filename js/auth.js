@@ -120,28 +120,104 @@ const FTSAuth = (() => {
    * mais ça réduit nettement la fréquence des déconnexions ressenties.
    */
   let renouvellementEnCours = false;
+  let renouvellementTimer = null;
   let verificationPeriodiqueDemarree = false;
+  let silencieuxTentePour = 0;   // expiresAt du token pour lequel on a déjà tenté
+  let clicArme = false;
+  let derniereDemande = 0;
+
+  // Renouvellement anticipé : on s'y prend 10 min avant la fin de l'heure,
+  // pendant que l'accès est encore valable, pour ne jamais "décrocher".
+  const MARGE_RENOUVELLEMENT = 10 * 60 * 1000;
+
+  function optionsRenouvellement(prompt) {
+    // Le compte mémorisé est donné à Google : sans lui, si le navigateur a
+    // plusieurs comptes Google (pro + perso), Google ne sait pas lequel
+    // choisir et le renouvellement échoue.
+    const email = emailMemorise();
+    const o = { prompt };
+    if (email) { o.hint = email; o.login_hint = email; }
+    return o;
+  }
+
+  function lancerDemande(prompt) {
+    if (!tokenClient || renouvellementEnCours) return false;
+    renouvellementEnCours = true;
+    derniereDemande = Date.now();
+    // Sécurité : si Google ne répond jamais (fenêtre bloquée sans erreur),
+    // on libère le verrou pour pouvoir réessayer.
+    clearTimeout(renouvellementTimer);
+    renouvellementTimer = setTimeout(() => { renouvellementEnCours = false; }, 30000);
+    try {
+      tokenClient.requestAccessToken(optionsRenouvellement(prompt));
+    } catch (e) {
+      renouvellementEnCours = false;
+      return false;
+    }
+    return true;
+  }
 
   function tenterRenouvellementSilencieux() {
-    if (!tokenClient || renouvellementEnCours) return;
-    renouvellementEnCours = true;
-    tokenClient.requestAccessToken({ prompt: "none" });
+    lancerDemande("none");
+  }
+
+  // Le navigateur bloque souvent la fenêtre Google quand elle s'ouvre
+  // toute seule (sans clic). Donc, quand l'accès arrive en fin de vie, on
+  // profite du prochain clic / toucher de l'utilisateur, n'importe où dans
+  // l'appli, pour renouveler : la fenêtre Google s'ouvre et se referme seule.
+  function armerRenouvellementAuClic() {
+    if (clicArme) return;
+    clicArme = true;
+    const surClic = () => {
+      document.removeEventListener("pointerdown", surClic, true);
+      clicArme = false;
+      if (!besoinRenouvellement()) return;
+      lancerDemande("");
+    };
+    document.addEventListener("pointerdown", surClic, true);
+  }
+
+  function besoinRenouvellement() {
+    const stored = chargerTokenBrut();
+    if (!stored || !stored.expiresAt) return false;
+    return stored.expiresAt - Date.now() < MARGE_RENOUVELLEMENT;
+  }
+
+  function verifierSession() {
+    const stored = chargerTokenBrut();
+    if (!stored || !stored.expiresAt) return;
+    const reste = stored.expiresAt - Date.now();
+    if (reste <= 0) {
+      // Vraiment expiré : on bascule en "déconnecté" (la page affiche alors
+      // son bouton de reconnexion) et on tente quand même en silence.
+      if (accessToken) { accessToken = null; notifyChange(); }
+      if (silencieuxTentePour !== stored.expiresAt) {
+        silencieuxTentePour = stored.expiresAt;
+        tenterRenouvellementSilencieux();
+      }
+      armerRenouvellementAuClic();
+    } else if (reste < MARGE_RENOUVELLEMENT) {
+      // Encore valable : on garde l'accès actuel pendant le renouvellement.
+      if (silencieuxTentePour !== stored.expiresAt) {
+        silencieuxTentePour = stored.expiresAt;
+        tenterRenouvellementSilencieux();
+      }
+      armerRenouvellementAuClic();
+    }
   }
 
   function demarrerVerificationPeriodique() {
     if (verificationPeriodiqueDemarree) return;
     verificationPeriodiqueDemarree = true;
-    // Vérifie chaque minute : utile si la page reste ouverte longtemps
+    // Vérifie toutes les 30 s : utile si la page reste ouverte longtemps
     // (tablette laissée allumée toute la journée) sans être rechargée.
-    setInterval(() => {
-      const stored = chargerTokenBrut();
-      const expire = !stored || !stored.expiresAt || Date.now() >= stored.expiresAt;
-      if (expire && accessToken) {
-        accessToken = null;
-        notifyChange();
-        tenterRenouvellementSilencieux();
-      }
-    }, 60000);
+    setInterval(verifierSession, 30000);
+    // Retour sur l'appli (sortie de veille, changement d'onglet/appli) :
+    // les minuteries sont souvent gelées pendant la veille, on revérifie.
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") verifierSession();
+    });
+    window.addEventListener("focus", verifierSession);
   }
 
   function onAuthChange(callback) {
@@ -181,6 +257,7 @@ const FTSAuth = (() => {
       scope: SCOPES,
       callback: (tokenResponse) => {
         renouvellementEnCours = false;
+        clearTimeout(renouvellementTimer);
         if (tokenResponse && tokenResponse.access_token) {
           storeToken(tokenResponse);
         } else {
@@ -192,6 +269,7 @@ const FTSAuth = (() => {
       },
       error_callback: () => {
         renouvellementEnCours = false;
+        clearTimeout(renouvellementTimer);
         notifyChange();
       },
     });
@@ -199,9 +277,14 @@ const FTSAuth = (() => {
     demarrerVerificationPeriodique();
 
     // Une session existait avant (même expirée maintenant) : on tente de
-    // la renouveler silencieusement plutôt que d'attendre un clic manuel.
+    // la renouveler silencieusement plutôt que d'attendre un clic manuel,
+    // et le premier clic dans l'appli fera la reconnexion si besoin.
     if (brutAvantExpiration && !accessToken) {
+      silencieuxTentePour = brutAvantExpiration.expiresAt || 0;
       tenterRenouvellementSilencieux();
+      armerRenouvellementAuClic();
+    } else {
+      verifierSession();
     }
   }
 
@@ -232,7 +315,14 @@ const FTSAuth = (() => {
     // Compte déjà connu sur cet appareil : on le donne à Google (hint) pour
     // sauter l'écran de choix du compte — la reconnexion se fait alors en
     // un clic, la fenêtre Google s'ouvre et se referme seule.
+    // Le même clic vient peut-être déjà de lancer le renouvellement
+    // (voir armerRenouvellementAuClic) : pas de deuxième fenêtre Google.
+    if (renouvellementEnCours && Date.now() - derniereDemande < 3000) return;
     const email = emailMemorise();
+    renouvellementEnCours = true;
+    derniereDemande = Date.now();
+    clearTimeout(renouvellementTimer);
+    renouvellementTimer = setTimeout(() => { renouvellementEnCours = false; }, 30000);
     tokenClient.requestAccessToken(email ? { hint: email, login_hint: email, prompt: "" } : {});
   }
 

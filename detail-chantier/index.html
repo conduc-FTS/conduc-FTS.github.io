@@ -14,6 +14,9 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <link rel="stylesheet" href="../css/supervision.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
+.srv-band { display: flex; align-items: center; gap: 12px; background: #FFF8EA; border: 1px solid #F1D9A6; border-radius: 10px; padding: 10px 14px; font-size: .84rem; margin-bottom: 14px; }
+.srv-band[hidden] { display: none; }
+.srv-band .t { flex: 1; min-width: 0; } .srv-band small { display: block; color: var(--text-sub); font-size: .76rem; overflow-wrap: anywhere; }
 .dt-meta { display: flex; gap: 8px 26px; flex-wrap: wrap; font-size: 0.84rem; color: var(--text-sub); margin-bottom: 16px; align-items: center; }
 .dt-meta b { color: var(--text-main); }
 .sv-kpis.dt { --nk: 6; }
@@ -108,6 +111,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 
 <div id="svPage">
   <div class="dt-meta" id="dcMeta"></div>
+  <div class="srv-band" id="srvBand" hidden></div>
   <div class="sv-kpis dt" id="dcKpis"></div>
 
   <div class="sv-tabs" id="dcTabs">
@@ -183,6 +187,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <script src="../js/personnel.js"></script>
 <script src="../js/ateliers.js"></script>
 <script src="../js/modules.js"></script>
+<script src="../js/serveur-fts.js"></script>
 <script src="../js/supervision-shell.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -409,6 +414,37 @@ document.addEventListener("DOMContentLoaded", () => {
     else if (m.statutChantier === "Termine") z.innerHTML = `<button type="button" class="sv-btn" id="rouvrirBtn">Rouvrir</button> <button type="button" class="sv-btn" id="archiverBtn">🗄️ Archiver le dossier</button>`;
     else z.innerHTML = `<button type="button" class="sv-btn" id="terminerBtn" style="color:#C0392B;border-color:#F2C4BE">Marquer terminé</button>`;
     brancherStatut();
+    afficherAttenteServeur(m);
+  }
+
+  // ─── Documents en attente de dépôt sur le serveur FTS ──────────
+  function afficherAttenteServeur(m) {
+    const z = $("srvBand");
+    const liste = Array.isArray(m.serveurAttente) ? m.serveurAttente : [];
+    z.hidden = !liste.length || !(typeof FTSServeur !== "undefined");
+    if (z.hidden) return;
+    const dates = (x) => { const d = new Date(x.le); return isNaN(d) ? "" : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }); };
+    const parDossier = {};
+    liste.forEach((x) => { const k = x.chemin.join(" › "); (parDossier[k] = parDossier[k] || []).push(x); });
+    const pc = FTSServeur.disponible() && !window.matchMedia("(max-width: 820px)").matches;
+    z.innerHTML = `<span>🗄️</span><div class="t"><b>${liste.length} document${liste.length > 1 ? "s" : ""} à déposer sur le serveur FTS</b>
+      ${Object.entries(parDossier).map(([k, l]) => `<small>${esc(k)} : ${l.map((x) => `${esc(x.nom)}${dates(x) ? " (" + dates(x) + ")" : ""}`).join(", ")}</small>`).join("")}
+      ${pc ? "" : `<small>À faire depuis Chrome ou Edge sur un PC du bureau.</small>`}</div>
+      ${pc ? `<button type="button" class="sv-btn pri" id="srvDeposerBtn">Déposer maintenant</button>` : ""}`;
+    const b = $("srvDeposerBtn");
+    if (b) b.addEventListener("click", async () => {
+      b.disabled = true; b.textContent = "Dépôt…";
+      try {
+        const r = await FTSServeur.dossierChantier(code);
+        if (!r.ok) { FTSShell.toast("⚠️ " + r.message, 6000); return; }
+        const res = await FTSServeur.traiterAttente(chantierId, r.dossier);
+        FTSShell.toast(res.erreurs.length
+          ? `⚠️ ${res.deposes} déposé(s), ${res.erreurs.length} en échec : ${res.erreurs[0].erreur}`
+          : `✅ ${res.deposes} document(s) déposé(s) sur le serveur${res.deja ? ` · ${res.deja} déjà présent(s)` : ""}`, 6000);
+        m.serveurAttente = await FTSServeur.lireAttente(chantierId);
+      } catch (e) { FTSShell.toast("⚠️ " + e.message, 6000); }
+      finally { afficherAttenteServeur(m); }
+    });
   }
 
   function kpi(label, valeur, sous, barre, classe) {

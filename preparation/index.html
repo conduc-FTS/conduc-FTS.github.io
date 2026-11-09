@@ -213,6 +213,16 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .pe-dp-s { font-size: .78rem; color: var(--text-sub); }
 .pe-dp-b { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 #tabEnvoi #dpPlanLigne[hidden] { display: none; }
+.srv-b { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: .84rem; }
+.srv-b.ok { border-color: #BFE3CB; background: #F3FAF5; } .srv-b.w { border-color: #F1D9A6; background: #FFF8EA; } .srv-b.ko { border-color: #F2C4BE; background: #FDF1EF; }
+.srv-chk { display: flex; gap: 8px; align-items: flex-start; font-weight: 700; cursor: pointer; }
+.srv-chk input { margin-top: 3px; accent-color: #222; }
+.srv-path { font-family: Consolas, monospace; font-size: .74rem; color: #3B4250; background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; margin-top: 8px; overflow-wrap: anywhere; }
+.srv-path b { color: #1D6E3E; }
+.srv-fl { list-style: none; margin: 8px 0 0; padding: 0; font-size: .8rem; }
+.srv-fl li { padding: 2px 0; overflow-wrap: anywhere; }
+.srv-mini { font-size: .76rem; color: var(--text-sub); margin-top: 6px; }
+.srv-att { margin-top: 10px; }
 .pe-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 0 16px; }
 .pe-pj { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
 .pe-pj .i { font-size: 1.4rem; } .pe-pj .t { flex: 1; min-width: 0; } .pe-pj .t b { display: block; overflow-wrap: anywhere; }
@@ -448,6 +458,16 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
             <p style="margin:4px 0 0;font-size:.82rem;color:var(--text-sub)">☁️ Copie automatique dans le Drive, dossier PREPARATION du chantier.</p>
           </div>
         </section>
+        <section class="sv-card" id="srvCarte">
+          <div class="sv-ch"><h2>Serveur FTS</h2><span class="s">13 - Travaux › PREPARATION CHANTIER</span></div>
+          <div style="padding:12px 18px 16px">
+            <div class="srv-b" id="srvBloc">
+              <label class="srv-chk"><input type="checkbox" id="srvDeposer" checked> Déposer aussi la fiche, le plan et la page de garde sur le serveur</label>
+              <div id="srvDetail"></div>
+            </div>
+            <div class="srv-att" id="srvAttente" hidden></div>
+          </div>
+        </section>
         <section class="sv-card">
           <div class="sv-ch"><h2 id="envChgTitre">Changements</h2></div>
           <div style="padding:12px 18px 16px" id="envChg"></div>
@@ -517,6 +537,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <script src="../js/plan-acces.js"></script>
 <script src="../js/page-garde.js"></script>
 <script src="../js/modules.js"></script>
+<script src="../js/serveur-fts.js"></script>
 <script src="../js/supervision-shell.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -1792,6 +1813,10 @@ document.addEventListener("DOMContentLoaded", () => {
   /** Plan joint au prochain envoi : fichier choisi à la main, sinon plan de l'étape 6 si coché */
   const planJoint = () => !!plan || (planGenere() && $("envPlanJoindre").checked);
   const nomPlan = (n) => `${P.nomFichier(code)}_Plan-acces_Ind${P.nomFichier(n)}.pdf`;
+  /** Plan joint à la main (PDF ou image) : nom du fichier rangé, avec l'indice */
+  const extPlan = () => (plan && (plan.nom.match(/\.[A-Za-z0-9]+$/) || [""])[0].toLowerCase()) || "";
+  const nomPlanAutre = (n) => `${P.nomFichier(code)}_Plan-acces_Ind${P.nomFichier(n)}${extPlan()}`;
+  const nomGarde = (n) => `${P.nomFichier(code)}_Page-de-garde_Ind${P.nomFichier(n)}.pdf`;
   let nomMoi = "";
   /** Relevé de ce qui est imprimé sur la fiche : sert à repérer les changements entre deux envois */
   const kPl = (p) => `Platines ${p.section} ${String(p.coiffe).toLowerCase()}`;
@@ -1907,6 +1932,7 @@ document.addEventListener("DOMContentLoaded", () => {
     $("envEnvoyer").textContent = `✉️ Envoyer l'indice ${n}`;
     majPageGarde();
     majOngletEnvoi();
+    afficherServeur();
   }
   $("envIndice").addEventListener("input", () => { indiceTouche = true; afficherEnvoi(); });
   ["envA", "envCc"].forEach((id) => $(id).addEventListener("input", () => { destTouche = true; }));
@@ -2063,6 +2089,104 @@ document.addEventListener("DOMContentLoaded", () => {
     finally { boutonsEnvoi(true); }
   });
 
+  // ─── Serveur FTS : dépôt à l'envoi (13 - Travaux › PREPARATION CHANTIER) ───
+  const SRV_CHEMIN = ["13 - Travaux", "PREPARATION CHANTIER"];
+  const srvDispo = () => !!(typeof FTSServeur !== "undefined") && FTSServeur.disponible();
+  try { if (localStorage.getItem("fts_srv_prepa") === "0") $("srvDeposer").checked = false; } catch (e) {}
+  $("srvDeposer").addEventListener("change", () => {
+    try { localStorage.setItem("fts_srv_prepa", $("srvDeposer").checked ? "1" : "0"); } catch (e) {}
+    afficherServeur();
+  });
+  document.addEventListener("fts-serveur-change", () => afficherServeur());
+  /** Noms des PDF du prochain envoi, dans l'ordre */
+  function fichiersPrevus(n) {
+    const l = [P.nomPdf(code, n)];
+    if (plan) l.push(nomPlanAutre(n)); else if (planJoint()) l.push(nomPlan(n));
+    l.push(nomGarde(n));
+    return l;
+  }
+  let srvAttente = null, srvTour = 0;
+  /** Carte « Serveur FTS » de l'étape Envoi (rechargerAttente : relit la file d'attente dans le Drive) */
+  async function afficherServeur(rechargerAttente) {
+    const tour = ++srvTour;
+    const bloc = $("srvBloc"), det = $("srvDetail");
+    const n = indiceEnvoi();
+    const liste = `<ul class="srv-fl">${fichiersPrevus(n).map((x) => `<li>📄 ${esc(x)}</li>`).join("")}</ul>`;
+    let cls = "", html = "";
+    if (!$("srvDeposer").checked) { html = `<div class="srv-mini">Rien ne sera déposé sur le serveur pour cet envoi.</div>`; }
+    else if (!srvDispo()) { cls = "w"; html = `<div class="srv-mini">⚠️ Ce navigateur n'écrit pas sur le serveur : utilise <b>Chrome ou Edge sur un PC du bureau</b>. Sinon les PDF seront mis en attente de dépôt.</div>${liste}`; }
+    else {
+      const st = await FTSServeur.etat();
+      if (tour !== srvTour) return;
+      if (st === "non-relie") { cls = "w"; html = `<div class="srv-mini">⚠️ Serveur pas encore relié sur ce PC : bouton <b>« Relier le serveur »</b> en haut. Sinon les PDF seront mis en attente de dépôt.</div>${liste}`; }
+      else if (st === "a-autoriser") { cls = "ok"; html = `<div class="srv-mini">Le navigateur demandera « Autoriser » au moment de l'envoi (une fois par session).</div>${liste}<div class="srv-mini">Rien n'est jamais remplacé ni supprimé sur le serveur.</div>`; }
+      else {
+        let t;
+        try { t = await FTSServeur.trouverChantier(code); } catch (e) { t = { etat: "erreur" }; }
+        if (tour !== srvTour) return;
+        if (t.etat === "ok") { cls = "ok"; html = `<div class="srv-path">${esc(FTSServeur.DOSSIER_ATTENDU)} › <b>${esc(t.nom)}</b> › ${SRV_CHEMIN.map(esc).join(" › ")}</div>${liste}<div class="srv-mini">Le dossier PREPARATION CHANTIER est créé s'il n'existe pas. Rien n'est jamais remplacé ni supprimé.</div>`; }
+        else if (t.etat === "plusieurs") { cls = "w"; html = `<div class="srv-mini">⚠️ ${t.choix.length} dossiers commencent par « ${esc(code)} » : on te demandera lequel au moment de l'envoi.</div>${liste}`; }
+        else if (t.etat === "introuvable") { cls = "ko"; html = `<div class="srv-mini">❌ <b>Aucun dossier « ${esc(code)} » sur le serveur.</b> Il a peut-être été déplacé ou pas encore créé (l'appli ne crée jamais de dossier chantier). Les PDF seront mis en attente de dépôt.</div>`; }
+        else { cls = "w"; html = `<div class="srv-mini">⚠️ Serveur FTS non accessible depuis ce PC (pas de VPN ?). Les PDF seront mis en attente de dépôt.</div>${liste}`; }
+      }
+    }
+    bloc.className = "srv-b " + cls; det.innerHTML = html;
+    // File d'attente du chantier
+    if (rechargerAttente || srvAttente === null) {
+      try { srvAttente = (typeof FTSServeur !== "undefined") && chantierId ? await FTSServeur.lireAttente(chantierId) : []; } catch (e) { srvAttente = []; }
+      if (tour !== srvTour && !rechargerAttente) return;
+    }
+    const z = $("srvAttente");
+    z.hidden = !srvAttente.length;
+    if (srvAttente.length) z.innerHTML = `<div class="srv-b w"><b>⏳ ${srvAttente.length} document${srvAttente.length > 1 ? "s" : ""} en attente de dépôt sur le serveur</b>
+      <ul class="srv-fl">${srvAttente.map((x) => `<li>📄 ${esc(x.nom)} <span style="color:var(--text-sub)">· ${esc(x.chemin.join(" › "))}</span></li>`).join("")}</ul>
+      <div style="margin-top:8px"><button type="button" class="sv-btn pri" id="srvDeposerAttente">🗄️ Déposer maintenant</button></div></div>`;
+    const b = $("srvDeposerAttente");
+    if (b) b.addEventListener("click", deposerAttente);
+  }
+  async function deposerAttente() {
+    const b = $("srvDeposerAttente");
+    if (b) b.disabled = true;
+    try {
+      const r = await FTSServeur.dossierChantier(code);
+      if (!r.ok) { erreur("Dépôt impossible", r.message); return; }
+      const res = await FTSServeur.traiterAttente(chantierId, r.dossier);
+      if (res.erreurs.length) erreur("Dépôt incomplet", `${res.deposes} déposé(s), ${res.erreurs.length} en échec.`, res.erreurs.map((x) => `${x.nom} : ${x.erreur}`).join(" · "));
+      else FTSShell.toast(`🗄️ ${res.deposes} document(s) déposé(s) sur le serveur${res.deja ? ` · ${res.deja} déjà présent(s)` : ""}`);
+    } catch (e) { erreur("Dépôt impossible", e.message); }
+    finally { await afficherServeur(true); }
+  }
+  /**
+   * Dépôt des PDF de l'envoi ; ce qui n'a pas pu être déposé part en file d'attente.
+   * @returns {Promise<string>} complément du message de fin d'envoi
+   */
+  async function deposerEnvoi(srv, copies) {
+    const st = $("envStatus");
+    let attente = copies, note = "";
+    if (srv && srv.ok) {
+      st.textContent = "Dépôt sur le serveur FTS…";
+      try {
+        const res = await FTSServeur.deposer(srv.dossier, SRV_CHEMIN, copies.map(({ nom, blob }) => ({ nom, blob })));
+        const ko = res.filter((r) => r.statut === "erreur");
+        const dep = res.filter((r) => r.statut === "depose").length, deja = res.filter((r) => r.statut === "deja").length;
+        attente = copies.filter((c) => ko.some((k) => k.nom === c.nom));
+        note = ` · 🗄️ ${dep} PDF déposé${dep > 1 ? "s" : ""} sur le serveur${deja ? ` (${deja} déjà présent${deja > 1 ? "s" : ""}, laissé${deja > 1 ? "s" : ""} tel${deja > 1 ? "s" : ""} quel${deja > 1 ? "s" : ""})` : ""}`;
+        if (ko.length) note += ` · ⚠️ ${ko.length} non déposé${ko.length > 1 ? "s" : ""} : ${ko[0].erreur}`;
+      } catch (err) { note = ` · ⚠️ serveur : ${err.message}`; }
+    } else note = ` · ⏳ serveur : ${((srv && srv.message) || "non accessible").replace(/\.$/, "")}`;
+    if (attente.length) {
+      const avecId = attente.filter((c) => c.driveId);
+      if (avecId.length) {
+        try {
+          await FTSServeur.ajouterAttente(chantierId, avecId.map((c) => ({ nom: c.nom, chemin: SRV_CHEMIN, driveId: c.driveId, origine: "preparation" })));
+          note += ` → ${avecId.length} PDF en attente de dépôt`;
+        } catch (err) { note += ` (file d'attente non enregistrée : ${err.message})`; }
+      }
+      if (avecId.length < attente.length) note += " · ⚠️ sans copie Drive, à déposer à la main";
+    }
+    return note;
+  }
+
   async function envoyerFiche() {
     if (!pret) return;
     const st = $("envStatus");
@@ -2090,6 +2214,13 @@ document.addEventListener("DOMContentLoaded", () => {
         ${parOutlook ? `<div class="warn" style="background:#F1F5FD">📧 Ton compte n'a pas Gmail : le mail va s'ouvrir dans <b>Outlook</b>, depuis ton adresse pro, et les PDF seront téléchargés pour que tu les glisses dans le mail.</div>` : ""}`,
       boutons: [{ lib: "Annuler", val: false }, { lib: parOutlook ? "Préparer le mail" : "Envoyer", val: true, cls: "pri" }] });
     if (ok !== true) return;
+    // Serveur FTS : autorisation et dossier chantier demandés tout de suite (juste après le clic)
+    const veutServeur = $("srvDeposer").checked;
+    let srv = null;
+    if (veutServeur) {
+      if (!srvDispo()) srv = { ok: false, message: "ce navigateur n'écrit pas sur le serveur (Chrome ou Edge sur un PC du bureau)" };
+      else { try { srv = await FTSServeur.dossierChantier(code); } catch (err) { srv = { ok: false, message: err.message }; } }
+    }
 
     boutonsEnvoi(false);
     const nomPdf = P.nomPdf(code, n);
@@ -2128,18 +2259,24 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     // Le mail est parti : copie Drive puis mise à jour de la fiche
     let lien = null, noteDrive = "";
+    // Documents de cet envoi rangés dans le Drive puis déposés sur le serveur : fiche, plan, page de garde
+    const copies = [{ nom: nomPdf, blob: pdf, type: "application/pdf" }];
+    if (plan) copies.push({ nom: nomPlanAutre(n), blob: plan.blob, type: plan.type });
+    else if (pdfPlanEnvoye) copies.push({ nom: nomPlan(n), blob: pdfPlanEnvoye, type: "application/pdf" });
+    try { copies.push({ nom: nomGarde(n), blob: (await pdfPageGarde()).blob, type: "application/pdf" }); }
+    catch (err) { console.warn("Page de garde non créée :", err); }
     {
       st.textContent = "Copie dans le Drive…";
       try {
         const dossier = await FTSDrive.findOrCreateFolder(P.NOM_DOSSIER, chantierId);
-        const f = await FTSDrive.uploadFile(pdf, nomPdf, "application/pdf", dossier, { remplacerSiExiste: true });
-        lien = { id: f.id, lien: f.webViewLink || "" };
-        if (plan) {
-          const ext = (plan.nom.match(/\.[A-Za-z0-9]+$/) || [""])[0].toLowerCase();
-          await FTSDrive.uploadFile(plan.blob, `${P.nomFichier(code)}_Plan-acces_Ind${P.nomFichier(n)}${ext}`, plan.type, dossier, { remplacerSiExiste: true });
-        } else if (pdfPlanEnvoye) await FTSDrive.uploadFile(pdfPlanEnvoye, nomPlan(n), "application/pdf", dossier, { remplacerSiExiste: true });
+        for (const c of copies) {
+          const f = await FTSDrive.uploadFile(c.blob, c.nom, c.type, dossier, { remplacerSiExiste: true });
+          c.driveId = f.id;
+          if (c.nom === nomPdf) lien = { id: f.id, lien: f.webViewLink || "" };
+        }
       } catch (err) { console.warn(err); noteDrive = " (copie Drive non faite : " + err.message + ")"; }
     }
+    const noteSrv = veutServeur ? await deposerEnvoi(srv, copies) : "";
     indicePdf = n; const surligne = [...surlignage().cles]; indicePdf = null;
     const maintenant = new Date().toISOString();
     const entree = { indice: n, le: maintenant, par: nomMoi, a, cc, plan: plan ? plan.nom : pdfPlanEnvoye ? nomPlan(n) : "", pdf: lien, changements: changements() };
@@ -2151,7 +2288,8 @@ document.addEventListener("DOMContentLoaded", () => {
     marquerSale();
     await enregistrer();
     afficherEnvoi();
-    st.textContent = sale ? `⚠️ Mail envoyé, mais la fiche n'est pas enregistrée : clique sur Enregistrer.${noteDrive}` : `✅ Indice ${n} envoyé à ${a.join(", ")}${noteDrive}`;
+    st.textContent = sale ? `⚠️ Mail envoyé, mais la fiche n'est pas enregistrée : clique sur Enregistrer.${noteDrive}${noteSrv}` : `✅ Indice ${n} envoyé à ${a.join(", ")}${noteDrive}${noteSrv}`;
+    afficherServeur(true);
     if (sale) erreur("Mail envoyé, fiche non enregistrée", "Le mail est bien parti, mais la fiche n'a pas pu être enregistrée.", "Clique sur Enregistrer pour garder la trace de cet envoi.");
     else FTSShell.toast(`✅ Indice ${n} envoyé${!noteDrive ? " · copie dans le Drive" : ""}`);
     boutonsEnvoi(true);

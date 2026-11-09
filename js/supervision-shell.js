@@ -138,6 +138,9 @@ const FTSShell = (() => {
     document.body.prepend(backdrop);
     document.body.prepend(sidebar);
 
+    // Voyant du serveur FTS (pages qui chargent serveur-fts.js, ordinateur uniquement)
+    if ((typeof FTSServeur !== "undefined")) FTSServeur.monterVoyant(main.querySelector(".sv-actions"));
+
     document.getElementById("menuPlusBtn").addEventListener("click", () => document.body.classList.toggle("menu-ouvert"));
     backdrop.addEventListener("click", () => document.body.classList.remove("menu-ouvert"));
     const more = document.getElementById("mMoreBtn");

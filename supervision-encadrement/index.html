@@ -440,6 +440,7 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
     <span class="sv-sp"></span>
     <label class="sv-search" id="searchBox">🔍<input type="text" id="rechercheChantier" placeholder="Rechercher un chantier, un chef…"></label>
     <label class="pp-moi" id="ppMoiBox" hidden title="Retenu sur cet ordinateur">👤 <select id="ppMoi"><option value="">Je suis… (choisir)</option></select></label>
+    <span id="srvVoyantZone"></span>
     <span class="sv-sync" id="syncTop"><span class="dot"></span><span class="txt"></span></span>
     <button type="button" class="sv-btn" id="refreshVueEnsembleBtn" title="Recharger depuis Google">🔄</button>
     <button type="button" class="sv-btn pri" id="nouveauChantierBtn">+ Nouveau chantier</button>
@@ -848,6 +849,7 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
 <script src="../js/parc-materiel.js"></script>
 <script src="../js/personnel.js"></script>
 <script src="../js/modules.js"></script>
+<script src="../js/serveur-fts.js"></script>
 <script src="../js/acces-drive.js"></script>
 <script src="../js/controle-securite.js"></script>
 <script src="../js/acces-modules.js"></script>
@@ -856,6 +858,8 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
 <script src="../js/statistiques.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+  // Voyant du serveur FTS (relier / autoriser), ordinateur uniquement
+  if ((typeof FTSServeur !== "undefined")) FTSServeur.monterVoyant(document.getElementById("srvVoyantZone"));
 
   // Les données des différents onglets restent en mémoire ce temps-ci avant
   // d'être relues depuis Google — évite de tout recharger à chaque clic

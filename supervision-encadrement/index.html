@@ -832,6 +832,7 @@ tr.pp-libre { background: #FFFCF0; }
 <script src="../js/calendar.js"></script>
 <script src="../js/parc-materiel.js"></script>
 <script src="../js/personnel.js"></script>
+<script src="../js/modules.js"></script>
 <script src="../js/acces-drive.js"></script>
 <script src="../js/controle-securite.js"></script>
 <script src="../js/documents-bureau.js"></script>
@@ -894,6 +895,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (id === "se-view-documents" && window.FTSDocsBureau) FTSDocsBureau.monter($("documentsBureau"), { obtenirDonnees: (forcer) => obtenirDonnees(forcer) });
     fermerMenuMobile();
     window.scrollTo(0, 0);
+    if (window.FTSModules && FTSModules.etat()) FTSModules.controler(FTSModules.VUE_MODULE[id]);
   }
   document.querySelectorAll(".se-nav-btn[data-view], .tab-btn[data-view]").forEach((btn) => {
     btn.addEventListener("click", () => afficherVue(btn.dataset.view));
@@ -993,6 +995,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const banner = $("sessionBanner");
     if (connecte) {
       banner.hidden = true;
+      // Accès aux modules (js/modules.js) : menu filtré + vue refusée si besoin
+      if (window.FTSModules) FTSModules.appliquer({ module: () => { const v = document.querySelector(".se-view.active"); return v ? FTSModules.VUE_MODULE[v.id] : null; }, surChange: () => { remplirMoi(); if (document.querySelector("#se-view-preparation.active")) afficherPreparation(); } }).catch(() => {});
     } else {
       banner.hidden = false;
       $("signInBtn").textContent = connue ? "Reprendre la session" : "Se connecter avec Google";
@@ -1264,6 +1268,17 @@ document.addEventListener("DOMContentLoaded", () => {
   /** Conducteurs de travaux (Personnel FTS) pour le choix « Je suis » */
   function remplirMoi() {
     const sel = $("ppMoi");
+    // Compte personnel reconnu dans Personnel FTS : c'est lui, pas de choix à faire
+    const moiCompte = window.FTSModules ? FTSModules.moi() : "";
+    if (moiCompte) {
+      if (clePersonne(ppMoi) !== clePersonne(moiCompte)) { ppMoi = moiCompte; ecrireLS(CLE_MOI, ppMoi); }
+      sel.innerHTML = `<option selected>${escapeHtmlSE(moiCompte)}</option>`;
+      sel.disabled = true;
+      sel.closest(".pp-moi").classList.remove("vide");
+      sel.closest(".pp-moi").title = "Ton compte Google";
+      return;
+    }
+    sel.disabled = false;
     let noms = [];
     try { noms = FTSPersonnel.encadrement().filter((p) => /CONDUCTEUR/.test(`${p.poste || ""} ${p.fonctionEnc || ""}`)).map(FTSPersonnel.nomComplet); } catch (e) {}
     if (ppMoi && !noms.some((n) => clePersonne(n) === clePersonne(ppMoi))) noms.unshift(ppMoi);

@@ -516,6 +516,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <script src="../lib/qrcode/qrcode.js"></script>
 <script src="../js/plan-acces.js"></script>
 <script src="../js/page-garde.js"></script>
+<script src="../js/modules.js"></script>
 <script src="../js/supervision-shell.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -734,7 +735,7 @@ document.addEventListener("DOMContentLoaded", () => {
           prep.infos.commune = cp ? cp[2].trim() : (meta.commune || "");
           prep.ciment.surconso = pp.surconso;
           // Conducteur : celui attribué au chantier, sinon « Je suis » de cet ordinateur
-          let moi = ""; try { moi = localStorage.getItem("fts_je_suis") || ""; } catch (e) {}
+          let moi = (window.FTSModules && FTSModules.moi()) || ""; try { moi = moi || localStorage.getItem("fts_je_suis") || ""; } catch (e) {}
           prep.infos.conducteur = meta.conducteur || moi || "";
           if (meta.dureeChantier) prep.infos.duree = Number(meta.dureeChantier);
         }

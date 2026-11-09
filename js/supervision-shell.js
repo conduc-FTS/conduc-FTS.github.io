@@ -185,6 +185,8 @@ const FTSShell = (() => {
         av.textContent = ini || "?";
       }).catch(() => {});
     }
+    // Accès aux modules (js/modules.js) : menu filtré + page refusée si besoin
+    if (window.FTSModules) FTSModules.appliquer({ module: FTSModules.VUE_MODULE[opts.actif] || null }).catch(() => {});
     if (typeof opts.onSession === "function") opts.onSession(connecte);
   }
 

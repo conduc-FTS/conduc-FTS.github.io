@@ -309,7 +309,15 @@ const FTSAcces = (() => {
           const id = await FTSDrive.createFolder(a.nomDossier, a.parentId);
           r = await req(`${DRIVE}/files/${id}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, { method: "POST", body: JSON.stringify({ role: "reader", type: "user", emailAddress: aff(a.email) }) });
         }
-        if (r && (r.ok || r.status === 204)) faits.push(a); else erreurs.push({ ...a, statut: r ? r.status : "?" });
+        if (r && (r.ok || r.status === 204)) faits.push(a);
+        else {
+          // Partage refusé par Google pour une adresse : presque toujours une
+          // adresse sans compte Google (compte pas encore créé, ou faute de frappe)
+          let detail = "";
+          try { const j = await r.clone().json(); detail = (j.error && (j.error.message || (j.error.errors && j.error.errors[0] && j.error.errors[0].reason))) || ""; } catch (e) {}
+          const sansCompte = a.type === "ajout" || a.type === "dossier" ? (r.status === 400 || r.status === 403) : /google account|invalidSharingRequest/i.test(detail);
+          erreurs.push({ ...a, statut: r ? r.status : "?", sansCompte, detail });
+        }
       } catch (e) { erreurs.push({ ...a, statut: e.message }); }
     }
     for (const c of plan.couleurs) {
@@ -397,7 +405,12 @@ const FTSAcces = (() => {
       if (b.proposes.length) bilan += `<div class="ad-alert">⚠️ <b>${b.proposes.length} retraits en attente</b> — c'est beaucoup d'un coup (plus de ${LIMITE_RETRAITS} personnes) : rien n'a été retiré, au cas où Personnel FTS contiendrait une erreur (adresses effacées, colonne vidée…).<ul>${b.proposes.slice(0, 30).map((a) => `<li>${esc(aff(a.email))} — ${esc(a.dossier)} (${roleLib(a.ancien)})</li>`).join("")}${b.proposes.length > 30 ? `<li>… et ${b.proposes.length - 30} autre(s)</li>` : ""}</ul>Vérifie Personnel FTS. Si tout est juste :<br><button type="button" class="ad-btn pri" id="adRetirer" style="margin-top:8px">Retirer ces ${b.proposes.length} accès</button></div>`;
       if (b.plan.chefsSansMail.length) bilan += `<div class="ad-warn">⚠️ <b>Chef(s) sans e-mail</b> : ${b.plan.chefsSansMail.map((p) => esc(`${p.nom} ${p.prenom}`)).join(", ")} — leur tablette n'a aucun accès tant que l'e-mail n'est pas renseigné dans Personnel FTS.</div>`;
       if (b.plan.absents.length) bilan += `<div class="ad-info">ℹ️ Dossiers pas encore créés : ${b.plan.absents.map(esc).join(", ")} (créés par le robot de recopie au besoin).</div>`;
-      if (b.erreurs.length) bilan += `<div class="ad-alert">❌ ${b.erreurs.length} action(s) impossible(s) : ${b.erreurs.map((a) => `${esc(aff(a.email))} / ${esc(a.dossier)} (${esc(a.statut)})`).join(" · ")}</div>`;
+      if (b.erreurs.length) {
+        const sansCompte = [...new Set(b.erreurs.filter((a) => a.sansCompte).map((a) => a.email))];
+        const autres = b.erreurs.filter((a) => !a.sansCompte);
+        if (sansCompte.length) bilan += `<div class="ad-warn">👤 <b>${sansCompte.length} personne(s) sans compte Google</b> (pas encore créé, ou adresse mal saisie dans Personnel FTS) : ${sansCompte.map((m) => `<b>${esc(aff(m))}</b>`).join(", ")}.<br>Google refuse de leur partager les dossiers tant que leur compte n'existe pas. Envoie-leur le message de création de compte, puis clique sur « Vérifier maintenant » quand c'est fait.</div>`;
+        if (autres.length) bilan += `<div class="ad-alert">❌ ${autres.length} action(s) impossible(s) : ${autres.map((a) => `${esc(aff(a.email))} / ${esc(a.dossier)} (${esc(a.statut)}${a.detail ? " : " + esc(a.detail) : ""})`).join(" · ")}</div>`;
+      }
     }
     const cellule = (d, qui) => {
       if (qui === "enc") return '<span class="ad-r r-mod">SELON LA LISTE</span>';

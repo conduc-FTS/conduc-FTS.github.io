@@ -759,6 +759,16 @@ document.addEventListener("DOMContentLoaded", () => {
           let moi = (window.FTSModules && FTSModules.moi()) || ""; try { moi = moi || localStorage.getItem("fts_je_suis") || ""; } catch (e) {}
           prep.infos.conducteur = meta.conducteur || moi || "";
           if (meta.dureeChantier) prep.infos.duree = Number(meta.dureeChantier);
+          // OUVERTURE CHANTIER : pré-remplissage depuis l'ouverture faite par le chargé d'affaires
+          if (meta.ouverture && meta.ouverture.prevu) {
+            const ov = meta.ouverture, pv = ov.prevu;
+            prep.remarques.implantation = pv.implantation ? "A NOTRE CHARGE" : "A LEUR CHARGE";
+            prep.remarques.boues = pv.deblais ? "A NOTRE CHARGE" : "A LEUR CHARGE";
+            if (pv.essai) { prep.remarques.essaiOui = true; prep.remarques.essaiNb = Math.max(1, Number(pv.essaiNb) || 1); prep.remarques.essais = P.texteEssais(prep.remarques); }
+            if (ov.realisation && ov.realisation.mode === "date" && ov.realisation.valeur) { prep.infos.dateConnue = true; prep.infos.date = ov.realisation.valeur; }
+            const notes = [ov.realisation && ov.realisation.mode === "semaine" ? `Réalisation prévue : ${ov.realisation.texte}` : "", ov.contraintes && ov.contraintes.hauteur ? `Hauteur limitée${ov.contraintes.hauteurVal ? " : " + ov.contraintes.hauteurVal : ""}` : "", ov.contraintes && ov.contraintes.acces ? "Accès difficile" : "", ov.infos || ""].filter(Boolean);
+            if (notes.length && !prep.remarques.divers) prep.remarques.divers = notes.join(" · ");
+          }
         }
         if (prep.ciment.surconso === "" || prep.ciment.surconso == null) prep.ciment.surconso = pp.surconso;
         pret = true;

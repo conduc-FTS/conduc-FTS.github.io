@@ -27,6 +27,9 @@ const FTSShell = (() => {
     { id: "se-view-preparation", ic: "📋", label: "Préparation", href: SUP + "#se-view-preparation", pastille: "fts_prepa_a_faire" },
     { id: "se-view-archives", ic: "🗄️", label: "Archives", href: SUP + "#se-view-archives" },
     { id: "se-view-documents", ic: "📁", label: "Documents", href: SUP + "#se-view-documents" },
+    // OUVERTURE CHANTIER (js/ouverture-chantier.js)
+    { grp: "AFFAIRES" },
+    { id: "se-view-ouverture", ic: "📝", label: "Ouverture de chantier", href: SUP + "#se-view-ouverture" },
     { grp: "POINTAGES" },
     { id: "materiel", ic: "🔧", label: "Matériel", href: "../recap-hebdo/index.html?type=materiel" },
     { id: "personnel", ic: "👷", label: "Personnel", href: "../recap-hebdo/index.html?type=personnel" },

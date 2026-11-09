@@ -412,6 +412,9 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
     <button type="button" class="se-nav-btn" data-view="se-view-preparation"><span class="ic">📋</span>Préparation<span class="sv-pill" id="navPrepaPill" hidden></span></button>
     <button type="button" class="se-nav-btn" data-view="se-view-archives"><span class="ic">🗄️</span>Archives</button>
     <button type="button" class="se-nav-btn" data-view="se-view-documents"><span class="ic">📁</span>Documents</button>
+    <!-- OUVERTURE CHANTIER (js/ouverture-chantier.js) : entrée de menu -->
+    <div class="sv-grp">AFFAIRES</div>
+    <button type="button" class="se-nav-btn" data-view="se-view-ouverture"><span class="ic">📝</span>Ouverture de chantier</button>
     <div class="sv-grp">POINTAGES</div>
     <a href="../recap-hebdo/index.html?type=materiel"><span class="ic">🔧</span>Matériel</a>
     <a href="../recap-hebdo/index.html?type=personnel"><span class="ic">👷</span>Personnel</a>
@@ -648,6 +651,11 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
     <div id="documentsBureau"></div>
   </div>
 
+  <!-- OUVERTURE CHANTIER (js/ouverture-chantier.js) : vue -->
+  <div class="se-view" id="se-view-ouverture">
+    <div id="ouvertureChantier"></div>
+  </div>
+
   <!-- ─── ACCÈS DRIVE (js/acces-drive.js) ──────────────────────── -->
   <div class="se-view" id="se-view-acces">
     <div class="se-page-title">Accès</div>
@@ -853,6 +861,10 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
 <script src="../js/acces-drive.js"></script>
 <script src="../js/controle-securite.js"></script>
 <script src="../js/acces-modules.js"></script>
+<!-- OUVERTURE CHANTIER (js/ouverture-chantier.js) : mail + module -->
+<script src="../js/gmail.js"></script>
+<script src="../js/mail-envoi.js"></script>
+<script src="../js/ouverture-chantier.js"></script>
 <script src="../js/documents-bureau.js"></script>
 <script src="../js/ateliers.js"></script>
 <script src="../js/statistiques.js"></script>
@@ -885,7 +897,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ─── Navigation (barre latérale + barre d'onglets mobile) ─────────
   const TITRES_VUES = {
     "se-view-overview": "Vue d'ensemble", "se-view-stats": "Statistiques", "se-view-preparation": "Préparation de chantier", "se-view-personnel": "Personnel FTS",
-    "se-view-parc": "Parc matériel", "se-view-acces": "Accès", "se-view-archives": "Archives", "se-view-documents": "Documents", "se-view-adresses": "Adresses Personnel",
+    "se-view-parc": "Parc matériel", "se-view-acces": "Accès", "se-view-ouverture": "Ouverture de chantier", /* OUVERTURE CHANTIER */ "se-view-archives": "Archives", "se-view-documents": "Documents", "se-view-adresses": "Adresses Personnel",
   };
 
   function fermerMenuMobile() { document.body.classList.remove("menu-ouvert"); }
@@ -913,6 +925,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (id === "se-view-acces" && window.FTSAcces) FTSAcces.monter($("accesDrive"));
     if (id === "se-view-acces" && window.FTSControle) FTSControle.monter($("controleSecurite"));
     if (id === "se-view-acces" && window.FTSAccesModules) FTSAccesModules.synchroniser();
+    // OUVERTURE CHANTIER (js/ouverture-chantier.js)
+    if (id === "se-view-ouverture" && window.FTSOuverture) FTSOuverture.monter($("ouvertureChantier"), { obtenirDonnees: (forcer) => obtenirDonnees(forcer), apresCreation: () => chargerVueEnsemble(true) });
     if (id === "se-view-acces" && !$("accesTabModules").hidden && window.FTSAccesModules) FTSAccesModules.monter($("accesModules"));
     if (id === "se-view-documents" && window.FTSDocsBureau) FTSDocsBureau.monter($("documentsBureau"), { obtenirDonnees: (forcer) => obtenirDonnees(forcer) });
     fermerMenuMobile();
@@ -1401,7 +1415,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const envoi = r && r.envoi && r.envoi.indice ? `Ind ${escapeHtmlSE(r.envoi.indice)}${r.envoi.le ? " · " + escapeHtmlSE(new Date(r.envoi.le).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })) : ""}` : "—";
       const cond = conducteurDe(l);
       return `<tr data-url="${l.avenir ? "" : escapeHtmlSE(url)}" class="${cond ? "" : "pp-libre"}">
-        <td class="c-nom"><span class="sv-code">${escapeHtmlSE(l.code)}</span><span class="sv-nom">${escapeHtmlSE(l.nom)}</span><div>${l.tech.map((t) => `<span class="pp-tech ${escapeHtmlSE(t)}">${escapeHtmlSE(t.toUpperCase())}</span>`).join("")}</div></td>
+        <td class="c-nom"><span class="sv-code">${escapeHtmlSE(l.code)}</span><span class="sv-nom">${escapeHtmlSE(l.nom)}</span><div>${l.tech.map((t) => `<span class="pp-tech ${escapeHtmlSE(t)}">${escapeHtmlSE(t.toUpperCase())}</span>`).join("")}</div>${/* OUVERTURE CHANTIER */ l.meta && l.meta.ouverture && l.etat === "afaire" ? `<span class="pp-nouveau">NOUVEAU · ouvert par ${escapeHtmlSE(l.meta.ouverture.par || "chargé d'affaires")}</span>` : ""}</td>
         <td>${l.date ? `<b>${fmtD(l.date)}</b>` : '<span class="pp-def">À DÉFINIR</span>'}</td>
         <td class="sv-chef">${escapeHtmlSE((r && r.chef) || "—")}</td>
         <td class="r">${r && r.nbPieux ? r.nbPieux : "—"}</td>

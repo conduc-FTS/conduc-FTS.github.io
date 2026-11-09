@@ -1073,6 +1073,30 @@ const FTSSheets = (() => {
     }));
   }
 
+  // ─── Zones FTS (rayons autour du dépôt) ─────────────────────────
+  // Onglet « Zones » du même classeur : Zone | Jusqu'à (km) | Modifié le | Par.
+  // Vide ou absent → l'appli garde les valeurs par défaut (js/trajets.js).
+  const ONGLET_ZONES = "Zones";
+  async function lireZones() {
+    const spreadsheetId = await getOuCreerFeuilleAdresses();
+    if (await getSheetId(spreadsheetId, ONGLET_ZONES) == null) return null;
+    const lignes = await lireOnglet(spreadsheetId, ONGLET_ZONES);
+    const zones = lignes.filter((r) => r[0] && r[1]).map((r) => ({ nom: String(r[0]).trim(), max: parseFloat(String(r[1]).replace(",", ".")), date: r[2] || "", par: r[3] || "" }));
+    return zones.length ? zones : null;
+  }
+  async function enregistrerZones(zones, date, par) {
+    const spreadsheetId = await getOuCreerFeuilleAdresses();
+    if (await getSheetId(spreadsheetId, ONGLET_ZONES) == null) {
+      await fetchAvecRetry(`${API_BASE}/${spreadsheetId}:batchUpdate`, {
+        method: "POST",
+        headers: { ...authHeader(), "Content-Type": "application/json" },
+        body: JSON.stringify({ requests: [{ addSheet: { properties: { title: ONGLET_ZONES } } }] }),
+      });
+    }
+    const valeurs = [["Zone", "Jusqu'à (km)", "Modifié le", "Par"], ...zones.map((z) => [z.nom, String(z.max), date, par])];
+    await ecrireValeurs(spreadsheetId, `${ONGLET_ZONES}!A1:D${valeurs.length}`, valeurs);
+  }
+
   /** Ajoute (sheetRow absent) ou remplace (sheetRow donné) une distance. Renvoie le sheetRow. */
   async function enregistrerDistance(d, sheetRow) {
     const spreadsheetId = await getOuCreerFeuilleAdresses();
@@ -1154,6 +1178,8 @@ const FTSSheets = (() => {
     supprimerAdresse,
     listerDistances,
     enregistrerDistance,
+    lireZones,
+    enregistrerZones,
   };
 })();
 

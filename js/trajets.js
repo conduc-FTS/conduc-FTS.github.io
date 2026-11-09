@@ -17,17 +17,67 @@ const FTSTrajets = (() => {
   // Dépôt FTS — 13 rue du Commandant Charcot, 33290 Blanquefort (BAN)
   const DEPOT = { lat: 44.922498, lng: -0.61896, label: "13 rue du Commandant Charcot, Blanquefort" };
 
-  // Zones FTS (rayons à vol d'oiseau depuis le dépôt). Borne haute incluse :
-  // 10,0 km = zone 1B. Au-delà de 50 km : zone 6 si la personne rentre chez
-  // elle, sinon grand déplacement (case GD du pointage).
-  const ZONES = [
+  // Zones FTS par défaut (rayons à vol d'oiseau depuis le dépôt), remplacées
+  // par l'onglet « Zones » du classeur Adresses Personnel FTS (modifiable dans
+  // le Pointage Personnel avec le compte conduc.fts). Borne haute incluse :
+  // 10,0 km = zone 1B. Au-delà de la zone 5 : zone 6 si la personne rentre
+  // chez elle, sinon grand déplacement (case GD du pointage).
+  const ZONES_DEFAUT = [
     { nom: "1B", max: 10, lib: "0 à 10 km" },
     { nom: "2", max: 20, lib: "10 à 20 km" },
     { nom: "3", max: 30, lib: "20 à 30 km" },
     { nom: "4", max: 40, lib: "30 à 40 km" },
     { nom: "5", max: 50, lib: "40 à 50 km" },
   ];
-  const ZONE_6 = { nom: "6", lib: "au-delà de 50 km" };
+  let ZONES = ZONES_DEFAUT.map((z) => ({ ...z }));
+  let ZONE_6 = { nom: "6", lib: "au-delà de 50 km" };
+  let infoZones = { date: "", par: "", source: "defaut" };
+  const libKm = (n) => String(n).replace(".", ",");
+  /** Applique une liste de limites (1B à 5) : recalcule les libellés « x à y km » */
+  function appliquerZones(liste, info) {
+    let bas = 0;
+    ZONES = ZONES_DEFAUT.map((d) => {
+      const z = (liste || []).find((x) => x.nom === d.nom);
+      const max = z && Number.isFinite(z.max) ? z.max : d.max;
+      const r = { nom: d.nom, max, lib: `${libKm(bas)} à ${libKm(max)} km` };
+      bas = max;
+      return r;
+    });
+    ZONE_6 = { nom: "6", lib: `au-delà de ${libKm(bas)} km` };
+    infoZones = info || infoZones;
+  }
+  /** Contrôle : limites positives et croissantes. Renvoie un message d'erreur ou "". */
+  function verifierZones(liste) {
+    let bas = 0;
+    for (const d of ZONES_DEFAUT) {
+      const z = liste.find((x) => x.nom === d.nom);
+      if (!z || !Number.isFinite(z.max) || z.max <= 0) return `Zone ${d.nom} : indique une distance en km.`;
+      if (z.max <= bas) return `Zone ${d.nom} : la limite doit être plus grande que celle de la zone du dessus (${libKm(bas)} km).`;
+      bas = z.max;
+    }
+    return "";
+  }
+  let zonesChargees = null;
+  function chargerZones(forcer) {
+    if (zonesChargees && !forcer) return zonesChargees;
+    zonesChargees = (async () => {
+      try {
+        const z = await FTSSheets.lireZones();
+        if (z) appliquerZones(z, { date: z[0].date, par: z[0].par, source: "sheet" });
+      } catch (e) { console.warn("Zones FTS : valeurs par défaut utilisées", e); }
+      return getZones();
+    })();
+    return zonesChargees;
+  }
+  async function enregistrerZones(liste, par) {
+    const err = verifierZones(liste);
+    if (err) throw new Error(err);
+    const d = new Date(), date = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+    await FTSSheets.enregistrerZones(ZONES_DEFAUT.map((x) => ({ nom: x.nom, max: liste.find((z) => z.nom === x.nom).max })), date, par);
+    appliquerZones(liste, { date, par, source: "sheet" });
+    zonesChargees = Promise.resolve(getZones());
+  }
+  const getZones = () => ({ zones: ZONES.map((z) => ({ ...z })), zone6: { ...ZONE_6 }, ...infoZones });
   const ZONE_1A = { nom: "1A", lib: "dépôt" };
   const RAYON_DEPOT_KM = 0.5; // chantier au dépôt même
 
@@ -174,6 +224,7 @@ const FTSTrajets = (() => {
     if (!pc) { out.zoneErr = out.domErr = "Adresse chantier manquante"; return out; }
     out.chantierApprox = !pc.precis;
     out.lieuChantier = pc.source === "adresse" ? pc.ville || pc.label : "";
+    await chargerZones();
     out.zone = zoneDe(pc, chantierName);
     // Intérimaires : pas de km domicile → chantier (ni calcul, ni enregistrement)
     if (interim) { out.interim = true; return out; }
@@ -190,5 +241,5 @@ const FTSTrajets = (() => {
     return out;
   }
 
-  return { DEPOT, ZONES, volOiseau, zoneDe, pointChantier, route, calculer, chargerAdresses, oublierAdresses, cleNom };
+  return { DEPOT, getZones, chargerZones, enregistrerZones, verifierZones, volOiseau, zoneDe, pointChantier, route, calculer, chargerAdresses, oublierAdresses, cleNom };
 })();

@@ -94,6 +94,23 @@ table.pt-grid { border-collapse: separate; border-spacing: 0; width: 100%; table
 .pt-zone.z6 { background: #FEE2E2; color: #991B1B; }
 .pt-zone.gd { background: var(--anthracite); color: var(--fts-yellow); }
 @media (max-width: 520px) { .pt-traj { grid-template-columns: 1fr; } }
+.pt-zbtn { border: 1px solid var(--border); background: #fff; border-radius: 9px; height: 40px; padding: 0 13px; font-weight: 700; font-size: 0.82rem; color: var(--anthracite); cursor: pointer; white-space: nowrap; }
+.pt-zbtn[hidden] { display: none !important; }
+.pt-zbtn.on { background: var(--anthracite); color: #fff; border-color: var(--anthracite); }
+.pt-zbtn .chev { font-size: 0.7rem; margin-left: 2px; }
+.pt-zpan { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; max-width: 620px; }
+.pt-zpan[hidden] { display: none !important; }
+.pt-zpan .zt { font-weight: 800; font-size: 0.92rem; }
+.pt-zpan .zs { font-size: 0.76rem; color: var(--text-sub); margin-top: 2px; }
+.pt-zpan table { width: 100%; border-collapse: collapse; font-size: 0.86rem; margin-top: 10px; }
+.pt-zpan th, .pt-zpan td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); }
+.pt-zpan th { font-size: 0.68rem; color: var(--text-sub); text-transform: uppercase; }
+.pt-zpan td input { width: 72px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; font: inherit; text-align: right; }
+.pt-zpan .mute { color: var(--text-sub); }
+.pt-zpan .zf { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; font-size: 0.76rem; color: var(--text-sub); }
+.pt-zpan .lock { background: #F3F4F6; border-radius: 8px; padding: 6px 10px; }
+.pt-zpan .zerr { color: #B91C1C; font-weight: 600; }
+@media (max-width: 760px) { .pt-zbtn { width: 100%; } }
 .pt-ent .ed input, .pt-ent .ed select { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 0.86rem; }
 
 /* Téléphone */
@@ -153,6 +170,7 @@ body.pt-bloque #svPage > :not(#ptTel) { display: none !important; }
   <div class="pt-bar">
     <div class="pt-seg" id="vueSeg" hidden><button type="button" data-v="planning" class="on">📅 Planning par machine</button><button type="button" data-v="recap">🏗️ Récap par chantier</button></div>
     <div class="pt-seg fam" id="famSeg"><button type="button" data-f="tous" class="on">Tous</button><button type="button" data-f="mp">Micropieux</button><button type="button" data-f="px">Pieux</button></div>
+    <button type="button" class="pt-zbtn" id="zonesBtn" hidden aria-expanded="false">📍 Zones FTS <span class="chev">▾</span></button>
     <span class="sv-sp pt-dsk"></span>
     <span class="pt-maj pt-dsk" id="majTxt"></span>
     <span class="pt-only-planning" style="display:contents">
@@ -169,6 +187,7 @@ body.pt-bloque #svPage > :not(#ptTel) { display: none !important; }
     </span>
   </div>
   <p class="sv-status" id="ptStatus"></p>
+  <div class="pt-zpan" id="zonesPan" hidden></div>
   <div id="ptDesk" class="pt-dsk"></div>
   <div id="ptMob" class="pt-mob"></div>
 </div>
@@ -221,6 +240,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let debut = lundi(new Date());
   if (estMateriel && nbSemaines === 2) debut = ajoute(lundi(new Date()), -7); // semaine passée + semaine en cours
   let autresOuverts = pref("autres", "0") === "1";
+  const COMPTE_ZONES = "conducfts@gmail.com"; // comparé sans les points (Gmail les ignore)
+  const emailNorm = (m) => String(m || "").trim().toLowerCase().replace(/\.(?=[^@]*@gmail\.com$)/g, "");
+  let zonesOuvert = false, zonesEdition = null;
 
   try { const c = JSON.parse(localStorage.getItem(CLE_CACHE)); if (c && Array.isArray(c.chantiers)) donnees = c; } catch (e) {}
 
@@ -308,6 +330,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ─── Affichage principal ──────────────────────────────────────
   function afficher() {
     couleurs = {};
+    afficherZones();
     majTexte();
     $("vueSeg").hidden = !estMateriel;
     $("dureeSeg").hidden = !estMateriel;
@@ -684,6 +707,60 @@ document.addEventListener("DOMContentLoaded", () => {
       }).catch((err) => { if (row.isConnected) { q("dom").className = q("zone").className = "v err"; q("dom").textContent = q("zone").textContent = "Calcul impossible"; q("domd").textContent = err.message; } });
     });
   }
+
+  // ─── Zones FTS : panneau replié à droite de Tous / Micropieux / Pieux ───
+  const peutModifierZones = () => window.FTSAuth && FTSAuth.isSignedIn() && emailNorm(FTSAuth.emailMemorise()) === COMPTE_ZONES;
+  function afficherZones() {
+    const btn = $("zonesBtn"), pan = $("zonesPan");
+    if (typeof FTSTrajets === "undefined" || estMateriel) return;
+    btn.hidden = false;
+    btn.classList.toggle("on", zonesOuvert);
+    btn.setAttribute("aria-expanded", zonesOuvert ? "true" : "false");
+    btn.querySelector(".chev").textContent = zonesOuvert ? "▴" : "▾";
+    pan.hidden = !zonesOuvert;
+    if (!zonesOuvert) return;
+    const z = FTSTrajets.getZones(), modif = peutModifierZones();
+    const pill = (n) => `<span class="pt-zone${n === "6" ? " z6" : ""}">${esc(n)}</span>`;
+    const km = (n) => String(n).replace(".", ",");
+    let bas = 0;
+    const lignes = z.zones.map((x) => {
+      const val = zonesEdition && zonesEdition[x.nom] != null ? zonesEdition[x.nom] : km(x.max);
+      const l = `<tr><td>${pill(x.nom)}</td><td>${km(bas)} km</td><td>${modif ? `<input type="text" inputmode="decimal" data-z="${esc(x.nom)}" value="${esc(val)}"> km` : `${km(x.max)} km`}</td></tr>`;
+      bas = x.max; return l;
+    }).join("");
+    pan.innerHTML = `<div class="zt">📍 Zones FTS</div>
+      <div class="zs">Cercles à vol d'oiseau autour du dépôt · ${esc(FTSTrajets.DEPOT.label)}</div>
+      <table><tr><th>Zone</th><th>De</th><th>Jusqu'à (inclus)</th></tr>
+        <tr><td>${pill("1A")}</td><td colspan="2" class="mute">Au dépôt</td></tr>
+        ${lignes}
+        <tr><td>${pill("6")}</td><td>${km(bas)} km</td><td class="mute">au-delà · si retour à la maison, sinon GD</td></tr></table>
+      <div class="zf">${modif
+        ? `<span id="zInfo">${z.date ? `Modifié le ${esc(z.date)}${z.par ? " par " + esc(z.par) : ""}` : "Valeurs par défaut (jamais modifiées)"}</span><span><button type="button" class="sv-btn" id="zAnnul">Annuler</button> <button type="button" class="sv-btn pri" id="zSave">Enregistrer</button></span>`
+        : `<span class="lock">🔒 Modifiable uniquement avec le compte conduc.fts</span><span>${z.date ? `Modifié le ${esc(z.date)}` : ""}</span>`}</div>`;
+    if (!modif) return;
+    pan.querySelectorAll("input[data-z]").forEach((inp) => inp.addEventListener("input", () => {
+      zonesEdition = zonesEdition || {}; zonesEdition[inp.dataset.z] = inp.value;
+      // « De » de la ligne suivante suit la limite saisie
+      const rows = [...pan.querySelectorAll("tr")].slice(2);
+      rows.forEach((tr, k) => { if (k === 0) return; const prev = rows[k - 1].querySelector("input[data-z]"); if (prev) tr.children[1].textContent = `${prev.value || "?"} km`; });
+    }));
+    $("zAnnul").addEventListener("click", () => { zonesEdition = null; afficherZones(); });
+    $("zSave").addEventListener("click", async (ev) => {
+      const liste = [...pan.querySelectorAll("input[data-z]")].map((inp) => ({ nom: inp.dataset.z, max: parseFloat(inp.value.replace(",", ".")) }));
+      const err = FTSTrajets.verifierZones(liste);
+      if (err) { $("zInfo").innerHTML = `<span class="zerr">${esc(err)}</span>`; return; }
+      ev.target.disabled = true; $("zInfo").textContent = "Enregistrement…";
+      try {
+        await FTSTrajets.enregistrerZones(liste, FTSAuth.emailMemorise());
+        zonesEdition = null; afficherZones(); FTSShell.toast("Zones enregistrées.");
+      } catch (e) { ev.target.disabled = false; $("zInfo").innerHTML = `<span class="zerr">Erreur : ${esc(e.message)}</span>`; }
+    });
+  }
+  $("zonesBtn").addEventListener("click", () => {
+    zonesOuvert = !zonesOuvert;
+    if (zonesOuvert && window.FTSAuth && FTSAuth.isSignedIn()) FTSTrajets.chargerZones().then(() => afficherZones());
+    afficherZones();
+  });
 
   function ouvrirAjout(pre) {
     if (!donnees) { FTSShell.toast("Connecte-toi d'abord."); return; }

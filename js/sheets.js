@@ -1045,6 +1045,44 @@ const FTSSheets = (() => {
     await ecrireValeurs(spreadsheetId, `${ONGLET_ADRESSES}!A${sheetRow}:C${sheetRow}`, [[nom, prenom, adresse]]);
   }
 
+  // ─── Distances domicile → chantier (cache permanent) ──────────
+  // Onglet « Distances » du classeur Adresses Personnel FTS : un calcul par
+  // binôme personne + chantier, réutilisé par tout le monde. Refait seulement
+  // si l'adresse du domicile ou le point du chantier change.
+  const ONGLET_DISTANCES = "Distances";
+  const EN_TETE_DISTANCES = ["Nom", "Chantier", "Km", "Durée (min)", "Adresse domicile", "Point chantier", "Id chantier", "Calculé le"];
+
+  async function assurerOngletDistances(spreadsheetId) {
+    if (await getSheetId(spreadsheetId, ONGLET_DISTANCES) != null) return;
+    await fetchAvecRetry(`${API_BASE}/${spreadsheetId}:batchUpdate`, {
+      method: "POST",
+      headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({ requests: [{ addSheet: { properties: { title: ONGLET_DISTANCES } } }] }),
+    });
+    await ecrireValeurs(spreadsheetId, `${ONGLET_DISTANCES}!A1:H1`, [EN_TETE_DISTANCES]);
+  }
+
+  async function listerDistances() {
+    const spreadsheetId = await getOuCreerFeuilleAdresses();
+    await assurerOngletDistances(spreadsheetId);
+    const lignes = await lireOnglet(spreadsheetId, ONGLET_DISTANCES);
+    return lignes.map((r, idx) => ({
+      sheetRow: idx + 2, nom: r[0] || "", chantier: r[1] || "",
+      km: parseFloat(String(r[2] || "").replace(",", ".")), min: parseFloat(String(r[3] || "").replace(",", ".")),
+      adresse: r[4] || "", point: r[5] || "", chantierId: r[6] || "", date: r[7] || "",
+    }));
+  }
+
+  /** Ajoute (sheetRow absent) ou remplace (sheetRow donné) une distance. Renvoie le sheetRow. */
+  async function enregistrerDistance(d, sheetRow) {
+    const spreadsheetId = await getOuCreerFeuilleAdresses();
+    const ligne = [d.nom, d.chantier, String(Math.round(d.km * 10) / 10), String(Math.round(d.min)), d.adresse, d.point, d.chantierId, d.date];
+    if (sheetRow) { await ecrireValeurs(spreadsheetId, `${ONGLET_DISTANCES}!A${sheetRow}:H${sheetRow}`, [ligne]); return sheetRow; }
+    const r = await ajouterLignes(spreadsheetId, ONGLET_DISTANCES, [ligne]);
+    const m = String((r && r.updates && r.updates.updatedRange) || "").match(/!A(\d+)/);
+    return m ? Number(m[1]) : null;
+  }
+
   async function supprimerAdresse(spreadsheetId, sheetRow) {
     const sheetId = await getSheetId(spreadsheetId, ONGLET_ADRESSES);
     if (sheetId == null) return;
@@ -1114,6 +1152,8 @@ const FTSSheets = (() => {
     ajouterAdresse,
     modifierAdresse,
     supprimerAdresse,
+    listerDistances,
+    enregistrerDistance,
   };
 })();
 

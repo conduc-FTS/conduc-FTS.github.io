@@ -82,6 +82,18 @@ table.pt-grid { border-collapse: separate; border-spacing: 0; width: 100%; table
 .pt-ent .q small { display: block; font-size: 0.72rem; color: var(--text-sub); font-weight: 600; }
 .pt-ent .ed { grid-column: 1 / -1; display: none; gap: 8px; flex-wrap: wrap; align-items: center; }
 .pt-ent.editing .ed { display: flex; }
+.pt-traj { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pt-traj .bx { border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; background: #FAFAFA; min-width: 0; }
+.pt-traj .lb { font-size: 0.66rem; color: var(--text-sub); text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.pt-traj .v { font-size: 1.15rem; font-weight: 800; margin-top: 2px; }
+.pt-traj .v small { font-size: 0.76rem; font-weight: 600; color: var(--text-sub); }
+.pt-traj .v.att { font-size: 0.9rem; color: var(--text-sub); font-weight: 600; }
+.pt-traj .v.err { font-size: 0.9rem; color: #92400E; }
+.pt-traj .d { font-size: 0.7rem; color: var(--text-sub); margin-top: 2px; overflow-wrap: anywhere; }
+.pt-zone { display: inline-block; font-size: 0.8rem; font-weight: 800; border-radius: 999px; padding: 2px 10px; background: #DCFCE7; color: #166534; }
+.pt-zone.z6 { background: #FEE2E2; color: #991B1B; }
+.pt-zone.gd { background: var(--anthracite); color: var(--fts-yellow); }
+@media (max-width: 520px) { .pt-traj { grid-template-columns: 1fr; } }
 .pt-ent .ed input, .pt-ent .ed select { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 0.86rem; }
 
 /* Téléphone */
@@ -171,6 +183,8 @@ body.pt-bloque #svPage > :not(#ptTel) { display: none !important; }
 <script src="../js/parc-materiel.js"></script>
 <script src="../js/personnel.js"></script>
 <script src="../js/ateliers.js"></script>
+<script src="../js/plan-acces.js"></script>
+<script src="../js/trajets.js"></script>
 <script src="../js/supervision-shell.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -592,10 +606,12 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="ed"><input type="text" class="e-m" list="dlMachines" value="${esc(e.cols[1])}" style="min-width:180px"><select class="e-s">${STATUTS.map((s) => `<option value="${s}" ${String(e.cols[2]).toUpperCase() === s ? "selected" : ""}>${LIB_ST[s]}</option>`).join("")}</select><button type="button" class="sv-btn pri" data-a="save">Enregistrer</button></div></div>`
       : `<div class="pt-ent" data-i="${i}"><div class="q">${esc(e.cols[1])}${e.cols[2] === "Intérim" ? ' <span class="sv-int">INTÉRIM</span>' : ""} · ${e.cols[4] ? esc(e.cols[4]) + " h" : "—"}${e.cols[3] === "GD" ? ' <span class="sv-gd">GD</span>' : ""}<small>${esc(e.fr)} · ${esc(e.chantierName)}</small></div>
           <div style="white-space:nowrap"><button type="button" class="sv-ib" data-a="edit" title="Modifier">✏️</button><button type="button" class="sv-ib" data-a="del" title="Supprimer">🗑️</button></div>
-          <div class="ed"><input type="text" class="e-n" list="dlNoms" value="${esc(e.cols[1])}" style="min-width:160px"><select class="e-t"><option value="FTS" ${e.cols[2] !== "Intérim" ? "selected" : ""}>FTS</option><option value="Intérim" ${e.cols[2] === "Intérim" ? "selected" : ""}>Intérim</option></select><input type="text" class="e-h" value="${esc(e.cols[4] || "")}" placeholder="heures" style="width:80px"><label style="display:flex;gap:4px;align-items:center;font-size:.86rem;font-weight:600"><input type="checkbox" class="e-g" ${e.cols[3] === "GD" ? "checked" : ""}> GD</label><button type="button" class="sv-btn pri" data-a="save">Enregistrer</button></div></div>`).join("")}</div>
+          <div class="ed"><input type="text" class="e-n" list="dlNoms" value="${esc(e.cols[1])}" style="min-width:160px"><select class="e-t"><option value="FTS" ${e.cols[2] !== "Intérim" ? "selected" : ""}>FTS</option><option value="Intérim" ${e.cols[2] === "Intérim" ? "selected" : ""}>Intérim</option></select><input type="text" class="e-h" value="${esc(e.cols[4] || "")}" placeholder="heures" style="width:80px"><label style="display:flex;gap:4px;align-items:center;font-size:.86rem;font-weight:600"><input type="checkbox" class="e-g" ${e.cols[3] === "GD" ? "checked" : ""}> GD</label><button type="button" class="sv-btn pri" data-a="save">Enregistrer</button></div>
+          <div class="pt-traj"><div class="bx"><div class="lb">🏠 Domicile → chantier</div><div class="v att" data-t="dom">Calcul…</div><div class="d" data-t="domd"></div></div><div class="bx"><div class="lb">📍 Zone FTS (depuis le dépôt)</div><div class="v att" data-t="zone">Calcul…</div><div class="d" data-t="zoned"></div></div></div></div>`).join("")}</div>
       <p class="sv-mstatus" id="edStatus"></p>`;
     const m = FTSShell.modale({ titre: esc(titre), corps, pied: `<button type="button" class="sv-btn" data-x>Fermer</button><button type="button" class="sv-btn" data-add>+ Ajouter une ligne</button>` });
     const st = m.el.querySelector("#edStatus");
+    if (!estMateriel) remplirTrajets(m.el, liste);
     m.el.querySelector("[data-x]").addEventListener("click", m.fermer);
     m.el.querySelector("[data-add]").addEventListener("click", () => { m.fermer(); ouvrirAjout({ ...defaut, chantierId: liste[0].chantierId }); });
     m.el.querySelectorAll(".pt-ent").forEach((row) => {
@@ -624,6 +640,47 @@ document.addEventListener("DOMContentLoaded", () => {
           m.fermer(); FTSShell.toast("Modification enregistrée."); charger(true);
         } catch (err) { st.textContent = `Erreur : ${err.message}`; st.className = "sv-mstatus err"; ev.target.disabled = false; }
       });
+    });
+  }
+
+  // Km domicile → chantier (route) et zone FTS (vol d'oiseau depuis le dépôt)
+  function remplirTrajets(el, liste) {
+    if (typeof FTSTrajets === "undefined") return;
+    const kmTxt = (k) => fmt(k, k < 10 ? 1 : 0);
+    const duree = (min) => { const h = Math.floor(min / 60), mn = Math.round(min % 60); return h ? `${h} h ${String(mn).padStart(2, "0")}` : `${mn} min`; };
+    liste.forEach((e, i) => {
+      const row = el.querySelector(`.pt-ent[data-i="${i}"]`);
+      if (!row) return;
+      const q = (k) => row.querySelector(`[data-t="${k}"]`);
+      const c = (donnees.chantiers || []).find((x) => x.id === e.chantierId) || {};
+      FTSTrajets.calculer({ nom: e.cols[1], chantierId: e.chantierId, chantierName: e.chantierName, meta: c.meta, interim: e.cols[2] === "Intérim" }).then((r) => {
+        if (!row.isConnected) return;
+        const approx = r.chantierApprox ? " · chantier situé à la commune (approx.)" : "";
+        if (r.interim) {
+          q("dom").className = "v att"; q("dom").textContent = "Intérimaire";
+          q("domd").textContent = "Pas de calcul pour le personnel intérimaire";
+        } else if (r.domicile) {
+          q("dom").className = "v";
+          q("dom").innerHTML = `${kmTxt(r.domicile.km)} km <small>· ${duree(r.domicile.min)}</small>`;
+          q("domd").textContent = `Par la route, aller simple${r.villeDomicile ? " · depuis " + r.villeDomicile : ""}${r.domicile.enregistre ? " · calculé le " + r.domicile.enregistre : ""}${approx}`;
+        } else {
+          q("dom").className = "v err"; q("dom").textContent = r.domErr;
+          q("domd").textContent = r.domDetail || "";
+        }
+        if (r.zone) {
+          const gd = e.cols[3] === "GD";
+          q("zone").className = "v";
+          q("zone").innerHTML = gd
+            ? `<span class="pt-zone gd">GD</span> <small>zone ${esc(r.zone.nom)}</small>`
+            : `<span class="pt-zone${r.zone.nom === "6" ? " z6" : ""}">Zone ${esc(r.zone.nom)}</span>`;
+          q("zoned").textContent = r.zone.nom === "1A"
+            ? "Au dépôt"
+            : `${kmTxt(r.zone.km)} km à vol d'oiseau · zone ${r.zone.nom} = ${r.zone.lib}${gd ? " · grand déplacement : remplace la zone" : ""}${approx}`;
+        } else {
+          q("zone").className = "v err"; q("zone").textContent = r.zoneErr;
+          q("zoned").textContent = "Renseigne l'adresse ou le GPS du chantier";
+        }
+      }).catch((err) => { if (row.isConnected) { q("dom").className = q("zone").className = "v err"; q("dom").textContent = q("zone").textContent = "Calcul impossible"; q("domd").textContent = err.message; } });
     });
   }
 

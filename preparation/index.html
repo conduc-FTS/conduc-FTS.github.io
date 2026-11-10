@@ -100,6 +100,11 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .fp-bas { margin-top: 4mm; align-items: start; }
 .fp-adblue { display: inline-block; background: #8DB4E2; color: #c00; font-weight: bold; padding: 0 4px; white-space: nowrap; font-size: 9px; }
 .fp-petit { font-size: 8.5px; }
+.fp-page td.adr { font-size: 12px; font-weight: bold; height: 44px; line-height: 1.35; text-align: center; padding: 4px 6px; }
+.fp-page.serre2 td.adr { height: 36px; }
+.fp-divers .c { overflow-wrap: anywhere; }
+#printZone img { display: block; width: 100%; height: auto; }
+#printZone img + img { break-before: page; }
 
 @media print {
   @page { size: A4; margin: 10mm; }
@@ -108,6 +113,26 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   #printZone { display: block !important; }
   #printZone .fp-page { width: auto; min-height: 0; padding: 0; margin: 0; box-shadow: none; }
 }
+/* Vérification de la fiche avant le PDF / l'envoi */
+.vf { background: #fff; border-radius: 16px; width: min(1180px, 100%); height: min(94vh, 1240px); display: grid; grid-template-columns: minmax(0, 1fr) 320px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+.vf .vf-pg { background: #525659; overflow: auto; padding: 18px; }
+.vf .vf-pg .fp-page { margin: 0 auto; min-height: 0; }
+.vf .vf-c { display: flex; flex-direction: column; border-left: 1px solid var(--border); min-height: 0; }
+.vf .vf-c .hd { display: flex; gap: 12px; align-items: center; padding: 18px 18px 8px; }
+.vf .vf-c .hd .ic { width: 40px; height: 40px; flex: none; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; background: #FFF6D6; }
+.vf .vf-c h4 { margin: 0; font-size: 1rem; line-height: 1.3; }
+.vf .vf-c .ct { flex: 1; overflow: auto; padding: 4px 18px 10px; color: #374151; line-height: 1.5; font-size: .88rem; }
+.vf .vf-c .ct .dest { background: var(--bg); border-radius: 10px; padding: 8px 12px; margin: 6px 0 10px; } .vf .vf-c .ct .dest div { padding: 2px 0; overflow-wrap: anywhere; }
+.vf .vf-c .ct .warn { background: #FFF6D6; border-radius: 10px; padding: 9px 12px; color: #7A5300; font-size: .84rem; margin-top: 8px; }
+.vf .vf-c .ct .info { background: #F1F5FD; border-radius: 10px; padding: 9px 12px; color: #1E3A6E; font-size: .84rem; margin-top: 8px; }
+.vf .vf-cor { margin-top: 12px; font-size: .82rem; color: var(--text-sub); }
+.vf .vf-cor button { border: 1px solid var(--border); background: #fff; border-radius: 8px; padding: 5px 9px; margin: 4px 4px 0 0; font: inherit; font-size: .8rem; font-weight: 600; color: var(--text-main); cursor: pointer; }
+.vf .vf-cor button:hover { border-color: #9CA3AF; }
+.vf .ft { display: flex; flex-direction: column; gap: 8px; padding: 12px 18px 18px; border-top: 1px solid var(--border); }
+.vf .ft .sv-btn { width: 100%; justify-content: center; padding: 11px 14px; }
+@media (max-width: 900px) { .vf { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; } .vf .vf-c { border-left: none; border-top: 1px solid var(--border); max-height: 45vh; } }
+.pr-tot { display: inline-block; margin-left: 6px; background: var(--fts-yellow, #FDCA01); color: #000; border-radius: 999px; padding: 1px 8px; font-size: .74rem; font-weight: 800; letter-spacing: 0; vertical-align: 1px; }
+.fp-page .dash tr.st td { border: 1px solid #000; background: #e6e6e6; font-weight: bold; font-size: 9px; height: 15px; letter-spacing: .3px; }
 /* Parcours en étapes */
 .pr-steps { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); background: #fff; border-radius: 14px; padding: 16px 10px 12px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
 .pr-steps button { position: relative; border: none; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 4px; font-family: inherit; color: var(--text-main); }
@@ -286,6 +311,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <div class="sv-f"><label>Chef d'équipe</label><select data-k="equipe.chef" id="fChef"></select></div>
         <div class="sv-f"><label>Téléphone <i>(Personnel FTS)</i></label><input type="text" id="fTel" readonly></div>
         <div></div>
+        <div class="full pr-note ok" id="noteKit" hidden></div>
         <div class="pr-sep">Matériel de chantier</div>
         <div class="sv-f"><label>Foreuse</label><select data-k="materiel.foreuse" id="fForeuse"></select></div>
         <div class="sv-f"><label>Course / réglage</label><select data-k="materiel.reglage" id="fReglage"></select></div>
@@ -293,7 +319,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <div class="sv-f"><label>Injection</label><input type="text" data-k="materiel.injection" list="dlInjection"></div>
         <div class="sv-f"><label>Presse</label><input type="text" data-k="materiel.presse" list="dlPresse"></div>
         <div class="sv-f"><label>Cuve GNR</label><select data-k="materiel.cuveGnr"><option>OUI</option><option>NON</option></select></div>
-        <div class="sv-f"><label>Cuve à eau</label><input type="text" data-k="materiel.cuveEau"></div>
+        <div class="sv-f"><label>Cuve à eau</label><select data-k="materiel.cuveEau"><option>OUI</option><option>NON</option></select></div>
         <div class="sv-f"><label>Caisse flexible</label><input type="text" data-k="materiel.caisseFlexible" list="dlChefs"></div>
         <div></div>
         <div class="pr-sep">Location</div>
@@ -304,6 +330,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <div class="sv-f" id="boxPelle"><label>Pelle : livraison le</label><input type="text" data-k="materiel.pelleLivraison" list="dlLivraison" placeholder="date ou ex : 2e jour du chantier"></div>
         <div class="sv-f" id="boxGodet"><label>&nbsp;</label><label class="chkline" style="padding:6px 0 0"><input type="checkbox" data-k="materiel.godet"> Godet avec l'élévateur</label></div>
         <div class="full pr-note w" id="noteGodet" hidden>⚠️ Godet coché mais aucun élévateur choisi.</div>
+        <div class="full pr-note" id="noteMa12" hidden></div>
         <div class="full pr-note ok" id="noteAdblue" hidden>✓ Compresseur choisi : AD-BLUE ajouté automatiquement sur la fiche.</div>
       </div>
     </section>
@@ -322,7 +349,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
       <div class="pr-note" id="ndcNote" style="margin:12px 18px 0" hidden></div>
 
       <div class="sv-ch" style="border-top:1px solid var(--border);margin-top:12px"><h2 style="font-size:.9rem">Longueurs retenues par diamètre</h2><span class="s">s'applique à tous les pieux du diamètre · la longueur NDC reste affichée pour info</span></div>
-      <table class="sv-tbl"><thead><tr><th>Tube principal</th><th class="r">Nb pieux</th><th class="r">Longueur NDC</th><th>Longueur retenue (tous)</th><th>Découpe</th></tr></thead><tbody id="parDiamBody"></tbody></table>
+      <table class="sv-tbl"><thead><tr><th>Tube principal</th><th class="r">Nb pieux <span class="pr-tot" id="nbTotal">0</span></th><th class="r">Longueur NDC</th><th>Longueur retenue (tous)</th><th>Découpe</th></tr></thead><tbody id="parDiamBody"></tbody></table>
 
       <div class="sv-ch" style="border-top:1px solid var(--border)"><h2 style="font-size:.9rem">Détail pieu par pieu</h2><span class="sv-sp"></span>
         <input type="text" id="fRecherche" class="pr-mini" placeholder="🔍 Rechercher (Mp12, 114…)" style="width:200px">
@@ -336,7 +363,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
       </div>
       <div class="pr-legende" id="legendeCouleurs"></div>
       <div style="padding:0 18px 14px;display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="pr-add" id="btnAjoutPieu">+ Ajouter un pieu</button><button type="button" class="pr-add" id="btnViderNdc" style="color:#C0392B">Vider la note de calcul</button></div>
-      <div class="pr-note" style="margin:0 18px 14px"><span class="pr-dot" style="cursor:default"></span> = longueur changée à la main sur ce pieu (différente de la longueur de son diamètre). Clic sur le point : retour à la longueur du diamètre.<br>Platine : barre → percée selon la table des perçages · sinon tube secondaire → collerette · sinon tube principal → collerette.</div>
+      <div class="pr-note" style="margin:0 18px 14px"><span class="pr-dot" style="cursor:default"></span> = longueur changée à la main sur ce pieu (différente de la longueur de son diamètre). Clic sur le point : retour à la longueur du diamètre.<br>Platine : barre → percée selon la table des perçages · sinon Ø du tube secondaire · sinon Ø du tube principal.</div>
     </section>
 
     <section class="sv-card">
@@ -365,6 +392,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
       <div class="pr-bar">
         <div class="sv-f"><label>Ciment</label><select data-k="ciment.type" id="fCiment"></select></div>
         <div class="sv-f"><label>Surconsommation (%)</label><input type="text" data-k="ciment.surconso" inputmode="decimal" id="fSurconso" style="width:110px"></div>
+        <div class="sv-f"><label>Palettes sur la fiche (total)</label><input type="text" data-k="ciment.palettesFiche" id="fPalFiche" inputmode="decimal" style="width:150px" placeholder="= calculé"></div>
         <div class="sv-f"><label>1re livraison (palettes)</label><input type="text" data-k="ciment.premiereLivraison" inputmode="decimal" style="width:130px" placeholder="= total"></div>
       </div>
       <div class="pr-kpi" id="cimentKpi"></div>
@@ -436,7 +464,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
     </section>
     <div class="pe-grid">
       <section class="sv-card">
-        <div class="sv-ch"><h2>Mail</h2><span class="s" id="envModeTxt">envoyé depuis ta boîte Gmail · tout est modifiable</span></div>
+        <div class="sv-ch"><h2>Mail</h2><span class="s" id="envModeTxt">s'ouvrira dans Outlook depuis ton adresse pro · tout est modifiable</span></div>
         <div class="pr-grid deux">
           <div class="sv-f full"><label>Destinataires</label><input type="text" id="envA" autocomplete="off"></div>
           <div class="sv-f full"><label>Copie <i>(facultatif)</i></label><input type="text" id="envCc" autocomplete="off" placeholder="adresse@fts-btp.fr"></div>
@@ -450,7 +478,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <section class="sv-card">
           <div class="sv-ch"><h2>Pièces jointes</h2></div>
           <div style="padding:14px 18px">
-            <div class="pe-pj"><span class="i">📄</span><div class="t"><b id="envNomPdf">Fiche</b><small>générée depuis l'étape 7 au moment de l'envoi</small></div><button type="button" class="sv-btn" id="envApercu">Aperçu</button></div>
+            <div class="pe-pj"><span class="i">📄</span><div class="t"><b id="envNomPdf">Fiche</b><small>générée depuis l'étape 7 · montrée avant l'envoi</small></div><button type="button" class="sv-btn" id="envApercu">Aperçu</button></div>
             <div class="pe-pj"><span class="i">🗺️</span><div class="t"><b id="envPlanNom">Plan d'accès</b><small id="envPlanInfo">facultatif · PDF ou image</small></div>
               <label id="envPlanCoche" style="display:flex;align-items:center;gap:6px;font-size:.82rem;font-weight:700" hidden><input type="checkbox" id="envPlanJoindre"> joindre</label>
               <button type="button" class="sv-btn" id="envPlanApercu" hidden>Aperçu</button>
@@ -511,7 +539,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   <div class="sv-modal" style="width:860px">
     <div class="sv-mh"><h3>Coller la note de calcul</h3><button type="button" class="sv-x" data-fermer>✕</button></div>
     <div style="padding:16px 22px">
-      <p style="margin:0 0 8px;font-size:.86rem;color:var(--text-sub)">Dans l'Excel du bureau d'études (onglet <b>A-5 TABLEAU RECAP</b>) : sélectionne les lignes des micropieux, avec les 2 lignes d'entête si possible, puis Ctrl + C et Ctrl + V ci-dessous.</p>
+      <p style="margin:0 0 8px;font-size:.86rem;color:var(--text-sub)">Dans la note de calcul (<b>ANNEXE E : TABLEAU RECAPITULATIF DES MICROPIEUX</b>) : sélectionne le tableau, du titre jusqu'au dernier micropieu, puis Ctrl + C et Ctrl + V ci-dessous. L'indice de la note et le DDC sont repris tout seuls ; la colonne Traction est ignorée.</p>
       <textarea class="pr-paste" id="collerTexte" placeholder="Ctrl + V ici"></textarea>
       <div id="collerApercu"></div>
       <div style="margin-top:12px">
@@ -631,9 +659,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const k = el.dataset.k;
       let v = el.type === "checkbox" ? el.checked : el.value;
       if (["indice", "ndc.forage", "ciment.surconso", "infos.duree"].includes(k)) v = nombre(v) === "" ? (k === "ciment.surconso" ? "" : el.value) : nombre(v);
+      if (k === "ciment.palettesFiche") v = nombre(v) === "" ? "" : Math.max(0, Math.round(nombre(v)));
       ecrireK(k, v);
       marquerSale();
       majDependances(k);
+      if (k === "equipe.chef") appliquerKitChef();
+      if (k === "materiel.injection") groupeDuMa12();
+      if (k === "ciment.palettesFiche") afficherFournitures();
     });
   });
   let pelleAvant = null; // pelle déjà renseignée au chargement : on ne recoche pas le godet
@@ -643,6 +675,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (k === "materiel.foreuse") { remplirReglages(); majTubeMax(); afficherNdc(); }
     if (k === "materiel.reglage") { majTubeMax(); afficherNdc(); }
     if (k === "materiel.compresseur") $("noteAdblue").hidden = !prep.materiel.compresseur.trim();
+    if (k === "materiel.injection" || k === "materiel.groupe") majNoteMa12();
     if (k === "materiel.pelle" || k === "materiel.godet" || k === "materiel.elevateur") {
       const pelle = !!prep.materiel.pelle.trim();
       // Une pelle sur le chantier : en général il faut le godet avec l'élévateur (coché d'office, décochable)
@@ -652,6 +685,66 @@ document.addEventListener("DOMContentLoaded", () => {
       $("boxGodet").hidden = !pelle && !prep.materiel.godet;
       $("noteGodet").hidden = !(prep.materiel.godet && !prep.materiel.elevateur.trim());
     }
+  }
+
+  // ─── Chef choisi → matériel de son atelier (Parc matériel : chef attitré) ───
+  const sansAcc = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  const GROUPE_DEFAUT = "GROUPE 60KVA";
+  let chefAvant = null; // chef au chargement / au dernier choix (pour remplacer son matériel, pas celui saisi à la main)
+  function kitChef(nomChef) {
+    const kit = nomChef ? FTSParc.kitDuChef(nomChef) : [];
+    const trouve = (f) => (kit.find(f) || {}).nom || "";
+    return {
+      foreuse: trouve((m) => m.categorie === FTSParc.CATEGORIE_FOREUSE),
+      injection: trouve((m) => m.categorie === "MALAXEURS") || trouve((m) => m.categorie === "POMPES" && !/PH15/.test(sansAcc(m.nom))),
+      presse: trouve((m) => /PH15/.test(sansAcc(m.nom))),
+      groupe: trouve((m) => m.categorie === "GROUPES ÉLECTROGÈNES"),
+    };
+  }
+  const estMa12 = (t) => /MA\s*12/.test(sansAcc(t));
+  function appliquerKitChef() {
+    const ma = prep.materiel;
+    const nouveau = kitChef(prep.equipe.chef), ancien = kitChef(chefAvant);
+    const mis = [];
+    ["foreuse", "injection", "presse", "groupe"].forEach((k) => {
+      const v = nouveau[k], actuel = String(ma[k] || "").trim();
+      // On remplace seulement une case vide ou le matériel du chef d'avant (jamais une saisie à la main)
+      const remplacable = !actuel || (ancien[k] && actuel === ancien[k]);
+      if (!remplacable) return;
+      if (v && v !== actuel) { ma[k] = v; mis.push(v); }
+      else if (!v && actuel) ma[k] = "";
+    });
+    if (!ma.cuveGnr) ma.cuveGnr = "OUI";
+    if (!ma.cuveEau) ma.cuveEau = "OUI";
+    chefAvant = prep.equipe.chef;
+    groupeDuMa12(true);
+    remplirChamps();
+    remplirReglages(); majTubeMax(); afficherNdc();
+    ["materiel.compresseur", "materiel.injection"].forEach(majDependances);
+    $("noteKit").hidden = !prep.equipe.chef;
+    $("noteKit").className = "full pr-note" + (mis.length ? " ok" : "");
+    $("noteKit").innerHTML = !prep.equipe.chef ? "" : mis.length
+      ? `✓ Matériel de l'atelier de ${esc(prep.equipe.chef)} mis tout seul : <b>${mis.map(esc).join(" · ")}</b>. Cuve GNR et cuve à eau : OUI. Tout reste modifiable.`
+      : `Aucun matériel attitré à ${esc(prep.equipe.chef)} dans le Parc matériel : choisis le matériel ci-dessous.`;
+  }
+  /** Un MA12 tourne toujours avec un groupe électrogène : on le met tout seul s'il manque */
+  let groupeAuto = false;
+  function groupeDuMa12(silencieux) {
+    const ma = prep.materiel;
+    if (estMa12(ma.injection) && !String(ma.groupe || "").trim()) {
+      ma.groupe = kitChef(prep.equipe.chef).groupe || GROUPE_DEFAUT;
+      groupeAuto = true;
+      const ch = document.querySelector('[data-k="materiel.groupe"]'); if (ch) ch.value = ma.groupe;
+      if (!silencieux) FTSShell.toast(`MA12 : groupe électrogène ajouté (${ma.groupe})`);
+    }
+    majNoteMa12();
+  }
+  function majNoteMa12() {
+    const ma = prep.materiel, n = $("noteMa12");
+    const ma12 = estMa12(ma.injection), groupe = String(ma.groupe || "").trim();
+    n.hidden = !ma12 || (!groupe ? false : !groupeAuto);
+    n.className = "full pr-note " + (groupe ? "ok" : "w");
+    n.innerHTML = groupe ? `✓ MA12 : groupe électrogène mis automatiquement (<b>${esc(groupe)}</b>), modifiable.` : "⚠️ Un MA12 tourne toujours avec un groupe électrogène : il en manque un.";
   }
 
   function marquerSale() {
@@ -693,7 +786,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const e = {};
     const manque = [!inf.adresse && "adresse", !inf.conducteur && "conducteur"].filter(Boolean);
     e.Infos = manque.length ? ["", `manque : ${manque.join(", ")}`] : ["ok", "complet"];
-    const m2 = [!prep.equipe.chef && "chef", !prep.materiel.foreuse && "foreuse"].filter(Boolean);
+    const m2 = [!prep.equipe.chef && "chef", !prep.materiel.foreuse && "foreuse", estMa12(prep.materiel.injection) && !String(prep.materiel.groupe || "").trim() && "groupe du MA12"].filter(Boolean);
     e.Materiel = m2.length ? ["", `manque : ${m2.join(", ")}`] : ["ok", "complet"];
     e.Ndc = n ? ["ok", `${n} pieu${n > 1 ? "x" : ""}`] : ["", "à coller"];
     e.Fournitures = n && tubeMax() !== "" ? ["ok", "calculées"] : ["", n ? "foreuse à choisir" : "après la NDC"];
@@ -780,7 +873,9 @@ document.addEventListener("DOMContentLoaded", () => {
         remplirListes();
         remplirChamps();
         pelleAvant = !!prep.materiel.pelle.trim();
-        ["infos.dateConnue", "equipe.chef", "materiel.foreuse", "materiel.compresseur", "materiel.pelle"].forEach(majDependances);
+        chefAvant = prep.equipe.chef;
+        if (!enreg && prep.equipe.chef) appliquerKitChef();
+        ["infos.dateConnue", "equipe.chef", "materiel.foreuse", "materiel.compresseur", "materiel.pelle", "materiel.injection"].forEach(majDependances);
         afficherNdc();
         majEssai();
         chargerImagesPlan();
@@ -900,6 +995,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const m = tubeMax();
     // Longueurs par diamètre
     const diams = P.diametresPresents(prep.ndc.pieux);
+    $("nbTotal").textContent = prep.ndc.pieux.length;
+    $("nbTotal").title = `${prep.ndc.pieux.length} micropieux au total`;
     $("parDiamBody").innerHTML = diams.length ? diams.map((x) => {
       const L = nombre(prep.ndc.longParDiam[String(x.d)]);
       const ndc = x.min === "" ? "—" : x.min === x.max ? `${fr(x.min, 2)} m` : `${fr(x.min, 2)} à ${fr(x.max, 2)} m`;
@@ -915,7 +1012,9 @@ document.addEventListener("DOMContentLoaded", () => {
     afficherPieux();
     const presents = [...new Set(prep.ndc.pieux.map((p) => nombre(p.tubeD)).filter((d) => d > 0))].sort((a, b) => a - b);
     $("legendeCouleurs").innerHTML = presents.length ? "<b style='color:var(--text-main)'>Code couleur :</b>" + presents.map((d) => `<span><span class="pr-sq" style="background:${P.couleurTube(d) || "#fff"}"></span>Ø${fr(d)}</span>`).join("") + "<span>· pas de couleur sur la fiche</span>" : "";
-    const note = prep.ndc.note ? `Note de la NDC : « ${esc(prep.ndc.note)} »` : "";
+    const nbNdc = nombre(prep.ndc.nbMpx);
+    const ecart = nbNdc !== "" && nbNdc !== prep.ndc.pieux.length ? `⚠️ La NDC annonce <b>${fr(nbNdc)} micropieux</b>, il y en a <b>${prep.ndc.pieux.length}</b> ici : vérifie qu'il n'en manque pas.` : "";
+    const note = [ecart, prep.ndc.note ? `Note de la NDC : « ${esc(prep.ndc.note)} »` : ""].filter(Boolean).join("<br>");
     $("ndcNote").hidden = !note; $("ndcNote").innerHTML = note;
     $("swPastilles").classList.toggle("on", !!prep.pastilles.actif);
     $("boxPastilles").hidden = !prep.pastilles.actif;
@@ -1094,7 +1193,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const exemple = collage.lignes.slice(0, 3);
     $("collerApercu").innerHTML = `<div class="pr-map"><table><tr>${collage.colonnes.map((k, c) => `<th><select data-col="${c}">${opts(k)}</select></th>`).join("")}</tr>
       ${exemple.map((l) => `<tr>${collage.colonnes.map((_, c) => `<td>${esc(l[c] || "")}</td>`).join("")}</tr>`).join("")}</table></div>
-      <p style="font-size:.76rem;color:var(--text-sub);margin:6px 0 0">${collage.entete ? "Colonnes reconnues d'après l'entête collée." : "Pas d'entête : ordre des colonnes de l'onglet A-5 utilisé."} Corrige une colonne si besoin.</p>`;
+      <p style="font-size:.76rem;color:var(--text-sub);margin:6px 0 0">${collage.entete ? "Colonnes reconnues d'après l'entête collée." : collage.format === "a5" ? "Pas d'entête : ordre des colonnes de l'ancien onglet A-5 utilisé." : "Pas d'entête : ordre des colonnes de l'Annexe E utilisé (colonne C Traction ignorée)."} Corrige une colonne si besoin.</p>`;
     $("collerApercu").querySelectorAll("[data-col]").forEach((s) => s.addEventListener("change", () => {
       const k = s.value, c = Number(s.dataset.col);
       collage.colonnes = collage.colonnes.map((x, j) => (j === c ? k : x === k && k ? "" : x));
@@ -1108,6 +1207,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (f.retires.length) chips.push(`<span class="pr-chip r">${f.retires.length} retiré(s)${f.retires.length <= 6 ? " : " + esc(f.retires.join(", ")) : ""}</span>`);
     if (res.ignorees) chips.push(`<span class="pr-chip">${res.ignorees} ligne(s) vide(s) ignorée(s)</span>`);
     if (res.note) chips.push(`<span class="pr-chip">note reprise : « ${esc(res.note.slice(0, 60))} »</span>`);
+    const inf = collage.infos || {};
+    if (inf.indice) chips.push(`<span class="pr-chip v">indice NDC : ${esc(inf.indice)}</span>`);
+    if (inf.ddc) chips.push(`<span class="pr-chip v">DDC repris</span>`);
+    if (inf.nbMpx !== undefined) chips.push(`<span class="pr-chip ${inf.nbMpx === res.pieux.length || modeCollage() === "ajouter" ? "" : "r"}">NDC : ${fr(inf.nbMpx)} micropieux annoncés</span>`);
     $("collerBilan").innerHTML = chips.join("");
     $("collerStatus").textContent = res.pieux.length ? "" : "Aucun pieu reconnu : vérifie la colonne « Repère » et la colonne « Longueur ».";
     $("collerStatus").className = "sv-mstatus" + (res.pieux.length ? "" : " err");
@@ -1124,6 +1227,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const forages = collage.res.pieux.map((p) => nombre(p.forage)).filter((x) => x > 0);
     if (forages.length) prep.ndc.forage = forages[0];
     if (collage.res.note) prep.ndc.note = collage.res.note;
+    const inf = collage.infos || {};
+    if (inf.indice) prep.ndc.indice = inf.indice;
+    if (inf.ddc) prep.ndc.ddc = inf.ddc;
+    if (inf.nbMpx !== undefined) prep.ndc.nbMpx = inf.nbMpx;
     marquerSale(); remplirChamps(); afficherNdc(); fermerCollage();
     FTSShell.toast(`✅ ${collage.res.pieux.length} pieux collés`);
   });
@@ -1132,8 +1239,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function marge(cle) { return nombre(prep.marges[cle]) || 0; }
   function articles(c) {
     const a = [];
-    c.tubes.forEach((t) => a.push({ cle: P.cleArticle("tube", t), lib: `Tube Ø${fr(t.d)} · ${fr(t.l)} m${t.pastille ? " · PASTILLÉ" : ""}`, d: t.d, qte: t.qte, sorte: "tube", x: t }));
-    c.platines.forEach((p) => a.push({ cle: P.cleArticle("platine", p), lib: `Platine ${p.section || "?"} · ${p.coiffe.toLowerCase()}`, qte: p.qte, sorte: "platine", x: p }));
+    c.tubes.forEach((t) => a.push({ cle: P.cleArticle("tube", t), lib: `${t.sec ? "Tubage" : "Tube"} Ø${fr(t.d)} · ${fr(t.l)} m${t.pastille ? " · PASTILLÉ" : ""}`, d: t.d, qte: t.qte, sorte: ["tube", "tubage", "pastille"][P.groupeTube(t)], x: t }));
+    c.platines.forEach((p) => a.push({ cle: P.cleArticle("platine", p), lib: `Platine ${p.section || "?"} · ${/^Ø/.test(p.coiffe) ? p.coiffe : p.coiffe.toLowerCase()}`, qte: p.qte, sorte: "platine", x: p }));
     c.centreurs.forEach((p) => a.push({ cle: P.cleArticle("centreur", p), lib: `As de carreau Ø${fr(p.forage)} · tube Ø${fr(p.d)}`, d: p.d, qte: p.qte, sorte: "centreur", x: p }));
     c.barres.forEach((b) => a.push({ cle: P.cleArticle("barre", b), lib: `Barre ${b.type} Ø${fr(b.d)} · ${fr(b.l)} m + écrou`, qte: b.qte, sorte: "barre", x: b }));
     return a;
@@ -1143,12 +1250,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const m = tubeMax();
     $("fournKpi").innerHTML = `<div><b>${c.nbPieux}</b><span>micropieux</span></div><div><b>${fr(c.lineaire, 1)} m</b><span>linéaire retenu</span></div><div><b>${m === "" ? "?" : fr(m) + " m"}</b><span>tube max de la foreuse</span></div>`;
     const a = articles(c);
-    const sections = [["tube", "Tubes"], ["platine", "Platines"], ["centreur", "As de carreau / pointes"], ["barre", "Barres / écrous"]];
+    const sections = [["tube", "Tubes principaux"], ["tubage", "Tubage (tubes secondaires)"], ["pastille", "Tubes pastillés"], ["platine", "Platines"], ["centreur", "As de carreau / pointes"], ["barre", "Barres / écrous"]];
     $("fournBody").innerHTML = a.length ? sections.map(([s, titre]) => {
       const l = a.filter((x) => x.sorte === s);
       if (!l.length) return "";
       return `<tr class="sep"><td colspan="4">${titre.toUpperCase()}</td></tr>` + l.map((x) => `<tr>
-        <td>${x.d && s === "tube" ? `<span class="pr-sq" style="background:${P.couleurTube(x.d) || "#fff"}"></span>` : ""}${esc(x.lib)}</td><td class="r">${x.qte}</td>
+        <td>${x.d && x.x && x.x.l ? `<span class="pr-sq" style="background:${P.couleurTube(x.d) || "#fff"}"></span>` : ""}${esc(x.lib)}</td><td class="r">${x.qte}</td>
         <td><input type="text" class="pr-mini n" data-marge="${esc(x.cle)}" value="${marge(x.cle) ? (marge(x.cle) > 0 ? "+" : "") + marge(x.cle) : "0"}" style="width:70px"></td>
         <td class="r"><b>${Math.max(0, x.qte + marge(x.cle))}</b></td></tr>`).join("");
     }).join("") : `<tr><td colspan="4" style="color:var(--text-sub)">Colle la note de calcul et choisis la foreuse pour calculer les fournitures.</td></tr>`;
@@ -1161,15 +1268,24 @@ document.addEventListener("DOMContentLoaded", () => {
     afficherManuels();
     const ci = c.ciment;
     const pal = ci.palettes === "" ? "?" : ci.palettes;
-    $("cimentKpi").innerHTML = `<div><b>${pal} palette${pal === 1 ? "" : "s"}</b><span>${ci.sacsPalette === "" ? "sacs par palette à renseigner dans le Parc matériel" : `${ci.sacsPalette} sacs par palette`}</span></div>
+    const surFiche = palettesFiche(ci);
+    $("fPalFiche").placeholder = ci.palettes === "" ? "" : `= ${ci.palettes} (calculé)`;
+    $("cimentKpi").innerHTML = `<div><b>${pal} palette${pal === 1 ? "" : "s"}</b><span>prévues par le calcul · ${ci.sacsPalette === "" ? "sacs par palette à renseigner dans le Parc matériel" : `${ci.sacsPalette} sacs par palette`}</span></div>
+      <div><b>${surFiche === "" ? "?" : surFiche} palette${surFiche === 1 ? "" : "s"}</b><span>${nombre(prep.ciment.palettesFiche) === "" ? "sur la fiche (= calcul)" : `sur la fiche · choisi à la main (${surFiche > ci.palettes ? "+" : ""}${surFiche - (ci.palettes || 0)} par rapport au calcul)`}</span></div>
       <div><b>${ci.sacs === "" ? "?" : ci.sacs} sacs</b><span>de ${fr(ci.sac)} kg · ${fr(ci.kg / 1000, 2)} t</span></div>
       <div><b>${fr(ci.volume, 2)} m³</b><span>volume théorique · dosage ${fr(ci.dosage)} kg/m³ · +${fr(ci.surconso === "" ? 0 : ci.surconso)} %</span></div>`;
   }
 
+  /** Palettes de ciment imprimées sur la fiche : nombre choisi à la main, sinon le calcul */
+  function palettesFiche(ci) { const v = nombre(prep.ciment.palettesFiche); return v === "" ? ci.palettes : v; }
+
   // ─── Fiche imprimée ────────────────────────────────────────────
   function dateFr(iso) { const [a, m, j] = String(iso || "").split("-"); return a && m && j ? `${j}/${m}/${a}` : ""; }
   function dashRows(lignes, nbMin) {
-    const out = lignes.map((l) => { const cells = Array.isArray(l) ? l : l.c; return `<tr${l.maj ? ' class="maj"' : ""}>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`; });
+    const out = lignes.map((l) => {
+      if (l.st) return `<tr class="st"><td colspan="3">${esc(l.st)}</td></tr>`; // sous-titre (TUBAGE…)
+      const cells = Array.isArray(l) ? l : l.c; return `<tr${l.maj ? ' class="maj"' : ""}>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`;
+    });
     while (out.length < nbMin) out.push(`<tr><td></td><td></td><td></td></tr>`);
     return out.join("");
   }
@@ -1212,7 +1328,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const tdJ = (cls, ...cles) => { const x = `${cls}${J(...cles)}`.trim(); return x ? ` class="${x}"` : ""; };
     const platines = c.platines.map((p) => ({ maj: J(kPl(p)), c: [`${q(P.cleArticle("platine", p), p.qte)} u`, esc(p.section), esc(p.coiffe)] }));
     const centreurs = c.centreurs.map((p) => ({ maj: J(kCe(p)), c: [`${q(P.cleArticle("centreur", p), p.qte)} u`, `Ø ${fr(p.forage)}`, `Ø ${fr(p.d)}`] }));
-    const tubes = P.tubesFiche(c, prep).map((t) => ({ maj: J(kTu(t)), c: [`${t.qte} u`, `Ø ${t.d.toFixed(1)}${t.pastille ? " PASTILLÉ" : ""}`, `${t.l.toFixed(1)} ML`] }));
+    // Tubes principaux (tous les Ø), puis TUBAGE (tubes secondaires), puis tubes pastillés
+    const tubes = [];
+    P.tubesFiche(c, prep).forEach((t, i, l) => {
+      const g = P.groupeTube(t);
+      if (g > 0 && (i === 0 || P.groupeTube(l[i - 1]) !== g)) tubes.push({ st: g === 1 ? "TUBAGE" : "TUBES PASTILLÉS" });
+      tubes.push({ maj: J(kTu(t)), c: [`${t.qte} u`, `Ø ${t.d.toFixed(1)}`, `${t.l.toFixed(1)} ML`] });
+    });
     const barres = c.barres.map((b) => ({ maj: J(kBa(b)), c: [`${q(P.cleArticle("barre", b), b.qte)} u`, `${esc(b.type)} Ø ${fr(b.d)}`, `${b.l === "" ? "" : Number(b.l).toFixed(1) + " ML"}`] }));
     const L = (n) => (n || n === 0 ? n : "");
     // Bas de page : même nombre de lignes à gauche et à droite → les traits sont alignés
@@ -1240,9 +1362,10 @@ document.addEventListener("DOMContentLoaded", () => {
 </div>
 <div class="fp-cols">
   <div>
-    <table>${cg(46, 54)}
-      <tr><td class="g lbl" rowspan="2">ADRESSE :</td><td${tdJ("gauche", "Adresse")}>${esc(inf.adresse)}</td></tr>
-      <tr><td${tdJ("gauche", "Commune")}>${esc(inf.commune)}</td></tr>
+    <table class="fp-adr">${cg(27, 73)}
+      <tr><td class="g lbl">ADRESSE :</td><td${tdJ("adr", "Adresse", "Commune")}>${[inf.adresse, inf.commune].filter((x) => String(x || "").trim()).map(esc).join("<br>")}</td></tr>
+    </table>
+    <table style="margin-top:-1px">${cg(46, 54)}
       <tr><td class="g lbl" style="white-space:nowrap;font-size:9.5px">PRISE DU MATÉRIEL :</td><td${tdJ("", "Prise du matériel")}>${esc(inf.priseMateriel)}</td></tr>
     </table>
     <div class="red">MATERIEL DE CHANTIER</div>
@@ -1258,7 +1381,7 @@ document.addEventListener("DOMContentLoaded", () => {
     </table>
     <div class="red">MATERIAUX</div>
     <table>${cg(25, 25, 50)}<tr><td class="g" colspan="3">CIMENT :</td></tr><tr><td colspan="2">Total chantier</td><td>1ère livraison</td></tr>
-      <tr><td${tdJ("v", "Ciment total")}><b>${pal(ci.palettes)}</b></td><td${tdJ(cimentSpecial ? "v maj" : "v", "Type de ciment")}>${esc(prep.ciment.type)}</td><td${tdJ("v", "Ciment 1ère livraison", premiere === "" ? "Ciment total" : "")}><b>${pal(premiere === "" ? ci.palettes : premiere)}</b></td></tr></table>
+      <tr><td${tdJ("v", "Ciment total")}><b>${pal(palettesFiche(ci))}</b></td><td${tdJ(cimentSpecial ? "v maj" : "v", "Type de ciment")}>${esc(prep.ciment.type)}</td><td${tdJ("v", "Ciment 1ère livraison", premiere === "" ? "Ciment total" : "")}><b>${pal(premiere === "" ? palettesFiche(ci) : premiere)}</b></td></tr></table>
   </div>
   <div class="fp-droite">
     <table>${cg(50, 50)}<tr><td class="g lbl" colspan="2">DATE INTERVENTION ET DURÉE :</td></tr><tr><td${tdJ("v", "Date d'intervention")}>${inf.dateConnue && inf.date ? `<b>${dateFr(inf.date)}</b>` : "<b>À DÉFINIR</b>"}</td><td${tdJ("v", "Durée")}>${esc(L(inf.duree))} ${esc(inf.dureeUnite)}</td></tr></table>
@@ -1298,14 +1421,20 @@ document.addEventListener("DOMContentLoaded", () => {
   <tr><td class="vide"></td><td class="vide"></td><td class="vide"></td></tr>
 </table>`;
   }
-  $("btnImprimer").addEventListener("click", () => {
+  $("btnImprimer").addEventListener("click", async () => {
     afficherFiche();
-    // Copie de la fiche directement sous <body> : l'impression peut alors continuer sur une 2e page si besoin
-    let z = $("printZone");
-    if (!z) { z = document.createElement("div"); z.id = "printZone"; document.body.appendChild(z); }
-    z.innerHTML = `<div class="fp-page ${$("fichePage").className.replace("fp-page", "")}">${$("fichePage").innerHTML}</div>`;
-    const d = z.querySelector("#fpDivers"); if (d) { d.removeAttribute("id"); d.removeAttribute("contenteditable"); }
-    window.print();
+    // On imprime l'image du PDF (même cadrage que le PDF envoyé, mise à la largeur de la page : rien ne sort du cadre)
+    const b = $("btnImprimer"), lib = b.textContent;
+    b.disabled = true; b.textContent = "Préparation de l'impression…";
+    try {
+      await genererPdf(surlignage().indice);
+      let z = $("printZone");
+      if (!z) { z = document.createElement("div"); z.id = "printZone"; document.body.appendChild(z); }
+      z.innerHTML = pagesPdf.map((pg) => `<img src="${pg.img}" alt="">`).join("");
+      await Promise.all([...z.querySelectorAll("img")].map((im) => (im.complete ? null : new Promise((ok) => { im.onload = im.onerror = ok; }))));
+      window.print();
+    } catch (e) { erreur("Impression impossible", e.message); }
+    finally { b.disabled = false; b.textContent = lib; }
   });
 
   // ─── Plan d'accès (étape 6) ────────────────────────────────────
@@ -1868,7 +1997,7 @@ document.addEventListener("DOMContentLoaded", () => {
   /** Relevé de ce qui est imprimé sur la fiche : sert à repérer les changements entre deux envois */
   const kPl = (p) => `Platines ${p.section} ${String(p.coiffe).toLowerCase()}`;
   const kCe = (p) => `Pointes Ø ${fr(p.forage)} tube Ø ${fr(p.d)}`;
-  const kTu = (t) => `Tubes Ø ${t.d.toFixed(1)}${t.pastille ? " pastillés" : ""} x ${t.l.toFixed(1)} ML`;
+  const kTu = (t) => `${t.sec ? "Tubage" : "Tubes"} Ø ${t.d.toFixed(1)}${t.pastille ? " pastillés" : ""} x ${t.l.toFixed(1)} ML`;
   const kBa = (b) => `Barres ${b.type} Ø ${fr(b.d)}${b.l === "" ? "" : " x " + Number(b.l).toFixed(1) + " ML"}`;
   let indicePdf = null; // indice imposé pendant la création du PDF
   /** Indice imprimé sur la fiche et cases à surligner en jaune (changements depuis le dernier envoi) */
@@ -1900,7 +2029,7 @@ document.addEventListener("DOMContentLoaded", () => {
     add("Compresseur", ma.compresseur); add("Groupe électrogène", ma.groupe); add("Pelle", ma.pelle);
     add("Livraison pelle", ma.pelle.trim() ? ma.pelleLivraison : "");
     add("Godet élévateur", ma.godet ? "oui" : "");
-    add("Ciment total", ci.palettes === "" ? "" : `${ci.palettes} Pal`); add("Type de ciment", prep.ciment.type);
+    add("Ciment total", palettesFiche(ci) === "" ? "" : `${palettesFiche(ci)} Pal`); add("Type de ciment", prep.ciment.type);
     add("Ciment 1ère livraison", premiere === "" ? "" : `${premiere} Pal`);
     add("Objectif forage", re.objectif); add("Micropieu(x) d'essai", P.texteEssais(re)); add("Implantation", re.implantation);
     add("Évacuation des boues", re.boues); add("Évacuation des déchets", re.dechets);
@@ -2000,6 +2129,45 @@ document.addEventListener("DOMContentLoaded", () => {
     try { const r = await pdfPlan(); ouvrirApercu(r.blob, nomPlan(indiceEnvoi()), r.pages); } catch (e) { erreur("Aperçu impossible", e.message); }
   });
 
+  /**
+   * Montre la fiche telle qu'elle sera mise en PDF, AVANT de créer le PDF.
+   * Lecture seule : pour corriger, on revient à l'étape concernée.
+   * @param {*} indice  indice imprimé
+   * @param {object} o  { titre, html (colonne de droite), bouton }
+   * @returns {Promise<boolean>} true si la fiche est validée
+   */
+  function verifierFiche(indice, o) {
+    return new Promise((ok) => {
+      const ov = document.createElement("div");
+      ov.className = "pb-ov";
+      ov.innerHTML = `<div class="vf" role="dialog" aria-modal="true">
+        <div class="vf-pg"><div class="fp-page"></div></div>
+        <div class="vf-c">
+          <div class="hd"><div class="ic">🔍</div><h4>${esc(o.titre)}</h4></div>
+          <div class="ct">${o.html || ""}
+            <div class="vf-cor">Quelque chose à corriger ? Va à l'étape :<br>${["Infos", "Materiel", "Ndc", "Fournitures", "Remarques"].map((t) => `<button type="button" data-etape="${t}">${esc(NOMS_ETAPES[t])}</button>`).join("")}</div>
+          </div>
+          <div class="ft"><button type="button" class="sv-btn pri" data-v="1">${esc(o.bouton)}</button><button type="button" class="sv-btn" data-v="0">Annuler</button></div>
+        </div></div>`;
+      document.body.appendChild(ov);
+      const page = ov.querySelector(".fp-page");
+      const sauve = prep.indice;
+      prep.indice = indice; indicePdf = indice;
+      try { afficherFiche(page); } finally { prep.indice = sauve; indicePdf = null; }
+      const fermer = (v) => { document.removeEventListener("keydown", clavier, true); ov.remove(); ok(v); };
+      function clavier(e) { if (e.key === "Escape") { e.preventDefault(); fermer(false); } }
+      document.addEventListener("keydown", clavier, true);
+      ov.addEventListener("click", (e) => {
+        if (e.target === ov) return fermer(false);
+        const et = e.target.closest("[data-etape]");
+        if (et) { fermer(false); ouvrirOnglet(et.dataset.etape); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+        const b = e.target.closest("[data-v]");
+        if (b) fermer(b.dataset.v === "1");
+      });
+      ov.querySelector('[data-v="1"]').focus();
+    });
+  }
+
   /** Génère le PDF A4 de la fiche, avec l'indice donné (sans toucher à l'écran) */
   let pagesPdf = []; // images des pages du dernier PDF créé (aperçu)
   async function genererPdf(indice) {
@@ -2008,12 +2176,12 @@ document.addEventListener("DOMContentLoaded", () => {
     prep.indice = indice; indicePdf = indice;
     let zone = $("pdfZone");
     if (!zone) { zone = document.createElement("div"); zone.id = "pdfZone"; document.body.appendChild(zone); }
-    zone.innerHTML = `<div class="fp-page" style="padding:0"></div>`;
+    zone.innerHTML = `<div class="fp-page" style="padding:0 0.6mm;box-sizing:border-box"></div>`;
     const page = zone.firstChild;
     try {
       afficherFiche(page);
       await Promise.all([...page.querySelectorAll("img")].map((im) => (im.complete ? null : new Promise((ok) => { im.onload = im.onerror = ok; }))));
-      const canvas = await html2canvas(page, { scale: 3, backgroundColor: "#ffffff", logging: false });
+      const canvas = await html2canvas(page, { scale: 3, backgroundColor: "#ffffff", logging: false, width: page.offsetWidth, windowWidth: Math.max(document.documentElement.clientWidth, 1200) });
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
       const L = 190, H = 277, M = 10;
@@ -2123,6 +2291,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   $("envTelecharger").addEventListener("click", async () => {
     if (!pret) return;
+    const vu = await verifierFiche(indiceEnvoi(), { titre: `Vérifie la fiche indice ${indiceEnvoi()} avant de l'enregistrer en PDF`,
+      html: `<p style="margin:0">La fiche ci-contre est exactement celle qui sera mise en PDF.</p>`, bouton: "💾 C'est bon : enregistrer en PDF" });
+    if (!vu) return;
     boutonsEnvoi(false); $("envStatus").textContent = "Création du PDF…";
     try {
       const nomF = P.nomPdf(code, indiceEnvoi());
@@ -2254,12 +2425,13 @@ document.addEventListener("DOMContentLoaded", () => {
     let moiEmail = "";
     try { const u = await FTSAuth.getUserInfo(); moiEmail = (u && u.email) || ""; } catch (err) {}
     const parOutlook = FTSMail.mode(moiEmail || null) === "outlook";
-    const ok = await boite({ icone: "✉️", titre: parOutlook ? `Préparer le mail de l'indice ${n} ?` : `Envoyer la fiche indice ${n} ?`,
+    // La fiche est montrée telle qu'elle partira, avant de créer le PDF
+    const ok = await verifierFiche(n, { titre: `Vérifie la fiche indice ${n} avant l'envoi`,
       html: `Destinataires :<div class="dest">${a.map((x) => `<div>${esc(x)}</div>`).join("")}${cc.map((x) => `<div style="color:var(--text-sub)">copie : ${esc(x)}</div>`).join("")}</div>
         Pièces jointes : fiche de préparation (PDF)${plan ? ` + plan d'accès (${esc(plan.nom)})` : planJoint() ? " + plan d'accès (PDF)" : ""}
         ${avertir.map((x) => `<div class="warn">⚠️ ${esc(x)}</div>`).join("")}
-        ${parOutlook ? `<div class="warn" style="background:#F1F5FD">📧 Ton compte n'a pas Gmail : le mail va s'ouvrir dans <b>Outlook</b>, depuis ton adresse pro, et les PDF seront téléchargés pour que tu les glisses dans le mail.</div>` : ""}`,
-      boutons: [{ lib: "Annuler", val: false }, { lib: parOutlook ? "Préparer le mail" : "Envoyer", val: true, cls: "pri" }] });
+        ${parOutlook ? `<div class="info">📧 Le mail va s'ouvrir dans <b>Outlook</b>, depuis ton adresse pro. Les PDF sont téléchargés pour que tu les glisses dans le mail.</div>` : ""}`,
+      bouton: parOutlook ? "✅ C'est bon : préparer le mail" : "✅ C'est bon : envoyer" });
     if (ok !== true) return;
     // Serveur FTS : autorisation et dossier chantier demandés tout de suite (juste après le clic)
     const veutServeur = $("srvDeposer").checked;
@@ -2376,7 +2548,7 @@ document.addEventListener("DOMContentLoaded", () => {
   (async () => {
     try {
       const u = window.FTSAuth && FTSAuth.isSignedIn() ? await FTSAuth.getUserInfo() : null;
-      if (u && u.email && FTSMail.mode(u.email) === "outlook") $("envModeTxt").textContent = "s'ouvrira dans Outlook depuis ton adresse pro · tout est modifiable";
+      if (u && u.email && FTSMail.mode(u.email) === "gmail") $("envModeTxt").textContent = "envoyé depuis ta boîte Gmail · tout est modifiable";
     } catch (e) {}
   })();
 

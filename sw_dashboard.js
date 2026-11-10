@@ -14,7 +14,7 @@
  * toujours prendre la version la plus fraîche sans avoir à changer
  * ce numéro.
  */
-const CACHE_NAME = "fts-dashboard-v21";
+const CACHE_NAME = "fts-dashboard-v22";
 // Documents gardés hors ligne par le chef (onglet DOCUMENTS) : ce cache
 // n'est JAMAIS supprimé par une mise à jour de l'appli.
 const CACHE_DOCS = "fts-docs-v1";

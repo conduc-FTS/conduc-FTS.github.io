@@ -322,11 +322,12 @@ const FTSDocsBureau = (() => {
   async function monter(conteneur, options = {}) {
     racine = conteneur;
     opts = options;
+    css(); // le style des messages doit être là dès le premier affichage
     // Ouverture directe sur #se-view-documents : on attend la connexion Google (30 s max)
     if (!(window.FTSAuth && FTSAuth.isSignedIn())) {
       racine.innerHTML = '<div class="se-panel"><div class="dx-vide">Connexion Google en attente…</div></div>';
       for (let i = 0; i < 60 && !(window.FTSAuth && FTSAuth.isSignedIn()); i++) await new Promise((ok) => setTimeout(ok, 500));
-      if (!FTSAuth.isSignedIn()) { racine.innerHTML = '<div class="se-panel"><div class="dx-vide">Connecte-toi (bouton en bas à gauche), puis reviens sur « Documents ».</div></div>'; return; }
+      if (!FTSAuth.isSignedIn()) { racine.innerHTML = '<div class="se-panel"><div class="dx-vide">Connecte-toi (bouton « Se connecter avec Google » en haut de la page), puis reviens sur « Documents ».</div></div>'; return; }
     }
     if (window.FTSPersonnel) await FTSPersonnel.charger({ rapide: true }).catch(() => {});
     return rendre();

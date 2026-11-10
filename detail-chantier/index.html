@@ -45,12 +45,16 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .dt-lbar { height: 10px; border-radius: 5px; background: #EEF0F2; overflow: hidden; }
 .dt-lbar div { height: 100%; }
 .dt-team { display: flex; flex-wrap: wrap; gap: 2px; }
-.dt-cal { overflow-x: auto; }
+.dt-cal { overflow: hidden; }
+#dcCal { overflow-x: auto; } /* seul le tableau défile, pas le titre de la carte */
+.dt-cal tr.sep td span { position: sticky; left: 18px; }
 .dt-cal table { border-collapse: collapse; width: 100%; }
 .dt-cal th, .dt-cal td { padding: 7px 4px; text-align: center; font-size: 0.72rem; border-bottom: 1px solid var(--border); }
 .dt-cal th { color: var(--text-sub); font-weight: 700; background: #FBFBFC; white-space: nowrap; }
 .dt-cal td:first-child, .dt-cal th:first-child { text-align: left; padding-left: 18px; white-space: nowrap; font-weight: 700; font-size: 0.82rem; position: sticky; left: 0; background: #fff; }
 .dt-cal th:first-child { background: #FBFBFC; }
+.dt-cal tr:not(.sep) td:last-child, .dt-cal th:last-child { position: sticky; right: 0; background: #fff; box-shadow: inset 1px 0 0 var(--border); padding: 7px 10px; }
+.dt-cal th:last-child { background: #FBFBFC; }
 .dt-c { width: 24px; height: 20px; border-radius: 5px; display: inline-block; }
 .dt-c.TRAVAIL { background: #27AE60; } .dt-c.PANNE { background: #C0392B; } .dt-c.ARRET { background: #F59E0B; } .dt-c.TRANSPORT { background: #4C82F0; } .dt-c.v { background: #F2F3F5; }
 .dt-cal tr.sep td { background: var(--anthracite); color: var(--fts-yellow); font-size: 0.62rem; letter-spacing: 0.08em; font-weight: 800; text-align: left; padding: 5px 18px; }
@@ -489,7 +493,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function afficherGraphique(c) {
-    const W = 640, H = 200, X0 = 40, X1 = 625, Y0 = 172, Y1 = 22;
+    // Y1 laisse 2 lignes d'étiquettes au-dessus du tracé (« fin prévue », « estimée ») : elles ne croisent plus la courbe
+    const W = 640, H = 210, X0 = 40, X1 = 625, Y0 = 182, Y1 = 38;
     if (!c.jours) { $("dcChart").innerHTML = `<div class="sv-empty" style="padding:30px 10px">Le graphique apparaîtra après le premier rapport journalier.</div>`; return; }
     const cadence = c.realise / c.jours;
     const reste = Math.max(0, c.totalPrevu - c.realise);
@@ -505,14 +510,14 @@ document.addEventListener("DOMContentLoaded", () => {
     for (let j = 1; j <= nJ; j += pas) svg += `<text x="${x(j)}" y="${H - 6}" font-size="11" fill="#6B7280" text-anchor="middle">J${j}</text>`;
     if (c.totalPrevu && c.totalJours) {
       svg += `<polyline fill="none" stroke="#C5C9D0" stroke-width="2" stroke-dasharray="5 4" points="${x(1)},${y(c.totalPrevu / c.totalJours)} ${x(c.totalJours)},${y(c.totalPrevu)}"/>`;
-      svg += `<line x1="${x(c.totalJours)}" y1="${Y1}" x2="${x(c.totalJours)}" y2="${Y0}" stroke="#C5C9D0" stroke-dasharray="3 3"/><text x="${x(c.totalJours) - 4}" y="${Y1 - 6}" font-size="11" fill="#6B7280" text-anchor="end">fin prévue J${c.totalJours}</text>`;
+      svg += `<line x1="${x(c.totalJours)}" y1="${Y1 - 18}" x2="${x(c.totalJours)}" y2="${Y0}" stroke="#C5C9D0" stroke-dasharray="3 3"/><text x="${x(c.totalJours) - 4}" y="${Y1 - 22}" font-size="11" fill="#6B7280" text-anchor="end">fin prévue J${c.totalJours}</text>`;
     }
     if (c.totalPrevu && reste > 0 && cadence > 0) {
       svg += `<polyline fill="none" stroke="#FDCA01" stroke-width="2" stroke-dasharray="2 4" points="${x(c.jours)},${y(c.realise)} ${x(joursEstimes)},${y(c.totalPrevu)}"/>`;
-      if (joursEstimes !== c.totalJours) svg += `<line x1="${x(joursEstimes)}" y1="${Y1}" x2="${x(joursEstimes)}" y2="${Y0}" stroke="#A15C00" stroke-dasharray="3 3"/><text x="${x(joursEstimes) - 4}" y="${Y1 + 8}" font-size="11" fill="#A15C00" font-weight="700" text-anchor="end">estimée J${joursEstimes}</text>`;
+      if (joursEstimes !== c.totalJours) svg += `<line x1="${x(joursEstimes)}" y1="${Y1 - 4}" x2="${x(joursEstimes)}" y2="${Y0}" stroke="#A15C00" stroke-dasharray="3 3"/><text x="${x(joursEstimes) - 4}" y="${Y1 - 8}" font-size="11" fill="#A15C00" font-weight="700" text-anchor="end">estimée J${joursEstimes}</text>`;
     }
     svg += `<polyline fill="none" stroke="#FDCA01" stroke-width="3" points="${c.jours === 1 ? `${x(1) - 1},${y(c.serie[0])} ` : ""}${pts}"/>`;
-    svg += `<circle cx="${x(c.jours)}" cy="${y(c.realise)}" r="5" fill="#FDCA01" stroke="#fff" stroke-width="2"/><text x="${x(c.jours) + 8}" y="${y(c.realise) + 16}" font-size="12" font-weight="700" fill="#1F2328">${fmt(c.realise)} ${c.unite}</text>`;
+    svg += `<circle cx="${x(c.jours)}" cy="${y(c.realise)}" r="5" fill="#FDCA01" stroke="#fff" stroke-width="2"/><text x="${x(c.jours) - 10}" y="${Math.max(Y1 + 4, y(c.realise) - 10)}" font-size="12" font-weight="700" fill="#1F2328" text-anchor="end" stroke="#fff" stroke-width="4" stroke-linejoin="round" paint-order="stroke">${fmt(c.realise)} ${c.unite}</text>`;
     svg += `</svg>`;
     $("dcChart").innerHTML = svg + `<div class="dt-legend"><span><i style="background:#FDCA01"></i>Réalisé</span>${c.totalPrevu && c.totalJours ? `<span><i style="background:#C5C9D0"></i>Objectif (${fmt(c.totalPrevu)} ${c.unite} en ${c.totalJours} j)</span>` : ""}${c.totalPrevu && reste > 0 ? `<span><i style="background:#FDCA01;opacity:.55"></i>Projection au rythme actuel</span>` : ""}</div>`;
     $("chartSub").textContent = `${c.unite} cumulés, réalisé et objectif`;
@@ -744,10 +749,12 @@ document.addEventListener("DOMContentLoaded", () => {
     let cal = `<table><thead><tr><th>Machine</th>${dates.map((d) => { const x = parseFR(d); return `<th>${x.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "")}<br>${String(x.getDate()).padStart(2, "0")}/${String(x.getMonth() + 1).padStart(2, "0")}</th>`; }).join("")}<th>Jours</th></tr></thead><tbody>`;
     locFait = false;
     groupes.forEach((g) => {
-      if (g.section === "loc" && !locFait) { cal += `<tr class="sep"><td colspan="${dates.length + 2}">MATÉRIEL LOCATION</td></tr>`; locFait = true; }
+      if (g.section === "loc" && !locFait) { cal += `<tr class="sep"><td colspan="${dates.length + 2}"><span>MATÉRIEL LOCATION</span></td></tr>`; locFait = true; }
       cal += `<tr><td>${esc(g.libelle)}</td>${dates.map((d) => { const s = g.parDate[d]; const st = s ? FTSAteliers.statutDuJour(s) : ""; return `<td>${st ? `<span class="dt-c ${esc(st)}" title="${esc(st)}"></span>` : `<span class="dt-c v"></span>`}</td>`; }).join("")}<td><b>${Object.keys(g.parDate).length}</b></td></tr>`;
     });
     $("dcCal").innerHTML = cal + `</tbody></table>`;
+    const zoneCal = $("dcCal");
+    requestAnimationFrame(() => { zoneCal.scrollLeft = zoneCal.scrollWidth; }); // dernières dates visibles d'emblée
   }
 
   function afficherPannes(c) {
@@ -765,6 +772,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("#dcTabs button").forEach((b) => b.addEventListener("click", () => {
     document.querySelectorAll("#dcTabs button").forEach((x) => x.classList.toggle("on", x === b));
     document.querySelectorAll(".sv-tab").forEach((t) => t.classList.toggle("on", t.id === "tab" + b.dataset.t));
+    if (b.dataset.t === "Materiel") { const z = document.getElementById("dcCal"); if (z) requestAnimationFrame(() => { z.scrollLeft = z.scrollWidth; }); }
     try { history.replaceState(null, "", "#" + b.dataset.t.toLowerCase()); } catch (e) {}
   }));
   const ongletInitial = (location.hash || "").slice(1);

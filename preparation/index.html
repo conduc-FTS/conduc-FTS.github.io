@@ -223,7 +223,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .srv-fl li { padding: 2px 0; overflow-wrap: anywhere; }
 .srv-mini { font-size: .76rem; color: var(--text-sub); margin-top: 6px; }
 .srv-att { margin-top: 10px; }
-.pe-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 0 16px; }
+.pe-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 0 16px; margin: 16px 0; }
 .pe-pj { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
 .pe-pj .i { font-size: 1.4rem; } .pe-pj .t { flex: 1; min-width: 0; } .pe-pj .t b { display: block; overflow-wrap: anywhere; }
 .pe-pj small { display: block; color: var(--text-sub); font-size: .76rem; }
@@ -449,7 +449,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <section class="sv-card">
           <div class="sv-ch"><h2>Pièces jointes</h2></div>
           <div style="padding:14px 18px">
-            <div class="pe-pj"><span class="i">📄</span><div class="t"><b id="envNomPdf">Fiche</b><small>générée depuis l'onglet 6 au moment de l'envoi</small></div><button type="button" class="sv-btn" id="envApercu">Aperçu</button></div>
+            <div class="pe-pj"><span class="i">📄</span><div class="t"><b id="envNomPdf">Fiche</b><small>générée depuis l'étape 7 au moment de l'envoi</small></div><button type="button" class="sv-btn" id="envApercu">Aperçu</button></div>
             <div class="pe-pj"><span class="i">🗺️</span><div class="t"><b id="envPlanNom">Plan d'accès</b><small id="envPlanInfo">facultatif · PDF ou image</small></div>
               <label id="envPlanCoche" style="display:flex;align-items:center;gap:6px;font-size:.82rem;font-weight:700" hidden><input type="checkbox" id="envPlanJoindre"> joindre</label>
               <button type="button" class="sv-btn" id="envPlanApercu" hidden>Aperçu</button>

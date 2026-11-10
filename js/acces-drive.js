@@ -496,7 +496,7 @@ const FTSAcces = (() => {
     if (d.ok) await personnelLu().catch(() => false);
     if (!d.ok && (d.pasConnecte || d.erreur)) {
       racine.innerHTML = `<div class="se-panel ad-verrou"><div class="ad-verrou-ic">⏳</div><h2>${d.pasConnecte ? "Connexion Google en attente" : "Vérification du compte impossible"}</h2>
-        <p>${d.pasConnecte ? "Connecte-toi (bouton en bas à gauche), puis reviens sur « Accès Drive »." : "Google n'a pas répondu (" + esc(d.erreur) + "). Réessaie dans un instant."}</p>
+        <p>${d.pasConnecte ? "Connecte-toi (bouton « Se connecter avec Google » en haut de la page), puis reviens sur « Accès »." : "Google n'a pas répondu (" + esc(d.erreur) + "). Réessaie dans un instant."}</p>
         <button type="button" class="ad-btn pri" id="adReessayer" style="margin-top:10px">Réessayer</button></div>`;
       racine.querySelector("#adReessayer").onclick = () => monter(conteneur);
       return;

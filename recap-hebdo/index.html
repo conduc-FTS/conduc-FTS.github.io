@@ -58,7 +58,7 @@ table.pt-grid { border-collapse: separate; border-spacing: 0; width: 100%; table
 .pt-blk { border-radius: 7px; padding: 5px 8px; font-size: 0.72rem; line-height: 1.2; height: 44px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; border-left: 4px solid var(--cc); background: var(--cb); text-align: left; }
 .pt-blk b { font-size: 0.74rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pt-blk span { color: #4B5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pt-blk.TRANSPORT, .pt-blk.ARRET, .pt-blk.PANNE { align-items: center; text-align: center; font-weight: 800; font-size: 0.7rem; letter-spacing: 0.04em; }
+.pt-blk.TRANSPORT, .pt-blk.ARRET, .pt-blk.PANNE { align-items: stretch; text-align: center; font-weight: 800; font-size: 0.7rem; letter-spacing: 0.04em; }
 .pt-blk.TRANSPORT { background: #EAF1FE; border-left-color: #4C82F0; color: #2A5DBF; }
 .pt-blk.ARRET { background: #FFEDD5; border-left-color: #F59E0B; color: #B45309; }
 .pt-blk.PANNE { background: #FDECEA; border-left-color: #C0392B; color: #C0392B; }
@@ -301,8 +301,15 @@ document.addEventListener("DOMContentLoaded", () => {
   let couleurs = {};
   const couleur = (nomCh) => { if (!couleurs[nomCh]) couleurs[nomCh] = PALETTE[Object.keys(couleurs).length % PALETTE.length]; return couleurs[nomCh]; };
   const codeDe = (n) => String(n).split(/\s+/)[0];
-  const villeDe = (n) => String(n).split(/\s+/).slice(1, 2).join(" ");
-  const resteDe = (n) => String(n).split(/\s+/).slice(2).join(" ").toLowerCase().replace(/^./, (c) => c.toUpperCase());
+  // « 26FTS101 BORDEAUX - Résidence Les Chartrons » → ville « BORDEAUX », reste « Résidence les chartrons »
+  // (la ville peut faire plusieurs mots : « LE BOUSCAT - … » ; sans tiret : 1er mot = ville)
+  const nomSansCode = (n) => String(n).trim().split(/\s+/).slice(1).join(" ");
+  const villeDe = (n) => { const r = nomSansCode(n), i = r.search(/\s[-–—]\s/); return i > 0 ? r.slice(0, i) : r.split(" ")[0] || ""; };
+  const resteDe = (n) => {
+    const r = nomSansCode(n), i = r.search(/\s[-–—]\s/);
+    const reste = (i > 0 ? r.slice(i + 3) : r.split(" ").slice(1).join(" ")).replace(/^[-–—\s]+/, "");
+    return reste.toLowerCase().replace(/^./, (c) => c.toUpperCase());
+  };
 
   function entrees() {
     if (!donnees) return [];
@@ -516,7 +523,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       corps += `<tr class="sec"><td class="lab">${s.titre}${s.id === "pieux" ? " · RAPPORT PIEUX À VENIR" : ""}</td><td colspan="${jours.length}"></td></tr>` + ls.map(ligneHtml).join("");
     });
-    const largeur = 270 + jours.filter((d) => d.getDay() % 6 !== 0).length * (nbSemaines >= 4 ? 64 : 96) + jours.filter((d) => d.getDay() % 6 === 0).length * 20;
+    // Largeur mini d'un jour : 2 semaines doivent tenir sans défiler sur un écran de bureau (1366 px et plus)
+    const largeur = 270 + jours.filter((d) => d.getDay() % 6 !== 0).length * (nbSemaines >= 4 ? 64 : nbSemaines === 2 ? 70 : 96) + jours.filter((d) => d.getDay() % 6 === 0).length * 20;
     $("ptDesk").innerHTML = `<section class="sv-card"><div class="pt-scroll"><table class="pt-grid" style="min-width:${largeur}px"><thead>${enTetes}</thead><tbody>${corps}</tbody></table></div>
       <div class="pt-foot"><span class="pt-leg"><span><i style="background:#E8F0FF;border-left:3px solid #4C82F0"></i>Sur chantier (couleur = chantier)</span><span><i style="background:#EAF1FE"></i>Transport</span><span><i style="background:#FFEDD5"></i>Arrêt</span><span><i style="background:#FDECEA"></i>Panne</span></span><span>Clic sur une case pour modifier · case vide = ajouter</span></div></section>`;
     const repli = $("ptDesk").querySelector("tr.sec.repli");

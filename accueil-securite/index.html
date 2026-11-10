@@ -29,7 +29,7 @@ body{font-family:"Segoe UI",Arial,sans-serif;background:#F2F2F2;color:#2E2E2E;fo
 .field-row{padding:10px 14px;border-bottom:1px solid var(--gris);}
 .field-row.full{grid-column:1/-1;}
 .field-label{font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
-input[type=text],input[type=date],textarea{width:100%;border:none;border-bottom:2px solid var(--gris);padding:6px 2px;font-size:15px;color:#2E2E2E;background:transparent;outline:none;-webkit-appearance:none;}
+input[type=text],input[type=date],textarea{width:100%;font-family:inherit;border:none;border-bottom:2px solid var(--gris);padding:6px 2px;font-size:15px;color:#2E2E2E;background:transparent;outline:none;-webkit-appearance:none;}
 input:focus,textarea:focus{border-bottom-color:var(--jaune);}
 /* Sections sécurité */
 .section-item{border-bottom:1px solid var(--gris);}
@@ -51,16 +51,16 @@ input:focus,textarea:focus{border-bottom-color:var(--jaune);}
 .preciser-label{font-size:10px;font-weight:700;color:var(--jaune);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
 .preciser-input{font-size:13px;border-bottom:2px solid var(--jaune) !important;}
 /* Signatures */
-.sig-row{display:grid;grid-template-columns:100px 1fr 120px 130px;gap:6px;padding:8px 14px;border-bottom:1px solid var(--gris);align-items:start;}
+.sig-row{display:grid;grid-template-columns:120px 1fr 1fr 190px;gap:10px;padding:10px 14px;border-bottom:1px solid var(--gris);align-items:start;}
 .sig-row:last-child{border-bottom:none;}
 .sig-cell{display:flex;flex-direction:column;gap:3px;}
 .sig-nom{grid-column:span 1;}
-.sig-label{font-size:9px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.7px;}
-.sig-cell input[type=text],.sig-cell input[type=date]{font-size:11px;padding:3px 2px;}
-.sig-canvas-mini-wrap{position:relative;border:1px solid var(--bord);border-radius:4px;background:#fff;height:70px;touch-action:none;}
-.sig-canvas-mini{width:100%;height:70px;display:block;cursor:crosshair;touch-action:none;}
+.sig-label{font-size:11px;font-weight:700;color:#777;text-transform:uppercase;letter-spacing:.7px;}
+.sig-cell input[type=text],.sig-cell input[type=date]{font-size:15px;padding:6px 2px;}
+.sig-canvas-mini-wrap{position:relative;border:1px solid var(--bord);border-radius:4px;background:#fff;height:100px;touch-action:none;}
+.sig-canvas-mini{width:100%;height:100px;display:block;cursor:crosshair;touch-action:none;}
 .sig-hint-mini{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#CCC;font-size:16px;pointer-events:none;}
-.btn-clear-mini{background:none;border:1px solid var(--bord);color:#999;padding:2px 6px;border-radius:3px;font-size:10px;cursor:pointer;margin-top:2px;align-self:flex-end;}
+.btn-clear-mini{background:#fff;border:1px solid var(--bord);color:#555;min-height:40px;padding:0 14px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;align-self:flex-end;}
 /* Compteur */
 .progress-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#F5F5F5;border-bottom:1px solid var(--gris);}
 .progress-track{flex:1;height:6px;background:#E0E0E0;border-radius:3px;overflow:hidden;}
@@ -450,7 +450,7 @@ input:focus,textarea:focus{border-bottom-color:var(--jaune);}
           <canvas id="sigCanvas_1" class="sig-canvas-mini" touch-action="none"></canvas>
           <div class="sig-hint-mini" id="sigHint_1">✍️</div>
         </div>
-        <button class="btn-clear-mini" onclick="clearSigRow(1)">✕</button>
+        <button class="btn-clear-mini" onclick="clearSigRow(1)">✕ Effacer</button>
       </div>
 
     </div>
@@ -473,7 +473,7 @@ input:focus,textarea:focus{border-bottom-color:var(--jaune);}
           <canvas id="sigCanvas_2" class="sig-canvas-mini" touch-action="none"></canvas>
           <div class="sig-hint-mini" id="sigHint_2">✍️</div>
         </div>
-        <button class="btn-clear-mini" onclick="clearSigRow(2)">✕</button>
+        <button class="btn-clear-mini" onclick="clearSigRow(2)">✕ Effacer</button>
       </div>
     </div>
     <div class="sig-row">
@@ -495,7 +495,7 @@ input:focus,textarea:focus{border-bottom-color:var(--jaune);}
           <canvas id="sigCanvas_3" class="sig-canvas-mini" touch-action="none"></canvas>
           <div class="sig-hint-mini" id="sigHint_3">✍️</div>
         </div>
-        <button class="btn-clear-mini" onclick="clearSigRow(3)">✕</button>
+        <button class="btn-clear-mini" onclick="clearSigRow(3)">✕ Effacer</button>
       </div>
     </div>
     <div class="sig-row">
@@ -517,7 +517,7 @@ input:focus,textarea:focus{border-bottom-color:var(--jaune);}
           <canvas id="sigCanvas_4" class="sig-canvas-mini" touch-action="none"></canvas>
           <div class="sig-hint-mini" id="sigHint_4">✍️</div>
         </div>
-        <button class="btn-clear-mini" onclick="clearSigRow(4)">✕</button>
+        <button class="btn-clear-mini" onclick="clearSigRow(4)">✕ Effacer</button>
       </div>
     </div>
     <div class="sig-row">
@@ -539,7 +539,7 @@ input:focus,textarea:focus{border-bottom-color:var(--jaune);}
           <canvas id="sigCanvas_5" class="sig-canvas-mini" touch-action="none"></canvas>
           <div class="sig-hint-mini" id="sigHint_5">✍️</div>
         </div>
-        <button class="btn-clear-mini" onclick="clearSigRow(5)">✕</button>
+        <button class="btn-clear-mini" onclick="clearSigRow(5)">✕ Effacer</button>
       </div>
     </div>
     <div class="sig-row">
@@ -561,7 +561,7 @@ input:focus,textarea:focus{border-bottom-color:var(--jaune);}
           <canvas id="sigCanvas_6" class="sig-canvas-mini" touch-action="none"></canvas>
           <div class="sig-hint-mini" id="sigHint_6">✍️</div>
         </div>
-        <button class="btn-clear-mini" onclick="clearSigRow(6)">✕</button>
+        <button class="btn-clear-mini" onclick="clearSigRow(6)">✕ Effacer</button>
       </div>
     </div>
     <div class="sig-row">
@@ -583,7 +583,7 @@ input:focus,textarea:focus{border-bottom-color:var(--jaune);}
           <canvas id="sigCanvas_7" class="sig-canvas-mini" touch-action="none"></canvas>
           <div class="sig-hint-mini" id="sigHint_7">✍️</div>
         </div>
-        <button class="btn-clear-mini" onclick="clearSigRow(7)">✕</button>
+        <button class="btn-clear-mini" onclick="clearSigRow(7)">✕ Effacer</button>
       </div>
     </div>
     <div class="sig-row">
@@ -605,7 +605,7 @@ input:focus,textarea:focus{border-bottom-color:var(--jaune);}
           <canvas id="sigCanvas_8" class="sig-canvas-mini" touch-action="none"></canvas>
           <div class="sig-hint-mini" id="sigHint_8">✍️</div>
         </div>
-        <button class="btn-clear-mini" onclick="clearSigRow(8)">✕</button>
+        <button class="btn-clear-mini" onclick="clearSigRow(8)">✕ Effacer</button>
       </div>
     </div>
 </div>

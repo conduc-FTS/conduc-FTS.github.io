@@ -126,6 +126,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
     margin-bottom: 4px;
   }
   input[type="text"], input[type="date"], input[type="number"], select, textarea {
+    font-family: inherit; /* sinon le textarea prend la police machine à écrire du navigateur */
     width: 100%;
     border: none;
     border-bottom: 2px solid var(--gris-clair);

@@ -44,7 +44,15 @@ const FTSStats = (() => {
   const sansAccent = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
   const code = (nom) => { const i = String(nom).search(/\s/); return i > 0 ? String(nom).slice(0, i) : String(nom); };
   const libelle = (nom) => { const i = String(nom).search(/\s/); return i > 0 ? String(nom).slice(i + 1) : String(nom); };
-  const court = (nom) => libelle(nom).split(" ").slice(0, 3).join(" ");
+  // Nom court : 3 mots utiles (le « - » ne compte pas), sans finir sur un tiret ni sur « de », « la »…
+  const PETITS_MOTS = /^(de|du|des|d'|la|le|les|l'|à|a|au|aux|en|et|sur)$/i;
+  const court = (nom) => {
+    const mots = libelle(nom).split(/\s+/).filter(Boolean), garde = [];
+    let n = 0;
+    for (const m of mots) { const sep = /^[-–—·]$/.test(m); if (!sep && n === 3) break; garde.push(m); if (!sep) n++; }
+    while (garde.length > 1 && (/^[-–—·]$/.test(garde[garde.length - 1]) || PETITS_MOTS.test(garde[garde.length - 1]))) garde.pop();
+    return garde.join(" ");
+  };
   const nomChantier = (nom) => `<span class="st-code">${esc(code(nom))}</span>${esc(libelle(nom))}`;
 
   function bornes() {
@@ -480,7 +488,7 @@ const FTSStats = (() => {
     const kpis = `<div class="st-kpis">
       ${kpi("Utilisation moyenne des foreuses sorties", utilMoy != null ? `${fmt(utilMoy)} <small>%</small>` : "—", `jours travaillés ÷ ${P.jo} jours ouvrés (${jj(P.debut)} → ${jj(P.fin)})`)}
       ${kpi("Foreuse sortie la moins utilisée", moins ? `<span class="st-v-txt">${esc(moins.g.libelle)}</span>` : "—", (moins ? `${moins.cpt.TRAVAIL} j sur ${P.jo} jours ouvrés (${fmt(moins.util)} %)` : "") + (foIdle ? `${moins ? " · " : ""}${foIdle} foreuse${foIdle > 1 ? "s" : ""} jamais pointée${foIdle > 1 ? "s" : ""}` : ""), moins && moins.util < 30 ? "warn" : "")}
-      ${kpi("Machine la plus en panne", plusPanne ? `<span class="st-v-txt">${esc(plusPanne.g.libelle)}</span>` : "Aucune panne", plusPanne ? `${plusPanne.n} panne${plusPanne.n > 1 ? "s" : ""} · ${fmt1(plusPanne.h)} h · ${plusPanne.cpt.PANNE} jour${plusPanne.cpt.PANNE > 1 ? "s" : ""} pointé${plusPanne.cpt.PANNE > 1 ? "s" : ""} en panne` : "", plusPanne ? "alert" : "ok")}
+      ${kpi("Machine la plus en panne", plusPanne ? `<span class="st-v-txt">${esc(plusPanne.g.libelle)}</span>` : `<span class="st-v-txt">Aucune panne</span>`, plusPanne ? `${plusPanne.n} panne${plusPanne.n > 1 ? "s" : ""} · ${fmt1(plusPanne.h)} h · ${plusPanne.cpt.PANNE} jour${plusPanne.cpt.PANNE > 1 ? "s" : ""} pointé${plusPanne.cpt.PANNE > 1 ? "s" : ""} en panne` : "", plusPanne ? "alert" : "ok")}
       ${kpi("Jours de location", `${locJ} <small>j</small>`, P.loc.length ? `${P.loc.length} machine${P.loc.length > 1 ? "s" : ""} · ${locCh} chantier${locCh > 1 ? "s" : ""}` : "aucune location pointée")}
     </div>`;
     const maxH = Math.max(0, ...P.lignes.map((l) => l.h));

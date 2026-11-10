@@ -531,6 +531,8 @@ body {
 
 @media (max-width: 900px) {
   .app-body { flex-direction: column; }
+  /* empilées : chaque colonne prend la hauteur de son contenu (sinon trou avant « Objectif chantier ») */
+  .app-col-left, .app-col-right { flex: none; }
   .app-tiles-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 640px) {

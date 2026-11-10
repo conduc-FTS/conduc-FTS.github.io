@@ -287,22 +287,37 @@ const FTSPlanAcces = (() => {
   }
 
   // ── Cartes automatiques (IGN Géoplateforme, gratuit, sans clé) ────
-  // Vue de loin = Plan IGN, vue d'approche = photo aérienne ; centrées sur le point GPS.
-  const PLAN_IGN = { layer: "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2", fmt: "image/png" };
-  const PHOTO = { layer: "ORTHOIMAGERY.ORTHOPHOTOS", fmt: "image/jpeg" };
-  const ROUTES = { layer: "TRANSPORTNETWORKS.ROADS", fmt: "image/png" };
-  const NOMS = { layer: "GEOGRAPHICALNAMES.NAMES", fmt: "image/png" };
+  // Les 3 vues peuvent être automatiques, centrées sur le point GPS (ou sur
+  // un centre déplacé à la souris : auto.clat / auto.clng).
+  // auto.z est un zoom « effectif » qui peut être décimal : on charge les
+  // tuiles au zoom entier inférieur et on les agrandit (effet loupe), ce qui
+  // grossit les noms de villes (vue de loin) et permet de zoomer plus près
+  // que les tuiles IGN (vue chantier).
+  // max = dernier zoom de tuiles du calque ; jusqua = calque masqué au-delà.
+  const PLAN_IGN = { layer: "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2", fmt: "image/png", max: 19 };
+  const PHOTO = { layer: "ORTHOIMAGERY.ORTHOPHOTOS", fmt: "image/jpeg", max: 19 };
+  const ROUTES = { layer: "TRANSPORTNETWORKS.ROADS", fmt: "image/png", max: 18, jusqua: 18 };
+  const LOUPE_LOIN = Math.log2(1.4); // vue de loin : plan IGN agrandi 1,4 fois (validé le 10/11/2026)
+  // rues = noms de rues écrits par l'appli (gros, lisibles), à partir de ce zoom
   const COUCHES = {
-    plan: { calques: [PLAN_IGN], min: 6, max: 18, lib: "Plan" },
-    ortho: { calques: [PHOTO], min: 6, max: 19, lib: "Photo" },
-    mixte: { calques: [PHOTO, ROUTES, NOMS], min: 10, max: 18, lib: "Photo + rues" },
+    plan: { calques: [PLAN_IGN], min: 6, max: 19, lib: "Plan", rues: 16 },
+    ortho: { calques: [PHOTO], min: 6, max: 20, lib: "Photo" },
+    mixte: { calques: [PHOTO, ROUTES], min: 10, max: 20, lib: "Photo + rues", rues: 16 },
   };
-  const AUTO_DEFAUT = [{ type: "plan", z: 11 }, { type: "mixte", z: 17 }];
-  const TAILLE_AUTO = { W: 1200, H: Math.round(1200 * VUES[0].h / VUES[0].l) };
-  /** Point GPS → pixels « monde » Web Mercator au zoom z (tuiles de 256 px) */
+  const AUTO_DEFAUT = [{ type: "plan", z: 10 + LOUPE_LOIN }, { type: "mixte", z: 17 }, { type: "mixte", z: 19 }];
+  // Taille (px) de chaque carte automatique, au format du cadre du PDF
+  const TAILLES_AUTO = [1200, 1200, 1800].map((W, i) => ({ W, H: Math.round(W * VUES[i].h / VUES[i].l) }));
+  const TAILLE_AUTO = TAILLES_AUTO[0]; // anciennes cartes (sans W/H enregistrés)
+  const tailleDe = (auto) => (auto && auto.W ? { W: auto.W, H: auto.H } : TAILLE_AUTO);
+  const centreDe = (auto) => (auto.clat != null ? [auto.clat, auto.clng] : [auto.lat, auto.lng]);
+  /** Point GPS → pixels « monde » Web Mercator au zoom z (tuiles de 256 px, z décimal possible) */
   function versMonde(lat, lng, z) {
     const n = 256 * Math.pow(2, z), r = (lat * Math.PI) / 180;
     return [((lng + 180) / 360) * n, ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n];
+  }
+  function depuisMonde(x, y, z) {
+    const n = 256 * Math.pow(2, z);
+    return { lat: (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) * 180) / Math.PI, lng: (x / n) * 360 - 180 };
   }
   const urlTuile = (c, z, x, y) => `https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${c.layer}&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}&FORMAT=${encodeURIComponent(c.fmt)}`;
   // ── Tuiles : mémoire + délai maxi ──
@@ -312,6 +327,11 @@ const FTSPlanAcces = (() => {
   const MEMOIRE_MAX = 1000, DELAI_TUILE = 4000, ABANDON_TUILE = 30000;
   const memoireTuiles = new Map(); // url → Promise<Image|null> (chargement complet)
   let premierPlanEnCours = 0;      // cartes demandées par l'utilisateur en cours
+  // 16 tuiles demandées à la fois au plus : au-delà, le serveur IGN en refuse une partie
+  const MAX_SIMULTANES = 16, attente = [];
+  let simultanes = 0;
+  const place = () => (simultanes < MAX_SIMULTANES ? (simultanes++, Promise.resolve()) : new Promise((ok) => attente.push(ok)));
+  const liberer = () => { const suivant = attente.shift(); if (suivant) suivant(); else simultanes--; };
   /** Chargement d'une tuile, gardé en mémoire (sans délai maxi, abandon à 30 s) */
   function chargerTuile(url) {
     if (memoireTuiles.has(url)) {
@@ -319,14 +339,17 @@ const FTSPlanAcces = (() => {
       memoireTuiles.delete(url); memoireTuiles.set(url, p); // remonte en tête (plus récente)
       return p;
     }
-    const p = new Promise((fin) => {
+    // Une tuile refusée (serveur IGN chargé) est redemandée 2 fois, un peu plus tard
+    const essai = (reste) => place().then(() => new Promise((fin0) => {
+      const fin = (x) => { liberer(); fin0(x); };
       const im = new Image();
       im.crossOrigin = "anonymous";
       const t = setTimeout(() => { im.onload = im.onerror = null; im.src = ""; fin(null); }, ABANDON_TUILE);
       im.onload = () => { clearTimeout(t); fin(im); };
-      im.onerror = () => { clearTimeout(t); fin(null); };
+      im.onerror = () => { clearTimeout(t); fin(reste ? new Promise((ok) => setTimeout(() => ok(essai(reste - 1)), 700 * (3 - reste))) : null); };
       im.src = url;
-    }).then((im) => { if (!im) memoireTuiles.delete(url); return im; }); // échec : on réessaiera plus tard
+    }));
+    const p = essai(2).then((im) => { if (!im) memoireTuiles.delete(url); return im; }); // échec : on réessaiera plus tard
     memoireTuiles.set(url, p);
     while (memoireTuiles.size > MEMOIRE_MAX) memoireTuiles.delete(memoireTuiles.keys().next().value);
     return p;
@@ -342,15 +365,16 @@ const FTSPlanAcces = (() => {
   /** Liste des tuiles (par calque, dans l'ordre de superposition) d'une carte */
   function tuilesCarte({ lat, lng, z, type, W, H }) {
     const c = COUCHES[type] || COUCHES.plan;
-    const [cx, cy] = versMonde(lat, lng, z);
-    const x0 = cx - W / 2, y0 = cy - H / 2, n = Math.pow(2, z);
-    return { x0, y0, calques: c.calques.map((calque) => {
+    return c.calques.filter((calque) => !(calque.jusqua && z > calque.jusqua + 1e-6)).map((calque) => {
+      const zt = Math.min(calque.max, Math.floor(z + 1e-6)), s = Math.pow(2, z - zt); // zoom des tuiles + agrandissement
+      const [cx, cy] = versMonde(lat, lng, zt), w = W / s, h = H / s;
+      const x0 = cx - w / 2, y0 = cy - h / 2, n = Math.pow(2, zt);
       const l = [];
-      for (let tx = Math.floor(x0 / 256); tx <= Math.floor((x0 + W) / 256); tx++)
-        for (let ty = Math.floor(y0 / 256); ty <= Math.floor((y0 + H) / 256); ty++)
-          if (ty >= 0 && ty < n) l.push({ tx, ty, url: urlTuile(calque, z, ((tx % n) + n) % n, ty) });
-      return l;
-    }) };
+      for (let tx = Math.floor(x0 / 256); tx <= Math.floor((x0 + w) / 256); tx++)
+        for (let ty = Math.floor(y0 / 256); ty <= Math.floor((y0 + h) / 256); ty++)
+          if (ty >= 0 && ty < n) l.push({ tx, ty, url: urlTuile(calque, zt, ((tx % n) + n) % n, ty) });
+      return { x0, y0, s, l };
+    });
   }
   // Préchargement discret des réglages voisins (zoom −/+ et autres types),
   // pour que le prochain clic soit instantané. Il se met en pause dès que
@@ -371,36 +395,202 @@ const FTSPlanAcces = (() => {
     filePrechargement.length = 0;
     voisins.forEach((v) => {
       const cv = COUCHES[v.type];
-      if (v.z < cv.min || v.z > cv.max) return;
-      tuilesCarte(v).calques.forEach((l) => l.forEach((t) => filePrechargement.push(t.url)));
+      if (v.z < cv.min || v.z > cv.max + 1e-6) return;
+      tuilesCarte(v).forEach((c) => c.l.forEach((t) => filePrechargement.push(t.url)));
     });
     setTimeout(pomperPrechargement, 400);
   }
+
+  // ── Noms de rues écrits par l'appli ──
+  // Les noms imprimés sur les tuiles IGN sont trop petits : on prend les
+  // tronçons de route nommés (BD TOPO IGN, gratuit, sans clé) et on écrit
+  // les noms nous-mêmes, en gros, dans l'axe de la rue.
+  const memoireRues = new Map();
+  function sansAccent(t) { return String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
+  function chargerRues(sud, ouest, nord, est) {
+    const r = (x) => x.toFixed(4);
+    const cle = [sud, ouest, nord, est].map(r).join(",");
+    if (memoireRues.has(cle)) return memoireRues.get(cle);
+    const filtre = `BBOX(geometrie,${cle}) AND nom_voie_ban_gauche IS NOT NULL`;
+    const url = "https://data.geopf.fr/wfs/ows?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAMES=BDTOPO_V3:troncon_de_route"
+      + "&SRSNAME=EPSG:4326&OUTPUTFORMAT=application/json&COUNT=3000&PROPERTYNAME=nom_voie_ban_gauche,geometrie&CQL_FILTER=" + encodeURIComponent(filtre);
+    const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const t = setTimeout(() => ctrl && ctrl.abort(), 8000);
+    const p = fetch(url, ctrl ? { signal: ctrl.signal } : {}).then((res) => (res.ok ? res.json() : null))
+      .catch(() => null).then((j) => { clearTimeout(t); if (!j) memoireRues.delete(cle); return j ? j.features || [] : []; });
+    memoireRues.set(cle, p);
+    return p;
+  }
   /**
-   * Carte centrée sur le point : assemble les tuiles IGN dans un canvas W × H.
-   * Tous les calques sont chargés en même temps (avant : l'un après l'autre).
+   * Relie les tronçons d'une même rue bout à bout (en pixels). À une
+   * fourche, on continue par le tronçon le plus dans l'axe.
+   */
+  function chainer(segs) {
+    segs = segs.filter((x) => x.length > 1).map((x) => x.slice());
+    const out = [], proche = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) < 1.5;
+    const dir = (a, b) => { const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
+    // prolonge la chaîne c par sa fin ; renvoie la chaîne prolongée ou null
+    const prolonger = (c) => {
+      const fin = c[c.length - 1], d0 = dir(c[Math.max(0, c.length - 3)], fin);
+      let best = null;
+      segs.forEach((x, k) => {
+        const t = proche(x[0], fin) ? x : proche(x[x.length - 1], fin) ? x.slice().reverse() : null;
+        if (!t) return;
+        const d1 = dir(t[0], t[Math.min(2, t.length - 1)]), sc = d0[0] * d1[0] + d0[1] * d1[1];
+        if (!best || sc > best.sc) best = { k, t, sc };
+      });
+      if (!best || best.sc < -0.2) return null; // demi-tour : on s'arrête
+      segs.splice(best.k, 1);
+      return c.concat(best.t.slice(1));
+    };
+    while (segs.length) {
+      let c = segs.shift(), n;
+      while ((n = prolonger(c))) c = n;
+      c.reverse();
+      while ((n = prolonger(c))) c = n;
+      out.push(c);
+    }
+    return out;
+  }
+  function densifier(c, pas = 8) {
+    const out = [c[0]];
+    for (let k = 1; k < c.length; k++) {
+      const [x0, y0] = c[k - 1], [x1, y1] = c[k], n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / pas));
+      for (let t = 1; t <= n; t++) out.push([x0 + ((x1 - x0) * t) / n, y0 + ((y1 - y0) * t) / n]);
+    }
+    return out;
+  }
+  const longueur = (c) => c.reduce((t, q, k) => (k ? t + Math.hypot(q[0] - c[k - 1][0], q[1] - c[k - 1][1]) : 0), 0);
+  function distSegment(p, a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2));
+    return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+  }
+  /**
+   * Écrit les noms de rues sur la carte. Rue de l'adresse en premier ;
+   * jamais sur le repère rouge ; pas deux noms l'un sur l'autre.
+   * @param {Array} features  tronçons GeoJSON (lng, lat)
+   * @param {Function} px      (lng, lat) → [x, y] dans le canvas
+   */
+  function ecrireRues(ctx, features, px, { W, H, fs, pin, adresse }) {
+    const noms = new Map();
+    features.forEach((f) => {
+      const nom = f.properties && f.properties.nom_voie_ban_gauche; if (!nom || !f.geometry) return;
+      const lignes = f.geometry.type === "MultiLineString" ? f.geometry.coordinates : [f.geometry.coordinates];
+      if (!noms.has(nom)) noms.set(nom, []);
+      lignes.forEach((l) => noms.get(nom).push(l.map((c) => px(c[0], c[1]))));
+    });
+    const adr = " " + sansAccent(adresse) + " ";
+    const liste = [...noms.entries()].map(([nom, segs]) => {
+      // points tous les 8 px : un nom peut commencer / finir au milieu d'un tronçon droit
+      const chaines = chainer(segs).map((c) => densifier(c)).sort((a, b) => longueur(b) - longueur(a));
+      return { nom, chaines, prio: adr.includes(" " + sansAccent(nom) + " ") ? 1 : 0, lg: longueur(chaines[0]) };
+    }).sort((a, b) => b.prio - a.prio || b.lg - a.lg);
+    ctx.save();
+    ctx.font = `bold ${fs}px Arial, Helvetica, sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    const poses = []; // segments déjà écrits [a, b]
+    // Nom trop long pour la place : abréviations habituelles (comme sur les plans de ville)
+    const ABREV = [[/^RUE /, "R. "], [/^AVENUE /, "AV. "], [/^BOULEVARD /, "BD "], [/^IMPASSE /, "IMP. "], [/^CHEMIN /, "CH. "], [/^ALL[EÉ]E /, "ALL. "],
+      [/^PLACE /, "PL. "], [/^ROUTE /, "RTE "], [/^QUAI /, "Q. "], [/\bCOMMANDANT\b/, "CDT"], [/\bG[EÉ]N[EÉ]RAL\b/, "GAL"], [/\bMAR[EÉ]CHAL\b/, "MAL"],
+      [/\bPR[EÉ]SIDENT\b/, "PDT"], [/\bDOCTEUR\b/, "DR"], [/\bSAINTE\b/, "STE"], [/\bSAINT\b/, "ST"], [/\bPROFESSEUR\b/, "PR"]];
+    const abreger = (t) => ABREV.reduce((x, [re, r]) => x.replace(re, r), t);
+    const placer = ({ nom, chaines, prio }, fs, court) => {
+      const marge = prio ? fs * 0.9 : fs * 1.5;
+      ctx.font = `bold ${fs}px Arial, Helvetica, sans-serif`;
+      const plein = nom.toUpperCase().replace(/^AVENUE /, "AV. ").replace(/^BOULEVARD /, "BD ").replace(/^IMPASSE /, "IMP. ");
+      const txt = court ? abreger(plein) : plein;
+      if (court && txt === plein) return false;
+      const tw = ctx.measureText(txt).width + fs;
+      let meilleur = null;
+      for (const ch of chaines) {
+        for (let i = 0; i < ch.length - 1; i++) {
+          let L = 0;
+          for (let j = i + 1; j < ch.length; j++) {
+            L += Math.hypot(ch[j][0] - ch[j - 1][0], ch[j][1] - ch[j - 1][1]);
+            if (L < tw) continue;
+            const a = ch[i], b = ch[j];
+            const droit = Math.hypot(b[0] - a[0], b[1] - a[1]) > (prio ? 0.8 : 0.93) * L;
+            const dedans = [a, b].every((q) => q[0] > marge && q[0] < W - marge && q[1] > marge && q[1] < H - marge - 20);
+            if (droit && dedans) {
+              const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+              // repère rouge : la pointe est sur le point, le corps au-dessus
+              const surPin = pin && (distSegment(pin, a, b) < fs * (prio ? 1.1 : 1.6) || distSegment([pin[0], pin[1] - fs * 2], a, b) < fs * (prio ? 1.3 : 1.8));
+              const surNom = poses.some(([p, q]) => [a, m, b].some((r) => distSegment(r, p, q) < fs * 1.4) || [p, q].some((r) => distSegment(r, a, b) < fs * 1.4));
+              if (!surPin && !surNom) {
+                const d = Math.hypot(m[0] - W / 2, m[1] - H / 2);
+                if (!meilleur || d < meilleur.d) meilleur = { a, b, m, d };
+              }
+            }
+            break;
+          }
+        }
+        if (meilleur) break;
+      }
+      if (!meilleur) return false;
+      const { a, b, m } = meilleur;
+      poses.push([a, b]);
+      let ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+      if (ang > Math.PI / 2) ang -= Math.PI; else if (ang < -Math.PI / 2) ang += Math.PI;
+      ctx.translate(m[0], m[1]); ctx.rotate(ang);
+      ctx.lineWidth = fs * 0.32; ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.strokeText(txt, 0, 0);
+      ctx.fillStyle = "#1E1E1E"; ctx.fillText(txt, 0, 0);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      return true;
+    };
+    liste.forEach((r) => {
+      if (placer(r, fs) || placer(r, fs, true)) return;
+      if (r.prio) [0.85, 0.72].some((k) => placer(r, Math.round(fs * k), true) || placer(r, Math.round(fs * k)));
+    });
+    ctx.restore();
+  }
+
+  /**
+   * Carte automatique : assemble les tuiles IGN dans un canvas W × H,
+   * centrée sur le centre (lat, lng) ; gps = point du chantier (repère),
+   * pour placer les noms de rues hors du repère ; adresse = rue prioritaire.
    * @returns {Promise<HTMLCanvasElement>}
    */
-  async function carteIGN({ lat, lng, z, type, W = TAILLE_AUTO.W, H = TAILLE_AUTO.H }) {
-    const { x0, y0, calques } = tuilesCarte({ lat, lng, z, type, W, H });
+  async function carteIGN({ lat, lng, z, type, W = TAILLE_AUTO.W, H = TAILLE_AUTO.H, gps, adresse }) {
+    const c = COUCHES[type] || COUCHES.plan;
+    const calques = tuilesCarte({ lat, lng, z, type, W, H });
     const cv = document.createElement("canvas");
     cv.width = W; cv.height = H;
     const ctx = cv.getContext("2d");
     ctx.fillStyle = "#e5e7eb"; ctx.fillRect(0, 0, W, H);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+    // Zone couverte (pour les noms de rues)
+    const [mx, my] = versMonde(lat, lng, z);
+    const no = depuisMonde(mx - W / 2, my - H / 2, z), se = depuisMonde(mx + W / 2, my + H / 2, z);
+    const avecRues = c.rues && z >= c.rues - 1e-6;
     let ok = 0;
     premierPlanEnCours++;
-    let images;
+    let images, rues = [];
     try {
-      images = await Promise.all(calques.map((l) => Promise.all(l.map((t) => tuileUrl(t.url)))));
+      [images, rues] = await Promise.all([
+        Promise.all(calques.map((k) => Promise.all(k.l.map((t) => tuileUrl(t.url))))).then((im) => {
+          // Connexion lente : si moins de la moitié des tuiles est arrivée en 4 s, on attend tout (30 s maxi par tuile)
+          const tout = im.flat(), recus = tout.filter(Boolean).length;
+          return recus >= tout.length / 2 ? im : Promise.all(calques.map((k) => Promise.all(k.l.map((t) => chargerTuile(t.url)))));
+        }),
+        avecRues ? chargerRues(se.lat, no.lng, no.lat, se.lng) : [],
+      ]);
     } finally {
       premierPlanEnCours--;
     }
-    // Calques superposés dans l'ordre (photo, puis routes, puis noms des rues)
-    calques.forEach((l, k) => l.forEach((t, j) => {
-      const im = images[k][j];
-      if (im) { ok++; ctx.drawImage(im, Math.round(t.tx * 256 - x0), Math.round(t.ty * 256 - y0)); }
+    // Calques superposés dans l'ordre (photo, puis routes), agrandis si besoin
+    calques.forEach((k, ki) => k.l.forEach((t, j) => {
+      const im = images[ki][j];
+      if (im) { ok++; ctx.drawImage(im, (t.tx * 256 - k.x0) * k.s, (t.ty * 256 - k.y0) * k.s, 256 * k.s + 0.5, 256 * k.s + 0.5); }
     }));
     if (!ok) throw new Error("Carte IGN indisponible (connexion internet ?)");
+    // Tuiles arrivées trop tard (cases grises) : promesse résolue à true quand elles sont toutes là
+    const manquantes = calques.flatMap((k, ki) => k.l.filter((t, j) => !images[ki][j]).map((t) => t.url));
+    cv.complet = manquantes.length ? Promise.all(manquantes.map(chargerTuile)).then((l) => l.every(Boolean)) : null;
+    if (avecRues && rues.length) {
+      const px = (lo, la) => { const [x, y] = versMonde(la, lo, z); return [x - mx + W / 2, y - my + H / 2]; };
+      ecrireRues(ctx, rues, px, { W, H, fs: Math.round(W / (W > 1500 ? 60 : 50)), pin: gps ? px(gps.lng, gps.lat) : null, adresse });
+    }
     precharger({ lat, lng, z, type, W, H });
     // Mention obligatoire de la source
     ctx.font = "bold 15px Arial, sans-serif";
@@ -410,10 +600,14 @@ const FTSPlanAcces = (() => {
     return cv;
   }
   /** Point de la carte automatique (u, v de 0 à 1) → coordonnées GPS */
-  function versGps(auto, u, v, W = TAILLE_AUTO.W, H = TAILLE_AUTO.H) {
-    const [cx, cy] = versMonde(auto.lat, auto.lng, auto.z), n = 256 * Math.pow(2, auto.z);
-    const x = cx - W / 2 + u * W, y = cy - H / 2 + v * H;
-    return { lat: (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) * 180) / Math.PI, lng: (x / n) * 360 - 180 };
+  function versGps(auto, u, v) {
+    const { W, H } = tailleDe(auto), [la, lo] = centreDe(auto), [cx, cy] = versMonde(la, lo, auto.z);
+    return depuisMonde(cx - W / 2 + u * W, cy - H / 2 + v * H, auto.z);
+  }
+  /** Coordonnées GPS → point de la carte automatique (u, v de 0 à 1) */
+  function versCarte(auto, lat, lng) {
+    const { W, H } = tailleDe(auto), [la, lo] = centreDe(auto), [cx, cy] = versMonde(la, lo, auto.z), [x, y] = versMonde(lat, lng, auto.z);
+    return [(x - cx) / W + 0.5, (y - cy) / H + 0.5];
   }
   /**
    * Adresse → point GPS (géocodage IGN / Base Adresse Nationale, gratuit, sans clé).
@@ -433,12 +627,10 @@ const FTSPlanAcces = (() => {
    * Recalcule la place des annotations quand la carte automatique change
    * de point ou de zoom (elles restent au même endroit sur le terrain).
    */
-  function deplacerAnnots(annots, avant, apres, W = TAILLE_AUTO.W, H = TAILLE_AUTO.H) {
-    const [ax, ay] = versMonde(avant.lat, avant.lng, avant.z), [bx, by] = versMonde(apres.lat, apres.lng, apres.z);
-    const k = Math.pow(2, apres.z - avant.z);
-    const conv = (u, v) => [((ax - W / 2 + u * W) * k - (bx - W / 2)) / W, ((ay - H / 2 + v * H) * k - (by - H / 2)) / H];
+  function deplacerAnnots(annots, avant, apres) {
+    const conv = (u, v) => { const g = versGps(avant, u, v); return versCarte(apres, g.lat, g.lng); };
     return annots.map((a) => {
-      if (a.t === "pin" && a.auto) return { ...a, u: 0.5, v: 0.5 };
+      if (a.t === "pin" && a.auto) { const [u, v] = versCarte(apres, apres.lat, apres.lng); return { ...a, u, v }; }
       const [u, v] = conv(a.u, a.v), b = { ...a, u, v };
       if (a.u2 != null) { const [u2, v2] = conv(a.u2, a.v2); b.u2 = u2; b.v2 = v2; }
       return b;
@@ -455,7 +647,7 @@ const FTSPlanAcces = (() => {
   return {
     ETIQUETTES, VUES, planVide, vueVide, normaliser, vide, aImage,
     lireGps, texteGps, urlItineraire, urlCarte, qrDataUrl,
-    COUCHES, AUTO_DEFAUT, TAILLE_AUTO, carteIGN, deplacerAnnots, versGps, geocoder,
+    COUCHES, AUTO_DEFAUT, TAILLE_AUTO, TAILLES_AUTO, carteIGN, deplacerAnnots, versGps, versCarte, geocoder, ecrireRues,
     geometrie, versCadre, versImage, dessinerVue, cadres, pdf, chargerImage, empreinte,
   };
 })();

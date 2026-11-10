@@ -185,7 +185,8 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .pa-seg button { border: none; background: none; border-radius: 6px; padding: 3px 8px; font: inherit; font-size: .74rem; font-weight: 700; color: var(--text-sub); cursor: pointer; }
 .pa-seg button.on { background: #1d1d1f; color: #fff; }
 .pa-vue .auto-tag { font-size: .68rem; font-weight: 800; color: #1D6E3E; background: #EAF6EE; border-radius: 5px; padding: 1px 6px; }
-.pa-cadre { position: relative; outline: none; }
+.pa-cadre { position: relative; outline: none; overflow: hidden; }
+.pa-cadre:has(canvas) { background: #e5e7eb; }
 .pa-cadre canvas { display: block; width: 100%; cursor: grab; touch-action: none; }
 .pa-cadre canvas.pose { cursor: crosshair; }
 .pa-cadre:focus-visible { box-shadow: inset 0 0 0 3px rgba(47,111,237,.45); }
@@ -1335,9 +1336,10 @@ document.addEventListener("DOMContentLoaded", () => {
     majGps();
     $("paVues").innerHTML = pl.vues.map((v, i) => `<div class="pa-vue ${i === 2 ? "big" : ""}" data-v="${i}">
       <div class="t"><span class="num">${i + 1} ·</span><input type="text" class="pa-titre" value="${esc(v.titre)}" title="Titre de la vue (modifiable)">${v.auto ? `<span class="auto-tag" title="Carte IGN générée depuis le point GPS">AUTO</span>` : ""}
-        ${i < 2 && v.auto ? `<span class="pa-seg">${Object.entries(A.COUCHES).map(([k, c]) => `<button type="button" data-type="${k}" class="${v.auto.type === k ? "on" : ""}">${c.lib}</button>`).join("")}</span>` : ""}
-        ${i < 2 && !v.auto && gpsOk() ? `<button type="button" class="pa-mb" data-auto="1" title="Remplacer par la carte IGN centrée sur le point GPS">🗺️ Carte auto</button>` : ""}
+        ${v.auto ? `<span class="pa-seg">${Object.entries(A.COUCHES).map(([k, c]) => `<button type="button" data-type="${k}" class="${v.auto.type === k ? "on" : ""}">${c.lib}</button>`).join("")}</span>` : ""}
+        ${!v.auto && gpsOk() ? `<button type="button" class="pa-mb" data-auto="1" title="Remplacer par la carte IGN centrée sur le point GPS">🗺️ Carte auto</button>` : ""}
         <span class="pa-img-btns" ${A.aImage(v) ? "" : "hidden"}><button type="button" class="pa-mb" data-z="-1" title="${v.auto ? "Voir plus large" : "Dézoomer la capture"}">−</button><button type="button" class="pa-mb" data-z="1" title="${v.auto ? "Voir plus près" : "Zoomer dans la capture"}">+</button></span>
+        ${v.auto && v.auto.clat != null ? `<button type="button" class="pa-mb" data-recentrer="1" title="Remettre le point GPS au centre de la carte">⌖ Recentrer</button>` : ""}
         <label class="pa-mb" style="display:flex;align-items:center;cursor:pointer" title="Choisir une image">📁<input type="file" accept="image/*" hidden class="pa-fichier"></label>
         <button type="button" class="pa-mb pa-retirer" title="Retirer l'image" ${A.aImage(v) ? "" : "hidden"}>✕</button></div>
       <div class="pa-aide" hidden></div>
@@ -1433,7 +1435,7 @@ document.addEventListener("DOMContentLoaded", () => {
       aide.hidden = true;
       const enCours = autoEnCours.has(i);
       cadre.innerHTML = enCours ? `<div class="pa-drop" style="height:calc(100% - 20px)"><span class="i">🗺️</span><b>Carte en cours de création…</b><small>carte IGN centrée sur le point GPS</small></div>`
-        : i < 2 && !gpsOk() ? `<div class="pa-drop" style="height:calc(100% - 20px)"><span class="i">📍</span><b>Saisis le point GPS : la carte se fera toute seule</b><small>ou clique ici puis Ctrl + V pour coller ta propre capture</small></div>`
+        : !gpsOk() ? `<div class="pa-drop" style="height:calc(100% - 20px)"><span class="i">📍</span><b>Saisis le point GPS : la carte se fera toute seule</b><small>ou clique ici puis Ctrl + V pour coller ta propre capture</small></div>`
         : `<div class="pa-drop" style="height:calc(100% - 20px)"><span class="i">📋</span><b>Clique ici puis Ctrl + V</b><small>capture Google Maps, Géoportail ou photo · ou glisse une image</small></div>`;
       return;
     }
@@ -1446,7 +1448,7 @@ document.addEventListener("DOMContentLoaded", () => {
     boitesPlan[i] = A.dessinerVue(cv.getContext("2d"), im.img, v, W, H, W / A.VUES[i].l, { selection: selPlan[i] });
     cv.classList.toggle("pose", !!o);
     const aPin = v.annots.some((a) => a.t === "pin");
-    const txt = o === "pin" ? "Clique sur l'endroit du chantier pour poser le repère rouge." : o && o.startsWith("lab:") ? `Clique sur l'image pour poser « ${o.slice(4)} ».` : o === "fleche" || o === "zone" ? "Clique et fais glisser sur l'image." : o === "texte" ? "Clique sur l'image à l'endroit du texte." : i < 2 && !aPin ? "📍 Pose le repère rouge : clique sur « Repère » puis sur l'endroit du chantier." : "";
+    const txt = o === "pin" ? "Clique sur l'endroit du chantier pour poser le repère rouge." : o && o.startsWith("lab:") ? `Clique sur l'image pour poser « ${o.slice(4)} ».` : o === "fleche" || o === "zone" ? "Clique et fais glisser sur l'image." : o === "texte" ? "Clique sur l'image à l'endroit du texte." : v.auto ? "Fais glisser la carte pour la déplacer · − / + pour zoomer · glisse le repère rouge pour corriger le point GPS." : i < 2 && !aPin ? "📍 Pose le repère rouge : clique sur « Repère » puis sur l'endroit du chantier." : "";
     aide.hidden = !txt; aide.textContent = txt;
   }
   function xyCanvas(cv, e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; }
@@ -1500,7 +1502,7 @@ document.addEventListener("DOMContentLoaded", () => {
         glisse = { mode: "deplace", u, w, orig: { ...a } };
       } else {
         selPlan[i] = null;
-        glisse = { mode: "pan", x, y, cx: g.cx, cy: g.cy, g };
+        glisse = { mode: "pan", x, y, cx: g.cx, cy: g.cy, g, ex: e.clientX, ey: e.clientY };
       }
       dessinerVuePlan(i);
     });
@@ -1514,6 +1516,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const du = u - glisse.u, dv = w - glisse.w;
         a.u = glisse.orig.u + du; a.v = glisse.orig.v + dv;
         if (a.u2 != null) { a.u2 = glisse.orig.u2 + du; a.v2 = glisse.orig.v2 + dv; }
+      } else if (glisse.mode === "pan" && v().auto) {
+        // le canvas se déplace avec la souris : on mesure sur l'écran (pas dans le canvas, qui bouge)
+        const ex = e.clientX - glisse.ex, ey = e.clientY - glisse.ey;
+        cv.style.transform = `translate(${ex}px, ${ey}px)`;
+        glisse.dx = ex * cv.width / cv.clientWidth; glisse.dy = ey * cv.height / cv.clientHeight;
       } else if (glisse.mode === "pan") {
         v().cx = glisse.cx - (x - glisse.x) / glisse.g.iw; v().cy = glisse.cy - (y - glisse.y) / glisse.g.ih;
         const g2 = A.geometrie(v(), cv.width, cv.height); v().cx = g2.cx; v().cy = g2.cy;
@@ -1542,6 +1549,15 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
         if (glisse.bouge) marquerPlan(); else annulerPlan[i].pop();
+      }
+      else if (glisse.mode === "pan" && glisse.bouge && v().auto) {
+        // Carte automatique déplacée : nouveau centre, la carte est refaite (le point GPS ne bouge pas)
+        const g = geo(), du = (glisse.dx || 0) / g.iw, dv = (glisse.dy || 0) / g.ih;
+        glisse = null;
+        if (Math.abs(du) + Math.abs(dv) < 0.005) { cv.style.transform = ""; return; }
+        const c = A.versGps(v().auto, 0.5 - du, 0.5 - dv);
+        genererAuto(i, { clat: c.lat, clng: c.lng }).then(() => { cv.style.transform = ""; });
+        return;
       }
       else if (glisse.mode === "pan" && glisse.bouge) marquerPlan();
       glisse = null;
@@ -1577,7 +1593,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const ty = e.target.closest("[data-type]");
     if (ty && v.auto) { if (ty.dataset.type !== v.auto.type) genererAuto(i, { type: ty.dataset.type, z: v.auto.z }); return; }
     if (e.target.closest("[data-auto]")) { genererAuto(i, A.AUTO_DEFAUT[i]); return; }
-    if (z && v.auto) { genererAuto(i, { z: v.auto.z + Number(z.dataset.z) }); return; }
+    if (e.target.closest("[data-recentrer]") && v.auto) { genererAuto(i, { clat: null, clng: null }); return; }
+    if (z && v.auto) {
+      if (autoEnCours.has(i)) { const t = attenteAuto[i] = attenteAuto[i] || {}; t.dz = (t.dz || 0) + Number(z.dataset.z); delete t.z; return; }
+      genererAuto(i, { z: v.auto.z + Number(z.dataset.z) }); return;
+    }
     if (z) {
       memoriser(i);
       v.zoom = Math.max(1, Math.min(4, Math.round(((v.zoom || 1) + 0.25 * Number(z.dataset.z)) * 4) / 4));
@@ -1586,8 +1606,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target.closest(".pa-retirer")) {
       confirmer(`Retirer l'image de la vue ${i + 1} ?`, "Les étiquettes posées sur cette vue seront retirées aussi.", "Retirer", "rouge", "🗑️").then((oui) => {
         if (!oui) return;
-        // Vue 1 ou 2 retirée : on ne recrée pas la carte automatique toute seule (bouton « Carte auto » pour la remettre)
-        imgsPlan[i] = null; prep.plan.vues[i] = { ...A.vueVide(i), titre: v.titre, fichierId: v.fichierId, retire: true, sansAuto: i < 2 };
+        // Vue retirée : on ne recrée pas la carte automatique toute seule (bouton « Carte auto » pour la remettre)
+        imgsPlan[i] = null; prep.plan.vues[i] = { ...A.vueVide(i), titre: v.titre, fichierId: v.fichierId, retire: true, sansAuto: true };
         annulerPlan[i] = []; selPlan[i] = null; outilsPlan[i] = null;
         marquerPlan(); afficherPlan();
       });
@@ -1631,43 +1651,60 @@ document.addEventListener("DOMContentLoaded", () => {
     if (A.aImage(prep.plan.vues[i])) { const libre = prep.plan.vues.findIndex((v) => !A.aImage(v)); if (libre >= 0 && document.activeElement && !document.activeElement.closest(`.pa-vue[data-v="${i}"]`)) i = libre; }
     prendreImage(i, it.getAsFile());
   });
-  // ── Cartes automatiques des vues 1 et 2 (IGN, depuis le point GPS) ──
+  // ── Cartes automatiques des 3 vues (IGN, depuis le point GPS) ──
   const autoEnCours = new Set(), echecsAuto = {}; // échec pour un point donné : on ne réessaie pas en boucle
   let minuterieAuto = null;
   const gpsOk = () => !!A.lireGps(prep.plan && prep.plan.gps);
   /** Crée (ou refait) la carte automatique de la vue i : point GPS au centre, repère rouge posé */
+  const attenteAuto = {}; // réglage demandé pendant qu'une carte de la même vue se fait : appliqué juste après
   async function genererAuto(i, reglage) {
     const g = A.lireGps(prep.plan.gps); if (!g) return;
+    if (autoEnCours.has(i)) { attenteAuto[i] = { ...(attenteAuto[i] || {}), ...(reglage || {}) }; return; }
     const v = prep.plan.vues[i];
     const avant = v.auto ? { ...v.auto } : null;
     const r = { ...A.AUTO_DEFAUT[i], ...(v.auto || {}), ...(reglage || {}) };
     const c = A.COUCHES[r.type];
     r.z = Math.max(c.min, Math.min(c.max, r.z));
-    autoEnCours.add(i); dessinerVuePlan(i);
+    // Centre déplacé à la souris : gardé tant que le point GPS ne change pas
+    const memePoint = avant && Math.abs(avant.lat - g.lat) < 1e-7 && Math.abs(avant.lng - g.lng) < 1e-7;
+    const centre = reglage && "clat" in reglage ? reglage : memePoint ? r : {};
+    const { W, H } = A.TAILLES_AUTO[i];
+    autoEnCours.add(i); if (!avant) dessinerVuePlan(i);
     try {
-      const cv = await A.carteIGN({ lat: g.lat, lng: g.lng, z: r.z, type: r.type });
+      const cv = await A.carteIGN({ lat: centre.clat != null ? centre.clat : g.lat, lng: centre.clat != null ? centre.clng : g.lng,
+        z: r.z, type: r.type, W, H, gps: g, adresse: planAdresse() });
       const blob = await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.88));
       const img = await A.chargerImage(URL.createObjectURL(blob));
       memoriser(i);
-      const apres = { type: r.type, z: r.z, lat: g.lat, lng: g.lng };
+      const apres = { type: r.type, z: r.z, lat: g.lat, lng: g.lng, W, H };
+      if (centre.clat != null) { apres.clat = centre.clat; apres.clng = centre.clng; }
       let annots = avant ? A.deplacerAnnots(v.annots, avant, apres) : v.annots.filter((a) => a.t !== "pin");
-      if (!annots.some((a) => a.t === "pin")) annots.push({ t: "pin", u: 0.5, v: 0.5, auto: true });
+      // Repère rouge : toujours sur les vues 1 et 2 ; sur la vue chantier seulement à la création (on peut le retirer)
+      if ((i < 2 || !avant) && !annots.some((a) => a.t === "pin")) { const [u, w] = A.versCarte(apres, g.lat, g.lng); annots.push({ t: "pin", u, v: w, auto: true }); }
       Object.assign(v, { w: img.width, h: img.height, zoom: 1, cx: 0.5, cy: 0.5, auto: apres, annots, version: (v.version || 0) + 1, retire: false, sansAuto: false });
       imgsPlan[i] = { img, blob, sale: true };
       marquerPlan();
+      // Cases grises (connexion lente) : la carte se refait toute seule une fois les tuiles arrivées
+      if (cv.complet) cv.complet.then((tout) => { if (tout && prep.plan.vues[i].auto === apres) genererAuto(i, {}); });
     } catch (e) {
       console.warn(e);
       echecsAuto[i] = `${g.lat},${g.lng}`;
       FTSShell.toast(`⚠️ Vue ${i + 1} : ${e.message}. Tu peux coller une capture à la place.`);
     } finally {
       autoEnCours.delete(i);
+      const suite = attenteAuto[i]; delete attenteAuto[i];
+      if (suite) {
+        // zoom demandé pendant le chargement : appliqué à partir de la carte qui vient d'arriver
+        if (suite.dz) { suite.z = (prep.plan.vues[i].auto || A.AUTO_DEFAUT[i]).z + suite.dz; delete suite.dz; }
+        return genererAuto(i, suite);
+      }
       if ($("tabPlan").classList.contains("on")) afficherPlan(); else majEtapes();
     }
   }
-  /** Vues 1 et 2 : carte automatique si elles sont vides (ou déjà automatiques et que le point a bougé) */
+  /** Vues 1, 2 et 3 : carte automatique si elles sont vides (ou déjà automatiques et que le point a bougé) */
   function lancerAuto() {
     const g = A.lireGps(prep.plan.gps); if (!g) return;
-    [0, 1].forEach((i) => {
+    [0, 1, 2].forEach((i) => {
       const v = prep.plan.vues[i];
       if (autoEnCours.has(i) || v.sansAuto || echecsAuto[i] === `${g.lat},${g.lng}`) return;
       const vide = !A.aImage(v);

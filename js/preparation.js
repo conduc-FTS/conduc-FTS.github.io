@@ -12,15 +12,17 @@
  *    accepté qui couvre le reste (reste < 1 m → tube de 1,5 m).
  *  - Tubes secondaires : en tête de pieu, sur la longueur de la NDC, ils
  *    S'AJOUTENT aux tubes principaux.
- *  - Platine : barre → percée (table des perçages) ; sinon tube
- *    secondaire → collerette Ø tube secondaire ; sinon collerette Ø tube
- *    principal.
+ *  - Platine : barre → percée (table des perçages) ; sinon Ø du tube
+ *    secondaire ; sinon Ø du tube principal (le mot « collerette » n'est
+ *    plus écrit, demande de Clément le 10/11/2026).
  *  - Ciment théorique : (section forage − section acier du tube principal)
  *    × longueur × dosage × (1 + surconsommation). Barres et tubes
  *    secondaires négligés.
  *  - As de carreau (pointes) : 1 par pieu au Ø du tube principal + 1 au Ø du
  *    tube secondaire s'il y en a un.
  *  - Tubes pastillés : lignes ajoutées à la main uniquement.
+ *  - Fiche : tubes principaux (tous les Ø), puis TUBAGE (tubes
+ *    secondaires), puis tubes pastillés (10/11/2026).
  *
  * Les fonctions de calcul sont pures (testables sans navigateur).
  */
@@ -105,8 +107,8 @@ const FTSPreparation = (() => {
       const pc = percagePour ? nombre(percagePour(barre)) : "";
       return pc !== "" ? `PERCE EN ${fr(pc)}mm` : `PERCE (barre Ø${fr(barre)} : perçage à définir)`;
     }
-    if (nombre(p.tubeSecD) > 0) return `COLLERETTE Ø ${fr(p.tubeSecD)}`;
-    if (nombre(p.tubeD) > 0) return `COLLERETTE Ø ${fr(p.tubeD)}`;
+    if (nombre(p.tubeSecD) > 0) return `Ø ${fr(p.tubeSecD)}`;
+    if (nombre(p.tubeD) > 0) return `Ø ${fr(p.tubeD)}`;
     return "";
   }
   function sectionPlatine(s) { return String(s || "").replace(/\s+/g, "").replace(/[xX×]/, " x ").trim(); }
@@ -121,7 +123,7 @@ const FTSPreparation = (() => {
     const longParDiam = (prep.ndc && prep.ndc.longParDiam) || {};
     const tubeMax = nombre(ctx.tubeMax);
     const forageMm = nombre(prep.ndc && prep.ndc.forage) || 250;
-    const tubes = new Map();      // "D|L" → { d, l, qte, pastille }
+    const tubes = new Map();      // "D|L" (principal) · "D|L|S" (tubage) · "D|L|P" (pastillé) → { d, l, qte, pastille, sec }
     const platines = new Map();   // "section|coiffe"
     const centreurs = new Map();  // "forage|tubeD"
     const barres = new Map();     // "type|D|L"
@@ -134,10 +136,10 @@ const FTSPreparation = (() => {
       const { L, origine } = longueurRetenue(p, longParDiam);
       const d = nombre(p.tubeD);
       const t = d > 0 ? decoupe(L, tubeMax) : [];
-      t.forEach((l) => ajoute(tubes, `${d}|${l}`, { d, l, pastille: false }));
+      t.forEach((l) => ajoute(tubes, `${d}|${l}`, { d, l, pastille: false, sec: false }));
       const ds = nombre(p.tubeSecD);
       const ts = ds > 0 ? decoupe(nombre(p.tubeSecL), tubeMax) : [];
-      ts.forEach((l) => ajoute(tubes, `${ds}|${l}`, { d: ds, l, pastille: false }));
+      ts.forEach((l) => ajoute(tubes, `${ds}|${l}|S`, { d: ds, l, pastille: false, sec: true }));
       const coiffe = coiffePlatine(p, ctx.percagePour);
       const section = sectionPlatine(p.platine);
       if (section || coiffe) ajoute(platines, `${section}|${coiffe}`, { section, coiffe });
@@ -162,12 +164,12 @@ const FTSPreparation = (() => {
       const d = nombre(x.d), l = nombre(x.l), q = nombre(x.qte);
       if (d > 0 && l > 0 && q > 0) {
         const cle = `${d}|${l}|P`;
-        const y = tubes.get(cle) || { d, l, pastille: true, qte: 0 };
+        const y = tubes.get(cle) || { d, l, pastille: true, sec: false, qte: 0 };
         y.qte += q; tubes.set(cle, y);
       }
     });
 
-    const tri = (a, b) => a.d - b.d || (a.pastille === b.pastille ? b.l - a.l : a.pastille ? 1 : -1);
+    const tri = (a, b) => groupeTube(a) - groupeTube(b) || a.d - b.d || b.l - a.l;
     const surconso = nombre(prep.ciment && prep.ciment.surconso);
     const dosage = nombre(ctx.dosage) || 1200;
     const kg = volume * dosage * (1 + (surconso === "" ? 0 : surconso) / 100);
@@ -197,24 +199,27 @@ const FTSPreparation = (() => {
     const marges = prep.marges || {};
     calc.tubes.forEach((t) => {
       const q = Math.max(0, t.qte + (nombre(marges[cleArticle("tube", t)]) || 0));
-      const k = `${t.d}|${t.l}|${t.pastille ? "P" : ""}`;
-      const x = m.get(k) || { d: t.d, l: t.l, pastille: t.pastille, qte: 0 };
+      const k = `${t.d}|${t.l}|${t.pastille ? "P" : t.sec ? "S" : ""}`;
+      const x = m.get(k) || { d: t.d, l: t.l, pastille: t.pastille, sec: !!t.sec, qte: 0 };
       x.qte += q; m.set(k, x);
     });
     (prep.tubesManuels || []).forEach((t) => {
       const d = nombre(t.d), l = nombre(t.l), q = nombre(t.qte);
       if (!(d > 0 && l > 0 && q > 0)) return;
       const k = `${d}|${l}|`;
-      const x = m.get(k) || { d, l, pastille: false, qte: 0 };
+      const x = m.get(k) || { d, l, pastille: false, sec: false, qte: 0 };
       x.qte += q; m.set(k, x);
     });
+    // Ordre de la fiche : tubes principaux (tous les Ø), puis TUBAGE, puis pastillés
     return [...m.values()].filter((x) => x.qte > 0)
-      .sort((a, b) => a.d - b.d || (a.pastille === b.pastille ? a.l - b.l : a.pastille ? 1 : -1));
+      .sort((a, b) => groupeTube(a) - groupeTube(b) || a.d - b.d || a.l - b.l);
   }
+  /** 0 = tube principal · 1 = tubage (tube secondaire) · 2 = tube pastillé */
+  function groupeTube(t) { return t.pastille ? 2 : t.sec ? 1 : 0; }
 
   /** Clé stable d'un article (pour les marges) */
   function cleArticle(type, a) {
-    if (type === "tube") return `tube|${a.d}|${a.l}${a.pastille ? "|P" : ""}`;
+    if (type === "tube") return `tube|${a.d}|${a.l}${a.pastille ? "|P" : a.sec ? "|S" : ""}`;
     if (type === "platine") return `platine|${a.section}|${a.coiffe}`;
     if (type === "centreur") return `centreur|${a.forage}|${a.d}`;
     if (type === "barre") return `barre|${a.type}|${a.d}|${a.l}`;
@@ -254,8 +259,35 @@ const FTSPreparation = (() => {
     { k: "barreL", lib: "Barre longueur" },
   ];
   // Ordre des colonnes de l'onglet « A-5 TABLEAU RECAP » (si aucune entête n'est collée)
-  const ORDRE_A5 = ["rep", "charge", "traction", "forage", "tubeD", "tubeE", "longNdc", "", "platine", "tubeSecD", "tubeSecE", "tubeSecL", "", "barreType", "barreD", "barreL", ""];
+  const ORDRE_A5 = ["rep", "charge", "", "forage", "tubeD", "tubeE", "longNdc", "", "platine", "tubeSecD", "tubeSecE", "tubeSecL", "", "barreType", "barreD", "barreL", ""];
+  // « ANNEXE E : TABLEAU RECAPITULATIF DES MICROPIEUX » (NDC FTS, toujours la même) :
+  // A repère · B charge · C traction (ignorée) · D Ø forage · E-F tube · G longueur ·
+  // H platine · I-K tube secondaire · L colonne masquée · M-O barres
+  const ORDRE_ANNEXE_E = ["rep", "charge", "", "forage", "tubeD", "tubeE", "longNdc", "platine", "tubeSecD", "tubeSecE", "tubeSecL", "", "barreType", "barreD", "barreL"];
+  // Même tableau copié sans la colonne masquée L
+  const ORDRE_ANNEXE_E_SANS_L = ORDRE_ANNEXE_E.filter((k, i) => i !== 11);
+  const ressemblePlatine = (v) => /\d\s*[²2]?\s*[xX×*]\s*\d/.test(String(v || ""));
 
+  /**
+   * Lignes d'en-tête de la NDC (au-dessus du tableau) : indice, DDC, nombre de micropieux.
+   * @returns {{ infos: {indice?, ddc?, nbMpx?}, reste: string[][] }}
+   */
+  function lireEnteteNdc(brutes) {
+    const infos = {}, reste = [];
+    const apres = (cells, i) => { for (let j = i + 1; j < cells.length; j++) { const v = String(cells[j] || "").trim(); if (v) return v; } return ""; };
+    brutes.forEach((cells) => {
+      let info = false;
+      cells.forEach((c, i) => {
+        const t = sansAccent(c).replace(/\s*:\s*$/, "");
+        if (/^INDICE( DE LA)? NOTE$/.test(t)) { const v = apres(cells, i); if (v) infos.indice = v; info = true; }
+        else if (/^DDC$/.test(t)) { const v = apres(cells, i); if (v) infos.ddc = v; info = true; }
+        else if (/^NOMBRE DE (MPX|MICROPIEUX)$/.test(t)) { const v = nombre(apres(cells, i)); if (v !== "") infos.nbMpx = v; info = true; }
+        else if (/^(REFERENCE|TYPE DE MICROPIEUX)$/.test(t) || /^ANNEXE|TABLEAU RECAPITULATIF/.test(t)) info = true;
+      });
+      if (!info) reste.push(cells);
+    });
+    return { infos, reste };
+  }
   function decouperLignes(texte) {
     return String(texte || "").replace(/\r/g, "").split("\n").map((l) => l.split("\t"));
   }
@@ -279,7 +311,7 @@ const FTSPreparation = (() => {
     }
     if (/TYPE DE TUBE|TUBE PRINCIPAL/.test(h)) return /EPAIS/.test(b) ? "tubeE" : "tubeD";
     if (/MICROPIEU|^N°/.test(h) || /^N°$/.test(b)) return "rep";
-    if (/TRACTION/.test(t)) return "traction";
+    if (/TRACTION/.test(t)) return ""; // colonne C : ignorée (quasiment jamais utilisée)
     if (/CHARGE|ELS/.test(t)) return "charge";
     if (/PLATINE/.test(t)) return "platine";
     if (/FORAGE/.test(t)) return "forage";
@@ -291,17 +323,18 @@ const FTSPreparation = (() => {
 
   /**
    * Analyse un collage Excel.
-   * @returns {{ colonnes: string[], lignes: string[][], entete: boolean, nbColonnes: number }}
+   * @returns {{ colonnes: string[], lignes: string[][], entete: boolean, nbColonnes: number, infos: object, format: string }}
    *   colonnes[i] = champ deviné pour la colonne i ("" = ignorée)
    */
   function analyserCollage(texte) {
-    const brutes = decouperLignes(texte).filter((c) => c.some((x) => String(x).trim() !== ""));
+    const lu = lireEnteteNdc(decouperLignes(texte).filter((c) => c.some((x) => String(x).trim() !== "")));
+    const brutes = lu.reste;
     const entetes = [];
     let i = 0;
     while (i < brutes.length && i < 3 && estLigneEntete(brutes[i])) { entetes.push(brutes[i]); i++; }
     const lignes = brutes.slice(i);
     const nbColonnes = Math.max(0, ...brutes.map((c) => c.length));
-    let colonnes;
+    let colonnes, format = "entete";
     if (entetes.length) {
       const haut = entetes[0], bas = entetes[1] || [];
       let porte = "";
@@ -316,9 +349,14 @@ const FTSPreparation = (() => {
       const vus = new Set();
       colonnes = colonnes.map((k) => (k && !vus.has(k) ? (vus.add(k), k) : ""));
     } else {
-      colonnes = Array.from({ length: nbColonnes }, (_, c) => ORDRE_A5[c] || "");
+      // Sans entête : tableau Annexe E (platine en H) ou ancien onglet A-5 (platine en I)
+      const platineEn = (c) => lignes.filter((l) => ressemblePlatine(l[c])).length;
+      const ordre = platineEn(7) >= platineEn(8) && platineEn(7) > 0 ? (nbColonnes === 14 ? ORDRE_ANNEXE_E_SANS_L : ORDRE_ANNEXE_E)
+        : platineEn(8) > 0 ? ORDRE_A5 : ORDRE_ANNEXE_E;
+      format = ordre === ORDRE_A5 ? "a5" : "annexeE";
+      colonnes = Array.from({ length: nbColonnes }, (_, c) => ordre[c] || "");
     }
-    return { colonnes, lignes, entete: entetes.length > 0, nbColonnes };
+    return { colonnes, lignes, entete: entetes.length > 0, nbColonnes, infos: lu.infos, format };
   }
 
   /**
@@ -399,14 +437,14 @@ const FTSPreparation = (() => {
       },
       equipe: { chef: "" },
       materiel: {
-        foreuse: "", reglage: "standard", injection: "", presse: "", cuveGnr: "OUI", cuveEau: "1", caisseFlexible: "",
+        foreuse: "", reglage: "standard", injection: "", presse: "", cuveGnr: "OUI", cuveEau: "OUI", caisseFlexible: "",
         elevateur: "", compresseur: "", groupe: "", pelle: "", pelleLivraison: "", godet: false,
       },
       remarques: { objectif: "", essais: "Aucun", essaiOui: false, essaiNb: 1, implantation: "A NOTRE CHARGE", boues: "NON", dechets: "A NOTRE CHARGE", outil: "", outilDiam: "", divers: "" },
       ndc: { indice: "", ddc: "", forage: 250, pieux: [], longParDiam: {}, note: "" },
       pastilles: { actif: false, lignes: [] },
       tubesManuels: [],
-      ciment: { type: "32.5", surconso: "", premiereLivraison: "" },
+      ciment: { type: "32.5", surconso: "", premiereLivraison: "", palettesFiche: "" },
       marges: {},
     };
   }
@@ -414,18 +452,31 @@ const FTSPreparation = (() => {
   function normaliser(p, meta) {
     const base = nouvellePreparation(meta);
     p = p || {};
+    const sansCollerette = (k) => String(k).replace(/COLLERETTE /gi, "");
+    const marges = {};
+    Object.entries(p.marges || {}).forEach(([k, v]) => { marges[sansCollerette(k)] = v; });
+    const materiel = { ...base.materiel, ...(p.materiel || {}) };
+    // Cuve à eau : OUI / NON comme la cuve GNR (anciennes fiches : « 1 » ou vide → OUI)
+    if (!/^(OUI|NON)$/i.test(String(materiel.cuveEau || "").trim())) materiel.cuveEau = "OUI";
+    if (!/^(OUI|NON)$/i.test(String(materiel.cuveGnr || "").trim())) materiel.cuveGnr = "OUI";
+    // Envoi enregistré avant le retrait du mot « collerette » : mêmes libellés qu'aujourd'hui (pas de faux changement)
+    const envoi = p.envoi && p.envoi.indice ? { historique: [], recap: [], ...p.envoi } : null;
+    if (envoi) {
+      envoi.recap = (envoi.recap || []).map(([k, v]) => [sansCollerette(k), k === "Cuve à eau" && !/^(OUI|NON)$/i.test(String(v || "").trim()) ? "OUI" : v]);
+      envoi.surligne = (envoi.surligne || []).map(sansCollerette);
+    }
     return {
       ...base, ...p,
       infos: { ...base.infos, ...(p.infos || {}) },
       equipe: { ...base.equipe, ...(p.equipe || {}) },
-      materiel: { ...base.materiel, ...(p.materiel || {}) },
+      materiel,
       remarques: essais({ ...base.remarques, ...(p.remarques || {}) }, p.remarques),
       ndc: { ...base.ndc, ...(p.ndc || {}), pieux: ((p.ndc && p.ndc.pieux) || []).map((x) => ({ ...pieuVide(), ...x })) },
       pastilles: { ...base.pastilles, ...(p.pastilles || {}) },
       tubesManuels: Array.isArray(p.tubesManuels) ? p.tubesManuels : [],
       ciment: { ...base.ciment, ...(p.ciment || {}) },
-      marges: { ...(p.marges || {}) },
-      envoi: p.envoi && p.envoi.indice ? { historique: [], recap: [], ...p.envoi } : null,
+      marges,
+      envoi,
     };
   }
 
@@ -560,7 +611,7 @@ const FTSPreparation = (() => {
   }
 
   return {
-    NOM_DOSSIER, NOM_FICHIER, TYPES_BARRE, DIAMETRES_TUBE, COULEURS_TUBE, CHAMPS, ORDRE_A5,
+    NOM_DOSSIER, NOM_FICHIER, TYPES_BARRE, DIAMETRES_TUBE, COULEURS_TUBE, CHAMPS, ORDRE_A5, ORDRE_ANNEXE_E, groupeTube,
     nombre, fr, arrondi, majuscules, compareReperes, couleurTube, cleRep,
     tubesAcceptes, decoupe, texteDecoupe, pieuVide, longueurRetenue, coiffePlatine, sectionPlatine,
     calculer, cleArticle, diametresPresents, tubesFiche,

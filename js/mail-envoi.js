@@ -12,11 +12,18 @@
  * claude/mail-informatique-outlook.md) : envoi direct par Outlook (Microsoft
  * Graph) à la place de l'envoi de secours — seul ce fichier changera.
  *
+ * Depuis le 10/11/2026 (demande de Clément) : TOUS les mails de la
+ * Supervision s'ouvrent dans Outlook, même connecté avec un compte Gmail
+ * (conduc.fts) — le mail part toujours de l'adresse pro @fts-btp.fr.
+ * L'envoi direct Gmail reste dans le code (ENVOI_GMAIL) pour revenir en
+ * arrière si besoin.
+ *
  * FTSMail.mode() → "gmail" | "outlook"
  * FTSMail.ouvrirOutlook({ to, cc, subject, body }) → { tronque: bool }
  */
 const FTSMail = (() => {
   const LIMITE_URL = 1900; // au-delà, certains Outlook coupent le texte du mail
+  const ENVOI_GMAIL = false; // true = ancien comportement (envoi direct pour les comptes Gmail)
 
   function emailConnecte() {
     try {
@@ -25,8 +32,9 @@ const FTSMail = (() => {
     return "";
   }
 
-  /** Gmail si le compte connecté est une adresse Gmail, sinon envoi par Outlook. */
+  /** Outlook (mail pré-rempli). Si ENVOI_GMAIL : Gmail pour une adresse Gmail. */
   function mode(email) {
+    if (!ENVOI_GMAIL) return "outlook";
     const e = String(email == null ? emailConnecte() : email).trim().toLowerCase();
     if (!e) return "gmail"; // inconnu : comportement d'avant
     return /@(gmail|googlemail)\.com$/.test(e) ? "gmail" : "outlook";

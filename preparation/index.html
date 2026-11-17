@@ -363,6 +363,37 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .nf-det summary { cursor: pointer; padding: 14px 18px; font-weight: 800; font-size: .98rem; }
 .nf-det summary small { font-weight: 400; color: var(--text-sub); font-size: .76rem; }
 .nf-outils { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 0 18px 10px; }
+/* Tableau récapitulatif : blocs de la NDC, valeurs sans cadre (cadre au survol / à la saisie) */
+.nf-rb { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.nf-rb b { font-size: .98rem; } .nf-rb-nb { color: var(--text-sub); font-size: .82rem; }
+.nf-rb input { border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font: inherit; width: 240px; }
+.nf-rc-zone { overflow: auto; max-height: 520px; }
+.nf-rc { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.nf-rc th, .nf-rc td { padding: 4px 4px; text-align: center; white-space: nowrap; }
+.nf-rc thead th { position: sticky; z-index: 1; }
+.nf-rc thead tr.g th { top: 0; font-size: .68rem; letter-spacing: .06em; font-weight: 800; padding: 7px 6px; color: #fff; }
+.nf-rc thead tr.c th { top: 27px; font-size: .68rem; font-weight: 700; color: var(--text-sub); border-bottom: 1px solid var(--border); background: #fff; }
+.nf-rc .g .gen { background: #4B5563; } .nf-rc .g .tub { background: #2F6FDB; } .nf-rc .g .pla { background: #7A5AC8; } .nf-rc .g .sec { background: #0E9488; } .nf-rc .g .bar { background: #C2410C; }
+.nf-rc .c .tub, .nf-rc td.tub { background: #EEF4FF; } .nf-rc .c .pla, .nf-rc td.pla { background: #F4F0FC; } .nf-rc .c .sec, .nf-rc td.sec { background: #ECF8F6; } .nf-rc .c .bar, .nf-rc td.bar { background: #FFF3EC; }
+.nf-rc td { border-bottom: 1px solid var(--border); }
+.nf-rc .d { border-left: 2px solid #fff; }
+.nf-rc .rep { text-align: left; padding-left: 12px; }
+.nf-rc .nw { white-space: nowrap; }
+.nf-rc .s { color: var(--text-sub); font-size: .76rem; margin-left: 4px; }
+.nf-rc tbody tr:hover td { box-shadow: inset 0 9999px rgba(0,0,0,.025); }
+.rc-in { border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 4px 5px; font: inherit; text-align: center; color: var(--text-main); }
+.rc-in.b { font-weight: 800; }
+.rc-in.rep, .nf-rc .rep .rc-in { text-align: left; }
+.rc-in.main { color: #B86E00; }
+.rc-in::placeholder { color: #B5BAC2; font-weight: 400; }
+.rc-in[data-f="longMain"]::placeholder { color: var(--text-main); font-weight: 800; opacity: 1; } /* longueur du diamètre */
+.rc-in:hover, .rc-sel:hover { border-color: #C9CDD4; background: #fff; }
+.rc-in:focus, .rc-sel:focus { outline: none; border-color: #4C82F0; background: #fff; box-shadow: 0 0 0 2px rgba(76,130,240,.18); }
+.rc-sel { appearance: none; -webkit-appearance: none; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 4px 6px; font: inherit; text-align: center; text-align-last: center; cursor: pointer; color: var(--text-main); min-width: 64px; }
+.rc-sel.diam { font-weight: 800; }
+.rc-sel.vide { color: #B5BAC2; }
+.nf-rc .pr-x { padding: 2px 7px; }
+.nf-leg { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 18px; font-size: .74rem; color: var(--text-sub); border-top: 1px solid var(--border); }
 .nf-f { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: #fff; border-top: 1px solid var(--border); }
 .nf-ok-txt { color: #1D6E3E; font-weight: 700; font-size: .84rem; }
 .pf-bandeau .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
@@ -513,13 +544,10 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <!-- 2 · Longueurs par diamètre -->
         <section class="nf-carte">
           <h3><span class="nf-n">2</span>Longueurs par diamètre <small>une longueur pour tous les pieux du diamètre · les quantités de la fiche suivent</small></h3>
-          <table class="nf-tbl"><thead><tr><th>Tube</th><th class="r">Pieux <span class="pr-tot" id="nbTotal">0</span></th><th class="r">Long. NDC</th><th>Long. retenue</th><th>Découpe</th><th class="r">Tubes</th></tr></thead><tbody id="parDiamBody"></tbody></table>
+          <table class="nf-tbl"><thead><tr><th>Tube</th><th class="r">Nbr Mpx <span class="pr-tot" id="nbTotal">0</span></th><th>Long. retenue</th><th>Découpe</th></tr></thead><tbody id="parDiamBody"></tbody></table>
           <div class="pr-note" id="ndcNote" style="margin:0 18px 12px" hidden></div>
           <div class="nf-params">
             <label>Indice NDC <input type="text" data-k="ndc.indice" style="width:60px"></label>
-            <label>DDC <input type="text" data-k="ndc.ddc" style="width:170px"></label>
-            <label>Ø forage <input type="text" data-k="ndc.forage" inputmode="decimal" style="width:64px"> mm</label>
-            <span>Tubes de la foreuse <b id="fTubeMax2"></b></span>
           </div>
         </section>
         <!-- 3 · Ciment -->
@@ -535,25 +563,27 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
           </div>
         </section>
       </div>
-      <!-- 4 · Pieu par pieu -->
+      <!-- 4 · Tableau récapitulatif : même découpage que la NDC (micropieu, tube, platine, tube secondaire, barre) -->
       <section class="nf-carte">
-        <details class="nf-det" id="detPieux">
-          <summary>4 · Pieu par pieu <small><span id="detPieuxNb"></span> · pour corriger un pieu en particulier (longueur, barre, tube secondaire…)</small></summary>
-          <div class="nf-outils">
-            <input type="text" id="fRecherche" class="pr-mini" placeholder="🔍 Rechercher (Mp12, 114…)" style="width:220px">
-            <select id="fTypeBarreTous" class="pr-mini" style="width:auto"><option value="">Type de barre : appliquer à tous…</option></select>
-            <span class="sv-sp"></span>
-            <button type="button" class="pr-add" id="btnAjoutPieu">+ Ajouter un pieu</button><button type="button" class="pr-add" id="btnViderNdc" style="color:#C0392B">Vider la note de calcul</button>
-          </div>
-          <div class="pr-scroll">
-            <table class="sv-tbl pr-pieux">
-              <thead><tr><th>Repère</th><th class="r">Charge (t)</th><th>Tube Ø</th><th>Ép.</th><th class="r">Long. NDC</th><th>Long. retenue</th><th>Tube sec. Ø / ép. / long.</th><th>Barre type / Ø / long.</th><th>Platine</th><th>Découpe tubes</th><th></th></tr></thead>
-              <tbody id="pieuxBody"></tbody>
-            </table>
-          </div>
-          <div class="pr-legende" id="legendeCouleurs"></div>
-          <div class="pr-note" style="margin:0 18px 14px"><span class="pr-dot" style="cursor:default"></span> = longueur changée à la main sur ce pieu. Clic sur le point : retour à la longueur du diamètre. Platine : barre → percée selon la table des perçages · sinon Ø du tube secondaire · sinon Ø du tube principal.</div>
-        </details>
+        <div class="nf-rb"><span class="nf-n">4</span><b>Tableau récapitulatif</b><span class="nf-rb-nb" id="detPieuxNb"></span>
+          <input type="text" id="fRecherche" placeholder="🔍 Rechercher (Mp12, 73…)">
+          <span class="sv-sp"></span>
+          <button type="button" class="pr-add" id="btnAjoutPieu">+ Ajouter un pieu</button><button type="button" class="pr-add" id="btnViderNdc" style="color:#C0392B">Vider la note de calcul</button>
+        </div>
+        <div class="nf-rc-zone">
+          <table class="nf-rc">
+            <thead>
+              <tr class="g"><th class="gen" colspan="3">MICROPIEU</th><th class="tub d" colspan="4">TUBE</th><th class="pla d">PLATINE</th><th class="sec d" colspan="3">TUBE SECONDAIRE</th><th class="bar d" colspan="3">BARRE</th><th class="gen d"></th></tr>
+              <tr class="c"><th class="rep">Repère</th><th>Charge (t)</th><th>Ø forage</th>
+                <th class="tub d">Ø</th><th class="tub">Ép.</th><th class="tub">Long. NDC</th><th class="tub">Long. retenue</th>
+                <th class="pla d">Section · coiffe</th>
+                <th class="sec d">Ø</th><th class="sec">Ép.</th><th class="sec">Long.</th>
+                <th class="bar d">Type</th><th class="bar">Ø</th><th class="bar">Long.</th><th class="d"></th></tr>
+            </thead>
+            <tbody id="pieuxBody"></tbody>
+          </table>
+        </div>
+        <div class="nf-leg"><span>Clique sur une valeur pour la changer</span><span><b style="color:#B86E00">6,5</b> = longueur changée à la main sur ce pieu (clic sur le point orange : retour à la longueur du diamètre)</span><span>Platine : barre → percée · sinon Ø du tube secondaire · sinon Ø du tube principal</span></div>
       </section>
     </div>
     <div class="nf-f"><span class="nf-ok-txt">✓ La fiche se met à jour au fur et à mesure</span><span class="sv-sp"></span><button type="button" class="sv-btn pri" data-fermer-ndc>Revenir à la fiche</button></div>
@@ -1054,7 +1084,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   const OUTILS = ['MFT 4"', 'MFT 5"', 'MFT 6"', 'MFT 8"', 'MFT 12"', "TRICONE", "FISHTAIL", "TRILAME 73", "TRILAME 88,9", "TRILAME 114", "TRILAME 127", "TRILAME 139,7", "TRILAME 177,8", "TARIERE"];
   function remplirListes() {
-    $("fTypeBarreTous").innerHTML = `<option value="">Type de barre : appliquer à tous…</option>` + P.TYPES_BARRE.map((t) => `<option value="${t}">${t} pour tout le chantier</option>`).join("");
+
   }
   function machineForeuse() { return FTSParc.parNom(prep.materiel.foreuse); }
   function tubeMax() {
@@ -1064,7 +1094,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function majTubeMax() {
     const m = tubeMax();
     const txt = !prep.materiel.foreuse ? "choisir la foreuse" : m === "" ? "à renseigner dans le Parc" : `${fr(m)} m`;
-    $("fTubeMax2").textContent = txt;
+    if ($("fTubeMax2")) $("fTubeMax2").textContent = txt;
   }
 
   // ─── Calcul ────────────────────────────────────────────────────
@@ -1077,7 +1107,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function optionsDiam(sel) {
     const v = nombre(sel);
     const liste = P.DIAMETRES_TUBE.includes(v) || v === "" ? P.DIAMETRES_TUBE : P.DIAMETRES_TUBE.concat([v]);
-    return `<option value="">—</option>` + liste.map((d) => `<option value="${d}" ${d === v ? "selected" : ""}>Ø${fr(d)}</option>`).join("");
+    return `<option value="">—</option>` + liste.map((d) => `<option value="${d}" ${d === v ? "selected" : ""}>Ø ${fr(d)}</option>`).join("");
   }
   function styleDiam(d) {
     const c = P.couleurTube(d);
@@ -1096,20 +1126,18 @@ document.addEventListener("DOMContentLoaded", () => {
       ? `<div class="t"><b>NDC${prep.ndc.indice ? ` indice ${esc(prep.ndc.indice)}` : ""} collée</b> · ${n} pieu${n > 1 ? "x" : ""}${prep.ndc.ddc ? ` · DDC ${esc(prep.ndc.ddc)}` : ""}<br>${nbNdc0 === "" ? "" : nbNdc0 === n ? "La NDC annonce " + fr(nbNdc0) + " micropieux : le compte est bon." : `<span class="w">⚠️ La NDC annonce ${fr(nbNdc0)} micropieux, il y en a ${n} ici.</span>`}</div><button type="button" class="sv-btn" data-coller-ndc>📋 Coller un nouvel indice</button>`
       : `<div class="t"><b>Pas encore de note de calcul</b><br>Colle-la ci-dessous, ou tape les fournitures directement sur la fiche.</div>`;
     if (!n) { $("zoneColler").hidden = false; $("ndcResume").hidden = false; }
-    // Tubes principaux par diamètre (quantités de la fiche, marges comprises)
-    const tubesParD = new Map();
-    P.tubesFiche(calcul(), prep).filter((t) => P.groupeTube(t) === 0).forEach((t) => tubesParD.set(t.d, (tubesParD.get(t.d) || 0) + t.qte));
+
     // Longueurs par diamètre
     const diams = P.diametresPresents(prep.ndc.pieux);
     $("nbTotal").textContent = prep.ndc.pieux.length;
     $("nbTotal").title = `${prep.ndc.pieux.length} micropieux au total`;
     $("parDiamBody").innerHTML = diams.length ? diams.map((x) => {
       const L = nombre(prep.ndc.longParDiam[String(x.d)]);
-      const ndc = x.min === "" ? "—" : x.min === x.max ? `${fr(x.min, 2)} m` : `${fr(x.min, 2)} à ${fr(x.max, 2)} m`;
-      return `<tr><td><span class="pr-sq" style="background:${P.couleurTube(x.d) || "#fff"}"></span><b>${esc(P.texteD(x.d))}</b> <span class="s">× ${fr(x.e)}</span></td><td class="r">${x.nb}</td><td class="r s">${ndc}</td>
+      // Tube · Nbr Mpx · Long. retenue · Découpe (17/11/2026)
+      return `<tr><td><span class="pr-sq" style="background:${P.couleurTube(x.d) || "#fff"}"></span><b>${esc(P.texteD(x.d))}</b></td><td class="r">${x.nb}</td>
         <td><input type="text" data-ld="${x.d}" inputmode="decimal" value="${L === "" ? "" : fr(L)}" placeholder="NDC"> m</td>
-        <td class="s">${L === "" ? "selon la NDC" : m === "" ? "foreuse à choisir" : P.texteDecoupe(P.decoupe(L, m))}</td><td class="r q">${tubesParD.has(x.d) ? tubesParD.get(x.d) + " u" : "—"}</td></tr>`;
-    }).join("") : `<tr><td colspan="6" class="s">Colle la note de calcul pour voir les diamètres.</td></tr>`;
+        <td class="s">${L === "" ? "selon la NDC" : m === "" ? "foreuse à choisir" : P.texteDecoupe(P.decoupe(L, m))}</td></tr>`;
+    }).join("") : `<tr><td colspan="4" class="s">Colle la note de calcul pour voir les diamètres.</td></tr>`;
     $("parDiamBody").querySelectorAll("[data-ld]").forEach((el) => el.addEventListener("change", () => {
       const v = nombre(el.value);
       if (v === "") delete prep.ndc.longParDiam[el.dataset.ld]; else prep.ndc.longParDiam[el.dataset.ld] = v;
@@ -1117,31 +1145,36 @@ document.addEventListener("DOMContentLoaded", () => {
     }));
     afficherPieux();
     const presents = [...new Set(prep.ndc.pieux.map((p) => nombre(p.tubeD)).filter((d) => d > 0))].sort((a, b) => a - b);
-    $("legendeCouleurs").innerHTML = presents.length ? "<b style='color:var(--text-main)'>Code couleur :</b>" + presents.map((d) => `<span><span class="pr-sq" style="background:${P.couleurTube(d) || "#fff"}"></span>Ø${fr(d)}</span>`).join("") + "<span>· pas de couleur sur la fiche</span>" : "";
+    if ($("legendeCouleurs")) $("legendeCouleurs").innerHTML = presents.length ? "<b style='color:var(--text-main)'>Code couleur :</b>" + presents.map((d) => `<span><span class="pr-sq" style="background:${P.couleurTube(d) || "#fff"}"></span>Ø${fr(d)}</span>`).join("") + "<span>· pas de couleur sur la fiche</span>" : "";
     const nbNdc = nombre(prep.ndc.nbMpx);
     const ecart = nbNdc !== "" && nbNdc !== prep.ndc.pieux.length ? `⚠️ La NDC annonce <b>${fr(nbNdc)} micropieux</b>, il y en a <b>${prep.ndc.pieux.length}</b> ici : vérifie qu'il n'en manque pas.` : "";
     const note = [ecart, prep.ndc.note ? `Note de la NDC : « ${esc(prep.ndc.note)} »` : ""].filter(Boolean).join("<br>");
     $("ndcNote").hidden = !note; $("ndcNote").innerHTML = note;
   }
+  /** Ligne du tableau récapitulatif : valeurs sans cadre, modifiables au clic (cadre au survol / à la saisie) */
   function lignePieu(p, i) {
     const r = P.longueurRetenue(p, prep.ndc.longParDiam);
     const regle = P.longueurRetenue({ ...p, longMain: "" }, prep.ndc.longParDiam);
     const main = r.origine === "main";
-    const t = P.decoupe(r.L, tubeMax());
-    const ts = nombre(p.tubeSecD) > 0 ? P.decoupe(nombre(p.tubeSecL), tubeMax()) : [];
     const n = (v) => (v === "" || v == null ? "" : fr(v));
+    const inp = (f, v, cls = "", w = 56, ph = "—") => `<input type="text" class="rc-in ${cls}" data-f="${f}" value="${v}" placeholder="${ph}" style="width:${w}px">`;
+    const secVide = !(nombre(p.tubeSecD) > 0), barVide = !(nombre(p.barreD) > 0);
     return `<tr data-i="${i}">
-      <td><input type="text" class="pr-mini rep" data-f="rep" value="${esc(p.rep)}" style="width:74px"></td>
-      <td class="r"><input type="text" class="pr-mini n" data-f="charge" value="${n(p.charge)}" style="width:56px"></td>
-      <td><select class="pr-mini" data-f="tubeD" style="width:88px;${styleDiam(p.tubeD)}">${optionsDiam(p.tubeD)}</select></td>
-      <td><input type="text" class="pr-mini n" data-f="tubeE" value="${n(p.tubeE)}" style="width:48px"></td>
-      <td class="r"><input type="text" class="pr-mini n" data-f="longNdc" value="${n(p.longNdc)}" style="width:58px"></td>
-      <td style="white-space:nowrap"><input type="text" class="pr-mini n ${main ? "main" : ""}" data-f="longMain" value="${main ? n(p.longMain) : ""}" placeholder="${n(regle.L)}" style="width:58px"><span class="pr-dot" data-raz title="Revenir à la longueur du diamètre (${n(regle.L)} m)" ${main ? "" : "hidden"}></span></td>
-      <td style="white-space:nowrap"><select class="pr-mini" data-f="tubeSecD" style="width:78px">${optionsDiam(p.tubeSecD)}</select> <input type="text" class="pr-mini n" data-f="tubeSecE" value="${n(p.tubeSecE)}" style="width:44px"> <input type="text" class="pr-mini n" data-f="tubeSecL" value="${n(p.tubeSecL)}" style="width:50px"></td>
-      <td style="white-space:nowrap"><select class="pr-mini" data-f="barreType" style="width:92px">${options(P.TYPES_BARRE, p.barreType, "—")}</select> <input type="text" class="pr-mini n" data-f="barreD" value="${n(p.barreD)}" style="width:44px"> <input type="text" class="pr-mini n" data-f="barreL" value="${n(p.barreL)}" style="width:44px"></td>
-      <td style="white-space:nowrap"><input type="text" class="pr-mini" data-f="platine" value="${esc(p.platine)}" style="width:78px"><span class="sub calc c-coiffe">${esc(P.coiffePlatine(p, (b) => FTSParc.percagePour(b)))}</span></td>
-      <td class="calc c-dec">${texteDecoupePieu(t, ts)}</td>
-      <td><button type="button" class="pr-x" data-suppr title="Supprimer ce pieu">✕</button></td></tr>`;
+      <td class="rep">${inp("rep", esc(p.rep), "b", 70, "")}</td>
+      <td>${inp("charge", n(p.charge))}</td>
+      <td>${inp("forage", n(p.forage), "", 52, n(prep.ndc.forage))}</td>
+      <td class="tub d"><select class="rc-sel diam" data-f="tubeD" style="${styleDiam(p.tubeD)}">${optionsDiam(p.tubeD)}</select></td>
+      <td class="tub">${inp("tubeE", n(p.tubeE), "", 40)}</td>
+      <td class="tub">${inp("longNdc", n(p.longNdc), "", 46)}</td>
+      <td class="tub nw">${inp("longMain", main ? n(p.longMain) : "", main ? "b main" : "b", 46, n(regle.L))}<span class="pr-dot" data-raz title="Revenir à la longueur du diamètre (${n(regle.L)} m)" ${main ? "" : "hidden"}></span></td>
+      <td class="pla d nw">${inp("platine", esc(P.sectionPlatine(p.platine) || p.platine), "", 82)}<span class="s c-coiffe">${esc(P.coiffePlatine(p, (b) => FTSParc.percagePour(b)))}</span></td>
+      <td class="sec d"><select class="rc-sel${secVide ? " vide" : ""}" data-f="tubeSecD">${optionsDiam(p.tubeSecD)}</select></td>
+      <td class="sec">${inp("tubeSecE", n(p.tubeSecE), "", 40)}</td>
+      <td class="sec">${inp("tubeSecL", n(p.tubeSecL), "", 40)}</td>
+      <td class="bar d"><select class="rc-sel${barVide ? " vide" : ""}" data-f="barreType">${options(P.TYPES_BARRE, p.barreType, "—")}</select></td>
+      <td class="bar">${inp("barreD", n(p.barreD), "", 40)}</td>
+      <td class="bar">${inp("barreL", n(p.barreL), "", 40)}</td>
+      <td class="d"><button type="button" class="pr-x" data-suppr title="Supprimer ce pieu">✕</button></td></tr>`;
   }
   function texteDecoupePieu(t, ts) { return `${P.texteDecoupe(t)}${ts.length ? `<span class="sub">sec. ${P.texteDecoupe(ts)}</span>` : ""}`; }
   /** Met à jour les cases calculées d'une ligne sans la redessiner (le curseur reste où il est) */
@@ -1154,7 +1187,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!main && document.activeElement !== inp) inp.value = "";
     const dot = tr.querySelector("[data-raz]"); dot.hidden = !main; dot.title = `Revenir à la longueur du diamètre (${fr(regle.L)} m)`;
     const ts = nombre(p.tubeSecD) > 0 ? P.decoupe(nombre(p.tubeSecL), tubeMax()) : [];
-    tr.querySelector(".c-dec").innerHTML = texteDecoupePieu(P.decoupe(r.L, tubeMax()), ts);
+    const dec = tr.querySelector(".c-dec"); if (dec) dec.innerHTML = texteDecoupePieu(P.decoupe(r.L, tubeMax()), ts);
     tr.querySelector(".c-coiffe").textContent = P.coiffePlatine(p, (b) => FTSParc.percagePour(b));
     ["barreType", "barreL"].forEach((f) => { const el = tr.querySelector(`[data-f="${f}"]`); if (el && document.activeElement !== el) el.value = p[f] === "" ? "" : (typeof p[f] === "number" ? fr(p[f]) : p[f]); });
     if (p.barreType === "" ) tr.querySelector('[data-f="barreType"]').value = "";
@@ -1162,9 +1195,9 @@ document.addEventListener("DOMContentLoaded", () => {
   function afficherPieux() {
     const q = $("fRecherche").value.trim().toUpperCase().replace(/\s+/g, "");
     const lignes = prep.ndc.pieux.map((p, i) => ({ p, i })).filter(({ p }) => !q || `${p.rep}|Ø${fr(p.tubeD)}|${p.tubeD}`.toUpperCase().replace(/\s+/g, "").includes(q));
-    $("pieuxBody").innerHTML = lignes.length ? lignes.map(({ p, i }) => lignePieu(p, i)).join("") : `<tr><td colspan="11" style="color:var(--text-sub);padding:16px 18px">${prep.ndc.pieux.length ? "Aucun pieu ne correspond." : "Aucun pieu : clique sur « Coller depuis Excel »."}</td></tr>`;
+    $("pieuxBody").innerHTML = lignes.length ? lignes.map(({ p, i }) => lignePieu(p, i)).join("") : `<tr><td colspan="15" style="color:var(--text-sub);padding:16px 18px;text-align:left">${prep.ndc.pieux.length ? "Aucun pieu ne correspond." : "Aucun pieu : colle la NDC en haut de la fenêtre, ou ajoute un pieu."}</td></tr>`;
   }
-  const CHAMPS_NUM = ["charge", "tubeD", "tubeE", "longNdc", "longMain", "tubeSecD", "tubeSecE", "tubeSecL", "barreD", "barreL"];
+  const CHAMPS_NUM = ["charge", "forage", "tubeD", "tubeE", "longNdc", "longMain", "tubeSecD", "tubeSecE", "tubeSecL", "barreD", "barreL"];
   $("pieuxBody").addEventListener("change", (e) => {
     const tr = e.target.closest("tr[data-i]"); if (!tr) return;
     const i = Number(tr.dataset.i), f = e.target.dataset.f; if (!f) return;
@@ -1206,15 +1239,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   $("fRecherche").addEventListener("input", afficherPieux);
-  $("fTypeBarreTous").addEventListener("change", async () => {
-    const t = $("fTypeBarreTous").value; if (!t) return;
-    $("fTypeBarreTous").value = "";
-    const concernes = prep.ndc.pieux.filter((p) => nombre(p.barreD) > 0);
-    if (!concernes.length) return;
-    if (await confirmer(`Mettre ${t} sur tout le chantier ?`, `${concernes.length} pieux ont une barre. Tu pourras encore changer un pieu à la main (chantier panaché).`, `Mettre ${t}`)) {
-      concernes.forEach((p) => { p.barreType = t; }); marquerSale(); afficherPieux();
-    }
-  });
   $("btnAjoutPieu").addEventListener("click", async () => {
     const rep = await boite({ icone: "➕", titre: "Ajouter un pieu", html: "Repère du nouveau pieu, tel qu'écrit dans la NDC :", champ: { placeholder: "ex : Mp25, MpG1" }, boutons: [{ lib: "Annuler", val: null }, { lib: "Ajouter", val: true, cls: "pri" }] });
     if (!rep || !String(rep).trim()) return;

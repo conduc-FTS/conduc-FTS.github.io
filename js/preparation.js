@@ -168,7 +168,8 @@ const FTSPreparation = (() => {
     const pieux = (prep.ndc && prep.ndc.pieux) || [];
     const longParDiam = (prep.ndc && prep.ndc.longParDiam) || {};
     const tubeMax = nombre(ctx.tubeMax);
-    const forageMm = nombre(prep.ndc && prep.ndc.forage) || 250;
+    // Ø forage : celui de chaque pieu (NDC), sinon celui du chantier (17/11/2026)
+    const forageChantier = nombre(prep.ndc && prep.ndc.forage) || 250;
     const tubes = new Map();      // "D|E|L" (principal) · "D|E|L|S" (tubage) · "D|L|P" (pastillé) → { d, e, l, qte, pastille, sec }
     const platines = new Map();   // "section|coiffe"
     const centreurs = new Map();  // "forage|tubeD"
@@ -176,9 +177,9 @@ const FTSPreparation = (() => {
     const detail = [];
     let lineaire = 0, volume = 0;
     const ajoute = (map, cle, base) => { const x = map.get(cle) || { ...base, qte: 0 }; x.qte++; map.set(cle, x); };
-    const sForage = Math.PI * Math.pow(forageMm / 1000, 2) / 4;
-
     pieux.forEach((p) => {
+      const forageMm = nombre(p.forage) > 0 ? nombre(p.forage) : forageChantier;
+      const sForage = Math.PI * Math.pow(forageMm / 1000, 2) / 4;
       const { L, origine } = longueurRetenue(p, longParDiam);
       const d = nombre(p.tubeD);
       const t = d > 0 ? decoupe(L, tubeMax) : [];
@@ -233,7 +234,7 @@ const FTSPreparation = (() => {
       lineaire: arrondi(lineaire, 3),
       tubes: [...tubes.values()].sort(tri),
       platines: [...platines.values()].sort((a, b) => a.coiffe.localeCompare(b.coiffe, "fr", { numeric: true })),
-      centreurs: [...centreurs.values()].sort((a, b) => a.d - b.d),
+      centreurs: [...centreurs.values()].sort((a, b) => a.d - b.d || a.forage - b.forage),
       barres: [...barres.values()].sort((a, b) => a.type.localeCompare(b.type) || a.d - b.d),
       ciment: { volume: arrondi(volume, 3), kg: Math.round(kg), sacs, palettes, sac, sacsPalette, surconso, dosage },
       detail,

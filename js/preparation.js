@@ -111,7 +111,53 @@ const FTSPreparation = (() => {
     if (nombre(p.tubeD) > 0) return `Ø ${fr(p.tubeD)}`;
     return "";
   }
-  function sectionPlatine(s) { return String(s || "").replace(/\s+/g, "").replace(/[xX×]/, " x ").trim(); }
+  /**
+   * Section de platine écrite comme sur la fiche (17/11/2026) : « 200² x 20 »
+   * (« 200 x 250 x 20 » si les deux côtés diffèrent). Accepte 200x200x20,
+   * 200²x20, 200 X 200 X 20…
+   */
+  function sectionPlatine(s) {
+    const t = String(s || "").replace(/\s+/g, "").replace(/[X×*]/g, "x").replace(/,/g, ".");
+    if (!t) return "";
+    const n = "(\\d+(?:\\.\\d+)?)";
+    let m = t.match(new RegExp(`^${n}x${n}x${n}$`));
+    if (m) return m[1] === m[2] ? `${frv(m[1])}² x ${frv(m[3])}` : `${frv(m[1])} x ${frv(m[2])} x ${frv(m[3])}`;
+    m = t.match(new RegExp(`^${n}²x${n}$`));
+    if (m) return `${frv(m[1])}² x ${frv(m[2])}`;
+    return String(s).replace(/\s+/g, " ").trim();
+  }
+  const frv = (x) => String(x).replace(".", ",");
+
+  // ── Écriture sur la fiche (règle unique, 17/11/2026) ──────────────
+  // Quantités « 36 u », diamètres « Ø 88,9 », longueurs « 1,5 ML », virgule partout.
+  function fr1(n) { const v = nombre(n); return v === "" ? "" : v.toFixed(1).replace(".", ","); }
+  function texteD(d) { const v = nombre(d); return v === "" ? "" : `Ø ${fr(v)}`; }
+  function texteL(l) { const v = nombre(l); return v === "" ? "" : `${fr1(v)} ML`; }
+  /** Ø d'un tube sur la fiche : diamètre extérieur seul, épaisseur seulement si le même Ø existe en deux épaisseurs */
+  function texteTube(t) { return `${texteD(t.d)}${t.ep && nombre(t.e) !== "" ? ` x ${fr(t.e)}` : ""}`; }
+  /**
+   * Mise en forme d'une case tapée à la main, en sortant de la case.
+   * @param {string} type  "u" quantité · "ML" longueur · "D" diamètre · "TU" Ø de tube (épaisseur retirée) · "PL" section de platine
+   */
+  function formaterSaisie(type, texte) {
+    const v = String(texte == null ? "" : texte).replace(/ /g, " ").trim();
+    if (!v) return "";
+    const num = (x) => { const t = String(x).replace(/\s/g, "").replace(",", "."); return /^\d+(\.\d+)?$/.test(t) ? parseFloat(t) : null; };
+    if (type === "u") { const q = num(v.replace(/\s*u$/i, "")); return q === null ? v : `${fr(q)} u`; }
+    if (type === "ML") { const q = num(v.replace(/\s*ml?$/i, "")); return q === null ? v : `${fr1(q)} ML`; }
+    if (type === "PL") return sectionPlatine(v);
+    if (type === "TU") {
+      const m = v.replace(/Ø|ø/g, "").trim().match(/^(\d+(?:[.,]\d+)?)(?:\s*[xX×*]\s*\d+(?:[.,]\d+)?)?$/);
+      return m ? `Ø ${frv(m[1])}` : v;
+    }
+    if (type === "D") {
+      const brut = v.replace(/Ø|ø/g, "").trim();
+      if (/^\d+([.,]\d+)?$/.test(brut)) return `Ø ${frv(brut)}`;
+      if (!/Ø/.test(v) && /\d/.test(v)) return v.replace(/(\d)/, "Ø $1").replace(/\.(\d)/g, ",$1");
+      return v;
+    }
+    return v;
+  }
 
   // ── Calcul complet des fournitures ─────────────────────────────
   /**
@@ -123,7 +169,7 @@ const FTSPreparation = (() => {
     const longParDiam = (prep.ndc && prep.ndc.longParDiam) || {};
     const tubeMax = nombre(ctx.tubeMax);
     const forageMm = nombre(prep.ndc && prep.ndc.forage) || 250;
-    const tubes = new Map();      // "D|L" (principal) · "D|L|S" (tubage) · "D|L|P" (pastillé) → { d, l, qte, pastille, sec }
+    const tubes = new Map();      // "D|E|L" (principal) · "D|E|L|S" (tubage) · "D|L|P" (pastillé) → { d, e, l, qte, pastille, sec }
     const platines = new Map();   // "section|coiffe"
     const centreurs = new Map();  // "forage|tubeD"
     const barres = new Map();     // "type|D|L"
@@ -136,10 +182,11 @@ const FTSPreparation = (() => {
       const { L, origine } = longueurRetenue(p, longParDiam);
       const d = nombre(p.tubeD);
       const t = d > 0 ? decoupe(L, tubeMax) : [];
-      t.forEach((l) => ajoute(tubes, `${d}|${l}`, { d, l, pastille: false, sec: false }));
-      const ds = nombre(p.tubeSecD);
+      const e = nombre(p.tubeE);
+      t.forEach((l) => ajoute(tubes, `${d}|${e}|${l}`, { d, e, l, pastille: false, sec: false }));
+      const ds = nombre(p.tubeSecD), es = nombre(p.tubeSecE);
       const ts = ds > 0 ? decoupe(nombre(p.tubeSecL), tubeMax) : [];
-      ts.forEach((l) => ajoute(tubes, `${ds}|${l}|S`, { d: ds, l, pastille: false, sec: true }));
+      ts.forEach((l) => ajoute(tubes, `${ds}|${es}|${l}|S`, { d: ds, e: es, l, pastille: false, sec: true }));
       const coiffe = coiffePlatine(p, ctx.percagePour);
       const section = sectionPlatine(p.platine);
       if (section || coiffe) ajoute(platines, `${section}|${coiffe}`, { section, coiffe });
@@ -153,7 +200,6 @@ const FTSPreparation = (() => {
       }
       if (L > 0) {
         lineaire += L;
-        const e = nombre(p.tubeE);
         const sAcier = d > 0 && e > 0 ? Math.PI * (Math.pow(d / 1000, 2) - Math.pow((d - 2 * e) / 1000, 2)) / 4 : 0;
         volume += L * Math.max(0, sForage - sAcier);
       }
@@ -169,7 +215,11 @@ const FTSPreparation = (() => {
       }
     });
 
-    const tri = (a, b) => groupeTube(a) - groupeTube(b) || a.d - b.d || b.l - a.l;
+    // Épaisseur écrite sur la fiche seulement si un même Ø (même groupe) existe en deux épaisseurs (17/11/2026)
+    const epaisseurs = new Map();
+    tubes.forEach((t) => { if (t.pastille) return; const k = `${t.sec ? "S" : ""}|${t.d}`; const s = epaisseurs.get(k) || new Set(); s.add(t.e); epaisseurs.set(k, s); });
+    tubes.forEach((t) => { t.ep = !t.pastille && epaisseurs.get(`${t.sec ? "S" : ""}|${t.d}`).size > 1; });
+    const tri = (a, b) => groupeTube(a) - groupeTube(b) || a.d - b.d || (nombre(a.e) || 0) - (nombre(b.e) || 0) || b.l - a.l;
     const surconso = nombre(prep.ciment && prep.ciment.surconso);
     const dosage = nombre(ctx.dosage) || 1200;
     const kg = volume * dosage * (1 + (surconso === "" ? 0 : surconso) / 100);
@@ -199,27 +249,28 @@ const FTSPreparation = (() => {
     const marges = prep.marges || {};
     calc.tubes.forEach((t) => {
       const q = Math.max(0, t.qte + (nombre(marges[cleArticle("tube", t)]) || 0));
-      const k = `${t.d}|${t.l}|${t.pastille ? "P" : t.sec ? "S" : ""}`;
-      const x = m.get(k) || { d: t.d, l: t.l, pastille: t.pastille, sec: !!t.sec, qte: 0 };
+      const k = `${t.d}|${t.ep ? t.e : ""}|${t.l}|${t.pastille ? "P" : t.sec ? "S" : ""}`;
+      const x = m.get(k) || { d: t.d, e: t.e, ep: !!t.ep, l: t.l, pastille: t.pastille, sec: !!t.sec, qte: 0 };
       x.qte += q; m.set(k, x);
     });
     (prep.tubesManuels || []).forEach((t) => {
       const d = nombre(t.d), l = nombre(t.l), q = nombre(t.qte);
       if (!(d > 0 && l > 0 && q > 0)) return;
-      const k = `${d}|${l}|`;
-      const x = m.get(k) || { d, l, pastille: false, sec: false, qte: 0 };
+      const k = `${d}||${l}|`;
+      const x = m.get(k) || { d, e: "", ep: false, l, pastille: false, sec: false, qte: 0 };
       x.qte += q; m.set(k, x);
     });
     // Ordre de la fiche : tubes principaux (tous les Ø), puis TUBAGE, puis pastillés
     return [...m.values()].filter((x) => x.qte > 0)
-      .sort((a, b) => groupeTube(a) - groupeTube(b) || a.d - b.d || a.l - b.l);
+      .sort((a, b) => groupeTube(a) - groupeTube(b) || a.d - b.d || (nombre(a.e) || 0) - (nombre(b.e) || 0) || a.l - b.l);
   }
   /** 0 = tube principal · 1 = tubage (tube secondaire) · 2 = tube pastillé */
   function groupeTube(t) { return t.pastille ? 2 : t.sec ? 1 : 0; }
 
   /** Clé stable d'un article (pour les marges) */
   function cleArticle(type, a) {
-    if (type === "tube") return `tube|${a.d}|${a.l}${a.pastille ? "|P" : a.sec ? "|S" : ""}`;
+    // L'épaisseur n'entre dans la clé que si elle est écrite sur la fiche (marges des anciennes fiches conservées)
+    if (type === "tube") return `tube|${a.d}|${a.l}${a.pastille ? "|P" : a.sec ? "|S" : ""}${a.ep ? `|e${a.e}` : ""}`;
     if (type === "platine") return `platine|${a.section}|${a.coiffe}`;
     if (type === "centreur") return `centreur|${a.forage}|${a.d}`;
     if (type === "barre") return `barre|${a.type}|${a.d}|${a.l}`;
@@ -440,13 +491,32 @@ const FTSPreparation = (() => {
         foreuse: "", reglage: "standard", injection: "", presse: "", cuveGnr: "OUI", cuveEau: "OUI", caisseFlexible: "",
         elevateur: "", compresseur: "", groupe: "", pelle: "", pelleLivraison: "", godet: false,
       },
-      remarques: { objectif: "", essais: "Aucun", essaiOui: false, essaiNb: 1, implantation: "A NOTRE CHARGE", boues: "NON", dechets: "A NOTRE CHARGE", outil: "", outilDiam: "", divers: "" },
+      // Implantation et évacuation des boues : OUI / NON, à compléter sur chaque nouvelle fiche (17/11/2026)
+      remarques: { objectif: "", essais: "Aucun", essaiOui: false, essaiNb: 1, implantation: "", boues: "", dechets: "À NOTRE CHARGE", outils: [{ outil: "", diam: "" }], divers: "" },
       ndc: { indice: "", ddc: "", forage: 250, pieux: [], longParDiam: {}, note: "" },
       pastilles: { actif: false, lignes: [] },
       tubesManuels: [],
+      // Lignes tapées directement sur la fiche (3 cases comme la fiche : Qté, Ø / section, longueur / coiffe…)
+      lignes: { platines: [], centreurs: [], tubes: [], barres: [] },
       ciment: { type: "32.5", surconso: "", premiereLivraison: "", palettesFiche: "" },
       marges: {},
+      // Cases changées à la main sur la fiche : { champ: { avant } } (repère jaune + « revenir »)
+      mains: {},
     };
+  }
+  /**
+   * Libellé d'un relevé d'envoi écrit avant le 17/11/2026 → libellé actuel
+   * (virgule, « Ø 114 » au lieu de « Ø 114.0 », platines « 200² x 20 ») :
+   * évite de faux changements au prochain envoi.
+   */
+  function cleRecapActuelle(k) {
+    let m = String(k).match(/^(Tubes|Tubage) Ø (\d+(?:\.\d+)?)( pastillés)? x (\d+(?:\.\d+)?) ML(.*)$/);
+    if (m) return `${m[1]} ${texteD(parseFloat(m[2]))}${m[3] || ""} x ${texteL(parseFloat(m[4]))}${m[5]}`;
+    m = String(k).match(/^(Barres .* Ø [\d,]+) x (\d+\.\d+) ML(.*)$/);
+    if (m) return `${m[1]} x ${texteL(parseFloat(m[2]))}${m[3]}`;
+    m = String(k).match(/^Platines ([\d\s.,xX×²*]+?)( (?:ø|perce).*|)(\s\(\d+\))?$/i);
+    if (m && /\d/.test(m[1])) return `Platines ${sectionPlatine(m[1])}${m[2]}${m[3] || ""}`;
+    return k;
   }
   /** Complète une préparation lue (ancienne version / champs manquants) */
   function normaliser(p, meta) {
@@ -462,24 +532,41 @@ const FTSPreparation = (() => {
     // Envoi enregistré avant le retrait du mot « collerette » : mêmes libellés qu'aujourd'hui (pas de faux changement)
     const envoi = p.envoi && p.envoi.indice ? { historique: [], recap: [], ...p.envoi } : null;
     if (envoi) {
-      envoi.recap = (envoi.recap || []).map(([k, v]) => [sansCollerette(k), k === "Cuve à eau" && !/^(OUI|NON)$/i.test(String(v || "").trim()) ? "OUI" : v]);
-      envoi.surligne = (envoi.surligne || []).map(sansCollerette);
+      envoi.recap = (envoi.recap || []).map(([k, v]) => [cleRecapActuelle(sansCollerette(k)), k === "Cuve à eau" && !/^(OUI|NON)$/i.test(String(v || "").trim()) ? "OUI" : v]);
+      envoi.surligne = (envoi.surligne || []).map((k) => cleRecapActuelle(sansCollerette(k)));
     }
+    // Marges des platines : section écrite « 200² x 20 » depuis le 17/11/2026
+    Object.keys(marges).forEach((k) => {
+      const m = k.match(/^platine\|([^|]*)\|(.*)$/);
+      if (m) { const k2 = `platine|${sectionPlatine(m[1])}|${m[2]}`; if (k2 !== k) { marges[k2] = marges[k]; delete marges[k]; } }
+    });
+    // Outils de forage : plusieurs lignes (anciennes fiches : un seul outil + Ø)
+    const re0 = p.remarques || {};
+    const outils = Array.isArray(re0.outils) && re0.outils.length ? re0.outils.map((o) => ({ outil: String(o.outil || ""), diam: o.diam == null ? "" : String(o.diam) }))
+      : [{ outil: String(re0.outil || ""), diam: re0.outilDiam == null ? "" : String(re0.outilDiam) }];
+    const lignes = {};
+    ["platines", "centreurs", "tubes", "barres"].forEach((s) => {
+      lignes[s] = ((p.lignes && p.lignes[s]) || []).map((l) => ({ c: [0, 1, 2].map((i) => String((l.c || [])[i] == null ? "" : l.c[i])) }));
+    });
     return {
       ...base, ...p,
       infos: { ...base.infos, ...(p.infos || {}) },
       equipe: { ...base.equipe, ...(p.equipe || {}) },
       materiel,
-      remarques: essais({ ...base.remarques, ...(p.remarques || {}) }, p.remarques),
+      // Anciennes fiches : implantation / boues / déchets gardent leur valeur enregistrée
+      remarques: essais(sansAncienOutil({ ...base.remarques, ...re0, outils }), p.remarques),
       ndc: { ...base.ndc, ...(p.ndc || {}), pieux: ((p.ndc && p.ndc.pieux) || []).map((x) => ({ ...pieuVide(), ...x })) },
       pastilles: { ...base.pastilles, ...(p.pastilles || {}) },
       tubesManuels: Array.isArray(p.tubesManuels) ? p.tubesManuels : [],
+      lignes,
       ciment: { ...base.ciment, ...(p.ciment || {}) },
       marges,
+      mains: p.mains && typeof p.mains === "object" ? p.mains : {},
       envoi,
     };
   }
 
+  function sansAncienOutil(re) { delete re.outil; delete re.outilDiam; return re; }
   /** Micropieux d'essai : interrupteur oui / non + nombre (anciennes fiches : déduit du texte) */
   function essais(re, lu) {
     if (!lu || lu.essaiOui == null) {
@@ -614,6 +701,7 @@ const FTSPreparation = (() => {
     NOM_DOSSIER, NOM_FICHIER, TYPES_BARRE, DIAMETRES_TUBE, COULEURS_TUBE, CHAMPS, ORDRE_A5, ORDRE_ANNEXE_E, groupeTube,
     nombre, fr, arrondi, majuscules, compareReperes, couleurTube, cleRep,
     tubesAcceptes, decoupe, texteDecoupe, pieuVide, longueurRetenue, coiffePlatine, sectionPlatine,
+    fr1, texteD, texteL, texteTube, formaterSaisie, cleRecapActuelle,
     calculer, cleArticle, diametresPresents, tubesFiche,
     analyserCollage, lirePieux, fusionner,
     nouvellePreparation, normaliser, lire, enregistrer, resume,

@@ -28,8 +28,16 @@ const FTSPlanAcces = (() => {
     p = p || {};
     return {
       ...base, ...p,
-      vues: base.vues.map((v, i) => ({ ...v, ...((p.vues && p.vues[i]) || {}), annots: (((p.vues && p.vues[i]) || {}).annots || []).slice() })),
+      vues: base.vues.map((v, i) => ({ ...v, ...((p.vues && p.vues[i]) || {}), annots: (((p.vues && p.vues[i]) || {}).annots || []).map(versionAnnot) })),
     };
+  }
+  /** Anciennes zones (rectangle u,v → u2,v2) : deviennent des zones à 4 coins modifiables */
+  function versionAnnot(a) {
+    if (a && a.t === "zone" && !a.pts && a.u2 != null) {
+      const { u, v, u2, v2, ...reste } = a;
+      return { ...reste, cat: a.cat || "", pts: [[u, v], [u2, v], [u2, v2], [u, v2]] };
+    }
+    return a;
   }
   const aImage = (v) => !!(v && (v.fichierId || v.w));
   function vide(plan) { return !plan || (!lireGps(plan.gps) && !plan.vues.some(aImage)); }
@@ -108,7 +116,25 @@ const FTSPlanAcces = (() => {
   const versCadre = (g, u, v) => [g.ox + u * g.iw, g.oy + v * g.ih];
   const versImage = (g, x, y) => [(x - g.ox) / g.iw, (y - g.oy) / g.ih];
 
-  function boiteTexte(ctx, texte, x, y, k, style) {
+  // ── Modules du plan (17/11/2026) ──
+  // Chaque famille a sa couleur ; tout pivote autour de son centre (r, en
+  // degrés) et les pictos ont une taille réglable (s, 1 = taille normale).
+  // Les zones sont des polygones (pts) aux coins libres ; leur nom peut être
+  // sorti de la zone (lu, lv), une flèche le relie alors au bord le plus proche.
+  const ZONES = {
+    "CHANTIER": { fond: "#FDCA01", trait: "#E8A900", lib: "Chantier" },
+    "BASE VIE": { fond: "#16A34A", trait: "#15803D", lib: "Base vie" },
+    "PARKING": { fond: "#64748B", trait: "#334155", lib: "Parking" },
+    "STOCKAGE": { fond: "#A855F7", trait: "#7E22CE", lib: "Stockage" },
+    "": { fond: "#FDCA01", trait: "#E8A900", lib: "Zone" },
+  };
+  const ACCES = { PL: "#E3242B", VL: "#2563EB" };
+  const EAU = "#0EA5E9", EAU_TXT = "#0369A1";
+  const zoneDe = (a) => ZONES[a.cat || ""] || ZONES[""];
+  const RAD = Math.PI / 180;
+  const tourner = (x, y, cx, cy, deg) => { const r = deg * RAD, dx = x - cx, dy = y - cy; return [cx + dx * Math.cos(r) - dy * Math.sin(r), cy + dx * Math.sin(r) + dy * Math.cos(r)]; };
+
+  function boiteTexte(ctx, texte, x, y, k, style, couleur) {
     const fs = 3.1 * k, pad = 1.3 * k;
     ctx.font = `bold ${fs}px Arial, Helvetica, sans-serif`;
     const lignes = String(texte || "").split("\n");
@@ -117,13 +143,13 @@ const FTSPlanAcces = (() => {
     const bx = x - w / 2, by = y - h / 2;
     if (style === "lab") {
       ctx.fillStyle = "#fff"; ctx.fillRect(bx, by, w, h);
-      ctx.lineWidth = 0.45 * k; ctx.strokeStyle = "#000"; ctx.strokeRect(bx, by, w, h);
+      ctx.lineWidth = (couleur ? 0.55 : 0.45) * k; ctx.strokeStyle = couleur || "#000"; ctx.strokeRect(bx, by, w, h);
     }
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     lignes.forEach((l, i) => {
       const ly = by + pad * 0.7 + fs * 1.2 * (i + 0.5);
       if (style !== "lab") { ctx.lineWidth = 0.9 * k; ctx.strokeStyle = "#fff"; ctx.lineJoin = "round"; ctx.strokeText(l, x, ly); }
-      ctx.fillStyle = style === "lab" ? "#000" : ROUGE; ctx.fillText(l, x, ly);
+      ctx.fillStyle = style === "lab" ? (couleur || "#000") : ROUGE; ctx.fillText(l, x, ly);
     });
     return [bx, by, w, h];
   }
@@ -143,6 +169,7 @@ const FTSPlanAcces = (() => {
     ctx.beginPath(); ctx.arc(x, y - h + r, r * 0.38, 0, Math.PI * 2); ctx.fillStyle = "#6E0A0E"; ctx.fill();
     return [x - r, y - h, r * 2, h];
   }
+  /** Ancienne flèche (fine, rouge) : plans faits avant le 17/11/2026 */
   function fleche(ctx, x1, y1, x2, y2, k) {
     const a = Math.atan2(y2 - y1, x2 - x1), t = 3.2 * k;
     ctx.strokeStyle = ROUGE; ctx.fillStyle = ROUGE; ctx.lineWidth = 0.9 * k; ctx.lineCap = "round";
@@ -152,10 +179,120 @@ const FTSPlanAcces = (() => {
     ctx.lineTo(x2 - t * Math.cos(a + 0.45), y2 - t * Math.sin(a + 0.45));
     ctx.closePath(); ctx.fill();
   }
+  /** Flèche d'accès PL / VL : large, colorée, avec « PL » ou « VL » écrit dedans (toujours à l'endroit) */
+  function flecheAcces(ctx, x1, y1, x2, y2, k, acces) {
+    const coul = ACCES[acces] || ROUGE, L = Math.hypot(x2 - x1, y2 - y1), an = Math.atan2(y2 - y1, x2 - x1);
+    const e = 1.7 * k, tl = Math.min(6 * k, L * 0.6), tw = 3.4 * k;
+    ctx.save(); ctx.translate(x1, y1); ctx.rotate(an);
+    ctx.beginPath();
+    ctx.moveTo(0, -e); ctx.lineTo(L - tl, -e); ctx.lineTo(L - tl, -tw); ctx.lineTo(L, 0); ctx.lineTo(L - tl, tw); ctx.lineTo(L - tl, e); ctx.lineTo(0, e); ctx.closePath();
+    ctx.lineJoin = "round"; ctx.lineWidth = 0.7 * k; ctx.strokeStyle = "#fff"; ctx.stroke();
+    ctx.fillStyle = coul; ctx.fill();
+    if (L - tl > 5 * k) {
+      const cx = (L - tl) / 2 + 0.3 * k;
+      ctx.translate(cx, 0);
+      if (Math.cos(an) < -1e-6) ctx.rotate(Math.PI); // texte jamais à l'envers
+      ctx.font = `bold ${2.5 * k}px Arial, Helvetica, sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = "#fff"; ctx.fillText(acces, 0, 0.1 * k);
+    }
+    ctx.restore();
+  }
+  function goutte(ctx, k) {
+    // goutte d'eau, pointe en haut, centrée sur (0, 0) ; hauteur ≈ 7 mm
+    const h = 3.5 * k;
+    ctx.beginPath();
+    ctx.moveTo(0, -h);
+    ctx.bezierCurveTo(-0.6 * k, -1.4 * k, -2.4 * k, 0, -2.4 * k, 1.1 * k);
+    ctx.arc(0, 1.1 * k, 2.4 * k, Math.PI, 0, true);
+    ctx.bezierCurveTo(2.4 * k, 0, 0.6 * k, -1.4 * k, 0, -h);
+    ctx.closePath();
+    ctx.lineWidth = 0.55 * k; ctx.strokeStyle = "#fff"; ctx.stroke();
+    ctx.fillStyle = EAU; ctx.fill();
+  }
+  function sensInterdit(ctx, k) {
+    const r = 3 * k;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fillStyle = ROUGE; ctx.fill(); ctx.lineWidth = 0.45 * k; ctx.strokeStyle = "#fff"; ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.fillRect(-r * 0.62, -r * 0.19, r * 1.24, r * 0.38);
+  }
+  /** Flèche fine de rappel (nom de zone sorti de la zone → la zone) */
+  function rappel(ctx, x1, y1, x2, y2, k, coul) {
+    const an = Math.atan2(y2 - y1, x2 - x1), h = 1.8 * k;
+    ctx.save(); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+    ctx.lineWidth = 1.1 * k; ctx.strokeStyle = "#fff"; ctx.stroke();
+    ctx.lineWidth = 0.45 * k; ctx.strokeStyle = coul; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - h * Math.cos(an - 0.45), y2 - h * Math.sin(an - 0.45));
+    ctx.lineTo(x2 - h * Math.cos(an + 0.45), y2 - h * Math.sin(an + 0.45));
+    ctx.closePath(); ctx.fillStyle = coul; ctx.fill(); ctx.lineWidth = 0.2 * k; ctx.strokeStyle = "#fff"; ctx.stroke();
+    ctx.restore();
+  }
+  function dansPoly(x, y, poly) {
+    let ok = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i], [xj, yj] = poly[j];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) ok = !ok;
+    }
+    return ok;
+  }
+  function plusProche(x, y, poly) {
+    let best = null, bd = Infinity;
+    poly.forEach((p, i) => {
+      const q = poly[(i + 1) % poly.length], dx = q[0] - p[0], dy = q[1] - p[1], l = dx * dx + dy * dy;
+      const t = l ? Math.max(0, Math.min(1, ((x - p[0]) * dx + (y - p[1]) * dy) / l)) : 0;
+      const px = p[0] + t * dx, py = p[1] + t * dy, d = (px - x) ** 2 + (py - y) ** 2;
+      if (d < bd) { bd = d; best = [px, py]; }
+    });
+    return best;
+  }
+  const centrePoly = (pts) => [pts.reduce((t, p) => t + p[0], 0) / pts.length, pts.reduce((t, p) => t + p[1], 0) / pts.length];
+  /** Pictos à taille et rotation : étendue locale (mm, avant rotation) autour du point posé */
+  function etendue(a) {
+    if (a.t === "pin") return [-2.8, -8.3, 2.8, 0.3];
+    if (a.t === "eau") return [-2.7, -3.8, 2.7, 3.8];
+    if (a.t === "si") return [-3.2, -3.2, 3.2, 3.2];
+    return null;
+  }
+  /** Légende : familles de couleurs utilisées dans le plan (dans l'ordre de la boîte à outils) */
+  function clesLegende(plan) {
+    const tous = (plan && plan.vues ? plan.vues : []).flatMap((v) => v.annots || []), out = [];
+    if (tous.some((a) => a.t === "fleche" && a.acces === "PL")) out.push("PL");
+    if (tous.some((a) => a.t === "fleche" && a.acces === "VL")) out.push("VL");
+    if (tous.some((a) => a.t === "eau")) out.push("EAU");
+    if (tous.some((a) => a.t === "si")) out.push("SI");
+    Object.keys(ZONES).filter(Boolean).forEach((z) => { if (tous.some((a) => a.t === "zone" && a.cat === z)) out.push("Z:" + z); });
+    return out;
+  }
+  function dessinerLegende(ctx, cles, W, H, k) {
+    if (!cles || !cles.length) return;
+    const fs = 2.3 * k, pas = 2.2 * k, ic = 4.2 * k;
+    ctx.font = `bold ${fs}px Arial, Helvetica, sans-serif`;
+    const libs = cles.map((c) => (c === "PL" ? "Accès PL" : c === "VL" ? "Accès VL" : c === "EAU" ? "Point d'eau" : c === "SI" ? "Sens interdit" : ZONES[c.slice(2)].lib));
+    const larg = libs.reduce((t, l) => t + ic + 1.2 * k + ctx.measureText(l).width + pas, 0) + pas;
+    const h = 5.6 * k, x0 = 1.6 * k, y0 = H - h - 1.6 * k;
+    ctx.fillStyle = "rgba(255,255,255,.93)"; ctx.fillRect(x0, y0, Math.min(larg, W - 3.2 * k), h);
+    ctx.lineWidth = 0.2 * k; ctx.strokeStyle = "#999"; ctx.strokeRect(x0, y0, Math.min(larg, W - 3.2 * k), h);
+    let x = x0 + pas; const cy = y0 + h / 2;
+    cles.forEach((c, i) => {
+      ctx.save(); ctx.translate(x + ic / 2, cy);
+      if (c === "PL" || c === "VL") { ctx.fillStyle = ACCES[c]; ctx.beginPath(); ctx.moveTo(-ic / 2, -0.8 * k); ctx.lineTo(ic / 2 - 1.6 * k, -0.8 * k); ctx.lineTo(ic / 2 - 1.6 * k, -1.7 * k); ctx.lineTo(ic / 2, 0); ctx.lineTo(ic / 2 - 1.6 * k, 1.7 * k); ctx.lineTo(ic / 2 - 1.6 * k, 0.8 * k); ctx.lineTo(-ic / 2, 0.8 * k); ctx.closePath(); ctx.fill(); }
+      else if (c === "EAU") { ctx.scale(0.6, 0.6); goutte(ctx, k); }
+      else if (c === "SI") { ctx.scale(0.6, 0.6); sensInterdit(ctx, k); }
+      else { const z = ZONES[c.slice(2)]; ctx.globalAlpha = 0.5; ctx.fillStyle = z.fond; ctx.fillRect(-ic / 2, -1.5 * k, ic, 3 * k); ctx.globalAlpha = 1; ctx.lineWidth = 0.45 * k; ctx.strokeStyle = z.trait; ctx.strokeRect(-ic / 2, -1.5 * k, ic, 3 * k); }
+      ctx.restore();
+      ctx.fillStyle = "#111"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillText(libs[i], x + ic + 1.2 * k, cy);
+      x += ic + 1.2 * k + ctx.measureText(libs[i]).width + pas;
+    });
+  }
   /**
    * Dessine une vue (image cadrée + annotations) dans un cadre W × H.
    * @param {number} k  pixels par millimètre du PDF (tailles des étiquettes)
-   * @returns {Array} boîtes [x, y, w, h] de chaque annotation (pour cliquer dessus)
+   * @param {object} options { selection, legende: [clés] }
+   * @returns {Array} formes de chaque annotation, pour cliquer dessus :
+   *   [x, y, w, h] (boîte englobante) + .forme ("poly" | "ligne" | "boite") et ses données,
+   *   .lab = boîte du nom détachable, .poignees (annotation sélectionnée)
    */
   function dessinerVue(ctx, img, vue, W, H, k, options = {}) {
     ctx.fillStyle = "#f3f4f6"; ctx.fillRect(0, 0, W, H);
@@ -163,31 +300,140 @@ const FTSPlanAcces = (() => {
     const boites = [];
     if (!g) return boites;
     ctx.drawImage(img, g.ox, g.oy, g.iw, g.ih);
-    (vue.annots || []).forEach((a, i) => {
-      const [x, y] = versCadre(g, a.u, a.v);
+    const P = (u, v) => versCadre(g, u, v);
+    const annots = vue.annots || [];
+    // Les zones d'abord (dessous), puis les flèches et les pictos, puis les noms
+    const ordre = annots.map((a, i) => i).sort((i, j) => (annots[i].t === "zone" ? 0 : 1) - (annots[j].t === "zone" ? 0 : 1));
+    const noms = [];
+    ordre.forEach((i) => {
+      const a = annots[i];
       let b;
-      if (a.t === "zone") {
-        const [x2, y2] = versCadre(g, a.u2, a.v2);
-        const zx = Math.min(x, x2), zy = Math.min(y, y2), zw = Math.abs(x2 - x), zh = Math.abs(y2 - y);
-        ctx.fillStyle = "rgba(253,202,1,.35)"; ctx.fillRect(zx, zy, zw, zh);
-        ctx.lineWidth = 0.6 * k; ctx.strokeStyle = "#E8A900"; ctx.strokeRect(zx, zy, zw, zh);
-        b = [zx, zy, zw, zh];
+      if (a.t === "zone" && a.pts && a.pts.length > 2) {
+        const pts = a.pts.map(([u, v]) => P(u, v)), z = zoneDe(a);
+        ctx.beginPath(); pts.forEach(([x, y], n) => (n ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath();
+        ctx.globalAlpha = 0.36; ctx.fillStyle = z.fond; ctx.fill(); ctx.globalAlpha = 1;
+        ctx.lineJoin = "round"; ctx.lineWidth = 0.6 * k; ctx.strokeStyle = z.trait; ctx.stroke();
+        const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+        b = [Math.min(...xs), Math.min(...ys), Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)];
+        b.forme = "poly"; b.pts = pts; b.centre = centrePoly(pts);
+        if (a.cat) noms.push({ i, a, b, texte: a.cat, coul: z.trait, defaut: b.centre, cible: (x, y) => (dansPoly(x, y, pts) ? null : plusProche(x, y, pts)) });
       } else if (a.t === "fleche") {
-        const [x2, y2] = versCadre(g, a.u2, a.v2);
-        fleche(ctx, x, y, x2, y2, k);
-        b = [Math.min(x, x2) - 2 * k, Math.min(y, y2) - 2 * k, Math.abs(x2 - x) + 4 * k, Math.abs(y2 - y) + 4 * k];
-        b.ligne = [x, y, x2, y2];
-      } else if (a.t === "pin") b = repere(ctx, x, y, k);
-      else b = boiteTexte(ctx, a.texte, x, y, k, a.t === "lab" ? "lab" : "texte");
+        const [x1, y1] = P(a.u, a.v), [x2, y2] = P(a.u2, a.v2);
+        if (a.acces) flecheAcces(ctx, x1, y1, x2, y2, k, a.acces); else fleche(ctx, x1, y1, x2, y2, k);
+        b = [Math.min(x1, x2) - 2 * k, Math.min(y1, y2) - 2 * k, Math.abs(x2 - x1) + 4 * k, Math.abs(y2 - y1) + 4 * k];
+        b.forme = "ligne"; b.ligne = [x1, y1, x2, y2]; b.epais = (a.acces ? 3.4 : 1.6) * k;
+      } else if (etendue(a)) {
+        const [x, y] = P(a.u, a.v), s = a.s || 1, r = a.r || 0, ks = k * s;
+        ctx.save(); ctx.translate(x, y); ctx.rotate(r * RAD);
+        if (a.t === "pin") repere(ctx, 0, 0, ks); else if (a.t === "eau") goutte(ctx, ks); else sensInterdit(ctx, ks);
+        ctx.restore();
+        const e = etendue(a).map((n) => n * ks);
+        b = [x + e[0], y + e[1], e[2] - e[0], e[3] - e[1]];
+        b.forme = "boite"; b.cx = x; b.cy = y; b.loc = e; b.r = r;
+        if (a.t === "eau") {
+          const rayon = 3.6 * ks;
+          noms.push({ i, a, b, texte: "POINT D'EAU", coul: EAU_TXT, defaut: [x, y + 3.8 * ks + 3 * k],
+            cible: (lx, ly) => { const d = Math.hypot(lx - x, ly - y); return d > rayon + 9 * k ? [x + ((lx - x) * rayon) / d, y + ((ly - y) * rayon) / d] : null; } });
+        }
+      } else if (a.t === "lab" || a.t === "texte") {
+        const [x, y] = P(a.u, a.v), s = a.s || 1, r = a.r || 0;
+        ctx.save(); ctx.translate(x, y); ctx.rotate(r * RAD);
+        const bb = boiteTexte(ctx, a.texte, 0, 0, k * s, a.t === "lab" ? "lab" : "texte");
+        ctx.restore();
+        b = [x + bb[0], y + bb[1], bb[2], bb[3]];
+        b.forme = "boite"; b.cx = x; b.cy = y; b.loc = [bb[0], bb[1], bb[0] + bb[2], bb[1] + bb[3]]; b.r = r;
+      }
       boites[i] = b;
     });
-    // Sélection (éditeur seulement)
-    if (options.selection != null && boites[options.selection]) {
-      const [bx, by, bw, bh] = boites[options.selection];
-      ctx.save(); ctx.setLineDash([5, 4]); ctx.lineWidth = 2; ctx.strokeStyle = "#2F6FED";
-      ctx.strokeRect(bx - 4, by - 4, bw + 8, bh + 8); ctx.restore();
+    // Noms de zone / point d'eau : toujours horizontaux, reliés par une flèche s'ils sont sortis
+    noms.forEach((n) => {
+      const [lx, ly] = n.a.lu != null ? P(n.a.lu, n.a.lv) : n.defaut;
+      const c = n.a.lu != null ? n.cible(lx, ly) : null;
+      if (c && Math.hypot(c[0] - lx, c[1] - ly) > 3 * k) rappel(ctx, lx, ly, c[0], c[1], k, n.coul);
+      const bb = boiteTexte(ctx, n.texte, lx, ly, k * 0.85, "lab", n.coul);
+      n.b.lab = bb;
+    });
+    if (options.legende) dessinerLegende(ctx, options.legende, W, H, k);
+    // Sélection et poignées (éditeur seulement)
+    const sel = options.selection, bs = sel != null ? boites[sel] : null;
+    if (bs) {
+      const a = annots[sel], pg = [];
+      const bleu = "#2F6FED", R = Math.max(7, 1.6 * k);
+      ctx.save(); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.6; ctx.strokeStyle = bleu;
+      let haut;
+      if (bs.forme === "poly") {
+        ctx.beginPath(); bs.pts.forEach(([x, y], n) => (n ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.stroke();
+        bs.pts.forEach(([x, y], n) => {
+          const [x2, y2] = bs.pts[(n + 1) % bs.pts.length];
+          if (Math.hypot(x2 - x, y2 - y) > 6 * R) pg.push({ type: "mid", n, x: (x + x2) / 2, y: (y + y2) / 2 });
+        });
+        bs.pts.forEach(([x, y], n) => pg.push({ type: "pt", n, x, y }));
+        haut = [bs.centre[0], Math.min(...bs.pts.map((p) => p[1])) - 5 * R];
+      } else if (bs.forme === "ligne") {
+        const [x1, y1, x2, y2] = bs.ligne;
+        pg.push({ type: "bout", n: 1, x: x1, y: y1 }, { type: "bout", n: 2, x: x2, y: y2 });
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, L = Math.hypot(x2 - x1, y2 - y1) || 1;
+        haut = [mx + ((y1 - y2) / L) * 5 * R, my + ((x2 - x1) / L) * 5 * R];
+        if (haut[1] > my) haut = [mx - ((y1 - y2) / L) * 5 * R, my - ((x2 - x1) / L) * 5 * R];
+      } else {
+        const [l0, t0, l1, t1] = bs.loc.map((n, j) => n + (j < 2 ? -4 : 4));
+        const coins = [[l0, t0], [l1, t0], [l1, t1], [l0, t1]].map(([x, y]) => tourner(bs.cx + x, bs.cy + y, bs.cx, bs.cy, bs.r));
+        ctx.beginPath(); coins.forEach(([x, y], n) => (n ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.stroke();
+        pg.push({ type: "taille", x: coins[2][0], y: coins[2][1] });
+        haut = tourner(bs.cx + (l0 + l1) / 2, bs.cy + t0 - 4 * R, bs.cx, bs.cy, bs.r);
+      }
+      if (bs.lab) { const [x, y, w, h] = bs.lab; ctx.strokeRect(x - 3, y - 3, w + 6, h + 6); }
+      ctx.restore();
+      pg.push({ type: "rot", x: haut[0], y: haut[1] });
+      // dessin des poignées
+      pg.forEach((p) => {
+        ctx.beginPath();
+        if (p.type === "pt" || p.type === "taille") { ctx.rect(p.x - R * 0.85, p.y - R * 0.85, R * 1.7, R * 1.7); ctx.fillStyle = bleu; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke(); }
+        else if (p.type === "bout") { ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.fillStyle = bleu; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke(); }
+        else if (p.type === "mid") {
+          ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = bleu; ctx.stroke();
+          ctx.fillStyle = bleu; ctx.font = `bold ${R * 1.7}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("+", p.x, p.y + 1);
+        } else {
+          ctx.arc(p.x, p.y, R * 1.35, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = bleu; ctx.stroke();
+          ctx.fillStyle = bleu; ctx.font = `bold ${R * 1.8}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("⟳", p.x, p.y + 1);
+        }
+      });
+      bs.poignees = pg; bs.R = R;
     }
     return boites;
+  }
+  /**
+   * Annotation touchée en (x, y) : { i, partie: "lab" | "corps" } ou null.
+   * Les noms passent devant, puis du dernier posé au premier (zones en dernier).
+   */
+  function toucher(boites, x, y) {
+    for (let i = boites.length - 1; i >= 0; i--) {
+      const b = boites[i]; if (b && b.lab) { const [bx, by, bw, bh] = b.lab; if (x >= bx - 3 && x <= bx + bw + 3 && y >= by - 3 && y <= by + bh + 3) return { i, partie: "lab" }; }
+    }
+    const essai = (zones) => {
+      for (let i = boites.length - 1; i >= 0; i--) {
+        const b = boites[i]; if (!b || (b.forme === "poly") !== zones) continue;
+        if (b.forme === "poly") { if (dansPoly(x, y, b.pts) || b.pts.some((p, n) => { const q = b.pts[(n + 1) % b.pts.length]; return distSeg(x, y, p, q) < 6; })) return { i, partie: "corps" }; }
+        else if (b.forme === "ligne") { const [x1, y1, x2, y2] = b.ligne; if (distSeg(x, y, [x1, y1], [x2, y2]) < Math.max(10, b.epais)) return { i, partie: "corps" }; }
+        else if (b.forme === "boite") { const [lx, ly] = tourner(x, y, b.cx, b.cy, -b.r), [l0, t0, l1, t1] = b.loc; if (lx >= b.cx + l0 - 5 && lx <= b.cx + l1 + 5 && ly >= b.cy + t0 - 5 && ly <= b.cy + t1 + 5) return { i, partie: "corps" }; }
+        else if (x >= b[0] - 4 && x <= b[0] + b[2] + 4 && y >= b[1] - 4 && y <= b[1] + b[3] + 4) return { i, partie: "corps" };
+      }
+      return null;
+    };
+    return essai(false) || essai(true);
+  }
+  function distSeg(x, y, p, q) {
+    const dx = q[0] - p[0], dy = q[1] - p[1], l2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((x - p[0]) * dx + (y - p[1]) * dy) / l2));
+    return Math.hypot(x - p[0] - t * dx, y - p[1] - t * dy);
+  }
+  /** Poignée de l'annotation sélectionnée sous (x, y) */
+  function poigneeEn(boites, sel, x, y) {
+    const b = sel != null ? boites[sel] : null;
+    if (!b || !b.poignees) return null;
+    const R = (b.R || 8) * 1.5;
+    for (let n = b.poignees.length - 1; n >= 0; n--) { const p = b.poignees[n]; if (Math.hypot(x - p.x, y - p.y) <= R) return p; }
+    return null;
   }
 
   // ── PDF A4 ───────────────────────────────────────────────────────
@@ -265,11 +511,12 @@ const FTSPlanAcces = (() => {
       texte("L'ITINÉRAIRE", 163, 47.5, 37, 5, { taille: 2.2, gras: true, centre: true });
     } else texte("POINT GPS À RENSEIGNER", 163, 10, 37, 50, { taille: 2.1, centre: true });
     // Vues
-    for (const f of cadres(plan)) {
+    const lesCadres = cadres(plan), cles = clesLegende(plan);
+    for (const f of lesCadres) {
       const v = plan.vues[f.i], img = o.images[f.i];
       const tmp = document.createElement("canvas");
       tmp.width = mm(f.w); tmp.height = mm(f.h);
-      dessinerVue(tmp.getContext("2d"), img, v, tmp.width, tmp.height, PX);
+      dessinerVue(tmp.getContext("2d"), img, v, tmp.width, tmp.height, PX, { legende: f === lesCadres[lesCadres.length - 1] ? cles : null });
       c.drawImage(tmp, mm(f.x), mm(f.y));
       cadre(f.x, f.y, f.w, f.h);
       const etiq = `${f.i + 1} · ${String(v.titre || VUES[f.i].titre).toUpperCase()}`;
@@ -301,8 +548,8 @@ const FTSPlanAcces = (() => {
   // rues = noms de rues écrits par l'appli (gros, lisibles), à partir de ce zoom
   const COUCHES = {
     plan: { calques: [PLAN_IGN], min: 6, max: 19, lib: "Plan", rues: 16 },
-    ortho: { calques: [PHOTO], min: 6, max: 20, lib: "Photo" },
-    mixte: { calques: [PHOTO, ROUTES], min: 10, max: 20, lib: "Photo + rues", rues: 16 },
+    ortho: { calques: [PHOTO], min: 6, max: 21, lib: "Photo" },
+    mixte: { calques: [PHOTO, ROUTES], min: 10, max: 21, lib: "Photo + rues", rues: 16 }, // 21 : photo IGN agrandie 4 fois (au-delà, trop floue)
   };
   const AUTO_DEFAUT = [{ type: "plan", z: 10 + LOUPE_LOIN }, { type: "mixte", z: 17 }, { type: "mixte", z: 19 }];
   // Taille (px) de chaque carte automatique, au format du cadre du PDF
@@ -631,8 +878,11 @@ const FTSPlanAcces = (() => {
     const conv = (u, v) => { const g = versGps(avant, u, v); return versCarte(apres, g.lat, g.lng); };
     return annots.map((a) => {
       if (a.t === "pin" && a.auto) { const [u, v] = versCarte(apres, apres.lat, apres.lng); return { ...a, u, v }; }
-      const [u, v] = conv(a.u, a.v), b = { ...a, u, v };
+      const b = { ...a };
+      if (a.u != null) { const [u, v] = conv(a.u, a.v); b.u = u; b.v = v; }
       if (a.u2 != null) { const [u2, v2] = conv(a.u2, a.v2); b.u2 = u2; b.v2 = v2; }
+      if (a.lu != null) { const [lu, lv] = conv(a.lu, a.lv); b.lu = lu; b.lv = lv; }
+      if (a.pts) b.pts = a.pts.map(([u, v]) => conv(u, v));
       return b;
     });
   }
@@ -649,6 +899,7 @@ const FTSPlanAcces = (() => {
     lireGps, texteGps, urlItineraire, urlCarte, qrDataUrl,
     COUCHES, AUTO_DEFAUT, TAILLE_AUTO, TAILLES_AUTO, carteIGN, deplacerAnnots, versGps, versCarte, geocoder, ecrireRues,
     geometrie, versCadre, versImage, dessinerVue, cadres, pdf, chargerImage, empreinte,
+    ZONES, ACCES, versionAnnot, clesLegende, toucher, poigneeEn, tourner, centrePoly,
   };
 })();
 

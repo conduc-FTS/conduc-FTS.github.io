@@ -191,6 +191,21 @@ const FTSServeur = (() => {
     return res;
   }
 
+  /**
+   * Un fichier existe-t-il déjà dans un sous-dossier du dossier chantier ?
+   * (rien n'est créé : sous-dossier absent = fichier absent)
+   */
+  async function existeDans(dossierChantier, chemin, nomFichier) {
+    let dir = dossierChantier;
+    for (const part of chemin) {
+      let trouve = null;
+      for await (const [nom, e] of dir.entries()) if (e.kind === "directory" && norm(nom) === norm(part)) { trouve = e; break; }
+      if (!trouve) return false;
+      dir = trouve;
+    }
+    try { return await existe(dir, nomFichier); } catch (e) { throw traduire(e); }
+  }
+
   // ─── File d'attente (infos du chantier dans le Drive) ───────────
   /** @returns {Promise<Array<{nom, chemin:string[], driveId, le, origine}>>} */
   async function lireAttente(chantierId) {
@@ -331,7 +346,7 @@ const FTSServeur = (() => {
 
   return {
     DOSSIER_ATTENDU, disponible, etat, relier, autoriser, racineAutorisee, trouverChantier, retenirChoix,
-    dossierChantier, deposer, lireAttente, ajouterAttente, retirerAttente, traiterAttente,
+    dossierChantier, deposer, existeDans, lireAttente, ajouterAttente, retirerAttente, traiterAttente,
     monterVoyant, codeDepuisNom, correspond, norm,
   };
 })();

@@ -274,8 +274,11 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .pf-edit tr.pf-plus td { border: none !important; height: auto !important; padding: 2px 0 5px !important; text-align: left; font: 600 11px -apple-system, "Segoe UI", Arial, sans-serif; color: #2A5DBF; background: none !important; }
 .pf-edit tr.pf-plus button { border: none; background: none; font: inherit; color: inherit; cursor: pointer; padding: 0; }
 .pf-edit tr.pf-plus button:hover { text-decoration: underline; }
-.pf-edit .pf-x { position: absolute; right: -22px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; border-radius: 50%; border: 1px solid #E3B5AF; background: #fff; color: #C0392B; font-size: 10px; line-height: 16px; padding: 0; cursor: pointer; display: none; }
-.pf-edit tr:hover .pf-x { display: block; }
+.pf-edit .pf-x { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; border-radius: 50%; border: 1px solid #E3B5AF; background: #fff; color: #C0392B; font-size: 10px; line-height: 16px; padding: 0; cursor: pointer; display: none; }
+.pf-edit .pf-x { display: block; opacity: .3; }
+.pf-edit tr:hover .pf-x { opacity: 1; }
+.pf-edit tr.pf-retire td { color: #A0A5AD; text-decoration: line-through; background: #F6F7F9; font-weight: normal; }
+.pf-edit tr.pf-retire .pf-x { opacity: 1; color: #2A5DBF; border-color: #B9CBEF; text-decoration: none; }
 .pf-edit tr { position: relative; }
 .pf-edit td.pf-xc { position: relative; overflow: visible; }
 .pf-edit .pf-ph { color: #9aa0aa; font-style: italic; font-weight: normal; }
@@ -315,6 +318,56 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .pf-tc { overflow: auto; flex: 1; padding: 14px 18px; }
 .pf-tc .sv-card { margin-bottom: 14px; }
 .pf-det summary { cursor: pointer; padding: 12px 18px; font-weight: 700; font-size: .88rem; color: #2A5DBF; border-top: 1px solid var(--border); }
+/* Fenêtre « Note de calcul et ciment » */
+.nf-voile { position: fixed; inset: 0; background: rgba(20,22,30,.45); z-index: 950; display: none; align-items: center; justify-content: center; padding: 20px; }
+.nf-voile.on { display: flex; }
+.nf { background: var(--bg); width: min(1240px, 100%); height: min(94vh, 1040px); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+.nf-h { display: flex; align-items: center; gap: 12px; padding: 14px 20px; background: #fff; border-bottom: 1px solid var(--border); }
+.nf-h h2 { margin: 0; font-size: 1.15rem; }
+.nf-x { border: none; background: var(--bg); width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 15px; }
+.nf-c { flex: 1; overflow: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; }
+.nf-carte { background: #fff; border: 1px solid var(--border); border-radius: 14px; min-width: 0; }
+.nf-carte h3 { margin: 0; font-size: .98rem; display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.nf-carte h3 small { font-weight: 400; color: var(--text-sub); font-size: .76rem; }
+.nf-n { width: 22px; height: 22px; border-radius: 50%; background: var(--fts-yellow, #FDCA01); display: inline-grid; place-items: center; font-size: .74rem; font-weight: 800; flex: none; }
+.nf-cc { padding: 16px 18px; }
+.nf-ok { display: flex; align-items: center; gap: 14px; }
+.nf-ok[hidden], #zoneColler[hidden], #collerModes[hidden], #collerAnnuler[hidden] { display: none; }
+.nf-ok .t { flex: 1; font-size: .86rem; color: var(--text-sub); } .nf-ok .t b { font-size: .98rem; color: var(--text-main); }
+.nf-ok .t .w { color: #B86E00; font-weight: 600; }
+.nf-choix { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.nf-choix .pr-radio { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.nf-bt { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+.nf-deux { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .nf-deux, .nf-choix { grid-template-columns: 1fr; } }
+.nf-tbl { width: 100%; border-collapse: collapse; }
+.nf-tbl th { font-size: .68rem; letter-spacing: .04em; text-transform: uppercase; color: var(--text-sub); text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); font-weight: 700; }
+.nf-tbl td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: .9rem; }
+.nf-tbl .r { text-align: right; }
+.nf-tbl .s { color: var(--text-sub); font-size: .8rem; }
+.nf-tbl .q { font-weight: 800; }
+.nf-tbl input { width: 84px; border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; font: inherit; font-size: 1rem; font-weight: 700; text-align: right; }
+.nf-params { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; padding: 12px 18px; background: #FAFAFB; border-radius: 0 0 14px 14px; font-size: .82rem; color: var(--text-sub); }
+.nf-params input { border: 1px solid var(--border); border-radius: 7px; padding: 5px 7px; font: inherit; color: var(--text-main); }
+.nf-params b { color: var(--text-main); }
+.nf-cim { padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+.nf-gros { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.nf-gros b { font-size: 2.6rem; line-height: 1; } .nf-gros span { color: var(--text-sub); font-size: .86rem; }
+.nf-lg { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: .86rem; padding: 7px 0; border-top: 1px solid var(--border); }
+.nf-lg small { color: var(--text-sub); }
+.nf-in { width: 70px; border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; font: inherit; text-align: right; }
+.nf-seg { display: inline-flex; background: var(--bg); border-radius: 9px; padding: 3px; flex-wrap: wrap; }
+.nf-seg button { border: none; background: none; border-radius: 7px; padding: 5px 10px; font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; color: var(--text-sub); }
+.nf-seg button.on { background: #fff; color: var(--text-main); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.nf-note { background: #EAF1FE; color: #1E3A6E; border-radius: 10px; padding: 10px 12px; font-size: .8rem; margin-top: 6px; line-height: 1.45; }
+.nf-det summary { cursor: pointer; padding: 14px 18px; font-weight: 800; font-size: .98rem; }
+.nf-det summary small { font-weight: 400; color: var(--text-sub); font-size: .76rem; }
+.nf-outils { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 0 18px 10px; }
+.nf-f { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: #fff; border-top: 1px solid var(--border); }
+.nf-ok-txt { color: #1D6E3E; font-weight: 700; font-size: .84rem; }
+.pf-bandeau .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.pf-bandeau .chips span { font-size: .74rem; font-weight: 700; border-radius: 12px; padding: 2px 9px; background: var(--bg); }
+.pf-bandeau .chips .vi { background: #F1ECFB; color: #5B3FB0; } .pf-bandeau .chips .vt { background: #EAF6EE; color: #1D6E3E; } .pf-bandeau .chips .or { background: #FFF3DC; color: #B86E00; }
 /* Fenêtre d'édition d'une case */
 .pf-pop { position: absolute; z-index: 800; background: #fff; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 12px; width: 300px; display: none; font-size: .86rem; }
 .pf-pop.on { display: block; }
@@ -430,55 +483,83 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   </div>
 </div>
 
-<!-- Tiroir : note de calcul (longueurs, pieu par pieu, tubes pastillés, ciment) -->
-<div class="pf-voile" id="pfVoile"></div>
-<aside class="pf-tiroir" id="tiroirNdc" aria-label="Note de calcul">
-  <div class="pf-th"><h2>Note de calcul</h2><span class="pr-chip v" id="ndcPastille" hidden></span><span class="sv-sp"></span><button type="button" class="sv-btn pri" id="btnColler">📋 Coller la NDC</button><button type="button" class="sv-x" data-fermer-tiroir>✕</button></div>
-  <div class="pf-tc">
-    <section class="sv-card">
-      <div class="pr-bar">
-        <div class="sv-f"><label>Indice NDC</label><input type="text" data-k="ndc.indice" style="width:90px"></div>
-        <div class="sv-f" style="flex:1;min-width:200px"><label>DDC / bureau d'études</label><input type="text" data-k="ndc.ddc"></div>
-        <div class="sv-f"><label>Ø forage chantier (mm)</label><input type="text" data-k="ndc.forage" inputmode="decimal" style="width:110px"></div>
-        <div class="sv-f"><label>Tube max foreuse</label><input type="text" id="fTubeMax2" readonly style="width:150px"></div>
-      </div>
-      <div class="pr-note" id="ndcNote" style="margin:12px 18px 0" hidden></div>
-      <div class="sv-ch" style="border-top:1px solid var(--border);margin-top:12px"><h2 style="font-size:.9rem">Longueurs retenues par diamètre</h2><span class="s">s'applique à tous les pieux du diamètre · les quantités de la fiche suivent</span></div>
-      <table class="sv-tbl"><thead><tr><th>Tube principal</th><th class="r">Nb pieux <span class="pr-tot" id="nbTotal">0</span></th><th class="r">Longueur NDC</th><th>Longueur retenue (tous)</th><th>Découpe</th></tr></thead><tbody id="parDiamBody"></tbody></table>
-      <details class="pf-det" id="detPieux">
-        <summary>Voir / modifier pieu par pieu <span id="detPieuxNb"></span></summary>
-        <div class="sv-ch"><span class="sv-sp"></span>
-          <input type="text" id="fRecherche" class="pr-mini" placeholder="🔍 Rechercher (Mp12, 114…)" style="width:200px">
-          <select id="fTypeBarreTous" class="pr-mini" style="width:auto"><option value="">Type de barre : appliquer à tous…</option></select>
+<!-- Fenêtre « Note de calcul et ciment » : tout ce qui touche à la NDC se fait ici (17/11/2026) -->
+<div class="nf-voile" id="fenNdc" aria-hidden="true">
+  <div class="nf" role="dialog" aria-modal="true" aria-label="Note de calcul et ciment">
+    <div class="nf-h"><h2>📐 Note de calcul et ciment</h2><span class="pr-chip v" id="ndcPastille" hidden></span><span class="sv-sp"></span><button type="button" class="nf-x" data-fermer-ndc title="Fermer">✕</button></div>
+    <div class="nf-c">
+      <!-- 1 · La NDC -->
+      <section class="nf-carte">
+        <h3><span class="nf-n">1</span>La note de calcul <small>ANNEXE E du bureau d'études : sélectionne le tableau du titre jusqu'au dernier micropieu, Ctrl + C, puis Ctrl + V ici</small></h3>
+        <div class="nf-cc">
+          <div class="nf-ok" id="ndcResume"></div>
+          <div id="zoneColler" hidden>
+            <textarea class="pr-paste" id="collerTexte" placeholder="Ctrl + V ici : titre, indice, DDC et nombre de micropieux sont reconnus tout seuls · la colonne Traction est ignorée"></textarea>
+            <div id="collerApercu"></div>
+            <div style="margin-top:12px" id="collerModes">
+              <p style="margin:0 0 4px;font-size:.86rem;font-weight:700">La fiche a déjà des fournitures : que faire de cette NDC ?</p>
+              <div class="nf-choix">
+                <label class="pr-radio"><input type="radio" name="mode" value="remplacer" checked><span><b>Tout remplacer</b> <span class="pr-chip v">conseillé</span><small>Les fournitures sont recalculées depuis cette NDC. Pieux absents du collage, lignes tapées à la main et quantités changées à la main retirés (la liste est montrée avant).</small></span></label>
+                <label class="pr-radio"><input type="radio" name="mode" value="ajouter"><span><b>Ajouter à la fiche</b><small>Ce qui est sur la fiche reste. Un repère déjà présent est mis à jour, pas compté deux fois. Pour une NDC à part (pieux de grue, un pieu en plus).</small></span></label>
+              </div>
+            </div>
+            <div class="pr-chips" id="collerBilan"></div>
+            <p class="sv-mstatus" id="collerStatus"></p>
+            <div class="nf-bt"><button type="button" class="sv-btn" id="collerAnnuler">Annuler</button><button type="button" class="sv-btn noir" id="collerValider" disabled>Valider ce collage</button></div>
+          </div>
         </div>
-        <div class="pr-scroll">
-          <table class="sv-tbl pr-pieux">
-            <thead><tr><th>Repère</th><th class="r">Charge (t)</th><th>Tube Ø</th><th>Ép.</th><th class="r">Long. NDC</th><th>Long. retenue</th><th>Tube sec. Ø / ép. / long.</th><th>Barre type / Ø / long.</th><th>Platine</th><th>Découpe tubes</th><th></th></tr></thead>
-            <tbody id="pieuxBody"></tbody>
-          </table>
-        </div>
-        <div class="pr-legende" id="legendeCouleurs"></div>
-        <div style="padding:0 18px 14px;display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="pr-add" id="btnAjoutPieu">+ Ajouter un pieu</button><button type="button" class="pr-add" id="btnViderNdc" style="color:#C0392B">Vider la note de calcul</button></div>
-        <div class="pr-note" style="margin:0 18px 14px"><span class="pr-dot" style="cursor:default"></span> = longueur changée à la main sur ce pieu. Clic sur le point : retour à la longueur du diamètre.<br>Platine : barre → percée selon la table des perçages · sinon Ø du tube secondaire · sinon Ø du tube principal.</div>
-      </details>
-    </section>
-    <section class="sv-card">
-      <div class="pr-swrow"><button type="button" class="pr-sw" id="swPastilles" aria-label="Tubes pastillés"></button><div><b>Tubes pastillés</b><span>Pour une injection spécifique — quantités saisies à la main</span></div></div>
-      <div id="boxPastilles" hidden>
-        <table class="sv-tbl"><thead><tr><th>Qté</th><th>Ø tube</th><th>Longueur (m)</th><th></th></tr></thead><tbody id="pastillesBody"></tbody></table>
-        <div style="padding:10px 18px 14px"><button type="button" class="pr-add" id="btnAjoutPastille">+ Ajouter une ligne</button></div>
+      </section>
+      <div class="nf-deux">
+        <!-- 2 · Longueurs par diamètre -->
+        <section class="nf-carte">
+          <h3><span class="nf-n">2</span>Longueurs par diamètre <small>une longueur pour tous les pieux du diamètre · les quantités de la fiche suivent</small></h3>
+          <table class="nf-tbl"><thead><tr><th>Tube</th><th class="r">Pieux <span class="pr-tot" id="nbTotal">0</span></th><th class="r">Long. NDC</th><th>Long. retenue</th><th>Découpe</th><th class="r">Tubes</th></tr></thead><tbody id="parDiamBody"></tbody></table>
+          <div class="pr-note" id="ndcNote" style="margin:0 18px 12px" hidden></div>
+          <div class="nf-params">
+            <label>Indice NDC <input type="text" data-k="ndc.indice" style="width:60px"></label>
+            <label>DDC <input type="text" data-k="ndc.ddc" style="width:170px"></label>
+            <label>Ø forage <input type="text" data-k="ndc.forage" inputmode="decimal" style="width:64px"> mm</label>
+            <span>Tubes de la foreuse <b id="fTubeMax2"></b></span>
+          </div>
+        </section>
+        <!-- 3 · Ciment -->
+        <section class="nf-carte">
+          <h3><span class="nf-n">3</span>Ciment <small>théorique</small></h3>
+          <div class="nf-cim">
+            <div class="nf-gros"><b id="cimPal">?</b><span id="cimPalTxt">palettes sur la fiche</span></div>
+            <div class="nf-lg"><span>Type de ciment</span><span class="nf-seg" id="cimType"></span></div>
+            <div class="nf-lg"><span>Surconsommation</span><span><input type="text" class="nf-in" data-k="ciment.surconso" inputmode="decimal" id="fSurconso"> %</span></div>
+            <div class="nf-lg"><span>Palettes sur la fiche</span><span><input type="text" class="nf-in" data-k="ciment.palettesFiche" inputmode="decimal" id="fPalFiche"> <small>vide = calcul</small></span></div>
+            <div class="nf-lg"><span>1ère livraison</span><span><input type="text" class="nf-in" data-k="ciment.premiereLivraison" inputmode="decimal" id="fPremiere"> <small>vide = total</small></span></div>
+            <div class="nf-note" id="cimentKpi"></div>
+          </div>
+        </section>
       </div>
-    </section>
-    <section class="sv-card">
-      <div class="sv-ch"><h2>Ciment</h2><span class="s">théorique : (section forage − acier du tube principal) × longueur × dosage × (1 + surconsommation)</span></div>
-      <div class="pr-bar">
-        <div class="sv-f"><label>Surconsommation (%)</label><input type="text" data-k="ciment.surconso" inputmode="decimal" id="fSurconso" style="width:110px"></div>
-      </div>
-      <div class="pr-kpi" id="cimentKpi"></div>
-    </section>
+      <!-- 4 · Pieu par pieu -->
+      <section class="nf-carte">
+        <details class="nf-det" id="detPieux">
+          <summary>4 · Pieu par pieu <small><span id="detPieuxNb"></span> · pour corriger un pieu en particulier (longueur, barre, tube secondaire…)</small></summary>
+          <div class="nf-outils">
+            <input type="text" id="fRecherche" class="pr-mini" placeholder="🔍 Rechercher (Mp12, 114…)" style="width:220px">
+            <select id="fTypeBarreTous" class="pr-mini" style="width:auto"><option value="">Type de barre : appliquer à tous…</option></select>
+            <span class="sv-sp"></span>
+            <button type="button" class="pr-add" id="btnAjoutPieu">+ Ajouter un pieu</button><button type="button" class="pr-add" id="btnViderNdc" style="color:#C0392B">Vider la note de calcul</button>
+          </div>
+          <div class="pr-scroll">
+            <table class="sv-tbl pr-pieux">
+              <thead><tr><th>Repère</th><th class="r">Charge (t)</th><th>Tube Ø</th><th>Ép.</th><th class="r">Long. NDC</th><th>Long. retenue</th><th>Tube sec. Ø / ép. / long.</th><th>Barre type / Ø / long.</th><th>Platine</th><th>Découpe tubes</th><th></th></tr></thead>
+              <tbody id="pieuxBody"></tbody>
+            </table>
+          </div>
+          <div class="pr-legende" id="legendeCouleurs"></div>
+          <div class="pr-note" style="margin:0 18px 14px"><span class="pr-dot" style="cursor:default"></span> = longueur changée à la main sur ce pieu. Clic sur le point : retour à la longueur du diamètre. Platine : barre → percée selon la table des perçages · sinon Ø du tube secondaire · sinon Ø du tube principal.</div>
+        </details>
+      </section>
+    </div>
+    <div class="nf-f"><span class="nf-ok-txt">✓ La fiche se met à jour au fur et à mesure</span><span class="sv-sp"></span><button type="button" class="sv-btn pri" data-fermer-ndc>Revenir à la fiche</button></div>
   </div>
-</aside>
-
+</div>
+<div class="pf-voile" id="pfVoile"></div>
 <!-- Tiroir : envoi (mail, pièces jointes, serveur FTS, historique) -->
 <aside class="pf-tiroir large" id="tiroirEnvoi" aria-label="Envoi">
   <div class="pf-th"><h2>Valider et envoyer</h2><span class="sv-sp"></span><button type="button" class="sv-x" data-fermer-tiroir>✕</button></div>
@@ -541,25 +622,6 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 
 <!-- Fenêtre d'édition d'une case de la fiche -->
 <div class="pf-pop" id="pfPop" role="dialog" aria-modal="false"></div>
-<!-- Fenêtre de collage de la NDC -->
-<div class="sv-ov" id="collerModal">
-  <div class="sv-modal" style="width:860px">
-    <div class="sv-mh"><h3>Coller la note de calcul</h3><button type="button" class="sv-x" data-fermer>✕</button></div>
-    <div style="padding:16px 22px">
-      <p style="margin:0 0 8px;font-size:.86rem;color:var(--text-sub)">Dans la note de calcul (<b>ANNEXE E : TABLEAU RECAPITULATIF DES MICROPIEUX</b>) : sélectionne le tableau, du titre jusqu'au dernier micropieu, puis Ctrl + C et Ctrl + V ci-dessous. L'indice de la note et le DDC sont repris tout seuls ; la colonne Traction est ignorée.</p>
-      <textarea class="pr-paste" id="collerTexte" placeholder="Ctrl + V ici"></textarea>
-      <div id="collerApercu"></div>
-      <div style="margin-top:12px" id="collerModes">
-        <p style="margin:0 0 4px;font-size:.86rem;font-weight:700">La fiche a déjà des fournitures : que faire de cette NDC ?</p>
-        <label class="pr-radio"><input type="radio" name="mode" value="remplacer" checked><span><b>Tout remplacer</b> <span class="pr-chip v">conseillé</span><small>Les fournitures sont recalculées depuis cette NDC. Les pieux absents du collage, les lignes tapées à la main et les quantités changées à la main sont retirés (la liste est montrée avant).</small></span></label>
-        <label class="pr-radio"><input type="radio" name="mode" value="ajouter"><span><b>Ajouter à la fiche</b><small>Ce qui est déjà sur la fiche reste. Les pieux de la NDC sont ajoutés ; un repère déjà présent est mis à jour, pas compté deux fois. Pour une NDC à part (pieux de grue, un pieu en plus).</small></span></label>
-      </div>
-      <div class="pr-chips" id="collerBilan"></div>
-      <p class="sv-mstatus" id="collerStatus"></p>
-    </div>
-    <div class="sv-mf"><button type="button" class="sv-btn" data-fermer>Annuler</button><button type="button" class="sv-btn pri" id="collerValider" disabled>Valider le collage</button></div>
-  </div>
-</div>
 
 <script src="../js/auth.js"></script>
 <script src="../js/drive.js"></script>
@@ -714,6 +776,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (v && v !== actuel) { ma[k] = v; mis.push(v); }
       else if (!v && actuel && ancien[k] && actuel === ancien[k]) ma[k] = "";
     });
+    // Caisse flexible : celle du chef de l'équipe (sauf case changée à la main)
+    if (!prep.mains.caisseFlexible && prep.equipe.chef && ma.caisseFlexible !== prep.equipe.chef) { ma.caisseFlexible = prep.equipe.chef; mis.push(`caisse flexible de ${prep.equipe.chef}`); }
     if (!ma.cuveGnr) ma.cuveGnr = "OUI";
     if (!ma.cuveEau) ma.cuveEau = "OUI";
     chefAvant = prep.equipe.chef;
@@ -831,38 +895,34 @@ document.addEventListener("DOMContentLoaded", () => {
     const b = ev.target.closest("[data-src]"); if (!b) return;
     const a = b.dataset.src;
     if (a === "chef") { const td = $("fichePage").querySelector('[data-ed="chef"]'); if (td) { td.scrollIntoView({ block: "center", behavior: "smooth" }); setTimeout(() => ouvrirEditeur(td), 300); } }
-    if (a === "ndc") ouvrirTiroir("tiroirNdc");
+    if (a === "ndc") ouvrirNdc();
     if (a === "coller") ouvrirCollage();
     if (a === "plan") ouvrirOnglet("Plan");
   });
 
-  /** Bandeau au-dessus de la fiche : d'où viennent les fournitures */
+  /** Bandeau au-dessus de la fiche : « Note de calcul et ciment », un seul bouton */
   function majBandeau() {
     const b = $("pfBandeau"), n = prep.ndc.pieux.length, manuel = lignesRemplies().length;
-    let ic = "📐", tx, boutons, w = false;
+    const ci = calcul().ciment, pal = palettesFiche(ci);
+    const chips = [];
+    let tx, w = false;
     if (n) {
       const diams = P.diametresPresents(prep.ndc.pieux);
-      const longs = diams.map((x) => { const L = nombre(prep.ndc.longParDiam[String(x.d)]); return `${P.texteD(x.d)} → ${L === "" ? "long. NDC" : P.fr1(L) + " m"}`; }).join(" · ");
-      const m = tubeMax();
-      w = m === "";
-      tx = `<b>NDC${prep.ndc.indice ? ` ind ${esc(prep.ndc.indice)}` : ""} · ${n} pieux</b><small>${w ? "⚠️ Longueur de tube de la foreuse inconnue : choisis la foreuse sur la fiche (ou renseigne-la dans le Parc matériel)." : `Longueurs retenues : ${esc(longs)}. Change une longueur et les quantités suivent.`}${manuel ? ` · ${manuel} ligne${manuel > 1 ? "s" : ""} tapée${manuel > 1 ? "s" : ""} à la main en plus` : ""}</small>`;
-      boutons = `<button type="button" class="sv-btn" data-bd="coller">📋 Coller une NDC</button><button type="button" class="sv-btn pri" data-bd="ndc">Régler les longueurs</button>`;
-    } else if (manuel) {
-      ic = "✍️";
-      tx = `<b>Fournitures remplies à la main</b><small>Tu peux coller la NDC quand tu veux : tu choisiras de tout remplacer ou d'ajouter ses lignes aux tiennes.</small>`;
-      boutons = `<button type="button" class="sv-btn" data-bd="coller">📋 Coller la NDC</button>`;
+      w = tubeMax() === "";
+      chips.push(`<span class="vi">NDC${prep.ndc.indice ? ` ind ${esc(prep.ndc.indice)}` : ""} · ${n} pieux</span>`);
+      chips.push(`<span>${diams.map((x) => { const L = nombre(prep.ndc.longParDiam[String(x.d)]); return `${esc(P.texteD(x.d))} → ${L === "" ? "long. NDC" : P.fr1(L) + " m"}`; }).join(" · ")}</span>`);
+      tx = w ? "⚠️ Longueur de tube de la foreuse inconnue : choisis la foreuse sur la fiche (ou renseigne-la dans le Parc matériel)." : "Coller un nouvel indice, longueurs par diamètre, ciment, pieu par pieu : tout se règle dans la fenêtre.";
     } else {
-      tx = `<b>Fournitures : deux façons de remplir</b><small>Colle la NDC (<b>Ctrl + V</b> sur cette page) et tout se calcule, <u>ou</u> tape directement les quantités dans les lignes de la fiche, comme dans l'Excel.</small>`;
-      boutons = `<button type="button" class="sv-btn" data-bd="main">✍️ Je remplis à la main</button><button type="button" class="sv-btn pri" data-bd="coller">📋 Coller la NDC</button>`;
+      tx = manuel ? "Fournitures tapées à la main sur la fiche. Tu peux coller la NDC quand tu veux." : "Pas de note de calcul : colle-la dans la fenêtre, ou tape les fournitures directement sur la fiche.";
     }
+    if (manuel) chips.push(`<span>${manuel} ligne${manuel > 1 ? "s" : ""} tapée${manuel > 1 ? "s" : ""} à la main</span>`);
+    if (pal !== "") chips.push(`<span class="vt">${pal} palette${pal === 1 ? "" : "s"} de ${esc(prep.ciment.type)}</span>`);
     b.className = "pf-bandeau" + (w ? " w" : "");
-    b.innerHTML = `<span class="ic">${ic}</span><div class="tx">${tx}</div>${boutons}`;
+    b.innerHTML = `<span class="ic">📐</span><div class="tx"><b>Note de calcul et ciment</b><small>${tx}</small>${chips.length ? `<div class="chips">${chips.join("")}</div>` : ""}</div><button type="button" class="sv-btn pri" data-bd="ndc">Ouvrir la note de calcul</button>`;
   }
   $("pfBandeau").addEventListener("click", (ev) => {
     const x = ev.target.closest("[data-bd]"); if (!x) return;
-    if (x.dataset.bd === "coller") ouvrirCollage();
-    if (x.dataset.bd === "ndc") ouvrirTiroir("tiroirNdc");
-    if (x.dataset.bd === "main") ajouterLigne("tubes");
+    if (x.dataset.bd === "ndc") ouvrirNdc();
   });
 
   // ─── Chargement ────────────────────────────────────────────────
@@ -1004,7 +1064,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function majTubeMax() {
     const m = tubeMax();
     const txt = !prep.materiel.foreuse ? "choisir la foreuse" : m === "" ? "à renseigner dans le Parc" : `${fr(m)} m`;
-    $("fTubeMax2").value = txt;
+    $("fTubeMax2").textContent = txt;
   }
 
   // ─── Calcul ────────────────────────────────────────────────────
@@ -1027,9 +1087,18 @@ document.addEventListener("DOMContentLoaded", () => {
     $("nPieux").textContent = prep.ndc.pieux.length;
     $("ndcPastille").hidden = !prep.ndc.pieux.length;
     $("ndcPastille").textContent = `${prep.ndc.indice ? `Ind ${prep.ndc.indice} · ` : ""}${prep.ndc.pieux.length} pieux`;
-    $("detPieuxNb").textContent = prep.ndc.pieux.length ? `(${prep.ndc.pieux.length})` : "";
+    $("detPieuxNb").textContent = `${prep.ndc.pieux.length} pieu${prep.ndc.pieux.length > 1 ? "x" : ""}`;
     majTubeMax();
     const m = tubeMax();
+    // 1 · Résumé de la NDC collée (le collage s'ouvre sous le résumé)
+    const n = prep.ndc.pieux.length, nbNdc0 = nombre(prep.ndc.nbMpx);
+    $("ndcResume").innerHTML = n
+      ? `<div class="t"><b>NDC${prep.ndc.indice ? ` indice ${esc(prep.ndc.indice)}` : ""} collée</b> · ${n} pieu${n > 1 ? "x" : ""}${prep.ndc.ddc ? ` · DDC ${esc(prep.ndc.ddc)}` : ""}<br>${nbNdc0 === "" ? "" : nbNdc0 === n ? "La NDC annonce " + fr(nbNdc0) + " micropieux : le compte est bon." : `<span class="w">⚠️ La NDC annonce ${fr(nbNdc0)} micropieux, il y en a ${n} ici.</span>`}</div><button type="button" class="sv-btn" data-coller-ndc>📋 Coller un nouvel indice</button>`
+      : `<div class="t"><b>Pas encore de note de calcul</b><br>Colle-la ci-dessous, ou tape les fournitures directement sur la fiche.</div>`;
+    if (!n) { $("zoneColler").hidden = false; $("ndcResume").hidden = false; }
+    // Tubes principaux par diamètre (quantités de la fiche, marges comprises)
+    const tubesParD = new Map();
+    P.tubesFiche(calcul(), prep).filter((t) => P.groupeTube(t) === 0).forEach((t) => tubesParD.set(t.d, (tubesParD.get(t.d) || 0) + t.qte));
     // Longueurs par diamètre
     const diams = P.diametresPresents(prep.ndc.pieux);
     $("nbTotal").textContent = prep.ndc.pieux.length;
@@ -1037,14 +1106,14 @@ document.addEventListener("DOMContentLoaded", () => {
     $("parDiamBody").innerHTML = diams.length ? diams.map((x) => {
       const L = nombre(prep.ndc.longParDiam[String(x.d)]);
       const ndc = x.min === "" ? "—" : x.min === x.max ? `${fr(x.min, 2)} m` : `${fr(x.min, 2)} à ${fr(x.max, 2)} m`;
-      return `<tr><td><span class="pr-sq" style="background:${P.couleurTube(x.d) || "#fff"}"></span>Ø${fr(x.d)} × ${fr(x.e)}</td><td class="r">${x.nb}</td><td class="r">${ndc}</td>
-        <td><input type="text" class="pr-mini n" style="width:80px" data-ld="${x.d}" inputmode="decimal" value="${L === "" ? "" : fr(L)}" placeholder="NDC"> m</td>
-        <td class="calc">${L === "" ? "selon NDC" : P.texteDecoupe(P.decoupe(L, m))}</td></tr>`;
-    }).join("") : `<tr><td colspan="5" style="color:var(--text-sub)">Colle la note de calcul pour voir les diamètres.</td></tr>`;
+      return `<tr><td><span class="pr-sq" style="background:${P.couleurTube(x.d) || "#fff"}"></span><b>${esc(P.texteD(x.d))}</b> <span class="s">× ${fr(x.e)}</span></td><td class="r">${x.nb}</td><td class="r s">${ndc}</td>
+        <td><input type="text" data-ld="${x.d}" inputmode="decimal" value="${L === "" ? "" : fr(L)}" placeholder="NDC"> m</td>
+        <td class="s">${L === "" ? "selon la NDC" : m === "" ? "foreuse à choisir" : P.texteDecoupe(P.decoupe(L, m))}</td><td class="r q">${tubesParD.has(x.d) ? tubesParD.get(x.d) + " u" : "—"}</td></tr>`;
+    }).join("") : `<tr><td colspan="6" class="s">Colle la note de calcul pour voir les diamètres.</td></tr>`;
     $("parDiamBody").querySelectorAll("[data-ld]").forEach((el) => el.addEventListener("change", () => {
       const v = nombre(el.value);
       if (v === "") delete prep.ndc.longParDiam[el.dataset.ld]; else prep.ndc.longParDiam[el.dataset.ld] = v;
-      marquerSale(); afficherNdc();
+      marquerSale(); afficherNdc(); afficherFournitures();
     }));
     afficherPieux();
     const presents = [...new Set(prep.ndc.pieux.map((p) => nombre(p.tubeD)).filter((d) => d > 0))].sort((a, b) => a - b);
@@ -1053,9 +1122,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const ecart = nbNdc !== "" && nbNdc !== prep.ndc.pieux.length ? `⚠️ La NDC annonce <b>${fr(nbNdc)} micropieux</b>, il y en a <b>${prep.ndc.pieux.length}</b> ici : vérifie qu'il n'en manque pas.` : "";
     const note = [ecart, prep.ndc.note ? `Note de la NDC : « ${esc(prep.ndc.note)} »` : ""].filter(Boolean).join("<br>");
     $("ndcNote").hidden = !note; $("ndcNote").innerHTML = note;
-    $("swPastilles").classList.toggle("on", !!prep.pastilles.actif);
-    $("boxPastilles").hidden = !prep.pastilles.actif;
-    afficherPastilles();
   }
   function lignePieu(p, i) {
     const r = P.longueurRetenue(p, prep.ndc.longParDiam);
@@ -1166,48 +1232,32 @@ document.addEventListener("DOMContentLoaded", () => {
     prep.ndc.pieux = []; marquerSale(); afficherNdc();
   });
 
-  // Tubes pastillés
-  function afficherPastilles() {
-    const l = prep.pastilles.lignes;
-    $("pastillesBody").innerHTML = l.map((x, i) => `<tr data-p="${i}">
-      <td><input type="text" class="pr-mini n" data-pf="qte" value="${x.qte === "" ? "" : fr(x.qte)}" style="width:70px"></td>
-      <td><select class="pr-mini" data-pf="d" style="width:100px;${styleDiam(x.d)}">${optionsDiam(x.d)}</select></td>
-      <td><select class="pr-mini" data-pf="l" style="width:90px">${FTSParc.LONGUEURS_TUBE.map((t) => `<option value="${t}" ${t === nombre(x.l) ? "selected" : ""}>${fr(t)} m</option>`).join("")}</select></td>
-      <td><button type="button" class="pr-x" data-pdel>✕</button></td></tr>`).join("") || `<tr><td colspan="4" style="color:var(--text-sub)">Aucune ligne.</td></tr>`;
-  }
-  $("swPastilles").addEventListener("click", () => {
-    prep.pastilles.actif = !prep.pastilles.actif;
-    if (prep.pastilles.actif && !prep.pastilles.lignes.length) prep.pastilles.lignes.push({ qte: "", d: "", l: 3 });
-    marquerSale(); afficherNdc();
-  });
-  $("btnAjoutPastille").addEventListener("click", () => { prep.pastilles.lignes.push({ qte: "", d: "", l: 3 }); marquerSale(); afficherPastilles(); });
-  $("pastillesBody").addEventListener("change", (e) => {
-    const tr = e.target.closest("tr[data-p]"); if (!tr || !e.target.dataset.pf) return;
-    prep.pastilles.lignes[Number(tr.dataset.p)][e.target.dataset.pf] = nombre(e.target.value);
-    marquerSale(); afficherPastilles();
-  });
-  $("pastillesBody").addEventListener("click", (e) => {
-    if (!e.target.matches("[data-pdel]")) return;
-    prep.pastilles.lignes.splice(Number(e.target.closest("tr").dataset.p), 1); marquerSale(); afficherPastilles();
-  });
-
   // ─── Collage de la NDC ─────────────────────────────────────────
   /** Fiche déjà remplie (pieux, lignes tapées, quantités changées) → choix « Tout remplacer / Ajouter » */
   const ficheRemplie = () => prep.ndc.pieux.length > 0 || lignesRemplies().length > 0 || Object.keys(prep.marges).length > 0;
+  /** Zone de collage, dans la fenêtre Note de calcul (sous le résumé de la NDC) */
   function ouvrirCollage(texte) {
     fermerEditeur();
-    $("collerTexte").value = texte || ""; $("collerApercu").innerHTML = ""; $("collerBilan").innerHTML = ""; $("collerStatus").textContent = "";
+    if (!$("fenNdc").classList.contains("on")) { afficherNdc(); afficherFournitures(); $("fenNdc").classList.add("on"); $("fenNdc").setAttribute("aria-hidden", "false"); }
+    $("collerTexte").value = typeof texte === "string" ? texte : ""; $("collerApercu").innerHTML = ""; $("collerBilan").innerHTML = ""; $("collerStatus").textContent = "";
     $("collerValider").disabled = true; collage = null;
     $("collerModes").hidden = !ficheRemplie();
     document.querySelector('input[name="mode"][value="remplacer"]').checked = true;
-    $("collerValider").textContent = ficheRemplie() ? "Valider le collage" : "Remplir la fiche";
-    $("collerModal").classList.add("open");
-    if (texte) analyser();
+    $("collerValider").textContent = ficheRemplie() ? "Valider ce collage" : "Remplir la fiche";
+    $("collerAnnuler").hidden = !prep.ndc.pieux.length;
+    $("ndcResume").hidden = !!prep.ndc.pieux.length;
+    $("zoneColler").hidden = false;
+    if (typeof texte === "string" && texte) analyser();
     setTimeout(() => $("collerTexte").focus(), 50);
   }
-  function fermerCollage() { $("collerModal").classList.remove("open"); }
-  $("btnColler").addEventListener("click", ouvrirCollage);
-  $("collerModal").querySelectorAll("[data-fermer]").forEach((b) => b.addEventListener("click", fermerCollage));
+  function fermerCollage() {
+    collage = null;
+    $("collerTexte").value = ""; $("collerApercu").innerHTML = ""; $("collerBilan").innerHTML = ""; $("collerValider").disabled = true;
+    $("ndcResume").hidden = false;
+    $("zoneColler").hidden = !!prep.ndc.pieux.length; // sans NDC, la zone reste ouverte
+  }
+  $("collerAnnuler").addEventListener("click", fermerCollage);
+  $("ndcResume").addEventListener("click", (ev) => { if (ev.target.closest("[data-coller-ndc]")) ouvrirCollage(); });
   function modeCollage() { return ficheRemplie() ? document.querySelector('input[name="mode"]:checked').value : "remplacer"; }
   function analyser() {
     const txt = $("collerTexte").value;
@@ -1267,24 +1317,35 @@ document.addEventListener("DOMContentLoaded", () => {
     if (inf.indice) prep.ndc.indice = inf.indice;
     if (inf.ddc) prep.ndc.ddc = inf.ddc;
     if (inf.nbMpx !== undefined) prep.ndc.nbMpx = inf.nbMpx;
-    marquerSale(); remplirChamps(); afficherNdc(); afficherFournitures(); fermerCollage();
+    const nbColles = collage.res.pieux.length;
+    marquerSale(); remplirChamps(); fermerCollage(); afficherNdc(); afficherFournitures();
     afficherFiche(); majEtapes();
-    const nouveaux = [...$("fichePage").querySelectorAll(".p-ndc")];
-    nouveaux.forEach((td) => { td.classList.remove("pf-flash"); void td.offsetWidth; td.classList.add("pf-flash"); });
-    FTSShell.toast(`✅ ${collage.res.pieux.length} pieux collés · fournitures de la fiche calculées`);
+    FTSShell.toast(`✅ ${nbColles} pieux collés · fournitures de la fiche calculées · règle les longueurs si besoin`);
   });
 
   // ─── Fournitures ───────────────────────────────────────────────
   function marge(cle) { return nombre(prep.marges[cle]) || 0; }
+  /** 3 · Ciment, dans la fenêtre Note de calcul */
   function afficherFournitures() {
     const ci = calcul().ciment;
-    const pal = ci.palettes === "" ? "?" : ci.palettes;
     const surFiche = palettesFiche(ci);
-    $("cimentKpi").innerHTML = `<div><b>${pal} palette${pal === 1 ? "" : "s"}</b><span>prévues par le calcul · ${ci.sacsPalette === "" ? "sacs par palette à renseigner dans le Parc matériel" : `${ci.sacsPalette} sacs par palette`}</span></div>
-      <div><b>${surFiche === "" ? "?" : surFiche} palette${surFiche === 1 ? "" : "s"}</b><span>${nombre(prep.ciment.palettesFiche) === "" ? "sur la fiche (= calcul)" : `sur la fiche · choisi à la main (${surFiche > ci.palettes ? "+" : ""}${surFiche - (ci.palettes || 0)} par rapport au calcul)`}</span></div>
-      <div><b>${ci.sacs === "" ? "?" : ci.sacs} sacs</b><span>de ${fr(ci.sac)} kg · ${fr(ci.kg / 1000, 2)} t</span></div>
-      <div><b>${fr(ci.volume, 2)} m³</b><span>volume théorique · dosage ${fr(ci.dosage)} kg/m³ · +${fr(ci.surconso === "" ? 0 : ci.surconso)} %</span></div>`;
+    const main = nombre(prep.ciment.palettesFiche) !== "";
+    $("cimPal").textContent = surFiche === "" ? "?" : surFiche;
+    $("cimPalTxt").innerHTML = `palette${surFiche === 1 ? "" : "s"} de ${esc(prep.ciment.type)}<br>sur la fiche${main ? ` · <b>à la main</b> (calcul : ${ci.palettes === "" ? "?" : ci.palettes})` : ""}`;
+    const types = LISTES.ciments();
+    if (prep.ciment.type && !types.includes(prep.ciment.type)) types.unshift(prep.ciment.type);
+    $("cimType").innerHTML = types.map((t) => `<button type="button" data-ciment="${escA(t)}" class="${t === prep.ciment.type ? "on" : ""}">${esc(t)}</button>`).join("");
+    $("fPalFiche").placeholder = ci.palettes === "" ? "" : String(ci.palettes);
+    $("fPremiere").placeholder = surFiche === "" ? "" : String(surFiche);
+    $("cimentKpi").innerHTML = prep.ndc.pieux.length
+      ? `${fr(ci.volume, 2)} m³ · ${ci.sacs === "" ? "?" : ci.sacs} sacs de ${fr(ci.sac)} kg · ${ci.sacsPalette === "" ? "sacs par palette à renseigner dans le Parc matériel" : `${ci.sacsPalette} sacs par palette`} · dosage ${fr(ci.dosage)} kg/m³${String(prep.ciment.type) !== "32.5" ? "<br>Type autre que 32.5 : case en jaune sur la fiche." : ""}`
+      : "Sans note de calcul, le ciment n'est pas calculé : tape le nombre de palettes ci-dessus.";
   }
+  $("cimType").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-ciment]"); if (!b) return;
+    prep.ciment.type = b.dataset.ciment;
+    marquerSale(); afficherFournitures();
+  });
 
   /** Palettes de ciment imprimées sur la fiche : nombre choisi à la main, sinon le calcul */
   function palettesFiche(ci) { const v = nombre(prep.ciment.palettesFiche); return v !== "" ? v : prep.ndc.pieux.length ? ci.palettes : ""; }
@@ -1411,16 +1472,31 @@ document.addEventListener("DOMContentLoaded", () => {
       const main = marge(cle) !== 0;
       return ` class="${[J(...cles).trim(), main ? "p-main" : "p-ndc"].filter(Boolean).join(" ")}" data-ed="qte" data-cle="${escA(cle)}"`;
     };
-    const platines = c.platines.map((p) => { const cle = P.cleArticle("platine", p); return { maj: J(kPl(p)), c: [`${q(cle, p.qte)} u`, esc(p.section), esc(p.coiffe)], td: [qteAtt(cle, [kPl(p)])] }; });
-    const centreurs = c.centreurs.map((p) => { const cle = P.cleArticle("centreur", p); return { maj: J(kCe(p)), c: [`${q(cle, p.qte)} u`, esc(P.texteD(p.forage)), esc(P.texteD(p.d))], td: [qteAtt(cle, [kCe(p)])] }; });
+    /**
+     * Ligne calculée depuis la NDC. Retirée (quantité 0) : absente du papier, grisée à l'écran avec ↺ pour la remettre.
+     * À l'écran, ✕ au bout de la ligne pour la retirer.
+     */
+    const ligneCalc = (cle, cles, cells, n) => {
+      if (n === 0) return I ? { html: `<tr class="pf-retire"><td>0 u</td><td>${cells[1]}</td><td class="pf-xc">${cells[2]}<button type="button" class="pf-x" data-remettre="${escA(cle)}" title="Remettre cette ligne">↺</button></td></tr>` } : null;
+      return { maj: J(...cles), c: [cells[0], cells[1], I ? `${cells[2]}<button type="button" class="pf-x" data-retirer="${escA(cle)}" title="Retirer cette ligne">✕</button>` : cells[2]], td: [qteAtt(cle, cles), "", I ? ' class="pf-xc"' : ""] };
+    };
+    const sansVide = (l) => l.filter(Boolean);
+    const platines = sansVide(c.platines.map((p) => { const cle = P.cleArticle("platine", p), n = q(cle, p.qte); return ligneCalc(cle, [kPl(p)], [`${n} u`, esc(p.section), esc(p.coiffe)], n); }));
+    const centreurs = sansVide(c.centreurs.map((p) => { const cle = P.cleArticle("centreur", p), n = q(cle, p.qte); return ligneCalc(cle, [kCe(p)], [`${n} u`, esc(P.texteD(p.forage)), esc(P.texteD(p.d))], n); }));
     // Tubes principaux (tous les Ø), lignes tapées à la main, puis TUBAGE (tubes secondaires), puis tubes pastillés
     const tubes = [];
     const tf = P.tubesFiche(c, prep);
     const ligneTube = (t) => {
       const ct = c.tubes.find((x) => x.d === t.d && x.l === t.l && !!x.pastille === !!t.pastille && !!x.sec === !!t.sec && (!t.ep || x.e === t.e));
-      return { maj: J(kTu(t)), c: [`${t.qte} u`, esc(P.texteTube(t)), esc(P.texteL(t.l))], td: [ct ? qteAtt(P.cleArticle("tube", ct), [kTu(t)]) : ""] };
+      const cells = [`${t.qte} u`, esc(P.texteTube(t)), esc(P.texteL(t.l))];
+      if (!ct) return { maj: J(kTu(t)), c: cells };
+      return ligneCalc(P.cleArticle("tube", ct), [kTu(t)], cells, t.qte);
     };
+    // Tubes calculés retirés de la fiche (quantité 0) : à l'écran seulement, pour pouvoir les remettre
+    const tubesRetires = (g) => (I ? c.tubes.filter((t) => P.groupeTube(t) === g && q(P.cleArticle("tube", t), t.qte) === 0)
+      .map((t) => ligneCalc(P.cleArticle("tube", t), [], ["0 u", esc(P.texteTube(t)), esc(P.texteL(t.l))], 0)) : []);
     tf.filter((t) => P.groupeTube(t) === 0).forEach((t) => tubes.push(ligneTube(t)));
+    tubes.push(...tubesRetires(0));
     const manuelles = (sec) => (prep.lignes[sec] || []).map((l, i) => ({ l, i })).filter(({ l }) => I || l.c.some((x) => String(x || "").trim()))
       .map(({ l, i }) => {
         const cles = [kLi(sec, l)];
@@ -1430,13 +1506,13 @@ document.addEventListener("DOMContentLoaded", () => {
     tubes.push(...manuelles("tubes"));
     // TUBAGE puis TUBES PASTILLÉS : lignes calculées (NDC) + lignes tapées à la main dans chaque rubrique
     [[1, "TUBAGE", "tubage"], [2, "TUBES PASTILLÉS", "pastilles"]].forEach(([g, titre, sec]) => {
-      const lignes = tf.filter((t) => P.groupeTube(t) === g).map(ligneTube).concat(manuelles(sec));
+      const lignes = tf.filter((t) => P.groupeTube(t) === g).map(ligneTube).concat(tubesRetires(g), manuelles(sec));
       if (lignes.length) tubes.push({ st: titre }, ...lignes);
     });
     const sousRubriques = tubes.some((l) => l.st);
     platines.push(...manuelles("platines"));
     centreurs.push(...manuelles("centreurs"));
-    const barres = c.barres.map((b) => { const cle = P.cleArticle("barre", b); return { maj: J(kBa(b)), c: [`${q(cle, b.qte)} u`, `${esc(b.type)} ${esc(P.texteD(b.d))}`, `${b.l === "" ? "" : esc(P.texteL(b.l))}`], td: [qteAtt(cle, [kBa(b)])] }; });
+    const barres = sansVide(c.barres.map((b) => { const cle = P.cleArticle("barre", b), n = q(cle, b.qte); return ligneCalc(cle, [kBa(b)], [`${n} u`, `${esc(b.type)} ${esc(P.texteD(b.d))}`, `${b.l === "" ? "" : esc(P.texteL(b.l))}`], n); }));
     barres.push(...manuelles("barres"));
     // Lignes vides : au stylo sur le papier ; à l'écran, on tape directement dedans
     const videSaisie = (sec) => (I && !(sec === "tubes" && sousRubriques) ? (k) => `<tr class="pf-v" data-sec="${sec}" data-i="${(prep.lignes[sec] || []).length + k}">${[0, 1, 2].map((col) => `<td><div class="pf-libre" contenteditable="true" spellcheck="false" data-col="${col}"></div></td>`).join("")}</tr>` : null);
@@ -1559,6 +1635,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const sx = ev.target.closest("[data-suppr-outil]");
     if (sx) { prep.remarques.outils.splice(Number(sx.dataset.supprOutil), 1); marquerSale(); afficherFiche(); majEtapes(); return; }
+    const rt = ev.target.closest("[data-retirer]");
+    if (rt) { const cle = rt.dataset.retirer; prep.marges[cle] = -articleCalcule(cle); marquerSale(); afficherFiche(); majEtapes(); FTSShell.toast("Ligne retirée de la fiche · ↺ pour la remettre"); return; }
+    const rm = ev.target.closest("[data-remettre]");
+    if (rm) { delete prep.marges[rm.dataset.remettre]; marquerSale(); afficherFiche(); majEtapes(); return; }
     const sl = ev.target.closest("[data-suppr-ligne]");
     if (sl) { const tr = sl.closest("tr"); prep.lignes[tr.dataset.sec].splice(Number(tr.dataset.i), 1); marquerSale(); afficherFiche(); majEtapes(); return; }
     const td = ev.target.closest("[data-ed]");
@@ -1653,7 +1733,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   function ouvrirEditeur(td) {
     const ed = td.dataset.ed; if (!ed) return;
-    if (ed === "ndc") { ouvrirTiroir("tiroirNdc"); return; }
+    if (ed === "ndc") { ouvrirNdc(); return; }
     let html = "", appliquer;
     popCase = td;
     const bas = (revenir) => `<div class="bas">${revenir ? `<button type="button" data-a="revenir">↺ ${revenir}</button>` : "<span></span>"}<button type="button" data-a="fermer">Fermer</button></div>`;
@@ -1791,7 +1871,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Ctrl + V sur la fiche (hors case) : collage de la NDC
   document.addEventListener("paste", (ev) => {
-    if (!$("tabFiche").classList.contains("on") || $("collerModal").classList.contains("open")) return;
+    const fen = $("fenNdc").classList.contains("on");
+    if (!fen && !$("tabFiche").classList.contains("on")) return;
     const t = ev.target;
     if (t && (t.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(t.tagName))) return;
     const texte = ev.clipboardData && ev.clipboardData.getData("text/plain");
@@ -2425,10 +2506,11 @@ document.addEventListener("DOMContentLoaded", () => {
     add("NDC", [prep.ndc.indice ? "Ind " + prep.ndc.indice : "", prep.ndc.ddc].filter(Boolean).join(" — "));
     (re.outils || []).filter((o) => String(o.outil || "").trim() || String(o.diam || "").trim()).forEach((o) => add("Outil de forage", [o.outil, o.diam ? "Ø " + o.diam : ""].filter(Boolean).join(" ")));
     add("Divers", re.divers);
-    c.platines.forEach((p) => add(kPl(p), `${q(P.cleArticle("platine", p), p.qte)} u`));
-    c.centreurs.forEach((p) => add(kCe(p), `${q(P.cleArticle("centreur", p), p.qte)} u`));
+    // Ligne retirée (quantité 0) : absente de la fiche, donc absente du relevé (« supprimé » dans le mail)
+    c.platines.forEach((p) => { const n = q(P.cleArticle("platine", p), p.qte); if (n > 0) add(kPl(p), `${n} u`); });
+    c.centreurs.forEach((p) => { const n = q(P.cleArticle("centreur", p), p.qte); if (n > 0) add(kCe(p), `${n} u`); });
     P.tubesFiche(c, prep).forEach((t) => add(kTu(t), `${t.qte} u`));
-    c.barres.forEach((b) => add(kBa(b), `${q(P.cleArticle("barre", b), b.qte)} u`));
+    c.barres.forEach((b) => { const n = q(P.cleArticle("barre", b), b.qte); if (n > 0) add(kBa(b), `${n} u`); });
     lignesRemplies().forEach(({ sec, l }) => add(kLi(sec, l), l.c[0]));
     return r;
   }
@@ -2919,7 +3001,6 @@ document.addEventListener("DOMContentLoaded", () => {
     fermerEditeur();
     document.querySelectorAll(".pf-tiroir").forEach((x) => x.classList.toggle("on", x.id === id));
     $("pfVoile").classList.add("on");
-    if (id === "tiroirNdc") { afficherNdc(); afficherFournitures(); }
     if (id === "tiroirEnvoi") afficherEnvoi();
   }
   function fermerTiroirs() {
@@ -2931,7 +3012,25 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   $("pfVoile").addEventListener("click", fermerTiroirs);
   document.querySelectorAll("[data-fermer-tiroir]").forEach((b) => b.addEventListener("click", fermerTiroirs));
-  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && !document.querySelector(".pb-ov") && !$("collerModal").classList.contains("open") && !pop.classList.contains("on")) fermerTiroirs(); });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Escape" || document.querySelector(".pb-ov") || pop.classList.contains("on")) return;
+    if ($("fenNdc").classList.contains("on")) fermerNdc(); else fermerTiroirs();
+  });
+  /** Fenêtre « Note de calcul et ciment » */
+  function ouvrirNdc() {
+    fermerEditeur();
+    afficherNdc(); afficherFournitures();
+    if (prep.ndc.pieux.length) fermerCollage(); else ouvrirCollage();
+    $("fenNdc").classList.add("on");
+    $("fenNdc").setAttribute("aria-hidden", "false");
+  }
+  function fermerNdc() {
+    $("fenNdc").classList.remove("on");
+    $("fenNdc").setAttribute("aria-hidden", "true");
+    if (pret) { afficherFiche(); majEtapes(); }
+  }
+  document.querySelectorAll("[data-fermer-ndc]").forEach((b) => b.addEventListener("click", fermerNdc));
+  $("fenNdc").addEventListener("mousedown", (ev) => { if (ev.target === $("fenNdc")) fermerNdc(); });
   /** « Valider et envoyer » : seulement quand rien ne manque, sinon on dit quoi */
   async function valider() {
     if (!pret) return;

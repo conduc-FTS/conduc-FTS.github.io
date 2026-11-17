@@ -363,11 +363,52 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .nf-det summary { cursor: pointer; padding: 14px 18px; font-weight: 800; font-size: .98rem; }
 .nf-det summary small { font-weight: 400; color: var(--text-sub); font-size: .76rem; }
 .nf-outils { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 0 18px 10px; }
+/* Collage de la NDC */
+.cl-depot { position: relative; display: block; border: 2px dashed #BFD3F7; background: #F7FAFF; border-radius: 14px; padding: 30px 20px; text-align: center; cursor: text; }
+.cl-depot:focus-within { border-color: #4C82F0; background: #EEF4FF; }
+.cl-depot textarea { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; resize: none; border: none; cursor: text; }
+.cl-depot .ic { font-size: 28px; display: block; }
+.cl-depot b { display: block; font-size: 1.05rem; margin: 6px 0 4px; }
+.cl-depot .t { display: block; color: var(--text-sub); font-size: .84rem; line-height: 1.5; }
+.cl-depot kbd { background: #fff; border: 1px solid #C9CDD4; border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; font: inherit; font-weight: 700; font-size: .76rem; }
+.cl-depot .ou { display: block; margin-top: 10px; font-size: .76rem; color: var(--text-sub); }
+.cl-recu { display: flex; align-items: center; gap: 12px; background: #EAF6EE; border-radius: 12px; padding: 12px 16px; }
+.cl-recu.w { background: #FFF6E5; }
+.cl-recu .ic { font-size: 22px; } .cl-recu .t { flex: 1; }
+.cl-recu b { font-size: .98rem; color: #1D6E3E; } .cl-recu.w b { color: #8A5A00; }
+.cl-recu small { display: block; color: #2E5E40; font-size: .82rem; margin-top: 2px; } .cl-recu.w small { color: #7A5300; }
+.cl-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.cl-chips span { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; font-size: .82rem; background: #fff; }
+.cl-chips span.ok { border-color: #BFE3CB; background: #F3FAF5; } .cl-chips span.w { border-color: #F1D9A6; background: #FFF8EA; color: #7A5300; } .cl-chips span.r { border-color: #F2C4BE; background: #FDF1EF; color: #9B1C1C; }
+.cl-chips .pt { width: 11px; height: 11px; border-radius: 3px; border: 1px solid rgba(0,0,0,.15); }
+.cl-ap { margin-top: 14px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.cl-ap-h { padding: 10px 14px; font-size: .8rem; color: var(--text-sub); background: #FAFAFB; border-bottom: 1px solid var(--border); }
+.cl-ap-h b { color: var(--text-main); }
+.cl-zone { max-height: 400px; overflow-y: auto; overflow-x: hidden; }
+.cl-tbl { table-layout: fixed; }
+.cl-tbl td, .cl-tbl th { overflow: hidden; text-overflow: ellipsis; padding: 7px 4px; }
+.cl-tbl td.rep { font-weight: 800; }
+.cl-tbl .vide { color: #C3C7CE; }
+.cl-tbl .diam { display: inline-block; min-width: 46px; border-radius: 6px; padding: 2px 6px; font-weight: 800; }
+.cl-corr { padding: 10px 14px; font-size: .76rem; color: var(--text-sub); border-top: 1px solid var(--border); background: #FAFAFB; }
+.cl-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 10px; }
+.cl-cols[hidden], #collerResultat[hidden], #collerDepot[hidden] { display: none; }
+.cl-col { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+.cl-col.ign { opacity: .6; }
+.cl-col .l { font-size: .7rem; color: var(--text-sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .cl-col .l b { color: var(--text-main); }
+.cl-col select { width: 100%; margin-top: 4px; font: inherit; font-size: .76rem; padding: 3px; }
 /* Tableau récapitulatif : blocs de la NDC, valeurs sans cadre (cadre au survol / à la saisie) */
 .nf-rb { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .nf-rb b { font-size: .98rem; } .nf-rb-nb { color: var(--text-sub); font-size: .82rem; }
 .nf-rb input { border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font: inherit; width: 240px; }
-.nf-rc-zone { overflow: auto; max-height: 520px; }
+.nf-rc-zone { overflow-y: auto; overflow-x: hidden; max-height: 520px; }
+/* Tout tient dans la largeur : pas de barre de défilement horizontale (17/11/2026) */
+.nf-rc.rc-fixe { table-layout: fixed; }
+.nf-rc.rc-fixe .rc-in, .nf-rc.rc-fixe .rc-sel { width: 100% !important; min-width: 0; box-sizing: border-box; }
+.nf-rc.rc-fixe td { overflow: hidden; }
+.nf-rc.rc-fixe td.nw { white-space: normal; }
+.nf-rc.rc-fixe .c-coiffe { display: block; margin: 0; line-height: 1.1; }
+.nf-rc.rc-fixe td.tub .pr-dot { position: absolute; margin: 9px 0 0 -12px; }
 .nf-rc { width: 100%; border-collapse: collapse; font-size: .84rem; }
 .nf-rc th, .nf-rc td { padding: 4px 4px; text-align: center; white-space: nowrap; }
 .nf-rc thead th { position: sticky; z-index: 1; }
@@ -525,18 +566,40 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         <div class="nf-cc">
           <div class="nf-ok" id="ndcResume"></div>
           <div id="zoneColler" hidden>
-            <textarea class="pr-paste" id="collerTexte" placeholder="Ctrl + V ici : titre, indice, DDC et nombre de micropieux sont reconnus tout seuls · la colonne Traction est ignorée"></textarea>
-            <div id="collerApercu"></div>
-            <div style="margin-top:12px" id="collerModes">
-              <p style="margin:0 0 4px;font-size:.86rem;font-weight:700">La fiche a déjà des fournitures : que faire de cette NDC ?</p>
-              <div class="nf-choix">
-                <label class="pr-radio"><input type="radio" name="mode" value="remplacer" checked><span><b>Tout remplacer</b> <span class="pr-chip v">conseillé</span><small>Les fournitures sont recalculées depuis cette NDC. Pieux absents du collage, lignes tapées à la main et quantités changées à la main retirés (la liste est montrée avant).</small></span></label>
-                <label class="pr-radio"><input type="radio" name="mode" value="ajouter"><span><b>Ajouter à la fiche</b><small>Ce qui est sur la fiche reste. Un repère déjà présent est mis à jour, pas compté deux fois. Pour une NDC à part (pieux de grue, un pieu en plus).</small></span></label>
+            <!-- A · rien de collé : grande zone simple, le texte brut n'est jamais affiché -->
+            <label class="cl-depot" id="collerDepot">
+              <textarea id="collerTexte" aria-label="Coller le tableau de la NDC" spellcheck="false"></textarea>
+              <span class="ic">📋</span>
+              <b>Colle ici le tableau de la NDC</b>
+              <span class="t">Dans l'Excel du bureau d'études : sélectionne le tableau du titre jusqu'au dernier micropieu,<br><kbd>Ctrl</kbd> + <kbd>C</kbd>, puis clique ici et <kbd>Ctrl</kbd> + <kbd>V</kbd>.</span>
+              <span class="ou">Pas de NDC ? Tape les fournitures directement sur la fiche.</span>
+            </label>
+            <!-- B · après le collage : ce qui a été compris + aperçu au format de la fiche -->
+            <div id="collerResultat" hidden>
+              <div class="cl-recu" id="collerRecu"></div>
+              <div class="cl-chips" id="collerBilan"></div>
+              <div class="cl-ap">
+                <div class="cl-ap-h"><b>Aperçu de ce qui sera repris</b> · <span id="collerNb"></span> · valeurs déjà mises au format de la fiche</div>
+                <div class="cl-zone"><table class="nf-rc cl-tbl">
+                  <colgroup><col style="width:8%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:5%"><col style="width:7%"><col style="width:11%"><col style="width:8%"><col style="width:5%"><col style="width:6%"><col style="width:7%"><col style="width:5%"><col style="width:6%"></colgroup>
+                  <thead>
+                    <tr class="g"><th class="gen" colspan="3">MICROPIEU</th><th class="tub d" colspan="3">TUBE</th><th class="pla d">PLATINE</th><th class="sec d" colspan="3">TUBE SECONDAIRE</th><th class="bar d" colspan="3">BARRE</th></tr>
+                    <tr class="c"><th class="rep">Repère</th><th>Charge (t)</th><th>Ø forage</th><th class="tub d">Ø</th><th class="tub">Ép.</th><th class="tub">Long. NDC</th><th class="pla d">Section</th><th class="sec d">Ø</th><th class="sec">Ép.</th><th class="sec">Long.</th><th class="bar d">Type</th><th class="bar">Ø</th><th class="bar">Long.</th></tr>
+                  </thead>
+                  <tbody id="collerApercu"></tbody>
+                </table></div>
+                <div class="cl-corr"><span id="collerFormat"></span> Une colonne mal lue ? <button type="button" class="pe-lien" id="collerCorriger">Corriger les colonnes ▾</button>
+                  <div class="cl-cols" id="collerCols" hidden></div></div>
               </div>
+              <p class="sv-mstatus" id="collerStatus"></p>
+              <div style="margin-top:14px" id="collerModes">
+                <div class="nf-choix">
+                  <label class="pr-radio"><input type="radio" name="mode" value="remplacer" checked><span><b>Tout remplacer</b> <span class="pr-chip v">conseillé</span><small>La fiche est recalculée depuis cette NDC (la liste de ce qui disparaît est montrée avant).</small></span></label>
+                  <label class="pr-radio"><input type="radio" name="mode" value="ajouter"><span><b>Ajouter à la fiche</b><small>Ce qui est sur la fiche reste ; un repère déjà présent est mis à jour, pas compté deux fois.</small></span></label>
+                </div>
+              </div>
+              <div class="nf-bt"><button type="button" class="sv-btn" id="collerAnnuler">Annuler</button><button type="button" class="sv-btn noir" id="collerValider" disabled>Remplir la fiche</button></div>
             </div>
-            <div class="pr-chips" id="collerBilan"></div>
-            <p class="sv-mstatus" id="collerStatus"></p>
-            <div class="nf-bt"><button type="button" class="sv-btn" id="collerAnnuler">Annuler</button><button type="button" class="sv-btn noir" id="collerValider" disabled>Valider ce collage</button></div>
           </div>
         </div>
       </section>
@@ -571,7 +634,8 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
           <button type="button" class="pr-add" id="btnAjoutPieu">+ Ajouter un pieu</button><button type="button" class="pr-add" id="btnViderNdc" style="color:#C0392B">Vider la note de calcul</button>
         </div>
         <div class="nf-rc-zone">
-          <table class="nf-rc">
+          <table class="nf-rc rc-fixe">
+            <colgroup><col style="width:7%"><col style="width:6%"><col style="width:6%"><col style="width:8%"><col style="width:5%"><col style="width:6%"><col style="width:7%"><col style="width:11%"><col style="width:8%"><col style="width:5%"><col style="width:5%"><col style="width:8%"><col style="width:5%"><col style="width:5%"><col style="width:4%"></colgroup>
             <thead>
               <tr class="g"><th class="gen" colspan="3">MICROPIEU</th><th class="tub d" colspan="4">TUBE</th><th class="pla d">PLATINE</th><th class="sec d" colspan="3">TUBE SECONDAIRE</th><th class="bar d" colspan="3">BARRE</th><th class="gen d"></th></tr>
               <tr class="c"><th class="rep">Repère</th><th>Charge (t)</th><th>Ø forage</th>
@@ -1263,59 +1327,95 @@ document.addEventListener("DOMContentLoaded", () => {
   function ouvrirCollage(texte) {
     fermerEditeur();
     if (!$("fenNdc").classList.contains("on")) { afficherNdc(); afficherFournitures(); $("fenNdc").classList.add("on"); $("fenNdc").setAttribute("aria-hidden", "false"); }
-    $("collerTexte").value = typeof texte === "string" ? texte : ""; $("collerApercu").innerHTML = ""; $("collerBilan").innerHTML = ""; $("collerStatus").textContent = "";
-    $("collerValider").disabled = true; collage = null;
-    $("collerModes").hidden = !ficheRemplie();
+    $("collerTexte").value = typeof texte === "string" ? texte : ""; collage = null;
+    $("collerCols").hidden = true;
     document.querySelector('input[name="mode"][value="remplacer"]').checked = true;
-    $("collerValider").textContent = ficheRemplie() ? "Valider ce collage" : "Remplir la fiche";
     $("collerAnnuler").hidden = !prep.ndc.pieux.length;
     $("ndcResume").hidden = !!prep.ndc.pieux.length;
     $("zoneColler").hidden = false;
-    if (typeof texte === "string" && texte) analyser();
+    analyser();
     setTimeout(() => $("collerTexte").focus(), 50);
   }
   function fermerCollage() {
     collage = null;
-    $("collerTexte").value = ""; $("collerApercu").innerHTML = ""; $("collerBilan").innerHTML = ""; $("collerValider").disabled = true;
+    $("collerTexte").value = ""; analyser();
     $("ndcResume").hidden = false;
     $("zoneColler").hidden = !!prep.ndc.pieux.length; // sans NDC, la zone reste ouverte
   }
   $("collerAnnuler").addEventListener("click", fermerCollage);
   $("ndcResume").addEventListener("click", (ev) => { if (ev.target.closest("[data-coller-ndc]")) ouvrirCollage(); });
   function modeCollage() { return ficheRemplie() ? document.querySelector('input[name="mode"]:checked').value : "remplacer"; }
+  /** Collage lu : bandeau « ce qui a été compris », résumé, aperçu au format de la fiche (sans barre horizontale) */
   function analyser() {
     const txt = $("collerTexte").value;
-    if (!txt.trim()) { collage = null; $("collerApercu").innerHTML = ""; $("collerBilan").innerHTML = ""; $("collerValider").disabled = true; return; }
+    if (!txt.trim()) {
+      collage = null;
+      $("collerDepot").hidden = false; $("collerResultat").hidden = true; $("collerValider").disabled = true;
+      return;
+    }
     if (!collage || collage.texte !== txt) collage = { texte: txt, ...P.analyserCollage(txt) };
     const res = P.lirePieux(collage.lignes, collage.colonnes);
     collage.res = res;
-    const opts = (k) => `<option value="">— ignorée —</option>` + P.CHAMPS.map((c) => `<option value="${c.k}" ${c.k === k ? "selected" : ""}>${c.lib}</option>`).join("");
-    const exemple = collage.lignes.slice(0, 3);
-    $("collerApercu").innerHTML = `<div class="pr-map"><table><tr>${collage.colonnes.map((k, c) => `<th><select data-col="${c}">${opts(k)}</select></th>`).join("")}</tr>
-      ${exemple.map((l) => `<tr>${collage.colonnes.map((_, c) => `<td>${esc(l[c] || "")}</td>`).join("")}</tr>`).join("")}</table></div>
-      <p style="font-size:.76rem;color:var(--text-sub);margin:6px 0 0">${collage.entete ? "Colonnes reconnues d'après l'entête collée." : collage.format === "a5" ? "Pas d'entête : ordre des colonnes de l'ancien onglet A-5 utilisé." : "Pas d'entête : ordre des colonnes de l'Annexe E utilisé (colonne C Traction ignorée)."} Corrige une colonne si besoin.</p>`;
-    $("collerApercu").querySelectorAll("[data-col]").forEach((s) => s.addEventListener("change", () => {
-      const k = s.value, c = Number(s.dataset.col);
-      collage.colonnes = collage.colonnes.map((x, j) => (j === c ? k : x === k && k ? "" : x));
-      analyser();
-    }));
+    $("collerDepot").hidden = true; $("collerResultat").hidden = false;
+    const nb = res.pieux.length, inf = collage.infos || {};
     const f = P.fusionner(prep.ndc.pieux, res.pieux, modeCollage());
-    const chips = [`<span class="pr-chip v">${res.pieux.length} pieux lus</span>`];
-    if (f.nouveaux.length) chips.push(`<span class="pr-chip v">${f.nouveaux.length} nouveau(x)${f.nouveaux.length <= 6 ? " : " + esc(f.nouveaux.join(", ")) : ""}</span>`);
-    if (f.misAJour.length) chips.push(`<span class="pr-chip o">${f.misAJour.length} mis à jour</span>`);
-    if (modeCollage() === "ajouter" && f.inchanges > 0) chips.push(`<span class="pr-chip">${f.inchanges} inchangé(s)</span>`);
-    if (f.retires.length) chips.push(`<span class="pr-chip r">${f.retires.length} retiré(s)${f.retires.length <= 6 ? " : " + esc(f.retires.join(", ")) : ""}</span>`);
-    if (res.ignorees) chips.push(`<span class="pr-chip">${res.ignorees} ligne(s) vide(s) ignorée(s)</span>`);
-    if (res.note) chips.push(`<span class="pr-chip">note reprise : « ${esc(res.note.slice(0, 60))} »</span>`);
-    const inf = collage.infos || {};
-    if (inf.indice) chips.push(`<span class="pr-chip v">indice NDC : ${esc(inf.indice)}</span>`);
-    if (inf.ddc) chips.push(`<span class="pr-chip v">DDC repris</span>`);
-    if (inf.nbMpx !== undefined) chips.push(`<span class="pr-chip ${inf.nbMpx === res.pieux.length || modeCollage() === "ajouter" ? "" : "r"}">NDC : ${fr(inf.nbMpx)} micropieux annoncés</span>`);
+    // 1 · Ce qui a été compris
+    const compte = inf.nbMpx === undefined ? "" : inf.nbMpx === nb ? `la NDC annonce ${fr(inf.nbMpx)} micropieux : le compte est bon` : `⚠️ la NDC annonce ${fr(inf.nbMpx)} micropieux, ${nb} lus : vérifie qu'il n'en manque pas`;
+    const alerte = !nb || (inf.nbMpx !== undefined && inf.nbMpx !== nb);
+    $("collerRecu").className = "cl-recu" + (alerte ? " w" : "");
+    $("collerRecu").innerHTML = nb
+      ? `<span class="ic">${alerte ? "⚠️" : "✅"}</span><div class="t"><b>NDC${inf.indice ? ` indice ${esc(inf.indice)}` : ""} reconnue · ${nb} micropieu${nb > 1 ? "x" : ""}</b><small>${[inf.ddc ? `DDC ${esc(inf.ddc)}` : "", esc(compte)].filter(Boolean).join(" · ")}</small></div><button type="button" class="pe-lien" data-recoller>↺ Recoller</button>`
+      : `<span class="ic">⚠️</span><div class="t"><b>Aucun micropieu reconnu</b><small>Vérifie que le tableau copié contient bien les repères (Mp1…) et les longueurs, ou corrige les colonnes ci-dessous.</small></div><button type="button" class="pe-lien" data-recoller>↺ Recoller</button>`;
+    // 2 · Résumé en pastilles
+    const chips = [];
+    P.diametresPresents(res.pieux).forEach((x) => chips.push(`<span><span class="pt" style="background:${P.couleurTube(x.d) || "#fff"}"></span><b>${x.nb}</b> en ${esc(P.texteD(x.d))}${x.e !== "" ? ` × ${fr(x.e)}` : ""}</span>`));
+    const forages = [...new Set(res.pieux.map((p) => nombre(p.forage)).filter((x) => x > 0))];
+    if (forages.length) chips.push(`<span>Ø forage <b>${forages.map((x) => fr(x)).join(" / ")}</b></span>`);
+    const nSec = res.pieux.filter((p) => nombre(p.tubeSecD) > 0).length, nBar = res.pieux.filter((p) => nombre(p.barreD) > 0).length;
+    if (nSec) chips.push(`<span>Tube secondaire sur <b>${nSec}</b> pieu${nSec > 1 ? "x" : ""}</span>`);
+    if (nBar) chips.push(`<span>Barre sur <b>${nBar}</b> pieu${nBar > 1 ? "x" : ""}</span>`);
+    if (prep.ndc.pieux.length) {
+      if (f.nouveaux.length) chips.push(`<span class="ok">${f.nouveaux.length} nouveau${f.nouveaux.length > 1 ? "x" : ""}${f.nouveaux.length <= 4 ? " : " + esc(f.nouveaux.join(", ")) : ""}</span>`);
+      if (f.misAJour.length) chips.push(`<span class="w">${f.misAJour.length} mis à jour</span>`);
+      if (f.retires.length) chips.push(`<span class="r">${f.retires.length} retiré${f.retires.length > 1 ? "s" : ""}${f.retires.length <= 4 ? " : " + esc(f.retires.join(", ")) : ""}</span>`);
+    } else if (nb) chips.push(`<span class="ok">${nb} nouveau${nb > 1 ? "x" : ""}</span>`);
+    if (res.ignorees) chips.push(`<span>${res.ignorees} ligne${res.ignorees > 1 ? "s" : ""} vide${res.ignorees > 1 ? "s" : ""} ignorée${res.ignorees > 1 ? "s" : ""}</span>`);
+    if (res.note) chips.push(`<span>note reprise : « ${esc(res.note.slice(0, 60))} »</span>`);
     $("collerBilan").innerHTML = chips.join("");
-    $("collerStatus").textContent = res.pieux.length ? "" : "Aucun pieu reconnu : vérifie la colonne « Repère » et la colonne « Longueur ».";
-    $("collerStatus").className = "sv-mstatus" + (res.pieux.length ? "" : " err");
-    $("collerValider").disabled = !res.pieux.length;
+    // 3 · Aperçu : même tableau que le récapitulatif
+    const v = (x) => (x === "" || x == null ? '<span class="vide">—</span>' : esc(typeof x === "number" ? fr(x) : x));
+    $("collerNb").textContent = `${nb} pieu${nb > 1 ? "x" : ""}`;
+    $("collerApercu").innerHTML = nb ? res.pieux.map((p) => {
+      const sec = nombre(p.tubeSecD) > 0, bar = nombre(p.barreD) > 0;
+      return `<tr><td class="rep">${esc(p.rep)}</td><td>${v(p.charge)}</td><td>${v(p.forage)}</td>
+        <td class="tub d">${nombre(p.tubeD) > 0 ? `<span class="diam" style="${styleDiam(p.tubeD) || "background:#fff;border:1px solid #ddd"}">${esc(P.texteD(p.tubeD))}</span>` : v("")}</td><td class="tub">${v(p.tubeE)}</td><td class="tub">${v(p.longNdc)}</td>
+        <td class="pla d">${v(P.sectionPlatine(p.platine))}</td>
+        <td class="sec d">${sec ? esc(P.texteD(p.tubeSecD)) : v("")}</td><td class="sec">${sec ? v(p.tubeSecE) : v("")}</td><td class="sec">${sec ? v(p.tubeSecL) : v("")}</td>
+        <td class="bar d">${bar ? v(p.barreType) : v("")}</td><td class="bar">${bar ? v(p.barreD) : v("")}</td><td class="bar">${bar ? v(p.barreL) : v("")}</td></tr>`;
+    }).join("") : `<tr><td colspan="13" style="text-align:left;padding:14px;color:var(--text-sub)">Rien à montrer : aucun micropieu reconnu.</td></tr>`;
+    $("collerFormat").textContent = collage.entete ? "Colonnes reconnues d'après l'entête de la NDC." : collage.format === "a5" ? "Pas d'entête : ordre de l'ancien onglet A-5 utilisé." : "Pas d'entête : ordre des colonnes de l'ANNEXE E utilisé.";
+    // 4 · Correction des colonnes (grille qui passe à la ligne)
+    if (!nb) $("collerCols").hidden = false;
+    const opts = (k) => `<option value="">— ignorée —</option>` + P.CHAMPS.map((c) => `<option value="${c.k}" ${c.k === k ? "selected" : ""}>${c.lib}</option>`).join("");
+    const lettre = (i) => (i < 26 ? String.fromCharCode(65 + i) : "A" + String.fromCharCode(65 + i - 26));
+    const exemple = (c) => { const l = collage.lignes.find((x) => String(x[c] || "").trim()); return l ? String(l[c]).trim() : ""; };
+    $("collerCols").innerHTML = collage.colonnes.map((k, c) => `<div class="cl-col${k ? "" : " ign"}"><div class="l">Colonne <b>${lettre(c)}</b> · ex. ${esc(exemple(c).slice(0, 18)) || "vide"}</div><select data-col="${c}">${opts(k)}</select></div>`).join("");
+    $("collerModes").hidden = !ficheRemplie();
+    $("collerStatus").textContent = "";
+    $("collerValider").disabled = !nb;
+    $("collerValider").textContent = nb ? `Remplir la fiche avec ${nb === 1 ? "ce pieu" : `ces ${nb} pieux`}` : "Remplir la fiche";
   }
+  $("collerCols").addEventListener("change", (ev) => {
+    const s = ev.target.closest("[data-col]"); if (!s || !collage) return;
+    const k = s.value, c = Number(s.dataset.col);
+    collage.colonnes = collage.colonnes.map((x, j) => (j === c ? k : x === k && k ? "" : x));
+    analyser();
+  });
+  $("collerCorriger").addEventListener("click", () => { $("collerCols").hidden = !$("collerCols").hidden; });
+  $("collerRecu").addEventListener("click", (ev) => {
+    if (!ev.target.closest("[data-recoller]")) return;
+    collage = null; $("collerTexte").value = ""; analyser(); $("collerTexte").focus();
+  });
   $("collerTexte").addEventListener("input", () => { collage = null; analyser(); });
   document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener("change", analyser));
   $("collerValider").addEventListener("click", async () => {

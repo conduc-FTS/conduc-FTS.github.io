@@ -350,7 +350,8 @@ const FTSPreparation = (() => {
   /** Devine le champ d'une colonne à partir de son entête (ligne du haut + sous-entête) */
   function deviner(haut, bas) {
     const h = sansAccent(haut), b = sansAccent(bas), t = `${h} ${b}`;
-    if (/PASTILL|ANCRAGE|ARASE|SUBSTRATUM/.test(t)) return "";
+    // Longueur partielle (neutralisée, ancrage…) : ignorée — la longueur du pieu est la longueur totale / moyenne indicative (17/11/2026)
+    if (/PASTILL|ANCRAGE|ARASE|SUBSTRATUM|NEUTRALIS|LIBRE|SCELLEMENT/.test(t)) return "";
     if (/SECONDAIRE/.test(h)) {
       if (/EPAIS/.test(b)) return "tubeSecE";
       if (/LG|LONG/.test(b)) return "tubeSecL";

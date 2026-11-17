@@ -90,7 +90,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .fp-divers .t { background: #c8c8c8; font-weight: bold; text-align: center; border-bottom: 1px solid #000; height: 17px; line-height: 17px; }
 .fp-divers .c { flex: 1; padding: 4px 6px; text-align: left; white-space: pre-wrap; font-size: 10px; outline: none; cursor: text; }
 .fp-zone .fp-divers .c:empty::before { content: "Clique ici pour écrire (texte libre)"; color: #9aa0aa; font-style: italic; }
-.fp-zone .fp-divers .c:focus { background: #FFFBEA; }
+.fp-zone .fp-divers .c:focus { background: #EEF4FF; }
 .fp-signe { margin-top: 4mm; }
 .fp-signe td.vide { height: 14mm; }
 .fp-page.serre1 .dash td { height: 16px; font-size: 10px; }
@@ -255,7 +255,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .pf-bandeau .tx { flex: 1; font-size: .86rem; min-width: 0; } .pf-bandeau .tx small { display: block; color: var(--text-sub); font-size: .78rem; margin-top: 2px; }
 .pf-legende { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: .76rem; color: var(--text-sub); margin: 0 0 8px 4px; }
 .pf-legende .lg { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
-.lg.auto { background: #9DB9F5; } .lg.ndc { background: #8E6CD8; } .lg.main { background: #E5B800; } .lg.afaire { background: #FFF3E0; border: 1px dashed #E8890C; }
+.lg.auto { background: #9DB9F5; } .lg.ndc { background: #8E6CD8; } .lg.main { background: #12A39A; } .lg.maj { background: #FFFF00; border: 1px solid #D9D900; } .lg.afaire { background: #FFF3E0; border: 1px dashed #E8890C; }
 .pf-a4 { font-weight: 700; border-radius: 12px; padding: 2px 9px; background: #EAF6EE; color: #1D6E3E; }
 .pf-a4.or { background: #FFF3DC; color: #B86E00; } .pf-a4.r { background: #FDECEA; color: #C0392B; }
 .pf-aide { font-size: .76rem; color: var(--text-sub); margin: 8px 4px 0; }
@@ -264,13 +264,13 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .pf-edit [data-ed]:hover { outline: 2px solid #4C82F0; outline-offset: -2px; background: #EAF1FE; }
 .pf-edit .p-auto { box-shadow: inset 3px 0 0 #9DB9F5; }
 .pf-edit .p-ndc { box-shadow: inset 3px 0 0 #8E6CD8; }
-.pf-edit .p-main { box-shadow: inset 3px 0 0 #E5B800; }
+.pf-edit .p-main { box-shadow: inset 3px 0 0 #12A39A; }
 .pf-edit .p-afaire { background: #FFF3E0 !important; outline: 2px dashed #E8890C; outline-offset: -3px; color: #B86E00 !important; font-style: italic; font-weight: normal !important; }
 .pf-edit .pf-libre { cursor: text; outline: none; }
 .pf-edit .pf-libre:hover { background: #F6F7F9; box-shadow: inset 0 0 0 1px #9aa0aa; }
-.pf-edit .pf-libre:focus { background: #FFFBEA; box-shadow: inset 0 0 0 2px #4C82F0; }
-.pf-edit tr.pf-l td { background: #FFFDE6; }
-.pf-edit tr.pf-l td:first-child { box-shadow: inset 3px 0 0 #E5B800; }
+.pf-edit .pf-libre:focus { background: #EEF4FF; box-shadow: inset 0 0 0 2px #4C82F0; }
+.pf-edit tr.pf-l:not(.maj) td { background: #F1F8F7; }
+.pf-edit tr.pf-l td:first-child { box-shadow: inset 3px 0 0 #12A39A; }
 .pf-edit tr.pf-plus td { border: none !important; height: auto !important; padding: 2px 0 5px !important; text-align: left; font: 600 11px -apple-system, "Segoe UI", Arial, sans-serif; color: #2A5DBF; background: none !important; }
 .pf-edit tr.pf-plus button { border: none; background: none; font: inherit; color: inherit; cursor: pointer; padding: 0; }
 .pf-edit tr.pf-plus button:hover { text-decoration: underline; }
@@ -280,7 +280,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .pf-edit td.pf-xc { position: relative; overflow: visible; }
 .pf-edit .pf-ph { color: #9aa0aa; font-style: italic; font-weight: normal; }
 .pf-flash { animation: pfFl 1.2s; }
-@keyframes pfFl { 0%, 40% { background: #FFD54A; } }
+@keyframes pfFl { 0%, 40% { background: #CFE3FF; } }
 /* Panneau de droite */
 .pf-nb { font-size: .74rem; font-weight: 800; border-radius: 12px; padding: 2px 9px; background: #FFF3DC; color: #B86E00; }
 .pf-nb.vt { background: #EAF6EE; color: #1D6E3E; }
@@ -356,6 +356,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
           <span><i class="lg ndc"></i>Calculé depuis la NDC</span>
           <span><i class="lg main"></i>Changé à la main</span>
           <span><i class="lg afaire"></i>À compléter</span>
+          <span><i class="lg maj"></i>Changé depuis le dernier envoi (imprimé)</span>
           <span class="sv-sp"></span>
           <span class="pf-a4" id="pfA4"></span>
         </div>
@@ -708,11 +709,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const mis = [];
     ["foreuse", "injection", "presse", "groupe"].forEach((k) => {
       const v = nouveau[k], actuel = String(ma[k] || "").trim();
-      // On remplace seulement une case vide ou le matériel du chef d'avant (jamais une saisie à la main)
-      const remplacable = !actuel || (ancien[k] && actuel === ancien[k]);
-      if (!remplacable) return;
+      // Le matériel suit le chef (17/11/2026) ; seule une case changée à la main sur la fiche est gardée
+      if (prep.mains[k]) return;
       if (v && v !== actuel) { ma[k] = v; mis.push(v); }
-      else if (!v && actuel) ma[k] = "";
+      else if (!v && actuel && ancien[k] && actuel === ancien[k]) ma[k] = "";
     });
     if (!ma.cuveGnr) ma.cuveGnr = "OUI";
     if (!ma.cuveEau) ma.cuveEau = "OUI";
@@ -980,7 +980,8 @@ document.addEventListener("DOMContentLoaded", () => {
   /** Listes de choix des cases de la fiche (Parc matériel, Personnel FTS) */
   const uniq = (l) => [...new Set(l.filter((x) => String(x || "").trim()))];
   const LISTES = {
-    chefs: () => uniq(FTSPersonnel.chefs().map(FTSPersonnel.nomComplet)),
+    // Fiche de préparation MICROPIEUX : chefs micropieux (ou « les deux »), pas les chefs pieux
+    chefs: () => uniq(FTSPersonnel.chefs().filter((p) => ["MICROPIEUX", "LES DEUX", ""].includes(String(p.categorie || "").toUpperCase())).map(FTSPersonnel.nomComplet)),
     conducteurs: () => uniq(FTSPersonnel.encadrement().filter((p) => /CONDUCTEUR/.test(p.poste || "") || /CONDUCTEUR/.test(p.fonctionEnc || "")).map(FTSPersonnel.nomComplet)),
     foreuses: () => uniq(foreuses().map((m) => m.nom)),
     injection: () => uniq(FTSParc.disponibles().filter((m) => m.categorie === "MALAXEURS" || /PH15|TECHNIWELL|AUTONOME/.test(m.nom)).map((m) => m.nom).filter((n) => !/PH15/.test(n)).concat(["MA12", "TECHNIWELL"])),
@@ -1291,9 +1292,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // ─── Fiche de préparation : écran de saisie ET document imprimé ─────
   function dateFr(iso) { const [a, m, j] = String(iso || "").split("-"); return a && m && j ? `${j}/${m}/${a}` : ""; }
   // Lignes tapées directement sur la fiche (3 cases) — mise en forme de chaque colonne
-  const SECTIONS_LIGNES = ["platines", "centreurs", "tubes", "barres"];
-  const NOMS_SECTIONS = { platines: "Platines", centreurs: "Pointes", tubes: "Tubes", barres: "Barres" };
-  const FORMATS_LIGNES = { platines: ["u", "PL", "D"], centreurs: ["u", "D", "D"], tubes: ["u", "TU", "ML"], barres: ["u", "D", "ML"] };
+  const SECTIONS_LIGNES = ["platines", "centreurs", "tubes", "tubage", "pastilles", "barres"];
+  const NOMS_SECTIONS = { platines: "Platines", centreurs: "Pointes", tubes: "Tubes", tubage: "Tubage", pastilles: "Tubes pastillés", barres: "Barres" };
+  const FORMATS_LIGNES = { platines: ["u", "PL", "D"], centreurs: ["u", "D", "D"], tubes: ["u", "TU", "ML"], tubage: ["u", "TU", "ML"], pastilles: ["u", "TU", "ML"], barres: ["u", "D", "ML"] };
   /**
    * Lignes d'un tableau du bas de la fiche.
    * l = { c: [3 cases html], td: [3 attributs], tr: attributs } · { st: sous-titre } · { html: ligne toute faite }
@@ -1427,18 +1428,21 @@ document.addEventListener("DOMContentLoaded", () => {
         return { html: `<tr class="pf-l${J(...cles)}" data-sec="${sec}" data-i="${i}">${l.c.map((x, k) => `<td class="pf-xc"><div class="pf-libre" contenteditable="true" spellcheck="false" data-col="${k}">${esc(x)}</div>${k === 2 ? `<button type="button" class="pf-x" data-suppr-ligne title="Retirer cette ligne">✕</button>` : ""}</td>`).join("")}</tr>` };
       });
     tubes.push(...manuelles("tubes"));
-    tf.filter((t) => P.groupeTube(t) > 0).forEach((t, i, l) => {
-      const g = P.groupeTube(t);
-      if (i === 0 || P.groupeTube(l[i - 1]) !== g) tubes.push({ st: g === 1 ? "TUBAGE" : "TUBES PASTILLÉS" });
-      tubes.push(ligneTube(t));
+    // TUBAGE puis TUBES PASTILLÉS : lignes calculées (NDC) + lignes tapées à la main dans chaque rubrique
+    [[1, "TUBAGE", "tubage"], [2, "TUBES PASTILLÉS", "pastilles"]].forEach(([g, titre, sec]) => {
+      const lignes = tf.filter((t) => P.groupeTube(t) === g).map(ligneTube).concat(manuelles(sec));
+      if (lignes.length) tubes.push({ st: titre }, ...lignes);
     });
+    const sousRubriques = tubes.some((l) => l.st);
     platines.push(...manuelles("platines"));
     centreurs.push(...manuelles("centreurs"));
     const barres = c.barres.map((b) => { const cle = P.cleArticle("barre", b); return { maj: J(kBa(b)), c: [`${q(cle, b.qte)} u`, `${esc(b.type)} ${esc(P.texteD(b.d))}`, `${b.l === "" ? "" : esc(P.texteL(b.l))}`], td: [qteAtt(cle, [kBa(b)])] }; });
     barres.push(...manuelles("barres"));
     // Lignes vides : au stylo sur le papier ; à l'écran, on tape directement dedans
-    const videSaisie = (sec) => (I ? (k) => `<tr class="pf-v" data-sec="${sec}" data-i="${(prep.lignes[sec] || []).length + k}">${[0, 1, 2].map((col) => `<td><div class="pf-libre" contenteditable="true" spellcheck="false" data-col="${col}"></div></td>`).join("")}</tr>` : null);
-    const plus = (sec) => (I ? `<tr class="pf-plus"><td colspan="3"><button type="button" data-plus="${sec}">+ ajouter une ligne</button></td></tr>` : "");
+    const videSaisie = (sec) => (I && !(sec === "tubes" && sousRubriques) ? (k) => `<tr class="pf-v" data-sec="${sec}" data-i="${(prep.lignes[sec] || []).length + k}">${[0, 1, 2].map((col) => `<td><div class="pf-libre" contenteditable="true" spellcheck="false" data-col="${col}"></div></td>`).join("")}</tr>` : null);
+    const plus = (sec) => (!I ? "" : sec === "tubes"
+      ? `<tr class="pf-plus"><td colspan="3"><button type="button" data-plus="tubes">+ ajouter une ligne</button> · <button type="button" data-plus="tubage">+ tubage</button> · <button type="button" data-plus="pastilles">+ tube pastillé</button></td></tr>`
+      : `<tr class="pf-plus"><td colspan="3"><button type="button" data-plus="${sec}">+ ajouter une ligne</button></td></tr>`);
     const L = (n) => (n || n === 0 ? n : "");
     // Bas de page : même nombre de lignes à gauche et à droite → les traits sont alignés
     // Lignes vides pour compléter au stylo : réduites si la fiche est longue (niveau de resserrage)
@@ -2378,6 +2382,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const kLi = (sec, l) => {
     const [, b, c] = l.c.map((x) => String(x || "").trim());
     if (sec === "tubes") return `Tubes ${b}${c ? " x " + c : ""}`.trim();
+    if (sec === "tubage") return `Tubage ${b}${c ? " x " + c : ""}`.trim();
+    if (sec === "pastilles") return `Tubes ${b} pastillés${c ? " x " + c : ""}`.trim();
     if (sec === "platines") return `Platines ${b} ${c.toLowerCase()}`.trim();
     if (sec === "centreurs") return `Pointes ${b}${c ? " tube " + c : ""}`.trim();
     return `Barres ${b}${c ? " x " + c : ""}`.trim();

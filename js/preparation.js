@@ -497,7 +497,8 @@ const FTSPreparation = (() => {
       pastilles: { actif: false, lignes: [] },
       tubesManuels: [],
       // Lignes tapées directement sur la fiche (3 cases comme la fiche : Qté, Ø / section, longueur / coiffe…)
-      lignes: { platines: [], centreurs: [], tubes: [], barres: [] },
+      // tubes = tubes principaux ; tubage et pastilles = rubriques TUBAGE et TUBES PASTILLÉS (17/11/2026)
+      lignes: { platines: [], centreurs: [], tubes: [], tubage: [], pastilles: [], barres: [] },
       ciment: { type: "32.5", surconso: "", premiereLivraison: "", palettesFiche: "" },
       marges: {},
       // Cases changées à la main sur la fiche : { champ: { avant } } (repère jaune + « revenir »)
@@ -534,6 +535,8 @@ const FTSPreparation = (() => {
     if (envoi) {
       envoi.recap = (envoi.recap || []).map(([k, v]) => [cleRecapActuelle(sansCollerette(k)), k === "Cuve à eau" && !/^(OUI|NON)$/i.test(String(v || "").trim()) ? "OUI" : v]);
       envoi.surligne = (envoi.surligne || []).map((k) => cleRecapActuelle(sansCollerette(k)));
+      // Fiche sans NDC envoyée avant le 17/11/2026 : « 0 Pal » imprimé ; la case est maintenant vide (pas un changement)
+      envoi.recap = envoi.recap.map(([k, v]) => [k, /^Ciment (total|1ère livraison)$/.test(k) && /^0 Pal$/.test(String(v || "").trim()) ? "" : v]);
     }
     // Marges des platines : section écrite « 200² x 20 » depuis le 17/11/2026
     Object.keys(marges).forEach((k) => {
@@ -545,7 +548,7 @@ const FTSPreparation = (() => {
     const outils = Array.isArray(re0.outils) && re0.outils.length ? re0.outils.map((o) => ({ outil: String(o.outil || ""), diam: o.diam == null ? "" : String(o.diam) }))
       : [{ outil: String(re0.outil || ""), diam: re0.outilDiam == null ? "" : String(re0.outilDiam) }];
     const lignes = {};
-    ["platines", "centreurs", "tubes", "barres"].forEach((s) => {
+    ["platines", "centreurs", "tubes", "tubage", "pastilles", "barres"].forEach((s) => {
       lignes[s] = ((p.lignes && p.lignes[s]) || []).map((l) => ({ c: [0, 1, 2].map((i) => String((l.c || [])[i] == null ? "" : l.c[i])) }));
     });
     return {

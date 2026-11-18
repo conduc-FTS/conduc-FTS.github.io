@@ -25,6 +25,7 @@ const FTSShell = (() => {
     { id: "se-view-stats", ic: "📈", label: "Statistiques", href: SUP + "#se-view-stats" },
     { grp: "CHANTIERS" },
     { id: "se-view-preparation", ic: "📋", label: "Préparation", href: SUP + "#se-view-preparation", pastille: "fts_prepa_a_faire" },
+    { id: "se-view-resultats", ic: "💶", label: "Résultats", href: SUP + "#se-view-resultats" },
     { id: "se-view-archives", ic: "🗄️", label: "Archives", href: SUP + "#se-view-archives" },
     { id: "se-view-documents", ic: "📁", label: "Documents", href: SUP + "#se-view-documents" },
     // OUVERTURE CHANTIER (js/ouverture-chantier.js)

@@ -3,7 +3,13 @@
  *   - Vendu / réalisé  : a-t-on tenu ce qu'on a vendu ?
  *   - Temps perdu      : pannes et arrêts, classés interne / à réclamer / neutre
  *   - Parc matériel    : utilisation et fiabilité des foreuses et centrales
- *   - Bilans           : fiche de fin de chantier (+ PDF) et cadences réelles
+ *   - Personnel        : jours-hommes, intérim, grands déplacements
+ *
+ * Refonte du 18/11/2026 (Clément) : des statistiques d'ACTIVITÉ, par métier
+ * (cases Pieux / Micropieux / Battage), pas chantier par chantier (le détail
+ * est dans la Vue d'ensemble). Aucun coût de revient, marge ni tarif ici :
+ * seulement le CA vendu (marché + avenants). Les bilans de fin de chantier
+ * sont remplacés par le module Résultats (js/resultats.js).
  *
  * Règle (Clément) : TOUTES les statistiques portent uniquement sur les
  * chantiers terminés et archivés — un chantier en cours se suit sur son
@@ -14,11 +20,11 @@
  * Materiel + Production), complétée par les onglets Pannes / Arrets et par
  * les chantiers archivés (gardés en copie locale : ils ne changent plus).
  *
- * FTSStats.monter(conteneur, { obtenirDonnees }) puis FTSStats.ouvrir("vr"|"tp"|"parc"|"bilans").
+ * FTSStats.monter(conteneur, { obtenirDonnees }) puis FTSStats.ouvrir("vr"|"tp"|"parc"|"pers").
  * Nécessite drive.js, sheets.js, parc-materiel.js, ateliers.js.
  */
 const FTSStats = (() => {
-  const CLE_ARCHIVES = "fts_stats_archives_v1";
+  const CLE_ARCHIVES = "fts_stats_archives_v2"; // v2 : avec le personnel
   const TTL = 120000;
   const H_JOUR = 8; // heures d'un jour d'atelier (conversion h → j)
 
@@ -28,7 +34,10 @@ const FTSStats = (() => {
   let enCours = null;
   let onglet = "vr";
   let periode = "annee";
-  let bilanSel = null;
+  // Métiers affichés (le rapport journalier pieux n'existe pas encore)
+  const METIERS = [["Micropieux", "Micropieux"], ["Battage", "Battage"], ["Pieux", "Pieux"]];
+  const METIERS_A_VENIR = ["Pieux"];
+  let metiers = new Set(["Micropieux", "Battage"]);
   let derniereErreur = "";
 
   // ─── Outils ──────────────────────────────────────────────────
@@ -123,7 +132,7 @@ const FTSStats = (() => {
             manquants.forEach((a, i) => {
               const s = suivis[i] || {};
               if (s.erreur) return; // on réessaiera la prochaine fois
-              cache.ids[a.id] = { name: a.name, meta: FTSDrive.parseMetadonnees(a.description), materiel: s.materiel || [], production: s.production || [], pannes: (pa[a.id] || {}).pannes || [], arrets: (pa[a.id] || {}).arrets || [] };
+              cache.ids[a.id] = { name: a.name, meta: FTSDrive.parseMetadonnees(a.description), materiel: s.materiel || [], production: s.production || [], personnel: s.personnel || [], pannes: (pa[a.id] || {}).pannes || [], arrets: (pa[a.id] || {}).arrets || [] };
             });
           }
           const garder = new Set(archives.map((a) => a.id));
@@ -134,7 +143,7 @@ const FTSStats = (() => {
         const pa = connecte ? await FTSSheets.lirePannesArrets((d.suivis || []).filter((x) => x && termines.has(x.id))) : {};
         const actifs = d.chantiers.map((c, i) => {
           const s = d.suivis[i] || {};
-          return { id: c.id, name: c.name, meta: c.meta || {}, materiel: s.materiel || [], production: s.production || [], pannes: (pa[c.id] || {}).pannes || [], arrets: (pa[c.id] || {}).arrets || [], archive: false };
+          return { id: c.id, name: c.name, meta: c.meta || {}, materiel: s.materiel || [], production: s.production || [], personnel: s.personnel || [], pannes: (pa[c.id] || {}).pannes || [], arrets: (pa[c.id] || {}).arrets || [], archive: false };
         });
         const vus = new Set(actifs.map((c) => c.id));
         // Montants : toujours ceux du classeur Marchés (encadrement)
@@ -199,7 +208,7 @@ const FTSStats = (() => {
   // rapport, dont le dernier rapport tombe dans la période choisie.
   function chantiersFiltres() {
     const b = bornes();
-    return jeu.chantiers.filter((c) => c.mp && c.etat === "termine" && c.jours && (!b[0] || dansPeriode(c.dernier, b)));
+    return jeu.chantiers.filter((c) => c.mp && c.etat === "termine" && c.jours && c.tech.some((t) => metiers.has(t)) && (!b[0] || dansPeriode(c.dernier, b)));
   }
 
   // ─── Montage ─────────────────────────────────────────────────
@@ -208,8 +217,9 @@ const FTSStats = (() => {
     opts = o || {};
     racine.innerHTML = `
       <div class="st-filters">
-        <span class="st-chip on">Micropieux + Battage</span>
-        <span class="st-chip off" title="Le rapport journalier pieux n'existe pas encore">Pieux · à venir</span>
+        ${METIERS.map(([m, lib]) => METIERS_A_VENIR.includes(m)
+          ? `<span class="st-chip off" title="Le rapport journalier ${lib.toLowerCase()} n'existe pas encore">${lib} · à venir</span>`
+          : `<button type="button" class="st-chip ${metiers.has(m) ? "on" : ""}" data-metier="${m}">${metiers.has(m) ? "✓ " : ""}${lib}</button>`).join("")}
         <select id="stPeriode">
           <option value="annee">Cette année</option>
           <option value="12m">12 derniers mois</option>
@@ -225,9 +235,17 @@ const FTSStats = (() => {
     racine.querySelector("#stPeriode").addEventListener("change", (e) => { periode = e.target.value; afficher(); });
     racine.querySelector("#stExport").addEventListener("click", exporter);
     racine.addEventListener("click", (e) => {
-      const b = e.target.closest("[data-bilan]");
-      if (b) { bilanSel = b.dataset.bilan; afficher(); return; }
-      if (e.target.closest("#stPdf")) genererPdf();
+      const m = e.target.closest("[data-metier]");
+      if (m) {
+        const k = m.dataset.metier;
+        if (metiers.has(k) && metiers.size === 1) return; // au moins un métier coché
+        metiers.has(k) ? metiers.delete(k) : metiers.add(k);
+        m.classList.toggle("on", metiers.has(k));
+        m.textContent = (metiers.has(k) ? "✓ " : "") + k;
+        afficher(); return;
+      }
+      const t = e.target.closest("[data-toggle]");
+      if (t) { const c = racine.querySelector(t.dataset.toggle); if (c) { c.hidden = !c.hidden; t.textContent = t.textContent.replace(/^[▸▾]/, c.hidden ? "▸" : "▾"); } return; }
       const lien = e.target.closest("[data-detail]");
       if (lien) location.href = `../detail-chantier/index.html?id=${encodeURIComponent(lien.dataset.detail)}&name=${encodeURIComponent(lien.dataset.nom)}`;
     });
@@ -250,7 +268,7 @@ const FTSStats = (() => {
     }
     majEtat(enCours ? "Actualisation…" : derniereErreur ? "Erreur : " + derniereErreur : "");
     try {
-      vue.innerHTML = onglet === "tp" ? vueTempsPerdu() : onglet === "parc" ? vueParc() : onglet === "bilans" ? vueBilans() : vueVenduRealise();
+      vue.innerHTML = bandeauCouverture() + (onglet === "tp" ? vueTempsPerdu() : onglet === "parc" ? vueParc() : onglet === "pers" ? vuePersonnel() : vueVenduRealise());
     } catch (e) {
       console.error(e);
       vue.innerHTML = `<div class="st-vide">Erreur d'affichage : ${esc(e.message)}</div>`;
@@ -261,77 +279,73 @@ const FTSStats = (() => {
   const vide = (t) => `<div class="st-vide">${t}</div>`;
   const barre = (pct, coul) => `<span class="st-bar"><i style="width:${Math.max(0, Math.min(100, pct))}%${coul ? ";background:" + coul : ""}"></i></span>`;
 
+  // ═══ Bandeau commun : sur quoi portent les chiffres ═══════════
+  function bandeauCouverture() {
+    if (!jeu) return "";
+    const b = bornes();
+    const tous = jeu.chantiers.filter((c) => c.mp && c.etat === "termine" && c.tech.some((t) => metiers.has(t)) && (!b[0] || !c.dernier || dansPeriode(c.dernier, b)));
+    const L = chantiersFiltres();
+    if (!tous.length) return "";
+    const sansRapport = tous.length - L.length;
+    const incomplets = L.filter((c) => !c.prevu || !c.joursVendus);
+    const lien = (c) => `<a href="#" data-detail="${esc(c.id)}" data-nom="${esc(c.name)}">${esc(court(c.name))}</a>`;
+    const morceaux = [`ℹ️ Calculé sur <b>${L.length} chantier${L.length > 1 ? "s" : ""} terminé${L.length > 1 ? "s" : ""}</b> (${[...metiers].join(" + ").toLowerCase()})`];
+    if (sansRapport > 0) morceaux.push(`${sansRapport} sans rapport journalier`);
+    if (incomplets.length) morceaux.push(`${incomplets.length} sans quantité ou durée vendue, non comparé${incomplets.length > 1 ? "s" : ""} au vendu : ${incomplets.slice(0, 4).map(lien).join(", ")}${incomplets.length > 4 ? "…" : ""}`);
+    return `<div class="st-cov">${morceaux.join(" · ")}</div>`;
+  }
+
   // ═══ 1. VENDU / RÉALISÉ ═══════════════════════════════════════
   function lignesVR() {
-    const ordre = { cours: 0, termine: 1, attente: 2 };
-    return chantiersFiltres().sort((a, b) => (ordre[a.etat] - ordre[b.etat]) || ((b.ecart ?? -99) - (a.ecart ?? -99)) || a.name.localeCompare(b.name));
+    return chantiersFiltres().sort((a, b) => ((b.ecart ?? -99) - (a.ecart ?? -99)) || a.name.localeCompare(b.name));
   }
   function vueVenduRealise() {
     const L = lignesVR();
-    if (!L.length) return vide("Aucun chantier micropieux terminé sur cette période. Un chantier entre dans les statistiques quand il est marqué « Terminé » sur son Détail chantier (ou archivé).");
-    const dem = L.filter((c) => c.jours);
-    const nT = L.filter((c) => c.etat === "termine").length, nC = L.filter((c) => c.etat === "cours").length, nA = L.filter((c) => c.etat === "attente").length;
-    const avecEcart = dem.filter((c) => c.ecart != null);
-    const ecartTot = avecEcart.reduce((s, c) => s + c.ecart, 0);
-    const vendusTot = avecEcart.reduce((s, c) => s + c.joursVendus, 0);
-    const dep = avecEcart.filter((c) => c.ecart > 0.5);
-    const avecCa = dem.filter((c) => c.caJour != null);
-    const caMoy = avecCa.length ? avecCa.reduce((s, c) => s + c.caProduit, 0) / avecCa.reduce((s, c) => s + c.jours, 0) : null;
-    const caMin = avecCa.length ? Math.min(...avecCa.map((c) => c.caJour)) : 0, caMax = avecCa.length ? Math.max(...avecCa.map((c) => c.caJour)) : 0;
+    if (!L.length) return vide("Aucun chantier terminé pour ces métiers sur cette période. Un chantier entre dans les statistiques quand il est marqué « Terminé » sur son Détail chantier (ou archivé).");
+    const comp = L.filter((c) => c.ecart != null);
+    const tenus = comp.filter((c) => c.ecart <= 0.5);
+    const gagnes = comp.filter((c) => c.ecart < -0.05).reduce((s, c) => s - c.ecart, 0);
+    const perdus = comp.filter((c) => c.ecart > 0.05).reduce((s, c) => s + c.ecart, 0);
+    const avecCa = L.filter((c) => c.montant);
+    const ca = avecCa.reduce((s, c) => s + c.montant, 0);
+    const jCa = avecCa.reduce((s, c) => s + c.jours, 0);
+    const mlCa = avecCa.reduce((s, c) => s + c.ml, 0);
+    const k = (n) => n >= 10000 ? `${fmt(n / 1000)} <small>k€</small>` : `${fmt(n)} <small>€</small>`;
 
     const kpis = `<div class="st-kpis">
-      ${kpi("Chantiers terminés analysés", L.length, (() => { const na = L.filter((c) => c.archive).length, nt = L.length - na; return [nt && `${nt} terminé${nt > 1 ? "s" : ""}`, na && `${na} archivé${na > 1 ? "s" : ""}`].filter(Boolean).join(" · "); })())}
-      ${kpi("Écart de jours (vendu → réel)", avecEcart.length ? `${signe(ecartTot)} <small>j</small>` : "—", avecEcart.length ? `sur ${fmt1(vendusTot)} j vendus` : "durée vendue non renseignée", avecEcart.length ? (ecartTot > 0.5 ? "alert" : "ok") : "")}
-      ${kpi("Chantiers en dépassement", `${dep.length} <small>/ ${avecEcart.length}</small>`, dep.length ? `${fmt1(dep.reduce((x, c) => x + c.ecart, 0))} j de dépassement au total` : "aucun", dep.length ? "warn" : "")}
-      ${kpi("CA par jour de rapport", caMoy != null ? `${fmt(caMoy)} <small>€/j</small>` : "—", caMoy != null ? (avecCa.length > 1 ? `de ${fmt(caMin)} à ${fmt(caMax)} €/j selon le chantier` : "1 chantier") : "montants non renseignés")}
+      ${kpi("Chantiers terminés", L.length, comp.length === L.length ? "tous comparables au vendu" : `dont ${comp.length} comparable${comp.length > 1 ? "s" : ""} au vendu`)}
+      ${kpi("Délais tenus", comp.length ? `${tenus.length} <small>/ ${comp.length}</small>` : "—", comp.length ? (comp.length - tenus.length ? `${comp.length - tenus.length} chantier${comp.length - tenus.length > 1 ? "s" : ""} en retard` : "aucun retard") : "durées vendues non renseignées", comp.length ? (tenus.length === comp.length ? "ok" : "alert") : "")}
+      ${kpi("Jours gagnés / perdus", comp.length ? `+${fmt1(gagnes)} <small>/</small> −${fmt1(perdus)} <small>j</small>` : "—", comp.length ? `bilan : ${perdus - gagnes > 0.05 ? fmt1(perdus - gagnes) + " j de retard" : gagnes - perdus > 0.05 ? fmt1(gagnes - perdus) + " j d'avance" : "à l'équilibre"} au total` : "", comp.length ? (perdus > gagnes + 0.05 ? "warn" : "ok") : "")}
+      ${kpi("CA vendu", avecCa.length ? k(ca) : "—", avecCa.length ? `${fmt(ca / jCa)} € par jour de chantier` : "montants non renseignés")}
     </div>`;
 
-    // Graphique des écarts
-    const graph = [...avecEcart].sort((a, b) => b.ecart - a.ecart);
-    const maxAbs = Math.max(1, ...graph.map((c) => Math.abs(c.ecart)));
-    const lignesGraph = graph.map((c) => {
-      const w = Math.abs(c.ecart) / maxAbs * 46;
-      const coul = c.ecart > 0.5 ? "#C0392B" : c.ecart > 0.05 ? "#E08A00" : "#1E8E4E";
-      const proj = c.etat === "cours";
-      return `<div class="st-div-row"><span class="st-ell">${nomChantier(c.name)}</span><div class="st-axis"><i style="${c.ecart >= 0 ? "left:50%" : `left:${50 - w}%`};width:${Math.max(w, 0.8)}%;background:${coul};${proj ? "opacity:.55" : ""}"></i></div><b class="${c.ecart > 0.5 ? "st-bad" : c.ecart < -0.05 ? "st-good" : ""}">${signe(c.ecart)} j${proj ? "*" : ""}</b></div>`;
+    // Cadence par métier : jamais mélangée entre métiers
+    const lignesMetier = [...metiers].map((m) => {
+      const cs = L.filter((c) => c.tech.includes(m));
+      const cmp = cs.filter((c) => c.prevu && c.joursVendus);
+      const j = cs.reduce((s, c) => s + c.jours, 0), r = cs.reduce((s, c) => s + c.realise, 0), ml = cs.reduce((s, c) => s + c.ml, 0);
+      const cadV = cmp.length ? cmp.reduce((s, c) => s + c.prevu, 0) / cmp.reduce((s, c) => s + c.joursVendus, 0) : null;
+      const cadRc = cmp.length ? cmp.reduce((s, c) => s + c.realise, 0) / cmp.reduce((s, c) => s + c.jours, 0) : null;
+      const ecart = cadV && cadRc != null ? (cadRc / cadV - 1) * 100 : null;
+      const mixtes = cs.filter((c) => c.tech.filter((t) => metiers.has(t)).length > 1).length;
+      if (!cs.length) return `<tr><td><b>${m}</b></td><td class="r">0</td><td class="r st-mut">—</td><td class="r st-mut">—</td><td class="r st-mut">—</td><td class="r st-mut">—</td><td class="r st-mut">pas encore de chantier terminé</td></tr>`;
+      return `<tr><td><b>${m}</b>${mixtes ? ` <span class="st-mut st-small">dont ${mixtes} mixte${mixtes > 1 ? "s" : ""}</span>` : ""}</td><td class="r">${cs.length}</td><td class="r">${r ? fmt(ml / r, 1) + " m" : "—"}</td>
+        <td class="r">${cadV ? fmt(cadV, 1) + " u/j" : '<span class="st-mut">—</span>'}</td><td class="r">${j ? fmt(r / j, 1) + " u/j" : "—"}</td><td class="r">${j ? fmt(ml / j) + " ml/j" : "—"}</td>
+        <td class="r ${ecart == null ? "" : ecart < -5 ? "st-warn" : ecart > 5 ? "st-good" : ""}">${ecart == null ? '<span class="st-mut">—</span>' : (ecart > 0 ? "+" : "−") + fmt(Math.abs(ecart)) + " %"}</td></tr>`;
     }).join("");
+    const cad = `<section class="st-card"><div class="st-ch"><h2>Cadence par métier</h2><span class="s">vendue / réalisée, jamais mélangées entre métiers</span></div>
+      <div class="st-scroll"><table class="st-tbl"><thead><tr><th>Métier</th><th class="r">Chantiers</th><th class="r">Long. moy.</th><th class="r">Vendue</th><th class="r">Réalisée</th><th class="r">Réalisée (ml)</th><th class="r">Écart</th></tr></thead><tbody>${lignesMetier}</tbody></table></div>
+      <div class="st-note">Cadence vendue = micropieux vendus ÷ jours vendus (marché + avenants), sur les chantiers où les deux sont renseignés ; l'écart compare ces mêmes chantiers. Le mètre par jour permet de comparer des chantiers de longueurs différentes. Un chantier mixte compte dans chacun de ses métiers ; tant que le rapport ne sépare pas le battage, sa production est comptée en micropieux.</div></section>`;
 
-    const prio = priorites(L);
-    const haut = `<div class="st-grid2">
-      <div class="st-card"><div class="st-ch"><h2>Écart de jours par chantier</h2><span class="s">vert = plus rapide que vendu · rouge = dépassement</span></div>
-        <div class="st-cb">${lignesGraph || '<span class="st-mut">Aucun chantier avec une durée vendue.</span>'}</div></div>
-      <div class="st-card"><div class="st-ch"><h2>À regarder en priorité</h2></div><div class="st-cb st-prio">${prio || '<span class="st-mut">Rien de particulier à signaler.</span>'}</div></div>
-    </div>`;
-
-    const lignes = L.map((c) => {
-      const pill = c.ecart > 0.5 ? `<span class="st-pill p-late">${c.archive ? "Archivé" : "Terminé"} · dépassé</span>` : c.etat === "termine" ? `<span class="st-pill p-done">${c.archive ? "Archivé" : "Terminé"}</span>`
-        : c.etat === "attente" ? '<span class="st-pill p-wait">Pas démarré</span>'
-        : c.ecart > 0.5 ? '<span class="st-pill p-late">En cours · retard</span>' : '<span class="st-pill p-run">En cours</span>';
-      const q = (v, f = fmt1) => v == null || v === 0 && false ? '<span class="st-mut">—</span>' : f(v);
-      const manq = (t) => `<span class="st-mut" title="${t}">?</span>`;
-      const pct = c.prevu ? Math.min(100, c.realise / c.prevu * 100) : null;
-      const clsCad = c.cadR != null && c.cadV ? (c.cadR < c.cadV * 0.95 ? "st-bad" : c.cadR > c.cadV * 1.05 ? "st-good" : "") : "";
-      const clsE = c.ecart == null ? "" : c.ecart > 0.5 ? "st-bad" : c.ecart < -0.05 ? "st-good" : "";
-      return `<tr class="st-lien" data-detail="${esc(c.id)}" data-nom="${esc(c.name)}" title="Ouvrir le détail du chantier">
-        <td>${nomChantier(c.name)}</td><td>${pill}</td>
-        <td class="r">${c.prevu ? fmt(c.prevu) + (c.avMpx ? ` <small class="st-mut">(${c.avMpx > 0 ? "+" : ""}${c.avMpx} TS)</small>` : "") : manq("quantité vendue non renseignée")}</td>
-        <td class="r">${fmt(c.realise)}${c.ecartMpx ? ` <span class="st-warn" title="Mpx réalisés différents des Mpx vendus (marché + avenants) : vérifier le montant / les avenants">⚠</span>` : ""}</td>
-        <td>${pct != null && c.jours ? `${fmt(pct)} %${barre(pct)}` : '<span class="st-mut">—</span>'}</td>
-        <td class="r">${c.joursVendus ? fmt1(c.joursVendus) : manq("durée vendue non renseignée")}</td>
-        <td class="r">${c.jours ? c.jours : '<span class="st-mut">—</span>'}</td>
-        <td class="r ${clsE}">${c.ecart != null ? signe(c.ecart) : '<span class="st-mut">—</span>'}</td>
-        <td class="r">${c.cadV ? fmt(c.cadV, 1) : '<span class="st-mut">—</span>'}</td>
-        <td class="r ${clsCad}">${c.cadR != null ? fmt(c.cadR, 1) : '<span class="st-mut">—</span>'}</td>
-        <td class="r">${c.caJour != null ? euros(c.caJour) : c.jours ? manq("montant ou quantité vendue non renseigné") : '<span class="st-mut">—</span>'}</td></tr>`;
-    }).join("");
-
-    const tableau = `<div class="st-card"><div class="st-ch"><h2>Détail par chantier</h2><span class="s">quantités, durées et montants = marché principal + avenants / TS validés · clic sur une ligne = détail du chantier</span></div>
-      <div class="st-scroll"><table class="st-tbl">
-        <thead><tr><th rowspan="2">Chantier</th><th rowspan="2">Statut</th><th class="g" colspan="3">MICROPIEUX</th><th class="g" colspan="3">JOURS</th><th class="g" colspan="2">CADENCE (Mpx/j)</th><th rowspan="2" class="r">CA / jour</th></tr>
-        <tr><th class="r">Vendus</th><th class="r">Réalisés</th><th>Avancement</th><th class="r">Vendus</th><th class="r">Réels</th><th class="r">Écart</th><th class="r">Vendue</th><th class="r">Réelle</th></tr></thead>
-        <tbody>${lignes}</tbody></table></div>
-      <div class="st-note"><b>Comment lire :</b> jours réels = jours de rapport (deux ateliers le même jour = 1 jour). Cadence vendue = Mpx vendus ÷ jours vendus. CA / jour = montant (marché + avenants validés) ÷ jours de rapport. ⚠ = Mpx réalisés différents des Mpx vendus (avenant manquant ?). « ? » = donnée manquante dans les infos du chantier (à compléter avec ✏️ Modifier les infos sur le Détail chantier).</div></div>`;
-    return kpis + haut + tableau;
+    const tot = { mpx: L.reduce((s, c) => s + c.realise, 0), ml: L.reduce((s, c) => s + c.ml, 0), j: L.reduce((s, c) => s + c.jours, 0) };
+    const vol = `<section class="st-card"><div class="st-ch"><h2>Volume réalisé</h2><span class="s">métiers cochés · période choisie</span></div>
+      <div class="st-cb"><div class="st-vr st-vr2">
+        <div><div class="l">Micropieux</div><div class="n"><b>${fmt(tot.mpx)}</b></div></div>
+        <div><div class="l">Mètres forés</div><div class="n"><b>${fmt(tot.ml)}</b> ml</div></div>
+        <div><div class="l">Jours de chantier</div><div class="n"><b>${fmt(tot.j)}</b> j</div></div>
+        <div><div class="l">CA vendu au mètre</div><div class="n">${mlCa ? `<b>${fmt(ca / mlCa)}</b> €/ml` : '<b class="st-mut">—</b>'}</div></div>
+      </div></div></section>`;
+    return kpis + `<div class="st-grid2">${cad}${vol}</div>`;
   }
 
   function heuresParGroupe(c) {
@@ -344,26 +358,6 @@ const FTSStats = (() => {
     c.evts.filter((e) => e.cat === "panne").forEach((e) => { m[e.quoi] = (m[e.quoi] || 0) + e.h; });
     return Object.entries(m).sort((a, b) => b[1] - a[1])[0] || null;
   }
-  function priorites(L) {
-    const dem = L.filter((c) => c.ecart != null);
-    const mauvais = dem.filter((c) => c.ecart > 0.5).sort((a, b) => b.ecart - a.ecart).slice(0, 2);
-    const bon = dem.filter((c) => c.ecart < -0.05).sort((a, b) => a.ecart - b.ecart)[0];
-    const out = mauvais.map((c, i) => {
-      const { h } = heuresParGroupe(c);
-      const tp = topPanne(c);
-      let t = `${i === 0 ? "🔴" : "🟠"} <b>${esc(code(c.name))} ${esc(court(c.name))}</b> : `;
-      if (c.etat === "cours") t += `${fmt(c.cadR, 1)} Mpx/j${c.cadV ? ` au lieu des ${fmt(c.cadV, 1)} vendus` : ""}. À ce rythme, ${fmt1(c.projetes)} j au lieu de ${fmt1(c.joursVendus)} → <b>${signe(c.ecart)} j</b>.`;
-      else t += `terminé avec <b>${signe(c.ecart)} j</b>${c.cadV ? ` (${fmt(c.cadR, 1)} Mpx/j pour ${fmt(c.cadV, 1)} vendus)` : ""}.`;
-      if (tp && tp[1] > 0) t += ` ${fmt1(tp[1])} h de pannes ${esc(tp[0])}.`;
-      if (h.reclamer > 0) t += ` ${fmt1(h.reclamer)} h d'arrêts imputables au client / MOE → onglet Temps perdu (à réclamer).`;
-      return t;
-    });
-    if (bon) out.push(`🟢 <b>${esc(code(bon.name))} ${esc(court(bon.name))}</b> : ${fmt(bon.cadR, 1)} Mpx/j${bon.cadV ? ` pour ${fmt(bon.cadV, 1)} vendus` : ""}, ${fmt1(-bon.ecart)} j d'avance${bon.etat === "cours" ? " (projection)" : ""}.`);
-    const sansInfos = L.filter((c) => !c.prevu || !c.joursVendus).length;
-    if (sansInfos) out.push(`<span class="st-mut">ℹ️ ${sansInfos} chantier${sansInfos > 1 ? "s" : ""} sans quantité ou durée vendue : non comparé${sansInfos > 1 ? "s" : ""}.</span>`);
-    return out.join("<br><br>");
-  }
-
   // ═══ 2. TEMPS PERDU ═══════════════════════════════════════════
   function evenementsPeriode() {
     const b = bornes();
@@ -393,26 +387,11 @@ const FTSStats = (() => {
     const stack = ordreCats.map((k) => { const p = parCat[k] / tot * 100; return `<div style="width:${p}%;background:${CATS[k].col}" title="${esc(CATS[k].lib)} : ${fmt1(parCat[k])} h">${p > 12 ? `${esc(CATS[k].lib.split(" (")[0])} ${fmt1(parCat[k])} h` : ""}</div>`; }).join("");
     const leg = ordreCats.map((k) => `<span class="sq" style="background:${CATS[k].col}"></span><span>${esc(CATS[k].lib)}</span><b>${fmt1(parCat[k])} h</b>${tag(CATS[k].grp)}`).join("");
 
-    const parMachine = {};
-    E.filter((e) => e.cat === "panne").forEach((e) => {
-      const g = window.FTSAteliers ? FTSAteliers.groupeDePointage(e.quoi, "", "", e.atelier) : { cle: e.quoi, libelle: e.quoi };
-      const m = (parMachine[g.cle] = parMachine[g.cle] || { lib: g.libelle, n: 0, h: 0, ch: new Set() });
-      m.n++; m.h += e.h; m.ch.add(court(e.c.name));
-    });
-    const machines = Object.values(parMachine).sort((a, b) => b.h - a.h);
-    const maxH = machines.length ? machines[0].h : 0;
+    const haut = `<div class="st-card"><div class="st-ch"><h2>Répartition du temps perdu</h2><span class="s">toutes causes, sur la période · le détail des pannes, machine par machine, est dans l'onglet Parc matériel</span></div>
+        <div class="st-cb"><div class="st-stack">${stack}</div><div class="st-leg">${leg}</div></div></div>`;
 
-    const haut = `<div class="st-grid2">
-      <div class="st-card"><div class="st-ch"><h2>Répartition du temps perdu</h2><span class="s">toutes causes, sur la période</span></div>
-        <div class="st-cb"><div class="st-stack">${stack}</div><div class="st-leg">${leg}</div></div></div>
-      <div class="st-card"><div class="st-ch"><h2>Pannes par machine</h2><span class="s">détail dans l'onglet Parc matériel</span></div>
-        ${machines.length ? `<table class="st-tbl"><thead><tr><th>Machine</th><th class="r">Pannes</th><th class="r">Heures</th><th>Chantiers</th></tr></thead><tbody>
-        ${machines.slice(0, 8).map((m) => `<tr><td><b>${esc(m.lib)}</b></td><td class="r">${m.n}</td><td class="r ${m.h === maxH && maxH > 0 ? "st-bad" : ""}">${fmt1(m.h)} h</td><td class="st-mut st-ell" style="max-width:260px">${esc([...m.ch].join(", "))}</td></tr>`).join("")}
-        </tbody></table>` : '<div class="st-cb st-mut">Aucune panne sur la période.</div>'}</div>
-    </div>`;
-
-    const tRec = `<div class="st-card"><div class="st-ch"><h2>Arrêts imputables au client / MOE — à réclamer</h2><span class="s">retour d'expérience sur les chantiers terminés (pendant un chantier : onglet Pannes &amp; arrêts du Détail chantier)</span></div>
-      ${reclam.length ? `<div class="st-scroll" style="max-height:460px"><table class="st-tbl"><thead><tr><th>Date</th><th>Chantier</th><th>Motif</th><th class="r">Durée</th><th>Observation du chef</th></tr></thead><tbody>
+    const tRec = `<div class="st-card"><div class="st-ch"><h2>Arrêts imputables au client / MOE — à réclamer</h2><span class="s">${reclam.length} arrêt${reclam.length > 1 ? "s" : ""} · pendant un chantier : onglet Pannes &amp; arrêts du Détail chantier</span>${reclam.length ? `<span class="st-sp"></span><button type="button" class="st-chip" data-toggle="#stReclam">▸ Voir le détail</button>` : ""}</div>
+      ${reclam.length ? `<div class="st-scroll" id="stReclam" hidden style="max-height:460px"><table class="st-tbl"><thead><tr><th>Date</th><th>Chantier</th><th>Motif</th><th class="r">Durée</th><th>Observation du chef</th></tr></thead><tbody>
       ${reclam.map((e) => `<tr><td>${esc(jj(e.d))}</td><td>${nomChantier(e.c.name)}</td><td>${esc(e.quoi)}</td><td class="r">${fmt1(e.h)} h</td><td class="st-mut st-wrap">${esc(e.obs)}</td></tr>`).join("")}
       </tbody></table></div>` : '<div class="st-cb st-mut">Aucun arrêt imputable au client ou à la MOE sur la période.</div>'}
       <div class="st-note">Classement des motifs du rapport journalier — <b>interne</b> : pannes, attente coulis / matériaux · <b>à réclamer</b> : attente client / MOE, implantation, accès chantier, réseau / obstacle · <b>neutre</b> : météo, attente béton, autre.</div></div>`;
@@ -521,202 +500,52 @@ const FTSStats = (() => {
     return kpis + tab + tLoc;
   }
 
-  // ═══ 4. BILANS ════════════════════════════════════════════════
-  function bilansListe() {
-    const b = bornes();
-    return chantiersFiltres().sort((a, c) => (c.dernier || 0) - (a.dernier || 0));
-  }
-  function machinesChantier(c) {
-    const A = window.FTSAteliers;
-    if (!A) return [];
-    const vus = new Map();
-    (c.materiel || []).forEach((r) => {
-      if (sansAccent(r[2]) !== "TRAVAIL") return;
-      const g = A.groupeDePointage(r[1], r[4], r[3], r[5]);
-      if (g.section === "foreuse" || g.section === "centrale") vus.set(g.cle, g.libelle);
+  // ═══ 4. PERSONNEL ═════════════════════════════════════════════
+  const NON_TROUVE = "NON TROUVÉ DANS PERSONNEL FTS";
+  const POSTE_ORDRE = ["CHEF DE CHANTIER", "SECOND", "FOREUR", "POMPISTE", "MANŒUVRE", "SOUDEUR", "RECÉPEUR", "POLYVALENT"];
+  function calculPersonnel() {
+    const L = chantiersFiltres();
+    const postes = {}, vus = new Set();
+    let jh = 0, jhInt = 0, gd = 0, heures = 0, ml = 0;
+    const gdCh = new Set();
+    L.forEach((c) => {
+      ml += c.ml;
+      (c.personnel || []).forEach((r) => {
+        const nom = String(r[1] || "").trim();
+        if (!parseFR(r[0]) || !nom) return;
+        const cle = c.id + "|" + String(r[0]).trim() + "|" + sansAccent(nom);
+        if (vus.has(cle)) return; // même personne, même jour, même chantier : une fois
+        vus.add(cle);
+        const interim = /INTERIM/.test(sansAccent(r[2]));
+        const p = !interim && window.FTSPersonnel && FTSPersonnel.parNom ? FTSPersonnel.parNom(nom) : null;
+        const poste = interim ? "INTÉRIM" : (p && p.poste) || NON_TROUVE;
+        const x = (postes[poste] = postes[poste] || { jh: 0, h: 0, gd: 0, gens: new Set() });
+        x.jh++; x.h += nb(r[4]); x.gens.add(sansAccent(nom));
+        jh++; heures += nb(r[4]);
+        if (interim) jhInt++;
+        if (String(r[3] || "").trim()) { gd++; x.gd++; gdCh.add(c.id); }
+      });
     });
-    return [...vus.values()];
+    const lignes = Object.entries(postes).map(([poste, x]) => ({ poste, ...x, n: x.gens.size }))
+      .sort((a, b) => (a.poste === "INTÉRIM") - (b.poste === "INTÉRIM") || ((POSTE_ORDRE.indexOf(a.poste) + 1 || 99) - (POSTE_ORDRE.indexOf(b.poste) + 1 || 99)));
+    return { L, lignes, jh, jhInt, gd, nGdCh: gdCh.size, heures, ml };
   }
-  function bilan(c) {
-    const { h, cats } = heuresParGroupe(c);
-    const parMachine = {};
-    c.evts.filter((e) => e.cat === "panne").forEach((e) => { const m = (parMachine[e.quoi] = parMachine[e.quoi] || { n: 0, h: 0 }); m.n++; m.h += e.h; });
-    const parMotif = {};
-    c.evts.filter((e) => e.cat !== "panne").forEach((e) => { const k = e.quoi; const m = (parMotif[k] = parMotif[k] || { h: 0, cat: e.cat }); m.h += e.h; });
-    const temps = [
-      ...Object.entries(parMachine).map(([k, v]) => ({ lib: `Pannes ${k} (${v.n} panne${v.n > 1 ? "s" : ""})`, h: v.h, grp: "interne" })),
-      ...Object.entries(parMotif).map(([k, v]) => ({ lib: k, h: v.h, grp: CATS[v.cat].grp })),
-    ].sort((a, b) => b.h - a.h);
-    const totPerdu = h.interne + h.reclamer + h.neutre;
-    // À retenir
-    let retenir;
-    const lm = c.lMoy ? fmt(c.lMoy, 1) : null;
-    if (!c.joursVendus) retenir = `Durée vendue non renseignée : impossible de comparer au chiffrage. Cadence réelle : ${fmt(c.cadR, 1)} Mpx/j${lm ? ` pour des Mpx de ${lm} m en moyenne` : ""}.`;
-    else if (c.ecart > 0.05) {
-      const hp = cats.panne || 0;
-      const parts = [];
-      if (hp > 0) {
-        const reste = c.ecart - hp / H_JOUR;
-        parts.push(`sans les ${fmt1(hp)} h de panne (≈ ${fmt(hp / H_JOUR, 1)} j), le chantier aurait fini à ${reste > 0.05 ? signe(reste) + " j" : "l'heure"}.`);
-      }
-      if (h.reclamer > 0) parts.push(`${fmt1(h.reclamer)} h d'arrêts étaient imputables au client / MOE (à réclamer).`);
-      if (c.cadV && c.cadR < c.cadV) parts.push(`${parts.length ? "Le reste de l'écart vient de la cadence" : "L'écart vient de la cadence"} : ${fmt(c.cadR, 1)} Mpx/j${lm ? ` pour des Mpx de ${lm} m en moyenne` : ""}, contre ${fmt(c.cadV, 1)} retenus au chiffrage.`);
-      retenir = parts.length ? parts.join(" ") : `Dépassement de ${signe(c.ecart)} j sans cause déclarée dans les rapports.`;
-      retenir = retenir.charAt(0).toUpperCase() + retenir.slice(1);
-    } else {
-      retenir = `Chantier tenu${c.ecart < -0.05 ? ` avec ${fmt1(-c.ecart)} j d'avance` : ""} : ${fmt(c.cadR, 1)} Mpx/j${lm ? ` pour des Mpx de ${lm} m en moyenne` : ""}${c.cadV ? `, pour ${fmt(c.cadV, 1)} retenus au chiffrage` : ""}. Cadence à retenir pour des chantiers similaires.`;
-    }
-    return { temps, totPerdu, retenir, machines: machinesChantier(c) };
-  }
-
-  function cadencesReelles() {
-    const T = jeu.chantiers.filter((c) => c.mp && c.etat === "termine" && c.jours && c.realise);
-    const tr = [["moins de 8 m", (l) => l < 8], ["8 à 12 m", (l) => l >= 8 && l <= 12], ["plus de 12 m", (l) => l > 12]];
-    return tr.map(([lib, f]) => {
-      const cs = T.filter((c) => c.lMoy != null && f(c.lMoy));
-      const j = cs.reduce((s, c) => s + c.jours, 0);
-      return { lib, n: cs.length, mpxj: j ? cs.reduce((s, c) => s + c.realise, 0) / j : null, mlj: j ? cs.reduce((s, c) => s + c.ml, 0) / j : null, hpj: j ? cs.reduce((s, c) => s + c.evts.reduce((x, e) => x + e.h, 0), 0) / j : null };
-    });
-  }
-
-  function vueBilans() {
-    const L = bilansListe();
-    const cad = cadencesReelles();
-    const fiab = (n) => n >= 5 ? "🟢 fiable" : n >= 3 ? "🟠 à confirmer" : n ? `⚪ ${n} chantier${n > 1 ? "s" : ""} — indicatif` : "aucun chantier";
-    const tCad = `<div class="st-card"><div class="st-ch"><h2>Cadences réelles constatées — pour chiffrer</h2><span class="s">tous les chantiers terminés (et archivés), par longueur moyenne de Mpx</span></div>
-      <table class="st-tbl"><thead><tr><th>Longueur moyenne des Mpx</th><th class="r">Chantiers</th><th class="r">Mpx / jour</th><th class="r">ml / jour</th><th class="r">Temps perdu moyen</th><th>Fiabilité</th></tr></thead><tbody>
-      ${cad.map((t) => `<tr><td>${t.lib}</td><td class="r">${t.n}</td><td class="r">${t.mpxj != null ? fmt(t.mpxj, 1) : '<span class="st-mut">—</span>'}</td><td class="r">${t.mlj != null ? fmt(t.mlj) : '<span class="st-mut">—</span>'}</td><td class="r">${t.hpj != null ? fmt(t.hpj, 1) + " h/j" : '<span class="st-mut">—</span>'}</td><td class="st-mut">${fiab(t.n)}</td></tr>`).join("")}
-      </tbody></table>
-      <div class="st-note">Devient fiable à partir de 4–5 chantiers terminés par tranche. Les chantiers terminés avant le rapport journalier v2 n'ont pas de pannes / arrêts.</div></div>`;
-    if (!L.length) return vide("Aucun chantier terminé sur cette période. Un chantier apparaît ici quand il est marqué « Terminé » sur son Détail chantier (ou archivé).") + tCad;
-    if (!bilanSel || !L.some((c) => c.id === bilanSel)) bilanSel = L[0].id;
-    const c = L.find((x) => x.id === bilanSel);
-    const B = bilan(c);
-    const liste = L.map((x) => `<a data-bilan="${esc(x.id)}" class="${x.id === bilanSel ? "on" : ""}"><b>${esc(x.name)}</b><small>${x.archive ? "archivé" : "terminé"} · dernier rapport ${esc(jja(x.dernier))}${x.ecart != null ? ` · <span class="${x.ecart > 0.5 ? "st-bad" : x.ecart < -0.05 ? "st-good" : ""}">${signe(x.ecart)} j</span>` : ""}</small></a>`).join("");
-    const box = (l, n, s) => `<div><div class="l">${l}</div><div class="n">${n}</div><div class="st-mut st-small">${s || ""}</div></div>`;
-    const clsE = c.ecart == null ? "" : c.ecart > 0.5 ? "st-bad" : c.ecart < -0.05 ? "st-good" : "";
-    const fiche = `<div class="st-card"><div class="st-ch"><h2>Bilan — ${esc(c.name)}</h2><span class="s">du ${esc(jja(c.premier))} au ${esc(jja(c.dernier))}${c.chefs.length ? " · chef " + esc(c.chefs.join(", ")) : ""}${B.machines.length ? " · " + esc(B.machines.join(", ")) : ""}</span><span class="st-sp"></span><button type="button" class="st-btn" id="stPdf">⬇ PDF du bilan</button></div>
-      <div class="st-cb">
-        <div class="st-vr">
-          ${box("Micropieux", `<b>${fmt(c.realise)}</b> réalisés${c.prevu ? ` / ${fmt(c.prevu)} vendus` : ""}`, c.avMpx ? `dont ${c.avMpx} en avenant${c.nbAvenants > 1 ? "s" : ""}` : "")}
-          ${box("Jours", `<b class="${clsE}">${c.jours}</b> réels${c.joursVendus ? ` / ${fmt1(c.joursVendus)} vendus` : ""}`, c.ecart != null ? `${signe(c.ecart)} j (${c.ecart >= 0 ? "+" : "−"}${fmt(Math.abs(c.ecart) / c.joursVendus * 100)} %)` : "durée vendue non renseignée")}
-          ${box("Cadence", `<b class="${c.cadV && c.cadR < c.cadV * 0.95 ? "st-bad" : c.cadV && c.cadR > c.cadV * 1.05 ? "st-good" : ""}">${fmt(c.cadR, 1)}</b> Mpx/j${c.cadV ? ` / ${fmt(c.cadV, 1)} vendue` : ""}`, `${fmt(c.ml / c.jours)} ml/j${c.lMoy ? ` · ${fmt(c.lMoy, 1)} ml par Mpx` : ""}`)}
-          ${box("Montant HT", c.montant ? `<b>${euros(c.montant)}</b>` : '<b class="st-mut">?</b>', c.montant ? `${c.caJour != null ? euros(c.caJour) + "/j réel" : ""}${c.joursVendus ? ` · ${euros(c.montant / c.joursVendus)}/j vendu` : ""}` : "montant non renseigné")}
-        </div>
-        ${B.temps.length ? `<table class="st-tbl"><thead><tr><th>Temps perdu (${fmt1(B.totPerdu)} h)</th><th class="r">Heures</th><th></th></tr></thead><tbody>
-          ${B.temps.map((t) => `<tr><td>${esc(t.lib)}</td><td class="r ${t.grp === "interne" ? "st-bad" : ""}">${fmt1(t.h)} h</td><td>${tag(t.grp)}</td></tr>`).join("")}</tbody></table>`
-          : '<div class="st-mut">Aucune panne ni aucun arrêt déclaré sur ce chantier.</div>'}
-        <div class="st-lesson">💡 <b>À retenir :</b> ${esc(B.retenir)}</div>
-      </div></div>`;
-    return `<div class="st-bil"><div class="st-card st-bl"><div class="st-ch"><h2>Chantiers terminés</h2><span class="s">${L.length}</span></div>${liste}</div><div>${fiche}${tCad}</div></div>`;
-  }
-
-  // ─── PDF du bilan (jsPDF, chargé à la demande) ───────────────
-  function chargerScript(src) {
-    return new Promise((ok, ko) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => ko(new Error("Bibliothèque PDF introuvable")); document.head.appendChild(s); });
-  }
-  function chargerLogo() {
-    return new Promise((ok) => {
-      const img = new Image();
-      img.onload = () => { try { const cv = document.createElement("canvas"); cv.width = img.naturalWidth; cv.height = img.naturalHeight; cv.getContext("2d").drawImage(img, 0, 0); ok({ data: cv.toDataURL("image/png"), r: img.naturalWidth / img.naturalHeight }); } catch (e) { ok(null); } };
-      img.onerror = () => ok(null);
-      img.src = "../assets/logo-fts.png";
-    });
-  }
-  const pdfTxt = (s) => String(s == null ? "" : s).replace(/[\u202F\u00A0\u2009]/g, " ").replace(/[−–]/g, "-").replace(/≈/g, "env.").replace(/→/g, ">").replace(/[’]/g, "'").replace(/[^\x00-\xFF€]/g, "");
-  async function genererPdf() {
-    const c = jeu && jeu.chantiers.find((x) => x.id === bilanSel);
-    if (!c) return;
-    const bouton = racine.querySelector("#stPdf");
-    if (bouton) { bouton.disabled = true; bouton.textContent = "Génération…"; }
-    try {
-      if (!window.jspdf) await chargerScript("../lib/jspdf/jspdf.umd.min.js");
-      const logo = await chargerLogo();
-      const doc = construirePdf(c, bilan(c), logo);
-      doc.save(`Bilan ${c.name}.pdf`.replace(/[\\/:*?"<>|]/g, "-"));
-    } catch (e) {
-      alert("PDF impossible : " + e.message);
-    } finally {
-      if (bouton) { bouton.disabled = false; bouton.textContent = "⬇ PDF du bilan"; }
-    }
-  }
-  function construirePdf(c, B, logo) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const W = 210, M = 14, LARG = W - 2 * M;
-    const ANTH = [58, 58, 58], JAUNE = [245, 197, 24], GRIS = [110, 110, 110], ROUGE = [192, 57, 43], VERT = [30, 142, 78], BORD = [215, 215, 215];
-    const T = pdfTxt;
-    let y = M;
-    // En-tête
-    if (logo) doc.addImage(logo.data, "PNG", M, y, 11 * logo.r, 11);
-    doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.setTextColor(...ANTH);
-    doc.text("BILAN DE FIN DE CHANTIER", W - M, y + 5, { align: "right" });
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...GRIS);
-    doc.text(T(`Édité le ${jja(new Date())}`), W - M, y + 10, { align: "right" });
-    y += 16;
-    doc.setFillColor(...JAUNE); doc.rect(M, y, LARG, 1.2, "F"); y += 7;
-    doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(20, 20, 20);
-    doc.text(T(c.name), M, y); y += 6;
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...GRIS);
-    const sous = [`Du ${jja(c.premier)} au ${jja(c.dernier)}`, c.chefs.length ? `Chef : ${c.chefs.join(", ")}` : "", c.meta.adresse ? c.meta.adresse : ""].filter(Boolean).join("   ·   ");
-    doc.splitTextToSize(T(sous), LARG).forEach((l) => { doc.text(l, M, y); y += 4.5; });
-    if (B.machines.length) { doc.splitTextToSize(T("Matériel : " + B.machines.join(", ")), LARG).forEach((l) => { doc.text(l, M, y); y += 4.5; }); }
-    y += 3;
-    // 4 cases
-    const cases = [
-      ["MICROPIEUX", `${fmt(c.realise)}${c.prevu ? " / " + fmt(c.prevu) : ""}`, c.prevu ? `réalisés / vendus${c.avMpx ? ` (dont ${c.avMpx} en avenant)` : ""}` : "réalisés", null],
-      ["JOURS", `${c.jours}${c.joursVendus ? " / " + fmt1(c.joursVendus) : ""}`, c.ecart != null ? `réels / vendus  (${signe(c.ecart)} j)` : "réels (durée vendue non renseignée)", c.ecart == null ? null : c.ecart > 0.5 ? ROUGE : c.ecart < -0.05 ? VERT : null],
-      ["CADENCE", `${fmt(c.cadR, 1)}${c.cadV ? " / " + fmt(c.cadV, 1) : ""} Mpx/j`, `réelle / vendue · ${fmt(c.ml / c.jours)} ml/j${c.lMoy ? ` · ${fmt(c.lMoy, 1)} ml/Mpx` : ""}`, c.cadV && c.cadR < c.cadV * 0.95 ? ROUGE : c.cadV && c.cadR > c.cadV * 1.05 ? VERT : null],
-      ["MONTANT HT", c.montant ? euros(c.montant) : "?", c.montant ? `${c.caJour != null ? euros(c.caJour) + "/j réel" : ""}${c.joursVendus ? " · " + euros(c.montant / c.joursVendus) + "/j vendu" : ""}` : "montant non renseigné", null],
-    ];
-    const cw = (LARG - 3 * 3) / 4, ch = 23;
-    cases.forEach(([l, v, s, col], i) => {
-      const x = M + i * (cw + 3);
-      doc.setDrawColor(...BORD); doc.setLineWidth(0.3); doc.roundedRect(x, y, cw, ch, 1.5, 1.5, "S");
-      doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...GRIS); doc.text(T(l), x + 3, y + 5);
-      doc.setFontSize(13); doc.setTextColor(...(col || [20, 20, 20])); doc.text(T(v), x + 3, y + 12.5);
-      doc.setFont("helvetica", "normal"); doc.setFontSize(6.8); doc.setTextColor(...GRIS);
-      doc.splitTextToSize(T(s), cw - 5).slice(0, 2).forEach((ln, k) => doc.text(ln, x + 3, y + 17 + k * 3));
-    });
-    y += ch + 8;
-    // Temps perdu
-    doc.setFillColor(...ANTH); doc.rect(M, y, LARG, 6.5, "F");
-    doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(255, 255, 255);
-    doc.text(T("TEMPS PERDU"), M + 3, y + 4.4); doc.text(T(`${fmt1(B.totPerdu)} h  (env. ${fmt(B.totPerdu / H_JOUR, 1)} j)`), W - M - 3, y + 4.4, { align: "right" });
-    y += 6.5;
-    doc.setFontSize(8.5);
-    const lib = { interne: "interne", reclamer: "à réclamer", neutre: "neutre" };
-    const lignes = B.temps.length ? B.temps : [{ lib: "Aucune panne ni aucun arrêt déclaré", h: null, grp: null }];
-    lignes.slice(0, 14).forEach((t, i) => {
-      if (i % 2) { doc.setFillColor(247, 247, 247); doc.rect(M, y, LARG, 6, "F"); }
-      doc.setFont("helvetica", "normal"); doc.setTextColor(40, 40, 40); doc.text(T(t.lib).slice(0, 80), M + 3, y + 4.1);
-      if (t.h != null) {
-        doc.setFont("helvetica", "bold"); doc.setTextColor(...(t.grp === "interne" ? ROUGE : [40, 40, 40])); doc.text(T(fmt1(t.h) + " h"), W - M - 32, y + 4.1, { align: "right" });
-        doc.setFont("helvetica", "normal"); doc.setTextColor(...GRIS); doc.text(T(lib[t.grp]), W - M - 3, y + 4.1, { align: "right" });
-      }
-      y += 6;
-    });
-    doc.setDrawColor(...BORD); doc.line(M, y, W - M, y);
-    y += 8;
-    // À retenir
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-    const txt = doc.splitTextToSize(T(B.retenir), LARG - 10);
-    const hR = 9 + txt.length * 4.4;
-    doc.setFillColor(255, 248, 219); doc.roundedRect(M, y, LARG, hR, 1.5, 1.5, "F");
-    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(20, 20, 20); doc.text(T("À RETENIR"), M + 5, y + 6);
-    doc.setFont("helvetica", "normal"); txt.forEach((l, k) => doc.text(l, M + 5, y + 11 + k * 4.4));
-    y += hR + 8;
-    // Rappel des avenants
-    const av = Array.isArray(c.meta.avenants) ? c.meta.avenants : [];
-    if (av.length) {
-      doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...ANTH); doc.text(T("AVENANTS / TS VALIDÉS"), M, y); y += 5;
-      doc.setFont("helvetica", "normal"); doc.setFontSize(8.2); doc.setTextColor(40, 40, 40);
-      av.slice(0, 8).forEach((a) => { doc.text(T(`• ${a.designation || "Avenant"}${a.ref ? " (" + a.ref + ")" : ""} : ${a.mpx ? "+" + a.mpx + " Mpx · " : ""}${a.jours ? "+" + a.jours + " j · " : ""}${a.montant ? "+" + euros(Number(a.montant)) : ""}`).slice(0, 110), M + 2, y); y += 4.6; });
-    }
-    // Pied
-    doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...GRIS);
-    doc.text(T("FTS — Fondations & Travaux Spéciaux · calculé à partir des rapports journaliers et des infos du chantier (marché + avenants validés)"), W / 2, 289, { align: "center" });
-    return doc;
+  function vuePersonnel() {
+    const P = calculPersonnel();
+    if (!P.L.length) return vide("Aucun chantier terminé pour ces métiers sur cette période.");
+    if (!P.jh) return vide("Aucun personnel pointé sur les chantiers terminés de cette période.");
+    const kpis = `<div class="st-kpis">
+      ${kpi("Jours-hommes", fmt(P.jh), `${fmt1(P.heures)} h pointées · ${P.L.length} chantier${P.L.length > 1 ? "s" : ""}`)}
+      ${kpi("Part d'intérim", `${fmt(P.jhInt / P.jh * 100)} <small>%</small>`, `${fmt(P.jhInt)} jour${P.jhInt > 1 ? "s" : ""}-hommes`)}
+      ${kpi("Grands déplacements", `${fmt(P.gd)} <small>nuit${P.gd > 1 ? "s" : ""}</small>`, P.gd ? `sur ${P.nGdCh} chantier${P.nGdCh > 1 ? "s" : ""}` : "aucun")}
+      ${kpi("Productivité", P.ml ? `${fmt(P.ml / P.jh, 1)} <small>ml / homme / j</small>` : "—", "mètres forés ÷ jours-hommes")}
+    </div>`;
+    const tab = `<div class="st-card"><div class="st-ch"><h2>Jours-hommes par poste</h2><span class="s">poste pris dans Personnel FTS · intérimaires à part</span></div>
+      <div class="st-scroll"><table class="st-tbl"><thead><tr><th>Poste</th><th class="r">Personnes</th><th class="r">Jours-hommes</th><th class="r">Heures</th><th class="r">Nuits GD</th><th>Part</th></tr></thead><tbody>
+      ${P.lignes.map((l) => `<tr><td><b>${esc(l.poste === NON_TROUVE ? "Non trouvé dans Personnel FTS" : l.poste.charAt(0) + l.poste.slice(1).toLowerCase())}</b></td><td class="r">${l.n}</td><td class="r">${fmt(l.jh)}</td><td class="r">${fmt1(l.h)}</td><td class="r">${l.gd || '<span class="st-mut">0</span>'}</td><td>${fmt(l.jh / P.jh * 100)} %${barre(l.jh / P.jh * 100)}</td></tr>`).join("")}
+      </tbody></table></div>
+      <div class="st-note">Un jour-homme = une personne présente un jour sur un chantier (rapport journalier). « Non trouvé » = nom saisi par le chef absent de Personnel FTS (orthographe différente ?).</div></div>`;
+    return kpis + tab;
   }
 
   // ─── Export (CSV lisible par Excel) ──────────────────────────
@@ -741,10 +570,16 @@ const FTSStats = (() => {
       P.loc.forEach((l) => L.push(["location", l.lib, l.n, "", "", "", "", "", "", Object.keys(l.par).join(" / ")]));
       return csv(L, "Statistiques_parc_materiel.csv");
     }
-    const src = onglet === "bilans" ? bilansListe() : lignesVR();
+    if (onglet === "pers") {
+      const P = calculPersonnel();
+      const L = [["Poste", "Personnes", "Jours-hommes", "Heures", "Nuits GD"]];
+      P.lignes.forEach((l) => L.push([l.poste, l.n, l.jh, n1(l.h), l.gd]));
+      return csv(L, "Statistiques_personnel.csv");
+    }
+    const src = lignesVR();
     const L = [["Chantier", "Statut", "Mpx vendus", "Mpx réalisés", "Jours vendus", "Jours réels (jours de rapport)", "Écart (j)", "Cadence vendue (Mpx/j)", "Cadence réelle (Mpx/j)", "ml réalisés", "ml moyen par Mpx", "Montant HT", "CA par jour", "Temps perdu (h)", "dont à réclamer (h)"]];
     src.forEach((c) => { const { h } = heuresParGroupe(c); L.push([c.name, c.archive ? "Archivé" : "Terminé", c.prevu || "", c.realise, c.joursVendus || "", c.jours, n1(c.ecart), n1(c.cadV), n1(c.cadR), n1(c.ml), n1(c.lMoy), c.montant || "", c.caJour != null ? Math.round(c.caJour) : "", n1(h.interne + h.reclamer + h.neutre), n1(h.reclamer)]); });
-    csv(L, onglet === "bilans" ? "Statistiques_bilans.csv" : "Statistiques_vendu_realise.csv");
+    csv(L, "Statistiques_vendu_realise.csv");
   }
 
   return { monter, ouvrir, charger, categorieArret, _analyser: analyser };

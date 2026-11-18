@@ -48,6 +48,12 @@ const FTSAccesModules = (() => {
     lireGens();
     const lu = await M().lireReglages();
     reg = lu || { id: null, postes: {}, exceptions: {} };
+    if (lu) {
+      // Module ajouté depuis le dernier enregistrement (ex. Résultats) : on part
+      // des défauts du code pour ce module, le reste ne bouge pas
+      Object.keys(reg.postes).forEach((p) => { reg.postes[p] = M().modulesPour(p, "", { postes: reg.postes, cols: reg.cols, exceptions: {} }); });
+      reg.cols = M().MODULES.map((m) => m.id);
+    }
     if (!lu) {
       // Premier réglage : défauts du code + exceptions déjà décidées
       postesListe().forEach((p) => { reg.postes[p] = defautPoste(p); });
@@ -176,6 +182,8 @@ const FTSAccesModules = (() => {
       reg.id = id;
       await ecrire(id);
       const sansCompte = await partager(id);
+      // Classeur des tarifs et résultats : partagé à ceux qui ont le module Résultats
+      if (window.FTSResultats) await FTSResultats.synchroniserPartages().catch(() => {});
       try { localStorage.setItem("fts_modules_reglages_v1", JSON.stringify(reg)); } catch (e) {}
       sale = false;
       statut = `✅ Accès enregistrés : chacun verra son menu à sa prochaine ouverture de la Supervision.${sansCompte.length ? ` ⚠️ Pas encore de compte Google pour : ${sansCompte.join(", ")} (le menu de son poste s'appliquera quand le compte existera).` : ""}`;
@@ -207,6 +215,7 @@ const FTSAccesModules = (() => {
       if (!FTSPersonnel.toutes().some((p) => p.email)) return; // base vide : on ne retire rien
       lireGens();
       await partager(f.id);
+      if (window.FTSResultats) await FTSResultats.synchroniserPartages();
     } catch (e) { console.warn("Partage du classeur des accès :", e); }
   }
 

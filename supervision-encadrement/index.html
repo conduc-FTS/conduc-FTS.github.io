@@ -12,6 +12,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <title>FTS — Supervision Encadrement</title>
 <link rel="stylesheet" href="../css/dashboard.css">
 <link rel="stylesheet" href="../css/statistiques.css">
+<link rel="stylesheet" href="../css/resultats.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 * { box-sizing: border-box; }
@@ -410,6 +411,7 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
     <button type="button" class="se-nav-btn" data-view="se-view-stats"><span class="ic">📈</span>Statistiques</button>
     <div class="sv-grp">CHANTIERS</div>
     <button type="button" class="se-nav-btn" data-view="se-view-preparation"><span class="ic">📋</span>Préparation<span class="sv-pill" id="navPrepaPill" hidden></span></button>
+    <button type="button" class="se-nav-btn" data-view="se-view-resultats"><span class="ic">💶</span>Résultats<span class="sv-pill" id="navResultatsPill" hidden></span></button>
     <button type="button" class="se-nav-btn" data-view="se-view-archives"><span class="ic">🗄️</span>Archives</button>
     <button type="button" class="se-nav-btn" data-view="se-view-documents"><span class="ic">📁</span>Documents</button>
     <!-- OUVERTURE CHANTIER (js/ouverture-chantier.js) : entrée de menu -->
@@ -498,20 +500,20 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
   <!-- ─── STATISTIQUES ────────────────────────────────────── -->
   <div class="se-view" id="se-view-stats">
     <div class="se-page-title">Statistiques</div>
-    <div class="se-page-sub">Analyse des chantiers à partir des rapports journaliers et des infos de chaque chantier (marché + avenants validés).</div>
+    <div class="se-page-sub">Activité par métier, à partir des rapports journaliers et des infos de chaque chantier (marché + avenants validés). Le détail chantier par chantier est dans la Vue d'ensemble ; les résultats financiers dans Résultats.</div>
 
     <div class="se-subtabs">
       <button type="button" class="se-subtab active" data-statview="vr">Vendu / réalisé<small>A-t-on tenu ce qu'on a vendu ?</small></button>
       <button type="button" class="se-subtab" data-statview="tp">Temps perdu<small>Où part notre temps ?</small></button>
       <button type="button" class="se-subtab" data-statview="parc">Parc matériel<small>Machines utilisées et fiables ?</small></button>
-      <button type="button" class="se-subtab" data-statview="bilans">Bilans de fin de chantier<small>Que retenir pour chiffrer ?</small></button>
-      <button type="button" class="se-subtab" data-statview="stats-personnel">Personnel<small>Heures, intérim, GD</small></button>
+      <button type="button" class="se-subtab" data-statview="pers">Personnel<small>Jours-hommes, intérim, GD</small></button>
     </div>
 
-    <!-- Vendu / réalisé, Temps perdu, Parc matériel, Bilans (js/statistiques.js) -->
+    <!-- Vendu / réalisé, Temps perdu, Parc matériel, Personnel (js/statistiques.js) -->
     <div id="stats-avancement"></div>
 
-    <!-- Personnel -->
+    <!-- Ancien onglet Personnel (heures par personne) : plus affiché depuis le 18/11/2026,
+         remplacé par l'onglet Personnel de js/statistiques.js. Gardé masqué tant que son code est branché. -->
     <div id="stats-personnel" style="display:none">
       <div class="se-stats-controls">
         <div class="se-stats-controls-left">
@@ -790,6 +792,12 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
     </section>
   </div>
 
+  <!-- ─── RÉSULTATS CHANTIER (js/resultats.js) ─────────────── -->
+  <div class="se-view" id="se-view-resultats">
+    <div class="se-page-title">Résultats chantier</div>
+    <div id="resultatsChantier"></div>
+  </div>
+
   <!-- ─── ARCHIVES ────────────────────────────────────────── -->
   <div class="se-view" id="se-view-archives">
     <div class="se-page-title">Archives</div>
@@ -868,6 +876,7 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
 <script src="../js/documents-bureau.js"></script>
 <script src="../js/ateliers.js"></script>
 <script src="../js/statistiques.js"></script>
+<script src="../js/resultats.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   // Voyant du serveur FTS (relier / autoriser), ordinateur uniquement
@@ -897,7 +906,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ─── Navigation (barre latérale + barre d'onglets mobile) ─────────
   const TITRES_VUES = {
     "se-view-overview": "Vue d'ensemble", "se-view-stats": "Statistiques", "se-view-preparation": "Préparation de chantier", "se-view-personnel": "Personnel FTS",
-    "se-view-parc": "Parc matériel", "se-view-acces": "Accès", "se-view-ouverture": "Ouverture de chantier", /* OUVERTURE CHANTIER */ "se-view-archives": "Archives", "se-view-documents": "Documents", "se-view-adresses": "Adresses Personnel",
+    "se-view-parc": "Parc matériel", "se-view-acces": "Accès", "se-view-ouverture": "Ouverture de chantier", /* OUVERTURE CHANTIER */ "se-view-archives": "Archives", "se-view-documents": "Documents", "se-view-resultats": "Résultats chantier", "se-view-adresses": "Adresses Personnel",
   };
 
   function fermerMenuMobile() { document.body.classList.remove("menu-ouvert"); }
@@ -928,6 +937,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // OUVERTURE CHANTIER (js/ouverture-chantier.js)
     if (id === "se-view-ouverture" && window.FTSOuverture) FTSOuverture.monter($("ouvertureChantier"), { obtenirDonnees: (forcer) => obtenirDonnees(forcer), apresCreation: () => chargerVueEnsemble(true) });
     if (id === "se-view-acces" && !$("accesTabModules").hidden && window.FTSAccesModules) FTSAccesModules.monter($("accesModules"));
+    if (id === "se-view-resultats" && window.FTSResultats) FTSResultats.monter($("resultatsChantier"), { obtenirDonnees: (forcer) => obtenirDonnees(forcer) });
     if (id === "se-view-documents" && window.FTSDocsBureau) FTSDocsBureau.monter($("documentsBureau"), { obtenirDonnees: (forcer) => obtenirDonnees(forcer) });
     fermerMenuMobile();
     window.scrollTo(0, 0);
@@ -1061,6 +1071,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const vueActive = document.querySelector(".se-view.active");
       if (vueActive && vueActive.id === "se-view-overview") chargerVueEnsemble();
       if (vueActive && vueActive.id === "se-view-preparation") chargerPreparation();
+      if (vueActive && vueActive.id === "se-view-resultats" && window.FTSResultats) FTSResultats.monter($("resultatsChantier"), { obtenirDonnees: (forcer) => obtenirDonnees(forcer) });
     }
   }
 

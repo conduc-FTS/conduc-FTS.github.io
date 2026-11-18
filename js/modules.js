@@ -24,6 +24,7 @@ const FTSModules = (() => {
     { id: "overview", lib: "Vue d'ensemble" },
     { id: "stats", lib: "Statistiques" },
     { id: "preparation", lib: "Préparation" },
+    { id: "resultats", lib: "Résultats" },
     { id: "archives", lib: "Archives" },
     { id: "documents", lib: "Documents" },
     { id: "ouverture", lib: "Ouverture de chantier" },
@@ -45,8 +46,10 @@ const FTSModules = (() => {
     "CHARGÉE D'AFFAIRES": ["overview", "stats", "ouverture"],
     "DIRECTEUR COMMERCIAL": ["overview", "stats", "ouverture"],
     "DIRECTRICE COMMERCIALE": ["overview", "stats", "ouverture"],
-    "PRÉSIDENT": TOUS,
-    "PRÉSIDENT DIRECTEUR GÉNÉRAL": TOUS,
+    // Résultats chantier : conducteurs de travaux et directrice travaux seulement
+    // pour l'instant (Clément, 18/11/2026) — exception possible dans l'écran Accès
+    "PRÉSIDENT": SAUF("resultats"),
+    "PRÉSIDENT DIRECTEUR GÉNÉRAL": SAUF("resultats"),
     "DIRECTEUR BUREAU D'ÉTUDES": ["overview", "stats", "preparation", "archives", "documents"],
     "RESPONSABLE MATÉRIEL": ["overview", "preparation", "pointMat", "parc"],
     "RESPONSABLE D'ATELIER": ["overview", "preparation", "pointMat", "parc"],
@@ -90,7 +93,7 @@ const FTSModules = (() => {
     if (!r.ok) throw new Error(`Lecture des réglages : ${r.status}`);
     const [postes, exc] = ((await r.json()).valueRanges || []).map((v) => v.values || []);
     const cols = (tete) => (tete || []).map((t) => (MODULES.find((m) => m.lib.toUpperCase() === String(t).trim().toUpperCase()) || {}).id || null);
-    const reg = { id: f.id, postes: {}, exceptions: {} };
+    const reg = { id: f.id, postes: {}, exceptions: {}, cols: postes && postes.length ? cols(postes[0]).filter(Boolean) : [] };
     if (postes && postes.length) {
       const c = cols(postes[0]);
       postes.slice(1).forEach((l) => { if (l[0]) reg.postes[String(l[0]).trim().toUpperCase()] = c.map((id, i) => (id && OUI(l[i]) ? id : null)).filter(Boolean); });
@@ -112,7 +115,14 @@ const FTSModules = (() => {
   /** Modules d'une personne : défaut du poste (réglage ou code) puis ses exceptions. */
   function modulesPour(poste, email, reg) {
     const P = String(poste || "").toUpperCase();
-    const base = reg && reg.postes && reg.postes[P] ? reg.postes[P] : DEFAUTS[P] || DEFAUT_INCONNU;
+    const code = DEFAUTS[P] || DEFAUT_INCONNU;
+    let base = reg && reg.postes && reg.postes[P] ? reg.postes[P] : code;
+    // Module ajouté après le dernier enregistrement des réglages (pas encore de
+    // colonne dans le classeur) : défaut du code pour ce module
+    if (base !== code) {
+      const cols = reg.cols || TOUS.filter((m) => m !== "resultats");
+      base = TOUS.filter((m) => (cols.includes(m) ? base.includes(m) : code.includes(m)));
+    }
     const ex = (reg && reg.exceptions && reg.exceptions[mail(email)]) || {};
     return TOUS.filter((m) => (m in ex ? ex[m] : base.includes(m)));
   }
@@ -182,7 +192,7 @@ const FTSModules = (() => {
   // Lien des entrées de menu → module (Supervision et pages bureau)
   const VUE_MODULE = {
     "se-view-overview": "overview", "se-view-stats": "stats", "se-view-preparation": "preparation", "se-view-archives": "archives",
-    "se-view-documents": "documents", "se-view-personnel": "personnel", "se-view-adresses": "personnel", "se-view-parc": "parc",
+    "se-view-documents": "documents", "se-view-resultats": "resultats", "se-view-personnel": "personnel", "se-view-adresses": "personnel", "se-view-parc": "parc",
     "se-view-acces": "acces", "se-view-ouverture": "ouverture", materiel: "pointMat", personnel: "pointPers",
   };
   const moduleDuLien = (el) => {
@@ -223,7 +233,7 @@ const FTSModules = (() => {
 
   /** Première page autorisée (lien), pour le bouton du message de refus. */
   function premierLien(e = etat, base = "../supervision-encadrement/index.html") {
-    const ordre = [["overview", ""], ["stats", "#se-view-stats"], ["preparation", "#se-view-preparation"], ["archives", "#se-view-archives"], ["documents", "#se-view-documents"],
+    const ordre = [["overview", ""], ["stats", "#se-view-stats"], ["preparation", "#se-view-preparation"], ["resultats", "#se-view-resultats"], ["archives", "#se-view-archives"], ["documents", "#se-view-documents"],
       ["pointMat", "../recap-hebdo/index.html?type=materiel"], ["pointPers", "../recap-hebdo/index.html?type=personnel"], ["personnel", "#se-view-personnel"], ["parc", "#se-view-parc"]];
     const t = ordre.find(([m]) => autorise(m, e));
     if (!t) return null;

@@ -131,7 +131,8 @@ const FTSSheets = (() => {
     [ONGLET_PERSONNEL]: ["Date", "Nom", "Type", "GD", "Heures", "Atelier"],
     [ONGLET_PRODUCTION]: ["Date", "Nb pieux", "Longueur totale (m)", "Longueur moyenne/jour (m)", "Nom du chef", "Atelier"],
     [ONGLET_PIEUX]: ["Date", "N° Pieu", "Atelier"],
-    [ONGLET_HORAIRES]: ["Date", "Aller depuis", "Départ aller", "Arrivée chantier", "Route aller (h)", "Départ chantier", "Retour vers", "Arrivée retour", "Route retour (h)", "Atelier"],
+    // « Personnel » en dernier : les classeurs existants gardent leurs colonnes (une ligne par personne depuis le 18/11/2026)
+    [ONGLET_HORAIRES]: ["Date", "Aller depuis", "Départ aller", "Arrivée chantier", "Route aller (h)", "Départ chantier", "Retour vers", "Arrivée retour", "Route retour (h)", "Atelier", "Personnel"],
     [ONGLET_PANNES]: ["Date", "Machine", "Durée (h)", "Observations", "Atelier"],
     [ONGLET_ARRETS]: ["Date", "Motif", "Durée (h)", "Observations", "Atelier"],
     [ONGLET_STOCK]: ["Mois", "Date du comptage", "Article", "Diamètre", "Longueur", "Quantité", "Compté par", "Remarque", "Enregistré le"],
@@ -168,6 +169,7 @@ const FTSSheets = (() => {
       range: `${onglet}!${lettreColonne(colonneAtelier(onglet))}1`, values: [["Atelier"]],
     }));
     data.push({ range: `${ONGLET_MATERIEL}!E1`, values: [["N° machine"]] });
+    data.push({ range: `${ONGLET_HORAIRES}!${lettreColonne(EN_TETES_ONGLETS[ONGLET_HORAIRES].indexOf("Personnel"))}1`, values: [["Personnel"]] });
     await fetchAvecRetry(`${API_BASE}/${spreadsheetId}/values:batchUpdate`, {
       method: "POST",
       headers: { ...authHeader(), "Content-Type": "application/json" },
@@ -309,7 +311,7 @@ const FTSSheets = (() => {
    * @param {number} opts.longueurTotale
    * @param {string[]} [opts.numerosPieux]  numéros de pieu saisis ce jour
    */
-  async function enregistrerDonneesRapport({ chantierFolderId, chantierName, date, machines, personnel, nbPieux, longueurTotale, numerosPieux, nomChef, horaires, pannes, arrets, atelier }) {
+  async function enregistrerDonneesRapport({ chantierFolderId, chantierName, date, machines, personnel, nbPieux, longueurTotale, numerosPieux, nomChef, horaires, trajets, pannes, arrets, atelier }) {
     const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
     const at = atelier || nomChef || "";
 
@@ -357,13 +359,21 @@ const FTSSheets = (() => {
     // dans le Sheet ; heures saisies gardées en texte (« 06:15 », pas une date).
     const enHeures = (min) => (min == null ? "" : Math.round((min / 60) * 100) / 100);
     const texte = (v) => (v ? `'${v}` : "");
-    if (horaires && (horaires.aller.depart || horaires.aller.arrivee || horaires.retour.depart || horaires.retour.arrivee)) {
-      await ajouterLignes(spreadsheetId, ONGLET_HORAIRES, [[
+    // Heure de route : une ligne par personne et par jour (18/11/2026). Un rapport
+    // resté dans la boîte d'envoi depuis avant n'a qu'un trajet sans personnel.
+    const lesTrajets = trajets || (horaires ? [{ qui: [], ...horaires }] : []);
+    const vide = (s) => !s || (!s.depart && !s.arrivee);
+    const lignesRoute = [];
+    lesTrajets.forEach((tr) => {
+      if (vide(tr.aller) && vide(tr.retour)) return;
+      const a = vide(tr.aller) ? {} : tr.aller, r = vide(tr.retour) ? {} : tr.retour;
+      (tr.qui && tr.qui.length ? tr.qui : [""]).forEach((nom) => lignesRoute.push([
         forcerTexteDate(date),
-        horaires.aller.lieu || "", texte(horaires.aller.depart), texte(horaires.aller.arrivee), enHeures(horaires.aller.route),
-        texte(horaires.retour.depart), horaires.retour.lieu || "", texte(horaires.retour.arrivee), enHeures(horaires.retour.route), at,
-      ]]);
-    }
+        a.lieu || "", texte(a.depart), texte(a.arrivee), enHeures(a.route),
+        texte(r.depart), r.lieu || "", texte(r.arrivee), enHeures(r.route), at, nom,
+      ]));
+    });
+    if (lignesRoute.length) await ajouterLignes(spreadsheetId, ONGLET_HORAIRES, lignesRoute);
     if (pannes && pannes.length > 0) {
       await ajouterLignes(spreadsheetId, ONGLET_PANNES,
         pannes.map((p) => [forcerTexteDate(date), p.machine || "", enHeures(p.minutes), p.obs || "", at]));

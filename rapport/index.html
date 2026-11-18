@@ -466,6 +466,16 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   .rj-duree select { width: 70px; }
   .rj-duree span { font-weight: 700; color: var(--gris-moyen); }
   .rj-auto { font-size: 11px; font-weight: 700; color: var(--rouge); margin-top: 3px; }
+  .rj-trj { border: 1.5px solid var(--gris-clair); border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; }
+  .rj-qui { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 2px 0 4px; }
+  .rj-qui .lq { font-size: 12px; font-weight: 700; color: var(--gris-moyen); margin-right: 2px; }
+  .t-chips { display: contents; }
+  .rj-chip { border: 1.5px solid var(--gris-fonce); background: var(--gris-fonce); color: #fff; border-radius: 999px; padding: 6px 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .rj-chip.vide { background: #fff; color: #999; border-color: var(--bordure); cursor: default; font-weight: 600; }
+  .rj-qui select { border: 1.5px dashed var(--bordure); border-radius: 999px; padding: 6px 10px; font-size: 13px; font-weight: 700; color: var(--gris-fonce); background: #fff; max-width: 220px; }
+  .rj-trj-del { margin-left: auto; border: 0; background: none; color: var(--rouge); font-size: 13px; font-weight: 700; cursor: pointer; padding: 6px; }
+  .h-vu { display: block; font-size: 11px; color: #0F766E; text-align: center; margin-top: 2px; min-height: 13px; }
+  .h-vu.ko { color: var(--rouge); }
   .rj-traj { display: grid; grid-template-columns: 90px 190px 1fr 1fr 130px; gap: 12px; align-items: end; padding: 10px 0; border-bottom: 1px solid var(--gris-clair); }
   .rj-traj:last-child { border-bottom: none; }
   .rj-traj .lbl { font-weight: 800; font-size: 14px; padding-bottom: 10px; }
@@ -633,26 +643,13 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
   </div>
 </div>
 
-<!-- 4 : HEURE DE ROUTE -->
+<!-- 4 : HEURE DE ROUTE (un trajet par groupe de personnes, 18/11/2026) -->
 <div class="section">
   <div class="section-title"><span class="num">4</span>Heure de route</div>
   <div class="rj-body">
-    <div class="rj-traj">
-      <div class="lbl">ALLER</div>
-      <div><div class="field-label">Départ de</div>
-        <div class="rj-toggle" id="tgAller"><button type="button" class="on" data-v="DEPOT">DÉPÔT</button><button type="button" data-v="DOMICILE">DOMICILE</button></div></div>
-      <div><div class="field-label">Heure de départ</div><input type="time" id="hAllerDepart"></div>
-      <div><div class="field-label">Arrivée chantier</div><input type="time" id="hAllerArrivee"></div>
-      <div><div class="field-label">Temps de route</div><div class="rj-calc" id="routeAller">—</div></div>
-    </div>
-    <div class="rj-traj">
-      <div class="lbl">RETOUR</div>
-      <div><div class="field-label">Arrivée à</div>
-        <div class="rj-toggle" id="tgRetour"><button type="button" class="on" data-v="DEPOT">DÉPÔT</button><button type="button" data-v="DOMICILE">DOMICILE</button></div></div>
-      <div><div class="field-label">Départ chantier</div><input type="time" id="hRetourDepart"></div>
-      <div><div class="field-label">Heure d'arrivée</div><input type="time" id="hRetourArrivee"></div>
-      <div><div class="field-label">Temps de route</div><div class="rj-calc" id="routeRetour">—</div></div>
-    </div>
+    <div class="rj-hint" style="text-align:left;margin:0 0 8px">Le 1er trajet compte pour <b>tout le personnel FTS</b>. Si quelqu'un a fait un autre trajet, ajoute un trajet pour lui. Pas de retour (GD) : laisse les heures du retour vides, la ligne ne sera pas imprimée.</div>
+    <div id="trajets"></div>
+    <div class="rj-add"><button type="button" id="btnTrajet" onclick="ajouterTrajet()">+ Ajouter un trajet (personnel qui n'a pas fait le même trajet)</button></div>
   </div>
 </div>
 
@@ -848,14 +845,8 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => { chargerParcPuisKit(); chargerPersonnelEtChef(); }, 0);
 
 
-  // Horaires : bascules DÉPÔT / DOMICILE + calcul des temps de route
-  ['tgAller', 'tgRetour'].forEach((id) => {
-    document.querySelectorAll(`#${id} button`).forEach((b) => b.addEventListener('click', () => {
-      document.querySelectorAll(`#${id} button`).forEach((x) => x.classList.toggle('on', x === b));
-    }));
-  });
-  ['hAllerDepart', 'hAllerArrivee', 'hRetourDepart', 'hRetourArrivee'].forEach((id) =>
-    document.getElementById(id).addEventListener('input', majTempsRoute));
+  // Heure de route : le 1er trajet (toute l'équipe FTS) est toujours là
+  if (!document.querySelector('#trajets .rj-trj')) ajouterTrajet({}, true);
 
   const obs = document.getElementById('observations');
   obs.addEventListener('input', () => {
@@ -1229,7 +1220,7 @@ function ajouterPersonne(v = {}) {
   div.id = id;
   div.innerHTML = `
     <input type="text" class="h-nom" list="dl_personnel" autocomplete="off" placeholder="PRÉNOM NOM" value="${echapperHtml(v.nom || '')}">
-    <input type="number" class="h-heures" step="0.5" min="0" max="24" placeholder="7.5" style="text-align:center" value="${echapperHtml(v.heures || '')}">
+    <div><input type="text" class="h-heures" inputmode="decimal" autocomplete="off" placeholder="8:30" style="text-align:center;width:100%" value="${echapperHtml(v.heures ? texteHeures(lireHeures(v.heures) ?? v.heures) : '')}"><span class="h-vu"></span></div>
     <label class="pers-check"><input type="checkbox" class="h-gd" ${v.gd ? 'checked' : ''}><span class="pers-check-box">✓</span></label>
     <label class="pers-check"><input type="checkbox" class="h-fts" ${v.type === 'FTS' ? 'checked' : ''}><span class="pers-check-box">✓</span></label>
     <label class="pers-check"><input type="checkbox" class="h-int" ${v.type === 'Intérim' ? 'checked' : ''}><span class="pers-check-box">✓</span></label>
@@ -1250,6 +1241,7 @@ function ajouterPersonne(v = {}) {
   fts.addEventListener('change', () => { if (fts.checked) int.checked = false; });
   int.addEventListener('change', () => { if (int.checked) fts.checked = false; });
   ['.h-nom', '.h-heures'].forEach((c) => div.querySelector(c).addEventListener('input', majCompteurs));
+  ['.h-fts', '.h-int'].forEach((c) => div.querySelector(c).addEventListener('change', majTrajets));
   majCompteurs();
   return div;
 }
@@ -1257,14 +1249,48 @@ function ajouterPersonne(v = {}) {
 function getPersonnel() {
   return Array.from(document.querySelectorAll('#persRows .rj-line')).map((l) => ({
     nom: l.querySelector('.h-nom').value.trim().toUpperCase(),
-    heures: l.querySelector('.h-heures').value.trim(),
+    // heures en décimal (8:30, 8h30, 8.30 ou 8,5 → « 8.5 ») : additionnables dans le Sheet
+    heures: (() => { const h = lireHeures(l.querySelector('.h-heures').value); return h == null ? '' : String(h); })(),
     gd: l.querySelector('.h-gd').checked,
     fts: l.querySelector('.h-fts').checked,
     interim: l.querySelector('.h-int').checked,
   })).filter((p) => p.nom);
 }
 
-// ─── 4. Horaires ───────────────────────────────────────────────
+// ─── Heures du personnel ───────────────────────────────────────
+/**
+ * Heures saisies → heures décimales (18/11/2026).
+ *   8:30, 8h30, 8 h 30, 8.30, 8,30 → 8,5   (deux chiffres après : des minutes)
+ *   8,5 ou 8.5                       → 8,5   (un chiffre après : décimal)
+ *   8, 8h                            → 8
+ * Retourne null si la saisie n'est pas comprise.
+ */
+function lireHeures(txt) {
+  const t = String(txt == null ? '' : txt).trim().toLowerCase().replace(/\s+/g, '');
+  if (!t) return null;
+  let m = t.match(/^(\d{1,2})(?:h|:)(\d{1,2})?$/) || t.match(/^(\d{1,2})h(\d{2})$/);
+  if (m) { const mn = Number(m[2] || 0); return mn < 60 ? Math.round((Number(m[1]) + mn / 60) * 100) / 100 : null; }
+  m = t.match(/^(\d{1,2})[.,](\d+)$/);
+  if (m) {
+    if (m[2].length === 2 && Number(m[2]) < 60) return Math.round((Number(m[1]) + Number(m[2]) / 60) * 100) / 100;
+    return Math.round(parseFloat(`${m[1]}.${m[2]}`) * 100) / 100;
+  }
+  if (/^\d{1,2}$/.test(t)) return Number(t);
+  return null;
+}
+/** 8.5 → « 8:30 » (pour remettre une heure enregistrée dans la case) */
+function texteHeures(h) {
+  if (typeof h !== 'number' || isNaN(h)) return String(h || '');
+  const mn = Math.round(h * 60);
+  return `${Math.floor(mn / 60)}:${String(mn % 60).padStart(2, '0')}`;
+}
+/** Un chiffre après la virgule au plus, à la française : 24,9000000000002 → « 24,9 », 25 → « 25 » */
+function fr1(n) {
+  const v = Math.round((Number(n) || 0) * 10) / 10;
+  return String(v).replace('.', ',');
+}
+
+// ─── 4. Heure de route ─────────────────────────────────────────
 function enMinutes(hhmm) {
   if (!hhmm || !/^\d{1,2}:\d{2}/.test(hhmm)) return null;
   const [h, m] = hhmm.split(':').map(Number);
@@ -1281,21 +1307,115 @@ function formatDuree(min) {
   if (min == null || isNaN(min)) return '—';
   return `${Math.floor(min / 60)} h ${String(Math.round(min % 60)).padStart(2, '0')}`;
 }
-function majTempsRoute() {
-  const h = getHoraires();
-  document.getElementById('routeAller').textContent = formatDuree(h.aller.route);
-  document.getElementById('routeRetour').textContent = formatDuree(h.retour.route);
+/**
+ * Trajets (18/11/2026) : le 1er compte pour tout le personnel FTS du jour,
+ * sauf ceux qu'on a mis dans un autre trajet (ou retirés : pas de route).
+ * Les autres trajets ont leur propre liste de personnes.
+ */
+function personnelFTS() { return getPersonnel().filter((p) => p.fts).map((p) => p.nom); }
+function blocTrajet(principal) {
+  const id = 'rjt' + (++rjSeq);
+  const div = document.createElement('div');
+  div.className = 'rj-trj'; div.id = id;
+  if (principal) div.dataset.principal = '1';
+  const ligne = (sens, lib, lieuLib, h1, h2) => `
+    <div class="rj-traj" data-sens="${sens}">
+      <div class="lbl">${lib}</div>
+      <div><div class="field-label">${lieuLib}</div>
+        <div class="rj-toggle"><button type="button" class="on" data-v="DEPOT">DÉPÔT</button><button type="button" data-v="DOMICILE">DOMICILE</button></div></div>
+      <div><div class="field-label">${h1}</div><input type="time" class="t-dep"></div>
+      <div><div class="field-label">${h2}</div><input type="time" class="t-arr"></div>
+      <div><div class="field-label">Temps de route</div><div class="rj-calc">—</div></div>
+    </div>`;
+  div.innerHTML = `<div class="rj-qui"><span class="lq">Qui ?</span><span class="t-chips"></span><select class="t-plus"></select>${principal ? '' : '<button type="button" class="rj-trj-del">✕ retirer ce trajet</button>'}</div>`
+    + ligne('aller', 'ALLER', 'Départ de', 'Heure de départ', 'Arrivée chantier')
+    + ligne('retour', 'RETOUR', 'Arrivée à', 'Départ chantier', "Heure d'arrivée");
+  div.querySelectorAll('.rj-toggle').forEach((tg) => tg.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    tg.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+  })));
+  div.querySelectorAll('input[type=time]').forEach((i) => i.addEventListener('input', majTrajets));
+  div.querySelector('.t-plus').addEventListener('change', (e) => {
+    const nom = e.target.value; e.target.value = '';
+    if (!nom) return;
+    // la personne quitte les autres trajets (jamais comptée deux fois)
+    document.querySelectorAll('#trajets .rj-trj').forEach((t) => {
+      if (t === div) return;
+      t._qui = (t._qui || []).filter((n) => n !== nom);
+    });
+    if (principal) div._exclus = (div._exclus || []).filter((n) => n !== nom);
+    else { div._qui = [...(div._qui || []), nom]; const p = document.querySelector('#trajets [data-principal]'); if (p) p._exclus = (p._exclus || []).filter((n) => n !== nom); }
+    majTrajets();
+  });
+  div.querySelector('.t-chips').addEventListener('click', (e) => {
+    const c = e.target.closest('[data-nom]'); if (!c) return;
+    const nom = c.dataset.nom;
+    if (principal) div._exclus = [...(div._exclus || []), nom];   // retiré : pas de route ce jour-là
+    else div._qui = (div._qui || []).filter((n) => n !== nom);      // retourne dans le 1er trajet
+    majTrajets();
+  });
+  const del = div.querySelector('.rj-trj-del');
+  if (del) del.addEventListener('click', () => { div.remove(); majTrajets(); });
+  return div;
 }
-function valeurToggle(id) {
-  const b = document.querySelector(`#${id} button.on`);
-  return b ? b.dataset.v : 'DEPOT';
-}
-function getHoraires() {
-  const g = (id) => document.getElementById(id).value;
-  return {
-    aller:  { lieu: valeurToggle('tgAller'),  depart: g('hAllerDepart'),  arrivee: g('hAllerArrivee'),  route: ecartMinutes(g('hAllerDepart'), g('hAllerArrivee')) },
-    retour: { lieu: valeurToggle('tgRetour'), depart: g('hRetourDepart'), arrivee: g('hRetourArrivee'), route: ecartMinutes(g('hRetourDepart'), g('hRetourArrivee')) },
+function ajouterTrajet(v = {}, principal = false) {
+  const div = blocTrajet(principal);
+  div._qui = (v.qui || []).slice(); div._exclus = (v.exclus || []).slice();
+  const remplir = (sens, o) => {
+    if (!o) return;
+    const l = div.querySelector(`[data-sens="${sens}"]`);
+    if (o.lieu) l.querySelectorAll('.rj-toggle button').forEach((b) => b.classList.toggle('on', b.dataset.v === o.lieu));
+    l.querySelector('.t-dep').value = o.depart || ''; l.querySelector('.t-arr').value = o.arrivee || '';
   };
+  remplir('aller', v.aller); remplir('retour', v.retour);
+  if (!principal) {
+    // même trajet que l'équipe par défaut : il n'y a plus qu'à corriger ce qui change
+    const p = document.querySelector('#trajets [data-principal]');
+    if (p && !v.aller && !v.retour) ['aller', 'retour'].forEach((sens) => {
+      const src = p.querySelector(`[data-sens="${sens}"]`), dst = div.querySelector(`[data-sens="${sens}"]`);
+      const on = src.querySelector('.rj-toggle button.on');
+      dst.querySelectorAll('.rj-toggle button').forEach((b) => b.classList.toggle('on', on && b.dataset.v === on.dataset.v));
+      dst.querySelector('.t-dep').value = src.querySelector('.t-dep').value; dst.querySelector('.t-arr').value = src.querySelector('.t-arr').value;
+    });
+  }
+  document.getElementById('trajets').appendChild(div);
+  majTrajets();
+  if (!principal && !v.qui) { const s = div.querySelector('.t-plus'); s.focus(); }
+  return div;
+}
+function lireSens(div, sens) {
+  const l = div.querySelector(`[data-sens="${sens}"]`), on = l.querySelector('.rj-toggle button.on');
+  const depart = l.querySelector('.t-dep').value, arrivee = l.querySelector('.t-arr').value;
+  return { lieu: on ? on.dataset.v : 'DEPOT', depart, arrivee, route: ecartMinutes(depart, arrivee) };
+}
+/** Personnes de chaque trajet (le 1er = tout le personnel FTS sauf les autres trajets et les retirés) */
+function quiDesTrajets() {
+  const fts = personnelFTS(), blocs = [...document.querySelectorAll('#trajets .rj-trj')];
+  const autres = new Set();
+  blocs.forEach((b) => { if (!b.dataset.principal) { b._qui = (b._qui || []).filter((n) => fts.includes(n) && !autres.has(n)); b._qui.forEach((n) => autres.add(n)); } });
+  return blocs.map((b) => (b.dataset.principal ? fts.filter((n) => !autres.has(n) && !(b._exclus || []).includes(n)) : b._qui));
+}
+function getTrajets() {
+  const blocs = [...document.querySelectorAll('#trajets .rj-trj')], qui = quiDesTrajets();
+  return blocs.map((b, i) => ({ qui: qui[i], aller: lireSens(b, 'aller'), retour: lireSens(b, 'retour') }));
+}
+function majTrajets() {
+  const blocs = [...document.querySelectorAll('#trajets .rj-trj')];
+  if (!blocs.length) return;
+  const fts = personnelFTS(), qui = quiDesTrajets();
+  blocs.forEach((b, i) => {
+    const chips = b.querySelector('.t-chips');
+    chips.innerHTML = qui[i].length
+      ? qui[i].map((n) => `<button type="button" class="rj-chip" data-nom="${echapperHtml(n)}" title="Retirer de ce trajet">${echapperHtml(n)} ✕</button>`).join(' ')
+      : `<span class="rj-chip vide">${fts.length ? 'personne' : 'aucun personnel FTS en section 3'}</span>`;
+    // « + personne » : le personnel FTS qui n'est pas dans ce trajet
+    const dispo = fts.filter((n) => !qui[i].includes(n));
+    const sel = b.querySelector('.t-plus');
+    sel.innerHTML = `<option value="">+ personne</option>` + dispo.map((n) => `<option value="${echapperHtml(n)}">${echapperHtml(n)}</option>`).join('');
+    sel.hidden = !dispo.length;
+    ['aller', 'retour'].forEach((sens) => { b.querySelector(`[data-sens="${sens}"] .rj-calc`).textContent = formatDuree(lireSens(b, sens).route); });
+  });
+  const btn = document.getElementById('btnTrajet');
+  if (btn) btn.disabled = fts.length < 2 || blocs.length >= 4;
 }
 const LIBELLE_LIEU = { DEPOT: 'DÉPÔT', DOMICILE: 'DOMICILE' };
 
@@ -1367,7 +1487,13 @@ function majCompteurs() {
   const pers = getPersonnel();
   const hTot = pers.reduce((a, p) => a + (parseFloat(p.heures) || 0), 0);
   document.getElementById('totalPers').innerHTML = pers.length
-    ? `Total : <b>${pers.length} personne${pers.length > 1 ? 's' : ''}</b> · <b>${String(hTot).replace('.', ',')} h</b>` : '';
+    ? `Total : <b>${pers.length} personne${pers.length > 1 ? 's' : ''}</b> · <b>${fr1(hTot)} h</b>` : '';
+  document.querySelectorAll('#persRows .rj-line').forEach((l) => {
+    const t = l.querySelector('.h-heures').value.trim(), h = lireHeures(t), vu = l.querySelector('.h-vu');
+    vu.classList.toggle('ko', !!t && h == null);
+    vu.textContent = !t ? '' : h == null ? 'pas compris' : `= ${fr1(h)} h`;
+  });
+  majTrajets();
   document.getElementById('cptPannes').textContent = `${n('panneRows')} / ${MAX.pannes}`;
   document.getElementById('cptArrets').textContent = `${n('arretRows')} / ${MAX.arrets}`;
   document.getElementById('videPannes').hidden = n('panneRows') > 0;
@@ -1897,18 +2023,23 @@ function construirePDF(mode) {
   const hTot = pers.reduce((a, p) => a + (parseFloat(p.heures) || 0), 0);
   const colsPers = [{ t: 'Nom', w: 0.46, align: 'left' }, { t: 'Heures', w: 0.14 }, { t: 'GD', w: 0.13 }, { t: 'FTS', w: 0.13 }, { t: 'Intérim', w: 0.14 }];
   const lignesPers = pers.length
-    ? pers.map((p) => [p.nom, p.heures, p.gd ? { coche: true } : '', p.fts ? { coche: true } : '', p.interim ? { coche: true } : ''])
+    ? pers.map((p) => [p.nom, p.heures ? fr1(parseFloat(p.heures)) : '', p.gd ? { coche: true } : '', p.fts ? { coche: true } : '', p.interim ? { coche: true } : ''])
     : [[{ vide: 'Aucun personnel renseigné' }]];
-  const droitePers = pers.length ? `${pers.length} personne${pers.length > 1 ? 's' : ''} - ${String(hTot).replace('.', ',')} h` : '';
+  const droitePers = pers.length ? `${pers.length} personne${pers.length > 1 ? 's' : ''} - ${fr1(hTot)} h` : '';
   bloc(hauteurTableau(colsPers, lignesPers, LARG), () => tableau('3 · PERSONNEL', droitePers, colsPers, lignesPers));
 
   // ── 4. Heure de route ────────────────────────────────────────
-  const hor = getHoraires();
-  const colsHor = [{ t: '', w: 0.14 }, { t: 'Départ de / Arrivée à', w: 0.22 }, { t: 'Départ', w: 0.2 }, { t: 'Arrivée', w: 0.2 }, { t: 'Temps de route', w: 0.24 }];
-  const lignesHor = [
-    [{ t: 'ALLER', bold: true }, LIBELLE_LIEU[hor.aller.lieu], hor.aller.depart || '-', hor.aller.arrivee ? `${hor.aller.arrivee} (chantier)` : '-', { t: hor.aller.route != null ? formatDuree(hor.aller.route) : '-', bold: true }],
-    [{ t: 'RETOUR', bold: true }, LIBELLE_LIEU[hor.retour.lieu], hor.retour.depart ? `${hor.retour.depart} (chantier)` : '-', hor.retour.arrivee || '-', { t: hor.retour.route != null ? formatDuree(hor.retour.route) : '-', bold: true }],
-  ];
+  // Une ou deux lignes par trajet ; un aller ou un retour sans heure n'est pas imprimé (ex : reste en GD)
+  const colsHor = [{ t: 'Personnel', w: 0.27, align: 'left', wrap: true }, { t: '', w: 0.1 }, { t: 'De / à', w: 0.13 }, { t: 'Départ', w: 0.16 }, { t: 'Arrivée', w: 0.18 }, { t: 'Temps', w: 0.16 }];
+  const lignesHor = [];
+  getTrajets().forEach((tr) => {
+    const qui = tr.qui.length ? tr.qui.join(', ') : '-';
+    const sens = [];
+    if (tr.aller.depart || tr.aller.arrivee) sens.push([{ t: 'ALLER', bold: true }, LIBELLE_LIEU[tr.aller.lieu], tr.aller.depart || '-', tr.aller.arrivee ? `${tr.aller.arrivee} (chantier)` : '-', { t: tr.aller.route != null ? formatDuree(tr.aller.route) : '-', bold: true }]);
+    if (tr.retour.depart || tr.retour.arrivee) sens.push([{ t: 'RETOUR', bold: true }, LIBELLE_LIEU[tr.retour.lieu], tr.retour.depart ? `${tr.retour.depart} (chantier)` : '-', tr.retour.arrivee || '-', { t: tr.retour.route != null ? formatDuree(tr.retour.route) : '-', bold: true }]);
+    sens.forEach((l, i) => lignesHor.push([i ? '' : qui, ...l]));
+  });
+  if (!lignesHor.length) lignesHor.push([{ vide: "Pas d'heure de route renseignée" }]);
   bloc(hauteurTableau(colsHor, lignesHor, LARG), () => tableau('4 · HEURE DE ROUTE', '', colsHor, lignesHor));
 
   // ── 5. Pannes / 6. Arrêts ─────────────────────────────────────
@@ -2018,7 +2149,7 @@ function preparerEnvoi(pdfBlob) {
       nbPieux: pieux.length,
       longueurTotale: pieux.reduce((a, p) => a + (parseFloat(p.lg) || 0), 0),
       numerosPieux: pieux.map((p) => p.numero),
-      horaires: getHoraires(),
+      trajets: getTrajets(),
       pannes: getPannes(),
       arrets: getArrets(),
     },

@@ -98,7 +98,7 @@ const FTSBoiteEnvoi = (() => {
   // ─── Ajout d'un rapport ──────────────────────────────────────
   /**
    * @param {object} r { pdfBlob, fileName, code, chantierName, nomChef, atelier, dateISO,
-   *                     suivi:{date, machines, personnel, nbPieux, longueurTotale, numerosPieux, horaires, pannes, arrets},
+   *                     suivi:{date, machines, personnel, nbPieux, longueurTotale, numerosPieux, trajets, pannes, arrets},
    *                     controles:{pieux:boolean, existant:boolean} }
    */
   async function ajouter(r) {
@@ -175,7 +175,7 @@ const FTSBoiteEnvoi = (() => {
               machines: item.suivi.machines, personnel: item.suivi.personnel,
               nbPieux: item.suivi.nbPieux, longueurTotale: item.suivi.longueurTotale, numerosPieux: item.suivi.numerosPieux,
               nomChef: item.nomChef, atelier: item.atelier,
-              horaires: item.suivi.horaires, pannes: item.suivi.pannes, arrets: item.suivi.arrets,
+              horaires: item.suivi.horaires, trajets: item.suivi.trajets, pannes: item.suivi.pannes, arrets: item.suivi.arrets,
             });
           }
         } catch (e) {

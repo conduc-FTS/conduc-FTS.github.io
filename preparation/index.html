@@ -249,6 +249,46 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .pe-pj .i { font-size: 1.4rem; } .pe-pj .t { flex: 1; min-width: 0; } .pe-pj .t b { display: block; overflow-wrap: anywhere; }
 .pe-pj small { display: block; color: var(--text-sub); font-size: .76rem; }
 .pe-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 14px 18px; }
+/* Fenêtre d'envoi (18/11/2026, maquette-prepa-envoi.html) : actions dans la barre du haut, « Ce qui part » */
+.pe-th { flex-wrap: wrap; row-gap: 8px; }
+.pe-th-ind { font-size: .8rem; color: var(--text-sub); font-weight: 600; }
+.pe-th .sv-mstatus { grid-column: auto; max-width: 380px; font-size: .78rem; line-height: 1.3; color: var(--text-sub); text-align: right; }
+.pe-th .sv-btn { white-space: nowrap; }
+.pj2 { padding: 4px 18px 4px; }
+.pj2-l { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--border); }
+.pj2-l:first-child { border-top: 0; }
+.pj2-ic { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-size: 1rem; background: #F3F4F6; }
+.pj2-t { min-width: 0; }
+.pj2-t b { display: block; font-size: .88rem; font-weight: 800; line-height: 1.25; }
+.pj2-t .f { display: block; font-family: Consolas, monospace; font-size: .72rem; color: #6B7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.pj2-t .s { display: block; font-size: .74rem; color: var(--text-sub); margin-top: 1px; }
+.pj2-t .d { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+.pj2-t .d:empty { display: none; }
+.pj2-t .d span { font-size: .66rem; font-weight: 700; border-radius: 20px; padding: 2px 8px; background: #F1F2F4; color: #4B5563; }
+.pj2-t .d span.on { background: #EAF6EE; color: #1D6E3E; }
+.pj2-t .d span.att { background: #FFF3DC; color: #8A4F00; }
+.pj2-t .d span.maj { background: #FFF7C2; color: #7A5B00; }
+.pj2-a { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.pj2-a.bas { grid-column: 2 / 4; margin-top: 4px; }
+.pj2-a .sv-btn { padding: 6px 10px; font-size: .78rem; }
+.pj2-a label.jo { display: flex; align-items: center; gap: 5px; font-size: .78rem; font-weight: 700; margin-right: 4px; }
+.pj2-a label.jo[hidden] { display: none; }
+.pj2-srv { margin: 4px 18px 12px; border-radius: 10px; padding: 10px 12px; font-size: .8rem; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+.pj2-srv.ok { border-color: #BFE3CB; background: #F3FAF5; } .pj2-srv.w { border-color: #F1D9A6; background: #FFF8EA; } .pj2-srv.ko { border-color: #F2C4BE; background: #FDF1EF; }
+.pj2-srv .srv-chk { display: block; font-size: .82rem; }
+.pj2-srv .srv-chk input { vertical-align: -2px; margin: 0 6px 0 0; }
+.pj2-srv .srv-chk span { font-weight: 500; color: #6B7280; }
+.pj2-srv .srv-et { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pj2-srv .srv-et b { font-size: .82rem; }
+.pj2-srv .srv-et .dot { width: 9px; height: 9px; border-radius: 50%; background: #9AA0AA; flex: none; }
+.pj2-srv.ok .dot { background: #34C759; } .pj2-srv.w .dot { background: #E8890C; } .pj2-srv.ko .dot { background: #E5484D; }
+.pj2-srv .srv-et small { flex-basis: 100%; color: var(--text-sub); font-size: .74rem; padding-left: 17px; }
+.pj2-srv .srv-path { margin-top: 0; }
+.pj2-att { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px dashed #E4CF9C; padding-top: 8px; color: #8A4F00; font-weight: 700; }
+.pj2-att .sv-btn { padding: 5px 10px; font-size: .76rem; }
+.pj2-att details { flex-basis: 100%; font-weight: 500; font-size: .74rem; color: var(--text-sub); }
+.pj2-att details summary { cursor: pointer; }
+.pj2-drv { font-size: .74rem; color: var(--text-sub); margin: 0 18px 14px; }
 .pe-lien { border: none; background: none; color: #2A5DBF; font: inherit; font-size: .74rem; cursor: pointer; padding: 0 0 0 6px; }
 .pe-chg { margin: 0; padding-left: 18px; font-size: .86rem; } .pe-chg li { margin: 3px 0; }
 .pe-et { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: .8rem; font-weight: 700; background: var(--bg); }
@@ -534,14 +574,14 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
           <div class="sv-ch"><h2>À compléter</h2><span class="sv-sp"></span><span class="pf-nb" id="pfNb"></span></div>
           <ul class="pf-faire" id="pfFaire"></ul>
         </section>
-        <section class="sv-card">
-          <div class="sv-ch"><h2>Ce qui alimente la fiche</h2></div>
-          <div class="pf-src" id="pfSources"></div>
-        </section>
         <section class="sv-card pf-envoi">
           <p id="pfEnvoiTxt"></p>
           <button type="button" class="sv-btn" id="pfValider">Valider et envoyer</button>
           <div class="pa-b3 pf-b3"><button type="button" class="sv-btn" id="pfApercu"><span>🔍</span>Aperçu</button><button type="button" class="sv-btn" id="btnImprimer"><span>🖨️</span>Imprimer</button><button type="button" class="sv-btn" id="pfEnregistrer"><span>💾</span>Enregistrer</button></div>
+        </section>
+        <section class="sv-card">
+          <div class="sv-ch"><h2>Ce qui alimente la fiche</h2></div>
+          <div class="pf-src" id="pfSources"></div>
         </section>
       </aside>
     </div>
@@ -713,7 +753,11 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <div class="pf-voile" id="pfVoile"></div>
 <!-- Tiroir : envoi (mail, pièces jointes, serveur FTS, historique) -->
 <aside class="pf-tiroir large" id="tiroirEnvoi" aria-label="Envoi">
-  <div class="pf-th"><h2>Valider et envoyer</h2><span class="sv-sp"></span><button type="button" class="sv-x" data-fermer-tiroir>✕</button></div>
+  <div class="pf-th pe-th"><h2>Valider et envoyer</h2><span class="pe-th-ind" id="envThInd"></span><span class="sv-sp"></span>
+    <span class="sv-mstatus" id="envStatus"></span>
+    <button type="button" class="sv-btn" id="envTelecharger" title="Enregistrer la fiche en PDF (par exemple dans le dossier du réseau FTS)">💾 Enregistrer la fiche en PDF…</button>
+    <button type="button" class="sv-btn pri" id="envEnvoyer">✉️ Envoyer</button>
+    <button type="button" class="sv-x" data-fermer-tiroir>✕</button></div>
   <div class="pf-tc">
     <section class="sv-card">
       <div class="pr-kpi" id="envKpi"></div>
@@ -731,27 +775,29 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         </div>
       </section>
       <div>
-        <section class="sv-card">
-          <div class="sv-ch"><h2>Pièces jointes</h2></div>
-          <div style="padding:14px 18px">
-            <div class="pe-pj"><span class="i">📄</span><div class="t"><b id="envNomPdf">Fiche</b><small>la fiche telle qu'elle est à l'écran</small></div><button type="button" class="sv-btn" id="envApercu">Aperçu</button></div>
-            <div class="pe-pj"><span class="i">🗺️</span><div class="t"><b id="envPlanNom">Plan d'accès</b><small id="envPlanInfo">PDF ou image</small></div>
-              <label id="envPlanCoche" style="display:flex;align-items:center;gap:6px;font-size:.82rem;font-weight:700" hidden><input type="checkbox" id="envPlanJoindre"> joindre</label>
-              <button type="button" class="sv-btn" id="envPlanApercu" hidden>Aperçu</button>
-              <button type="button" class="sv-btn" id="envPlanRetirer" hidden>Retirer</button>
-              <label class="sv-btn" style="cursor:pointer" title="Joindre un autre fichier à la place du plan de l'onglet 2">Autre fichier…<input type="file" id="envPlan" accept="application/pdf,image/*" hidden></label></div>
-            <p style="margin:4px 0 0;font-size:.82rem;color:var(--text-sub)">☁️ Copie automatique dans le Drive, dossier PREPARATION du chantier.</p>
-          </div>
-        </section>
         <section class="sv-card" id="srvCarte">
-          <div class="sv-ch"><h2>Serveur FTS</h2><span class="s">13 - Travaux › PREPARATION CHANTIER</span></div>
-          <div style="padding:12px 18px 16px">
-            <div class="srv-b" id="srvBloc">
-              <label class="srv-chk"><input type="checkbox" id="srvDeposer" checked> Déposer aussi la fiche, le plan et la page de garde sur le serveur</label>
-              <div id="srvDetail"></div>
-            </div>
-            <div class="srv-att" id="srvAttente" hidden></div>
+          <div class="sv-ch"><h2>Ce qui part</h2><span class="s">mail · Drive · serveur FTS</span></div>
+          <div class="pj2">
+            <div class="pj2-l"><span class="pj2-ic" style="background:#EAF1FE">📄</span>
+              <div class="pj2-t"><b>Fiche de préparation</b><span class="f" id="envNomPdf"></span><div class="d" id="pjDFiche"></div></div>
+              <div class="pj2-a"><button type="button" class="sv-btn" id="envApercu">Aperçu</button></div></div>
+            <div class="pj2-l"><span class="pj2-ic" style="background:#EAF6EE">🗺️</span>
+              <div class="pj2-t"><b>Plan d'accès</b><span class="f" id="envPlanNom"></span><span class="s" id="envPlanInfo">PDF ou image</span><div class="d" id="pjDPlan"></div></div>
+              <div class="pj2-a bas">
+                <label class="jo" id="envPlanCoche" hidden><input type="checkbox" id="envPlanJoindre"> joindre</label>
+                <button type="button" class="sv-btn" id="envPlanApercu" hidden>Aperçu</button>
+                <button type="button" class="sv-btn" id="envPlanRetirer" hidden>Retirer</button>
+                <label class="sv-btn" style="cursor:pointer" title="Joindre un autre fichier à la place du plan de l'onglet 2">Autre fichier…<input type="file" id="envPlan" accept="application/pdf,image/*" hidden></label></div></div>
+            <div class="pj2-l"><span class="pj2-ic">📑</span>
+              <div class="pj2-t"><b>Page de garde</b><span class="f" id="pjNomGarde"></span><div class="d" id="pjDGarde"></div></div>
+              <div class="pj2-a"><button type="button" class="sv-btn" id="pjGardeVoir" title="Ouvrir l'onglet Page de garde">Voir</button></div></div>
           </div>
+          <div class="pj2-srv" id="srvBloc">
+            <div id="srvDetail"></div>
+            <label class="srv-chk"><input type="checkbox" id="srvDeposer" checked> Déposer aussi sur le serveur <span>· 13 - Travaux › PREPARATION CHANTIER</span></label>
+            <div id="srvAttente" hidden></div>
+          </div>
+          <p class="pj2-drv">☁️ Copie automatique dans le Drive, dossier PREPARATION du chantier.</p>
         </section>
         <section class="sv-card">
           <div class="sv-ch"><h2 id="envChgTitre">Changements</h2></div>
@@ -759,11 +805,6 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
         </section>
       </div>
     </div>
-    <section class="sv-card"><div class="pe-actions">
-      <span class="sv-mstatus" id="envStatus"></span><span class="sv-sp"></span>
-      <button type="button" class="sv-btn" id="envTelecharger" title="Enregistrer la fiche en PDF (par exemple dans le dossier du réseau FTS)">💾 Enregistrer la fiche en PDF…</button>
-      <button type="button" class="sv-btn pri" id="envEnvoyer">✉️ Envoyer</button>
-    </div></section>
     <section class="sv-card">
       <div class="sv-ch"><h2>Historique des envois</h2></div>
       <div style="overflow-x:auto"><table class="sv-tbl"><thead><tr><th>Indice</th><th>Envoyé le</th><th>Par</th><th>Destinataires</th><th>Plan d'accès</th><th>PDF</th></tr></thead><tbody id="envHist"></tbody></table></div>
@@ -3000,7 +3041,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!objetTouche) $("envObjet").value = texteObjet(n);
     if (!msgTouche) $("envMessage").value = texteMessage(n);
     $("envNomPdf").textContent = P.nomPdf(code, n);
-    $("envPlanNom").textContent = plan ? plan.nom : gen ? nomPlan(n) : "Plan d'accès";
+    $("envPlanNom").textContent = plan ? plan.nom : gen ? nomPlan(n) : "aucun plan";
+    $("pjNomGarde").textContent = nomGarde(n);
+    $("envThInd").textContent = `${code} · indice ${n}`;
     $("envPlanInfo").textContent = plan ? `${(plan.blob.size / 1024 / 1024).toFixed(1).replace(".", ",")} Mo · sera joint au mail${gen ? " à la place du plan de l'onglet 2" : ""}`
       : gen ? `onglet Plan d'accès · ${!e ? "premier envoi" : planModifie() ? "modifié depuis le dernier envoi" : `inchangé depuis l'indice ${e.indice}`}`
       : "pas de plan : à faire dans l'onglet Plan d'accès, ou joins un fichier";
@@ -3016,6 +3059,7 @@ document.addEventListener("DOMContentLoaded", () => {
       <td>${x.pdf && x.pdf.lien ? `<a href="${esc(x.pdf.lien)}" target="_blank" rel="noopener">Ouvrir</a>` : "—"}</td></tr>`).join("")
       : `<tr><td colspan="6" style="color:var(--text-sub)">Aucun envoi pour l'instant.</td></tr>`;
     $("envEnvoyer").textContent = `✉️ Envoyer l'indice ${n}`;
+    majPartent();
     majPageGarde();
     majOngletEnvoi();
     afficherServeur();
@@ -3034,6 +3078,19 @@ document.addEventListener("DOMContentLoaded", () => {
     afficherEnvoi();
   });
   $("envPlanRetirer").addEventListener("click", () => { plan = null; afficherEnvoi(); });
+  $("envPlanJoindre").addEventListener("change", () => majPartent());
+  $("pjGardeVoir").addEventListener("click", () => { fermerTiroirs(); ouvrirOnglet("Garde"); });
+  /** « Ce qui part » : où part chaque document (mail, Drive, serveur) */
+  let srvChip = null; // null = pas de dépôt, "ok" = déposé à l'envoi, "att" = mis en attente
+  function majPartent() {
+    const plOk = planJoint();
+    const srv = srvChip === "ok" ? ["on", "🗄️ serveur"] : srvChip === "att" ? ["att", "🗄️ serveur · en attente"] : null;
+    const chips = (l) => l.filter(Boolean).map(([c, t]) => `<span class="${c}">${esc(t)}</span>`).join("");
+    $("pjDFiche").innerHTML = chips([["on", "✉️ mail"], ["on", "☁️ Drive"], srv]);
+    $("pjDPlan").innerHTML = plOk ? chips([["on", "✉️ mail"], ["on", "☁️ Drive"], srv])
+      : chips([["", planGenere() ? "pas joint à cet envoi" : "rien à joindre"]]);
+    $("pjDGarde").innerHTML = chips([["", "pas dans le mail · s'imprime"], ["on", "☁️ Drive"], srv]);
+  }
   $("envPlanJoindre").addEventListener("change", () => { planJoindreTouche = true; afficherEnvoi(); });
   $("envPlanApercu").addEventListener("click", async () => {
     try { const r = await pdfPlan(); ouvrirApercu(r.blob, nomPlan(indiceEnvoi()), r.pages); } catch (e) { erreur("Aperçu impossible", e.message); }
@@ -3199,26 +3256,31 @@ document.addEventListener("DOMContentLoaded", () => {
     const tour = ++srvTour;
     const bloc = $("srvBloc"), det = $("srvDetail");
     const n = indiceEnvoi();
-    const liste = `<ul class="srv-fl">${fichiersPrevus(n).map((x) => `<li>📄 ${esc(x)}</li>`).join("")}</ul>`;
-    let cls = "", html = "";
-    if (!$("srvDeposer").checked) { html = `<div class="srv-mini">Rien ne sera déposé sur le serveur pour cet envoi.</div>`; }
-    else if (!srvDispo()) { cls = "w"; html = `<div class="srv-mini">⚠️ Ce navigateur n'écrit pas sur le serveur : utilise <b>Chrome ou Edge sur un PC du bureau</b>. Sinon les PDF seront mis en attente de dépôt.</div>${liste}`; }
+    const ligne = (titre, detail, bouton) => `<div class="srv-et"><span class="dot"></span><b>${titre}</b>${bouton || ""}${detail ? `<small>${detail}</small>` : ""}</div>`;
+    const relier = `<button type="button" class="sv-btn" id="srvRelierEnvoi" style="padding:5px 10px;font-size:.76rem">🗄️ Relier le serveur</button>`;
+    let cls = "", html = "", chip = null;
+    if (!$("srvDeposer").checked) { html = ligne("Pas de dépôt sur le serveur pour cet envoi", ""); }
+    else if (!srvDispo()) { cls = "w"; chip = "att"; html = ligne("Ce navigateur n'écrit pas sur le serveur", "Utilise Chrome ou Edge sur un PC du bureau. Sinon les PDF seront mis en attente de dépôt."); }
     else {
       const st = await FTSServeur.etat();
       if (tour !== srvTour) return;
-      if (st === "non-relie") { cls = "w"; html = `<div class="srv-mini">⚠️ Serveur pas encore relié sur ce PC : bouton <b>« Relier le serveur »</b> en haut. Sinon les PDF seront mis en attente de dépôt.</div>${liste}`; }
-      else if (st === "a-autoriser") { cls = "ok"; html = `<div class="srv-mini">Le navigateur demandera « Autoriser » au moment de l'envoi (une fois par session).</div>${liste}<div class="srv-mini">Rien n'est jamais remplacé ni supprimé sur le serveur.</div>`; }
+      if (st === "non-relie") { cls = "w"; chip = "att"; html = ligne("Serveur FTS pas relié sur ce PC", "Les PDF seront mis en attente de dépôt.", relier); }
+      else if (st === "a-autoriser") { cls = "ok"; chip = "ok"; html = ligne("Serveur FTS relié", "Le navigateur demandera « Autoriser » au moment de l'envoi (une fois par session). Rien n'est jamais remplacé ni supprimé."); }
       else {
         let t;
         try { t = await FTSServeur.trouverChantier(code); } catch (e) { t = { etat: "erreur" }; }
         if (tour !== srvTour) return;
-        if (t.etat === "ok") { cls = "ok"; html = `<div class="srv-path">${esc(FTSServeur.DOSSIER_ATTENDU)} › <b>${esc(t.nom)}</b> › ${SRV_CHEMIN.map(esc).join(" › ")}</div>${liste}<div class="srv-mini">Le dossier PREPARATION CHANTIER est créé s'il n'existe pas. Rien n'est jamais remplacé ni supprimé.</div>`; }
-        else if (t.etat === "plusieurs") { cls = "w"; html = `<div class="srv-mini">⚠️ ${t.choix.length} dossiers commencent par « ${esc(code)} » : on te demandera lequel au moment de l'envoi.</div>${liste}`; }
-        else if (t.etat === "introuvable") { cls = "ko"; html = `<div class="srv-mini">❌ <b>Aucun dossier « ${esc(code)} » sur le serveur.</b> Il a peut-être été déplacé ou pas encore créé (l'appli ne crée jamais de dossier chantier). Les PDF seront mis en attente de dépôt.</div>`; }
-        else { cls = "w"; html = `<div class="srv-mini">⚠️ Serveur FTS non accessible depuis ce PC (pas de VPN ?). Les PDF seront mis en attente de dépôt.</div>${liste}`; }
+        if (t.etat === "ok") { cls = "ok"; chip = "ok"; html = ligne("Serveur FTS relié", "") + `<div class="srv-path">${esc(FTSServeur.DOSSIER_ATTENDU)} › <b>${esc(t.nom)}</b> › ${SRV_CHEMIN.map(esc).join(" › ")}</div>`; }
+        else if (t.etat === "plusieurs") { cls = "w"; chip = "ok"; html = ligne(`${t.choix.length} dossiers commencent par « ${esc(code)} »`, "On te demandera lequel au moment de l'envoi."); }
+        else if (t.etat === "introuvable") { cls = "ko"; chip = "att"; html = ligne(`Aucun dossier « ${esc(code)} » sur le serveur`, "Il a peut-être été déplacé ou pas encore créé (l'appli ne crée jamais de dossier chantier). Les PDF seront mis en attente de dépôt."); }
+        else { cls = "w"; chip = "att"; html = ligne("Serveur FTS non accessible depuis ce PC", "Pas de VPN ? Les PDF seront mis en attente de dépôt."); }
       }
     }
-    bloc.className = "srv-b " + cls; det.innerHTML = html;
+    srvChip = $("srvDeposer").checked ? chip : null;
+    majPartent();
+    bloc.className = "pj2-srv " + cls; det.innerHTML = html;
+    const rel = $("srvRelierEnvoi");
+    if (rel) rel.addEventListener("click", async () => { try { const r = await FTSServeur.relier(); if (r && r.avert) erreur("Serveur FTS", r.avert); } catch (e) { erreur("Serveur non relié", e.message); } afficherServeur(true); });
     // File d'attente du chantier
     if (rechargerAttente || srvAttente === null) {
       try { srvAttente = (typeof FTSServeur !== "undefined") && chantierId ? await FTSServeur.lireAttente(chantierId) : []; } catch (e) { srvAttente = []; }
@@ -3226,9 +3288,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const z = $("srvAttente");
     z.hidden = !srvAttente.length;
-    if (srvAttente.length) z.innerHTML = `<div class="srv-b w"><b>⏳ ${srvAttente.length} document${srvAttente.length > 1 ? "s" : ""} en attente de dépôt sur le serveur</b>
-      <ul class="srv-fl">${srvAttente.map((x) => `<li>📄 ${esc(x.nom)} <span style="color:var(--text-sub)">· ${esc(x.chemin.join(" › "))}</span></li>`).join("")}</ul>
-      <div style="margin-top:8px"><button type="button" class="sv-btn pri" id="srvDeposerAttente">🗄️ Déposer maintenant</button></div></div>`;
+    if (srvAttente.length) z.innerHTML = `<div class="pj2-att">⏳ ${srvAttente.length} document${srvAttente.length > 1 ? "s" : ""} déjà en attente de dépôt<button type="button" class="sv-btn pri" id="srvDeposerAttente">🗄️ Déposer maintenant</button>
+      <details><summary>voir lesquels</summary>${srvAttente.map((x) => `${esc(x.nom)} · ${esc(x.chemin.join(" › "))}`).join("<br>")}</details></div>`;
     const b = $("srvDeposerAttente");
     if (b) b.addEventListener("click", deposerAttente);
   }

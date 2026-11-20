@@ -1219,7 +1219,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function celluleDelai(c) {
-    if (!c.jours) return `<div class="sv-prog"><div class="n"><span>—</span></div></div>`;
+    // Pas encore de rapport : on montre quand même la durée prévue (0 / 10 j), comme l'avancement (0 / 37)
+    if (!c.jours) return c.duree ? barre(0, c.duree, "", false).replace(`0 / ${c.duree}<`, `0 / ${c.duree} j<`) : `<div class="sv-prog"><div class="n"><span>—</span></div></div>`;
     if (!c.duree) return `<div class="sv-prog"><div class="n"><span>${c.jours} j</span></div></div>`;
     if (c.enRetard) {
       return `<div class="sv-prog late"><div class="n"><span>${c.jours} / ${c.duree} j</span><small>+${c.jours - c.duree} j</small></div><div class="sv-bar"><div style="width:100%"></div></div></div>`;

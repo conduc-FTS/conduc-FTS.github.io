@@ -34,6 +34,10 @@ const FTSSheets = (() => {
   const ONGLET_ARRETS = "Arrets";
   // Stock de fin de mois (tablette) : une ligne par article compté
   const ONGLET_STOCK = "Stock";
+  // Rapport journalier PIEUX (20/11/2026) : onglets créés seulement sur les chantiers qui ont des pieux
+  const ONGLET_PX = "Px";
+  const ONGLET_BETON = "Beton";
+  const ONGLET_DEBLAIS = "Deblais";
 
   /**
    * Remplace fetch() pour tous les appels Sheets/Drive de ce module.
@@ -137,6 +141,14 @@ const FTSSheets = (() => {
     [ONGLET_ARRETS]: ["Date", "Motif", "Durée (h)", "Observations", "Atelier"],
     [ONGLET_STOCK]: ["Mois", "Date du comptage", "Article", "Diamètre", "Longueur", "Quantité", "Compté par", "Remarque", "Enregistré le"],
   };
+  // Une ligne par pieu et par jour : un pieu reforé un autre jour a une ligne à chaque date,
+  // son volume réel total = somme de ses lignes ; « Reforages » = nombre de R à cette date.
+  const EN_TETES_PIEUX = {
+    [ONGLET_PX]: ["Date", "N° Px", "Type", "Ø EXE (mm)", "Lg EXE (m)", "Vol réel (m³)", "Vol théo (m³)", "Reforages", "Ferraillage", "Ø NDC (mm)", "Lg NDC (m)", "Hors NDC", "Atelier"],
+    [ONGLET_BETON]: ["Date", "N° BL", "Classe béton", "Volume (m³)", "Retour (m³)", "Éprouvette", "Slump (mm)", "Atelier"],
+    [ONGLET_DEBLAIS]: ["Date", "Type de camion", "Nbr de tours", "Atelier"],
+  };
+  const enTetes = (onglet) => EN_TETES_ONGLETS[onglet] || EN_TETES_PIEUX[onglet];
 
   // ── Ateliers ─────────────────────────────────────────────────────
   // Plusieurs ateliers peuvent travailler le même jour sur un chantier :
@@ -155,12 +167,14 @@ const FTSSheets = (() => {
    *      2026-11-04_Rapport journalier_26FTS099_HUGO LAJUS ATELIER 2.pdf
    * Sans chef : ancien format (2026-11-04_Rapport journalier_26FTS099.pdf).
    */
-  function nomFichierRapport(dateISO, codeDossier, atelier) {
-    const base = `${dateISO}_Rapport journalier_${String(codeDossier || "").trim().toUpperCase()}`;
+  function nomFichierRapport(dateISO, codeDossier, atelier, activite) {
+    // Rapport pieux : « Rapport journalier PIEUX » (le micropieux garde son nom d'avant)
+    const titre = activite === "PIEUX" ? "Rapport journalier PIEUX" : "Rapport journalier";
+    const base = `${dateISO}_${titre}_${String(codeDossier || "").trim().toUpperCase()}`;
     const a = String(atelier || "").trim().toUpperCase().replace(/\s*#\s*(\d+)$/, " ATELIER $1");
     return a ? `${base}_${a}.pdf` : `${base}.pdf`;
   }
-  function colonneAtelier(onglet) { return EN_TETES_ONGLETS[onglet].indexOf("Atelier"); }
+  function colonneAtelier(onglet) { return enTetes(onglet).indexOf("Atelier"); }
   function lettreColonne(i) { return String.fromCharCode("A".charCodeAt(0) + i); }
 
   // En-têtes « N° machine » / « Atelier » ajoutés aux classeurs existants (un seul appel)
@@ -211,6 +225,25 @@ const FTSSheets = (() => {
     }
   }
 
+  /** Onglets Px / Beton / Deblais : créés au premier rapport pieux du chantier */
+  async function assurerOngletsPieux(spreadsheetId) {
+    const res = await fetchAvecRetry(`${API_BASE}/${spreadsheetId}?fields=sheets.properties.title`, { headers: authHeader() });
+    if (!res.ok) throw new Error(`Erreur lecture du classeur de suivi : ${res.status}`);
+    const data = await res.json();
+    const titres = new Set((data.sheets || []).map((s) => s.properties.title));
+    const manquants = Object.keys(EN_TETES_PIEUX).filter((o) => !titres.has(o));
+    if (!manquants.length) return;
+    await fetchAvecRetry(`${API_BASE}/${spreadsheetId}:batchUpdate`, {
+      method: "POST",
+      headers: { ...authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify({ requests: manquants.map((o) => ({ addSheet: { properties: { title: o } } })) }),
+    });
+    for (const o of manquants) {
+      const e = EN_TETES_PIEUX[o];
+      await ecrireValeurs(spreadsheetId, `${o}!A1:${lettreColonne(e.length - 1)}1`, [e]);
+    }
+  }
+
   async function ecrireValeurs(spreadsheetId, range, values) {
     const res = await fetchAvecRetry(
       `${API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
@@ -247,7 +280,7 @@ const FTSSheets = (() => {
     const lignes = await lireOnglet(spreadsheetId, onglet);
     // atelier fourni : on ne supprime que les lignes de cet atelier (ou
     // sans atelier, enregistrées avant la colonne) ; sinon toute la date.
-    const col = atelier !== undefined && EN_TETES_ONGLETS[onglet] ? colonneAtelier(onglet) : -1;
+    const col = atelier !== undefined && enTetes(onglet) ? colonneAtelier(onglet) : -1;
     const cle = cleAtelier(atelier);
     const indices = [];
     lignes.forEach((l, idx) => {
@@ -311,16 +344,21 @@ const FTSSheets = (() => {
    * @param {number} opts.longueurTotale
    * @param {string[]} [opts.numerosPieux]  numéros de pieu saisis ce jour
    */
-  async function enregistrerDonneesRapport({ chantierFolderId, chantierName, date, machines, personnel, nbPieux, longueurTotale, numerosPieux, nomChef, horaires, trajets, pannes, arrets, atelier }) {
+  async function enregistrerDonneesRapport({ chantierFolderId, chantierName, date, machines, personnel, nbPieux, longueurTotale, numerosPieux, nomChef, horaires, trajets, pannes, arrets, atelier, activite, pieux }) {
     const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
     const at = atelier || nomChef || "";
+    // Rapport PIEUX : sa production va dans Px / Beton / Deblais. Production et
+    // Pieux restent réservés aux micropieux (résultats, cadence, doublons).
+    const estPieux = activite === "PIEUX";
+    if (estPieux) await assurerOngletsPieux(spreadsheetId);
 
     // Un rapport refait le même jour (après correction d'une erreur) doit
     // REMPLACER les données déjà enregistrées pour cette date ET cet
     // atelier, sans toucher à un autre atelier du même chantier ce jour-là.
     await assurerEntetesAtelier(spreadsheetId);
     await Promise.all([
-      ONGLET_MATERIEL, ONGLET_PERSONNEL, ONGLET_PRODUCTION, ONGLET_PIEUX, ONGLET_HORAIRES, ONGLET_PANNES, ONGLET_ARRETS,
+      ONGLET_MATERIEL, ONGLET_PERSONNEL, ONGLET_HORAIRES, ONGLET_PANNES, ONGLET_ARRETS,
+      ...(estPieux ? [ONGLET_PX, ONGLET_BETON, ONGLET_DEBLAIS] : [ONGLET_PRODUCTION, ONGLET_PIEUX]),
     ].map((onglet) => supprimerLignesDate(spreadsheetId, onglet, date, at)));
 
     if (machines && machines.length > 0) {
@@ -346,12 +384,29 @@ const FTSSheets = (() => {
     // qui reflète aussi les jours sans production. Le nom du chef est
     // gardé ici pour pouvoir retrouver et nettoyer son archive PDF
     // personnelle (ADMINISTRATIF/{chef}/...) en cas de suppression du rapport.
-    const moyenne = nbPieux > 0 ? longueurTotale / nbPieux : 0;
-    await ajouterLignes(spreadsheetId, ONGLET_PRODUCTION, [
-      [forcerTexteDate(date), nbPieux, longueurTotale.toFixed(2), moyenne.toFixed(2), nomChef || "", at],
-    ]);
+    if (estPieux) {
+      const p = pieux || {};
+      const n = (v) => (v === "" || v == null ? "" : Number(v));
+      const d = forcerTexteDate(date);
+      if (p.px && p.px.length) {
+        await ajouterLignes(spreadsheetId, ONGLET_PX, p.px.map((x) => [
+          d, `'${x.rep}`, p.type || "", n(x.phi), n(x.lg), n(x.vol), n(x.theo), x.r || 0, x.fer || "", n(x.phiNdc), n(x.lgNdc), x.horsNdc ? "OUI" : "", at,
+        ]));
+      }
+      if (p.bl && p.bl.length) {
+        await ajouterLignes(spreadsheetId, ONGLET_BETON, p.bl.map((b) => [d, b.num ? `'${b.num}` : "", b.classe || "", n(b.vol), n(b.retour), b.eprouvette ? "OUI" : "NON", n(b.slump), at]));
+      }
+      if (p.dz && p.dz.length) {
+        await ajouterLignes(spreadsheetId, ONGLET_DEBLAIS, p.dz.map((z) => [d, z.camion || "", n(z.tours), at]));
+      }
+    } else {
+      const moyenne = nbPieux > 0 ? longueurTotale / nbPieux : 0;
+      await ajouterLignes(spreadsheetId, ONGLET_PRODUCTION, [
+        [forcerTexteDate(date), nbPieux, longueurTotale.toFixed(2), moyenne.toFixed(2), nomChef || "", at],
+      ]);
+    }
 
-    if (numerosPieux && numerosPieux.length > 0) {
+    if (!estPieux && numerosPieux && numerosPieux.length > 0) {
       await ajouterLignes(spreadsheetId, ONGLET_PIEUX, numerosPieux.map((n) => [forcerTexteDate(date), n, at]));
     }
 
@@ -420,6 +475,24 @@ const FTSSheets = (() => {
       }
     });
     return conflits;
+  }
+
+  /**
+   * Passages déjà enregistrés des pieux (onglet Px) : pour reprendre le
+   * volume et les reforages d'un pieu foré un autre jour (antériorité).
+   * @returns {Promise<Array<{date, rep, vol, r, lg, phi, atelier}>>} [] si l'onglet n'existe pas encore
+   */
+  async function lirePassagesPx(chantierFolderId, chantierName) {
+    const spreadsheetId = await getOuCreerClasseurSuivi(chantierFolderId, chantierName);
+    const res = await fetchAvecRetry(`${API_BASE}/${spreadsheetId}/values/${encodeURIComponent(ONGLET_PX)}!A2:M`, { headers: authHeader() });
+    if (res.status === 400) return []; // pas encore d'onglet Px
+    if (!res.ok) throw new Error(`Erreur lecture Sheets : ${res.status}`);
+    const data = await res.json();
+    const num = (v) => { const x = parseFloat(String(v == null ? "" : v).replace(",", ".")); return Number.isFinite(x) ? x : 0; };
+    return (data.values || []).filter((l) => l[1]).map((l) => ({
+      date: String(l[0] || "").replace(/^'/, ""), rep: String(l[1]).replace(/^'/, "").trim(),
+      phi: num(l[3]), lg: num(l[4]), vol: num(l[5]), r: num(l[7]), atelier: l[12] || "",
+    }));
   }
 
   /**
@@ -1161,6 +1234,7 @@ const FTSSheets = (() => {
     avancementChantier,
     getOuCreerClasseurSuivi,
     enregistrerDonneesRapport,
+    lirePassagesPx,
     lireSuiviComplet,
     lireSuiviDetail,
     resumeChantier,

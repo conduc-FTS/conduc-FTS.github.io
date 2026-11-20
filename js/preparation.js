@@ -340,8 +340,34 @@ const FTSPreparation = (() => {
     });
     return { infos, reste };
   }
+  /**
+   * Découpe un collage Excel. Les cellules qui contiennent un retour à la
+   * ligne arrivent entre guillemets : elles restent entières (20/11/2026).
+   */
   function decouperLignes(texte) {
-    return String(texte || "").replace(/\r/g, "").split("\n").map((l) => l.split("\t"));
+    const s = String(texte || "").replace(/\r\n?/g, "\n");
+    const lignes = [];
+    let ligne = [], cel = "", i = 0;
+    while (i < s.length) {
+      const c = s[i];
+      if (c === '"' && cel === "") {
+        let j = i + 1, v = "", ferme = false;
+        while (j < s.length) {
+          if (s[j] === '"') {
+            if (s[j + 1] === '"') { v += '"'; j += 2; continue; }
+            if (j + 1 >= s.length || s[j + 1] === "\t" || s[j + 1] === "\n") { ferme = true; j++; break; }
+          }
+          v += s[j]; j++;
+        }
+        if (ferme) { cel = v; i = j; continue; }
+        cel += c; i++; continue;
+      }
+      if (c === "\t") { ligne.push(cel); cel = ""; i++; continue; }
+      if (c === "\n") { ligne.push(cel); cel = ""; lignes.push(ligne); ligne = []; i++; continue; }
+      cel += c; i++;
+    }
+    if (cel !== "" || ligne.length) { ligne.push(cel); lignes.push(ligne); }
+    return lignes;
   }
   function estLigneEntete(cells) {
     const t = sansAccent(cells.join(" "));

@@ -1422,18 +1422,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const fmtD = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
     tbody.innerHTML = lignes.map((l) => {
       const r = l.r;
-      const url = `../preparation/index.html?id=${encodeURIComponent(l.id)}&name=${encodeURIComponent(l.nomComplet)}${l.etat === "modifiee" ? "#envoi" : ""}`;
+      // Chantier uniquement en pieux : la préparation = la note de calcul pieux (20/11/2026)
+      const npx = l.avenir ? (l.meta && l.meta.ndcPieux) || null : null;
+      const url = `../preparation/index.html?id=${encodeURIComponent(l.id)}&name=${encodeURIComponent(l.nomComplet)}${l.avenir ? "#pieux" : l.etat === "modifiee" ? "#envoi" : ""}`;
       const envoi = r && r.envoi && r.envoi.indice ? `Ind ${escapeHtmlSE(r.envoi.indice)}${r.envoi.le ? " · " + escapeHtmlSE(new Date(r.envoi.le).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })) : ""}` : "—";
       const cond = conducteurDe(l);
-      return `<tr data-url="${l.avenir ? "" : escapeHtmlSE(url)}" class="${cond ? "" : "pp-libre"}">
+      return `<tr data-url="${escapeHtmlSE(url)}" class="${cond ? "" : "pp-libre"}">
         <td class="c-nom"><span class="sv-code">${escapeHtmlSE(l.code)}</span><span class="sv-nom">${escapeHtmlSE(l.nom)}</span><div>${l.tech.map((t) => `<span class="pp-tech ${escapeHtmlSE(t)}">${escapeHtmlSE(t.toUpperCase())}</span>`).join("")}</div>${/* OUVERTURE CHANTIER */ l.meta && l.meta.ouverture && l.etat === "afaire" ? `<span class="pp-nouveau">NOUVEAU · ouvert par ${escapeHtmlSE(l.meta.ouverture.par || "chargé d'affaires")}</span>` : ""}</td>
         <td>${l.date ? `<b>${fmtD(l.date)}</b>` : '<span class="pp-def">À DÉFINIR</span>'}</td>
         <td class="sv-chef">${escapeHtmlSE((r && r.chef) || "—")}</td>
-        <td class="r">${r && r.nbPieux ? r.nbPieux : "—"}</td>
-        <td>${l.avenir ? '<span class="pp-avenir">Fiche pieux à venir</span>' : `<span class="pp-et ${l.etat}">${ETATS_PREPA[l.etat] || l.etat}</span>${l.note ? `<span class="pp-note">${escapeHtmlSE(l.note)}</span>` : ""}`}</td>
+        <td class="r">${npx && npx.nb ? npx.nb : r && r.nbPieux ? r.nbPieux : "—"}</td>
+        <td>${l.avenir ? (npx && npx.nb ? `<span class="pp-et encours">NDC pieux${npx.indice ? " ind " + escapeHtmlSE(npx.indice) : ""}</span>` : '<span class="pp-et afaire">NDC pieux à coller</span>') : `<span class="pp-et ${l.etat}">${ETATS_PREPA[l.etat] || l.etat}</span>${l.note ? `<span class="pp-note">${escapeHtmlSE(l.note)}</span>` : ""}`}</td>
         <td style="white-space:nowrap">${envoi}</td>
         <td>${cond ? `<span style="color:var(--text-sub)">${escapeHtmlSE(cond)}</span>` : `<button type="button" class="pp-attr" data-attr="${escapeHtmlSE(l.id)}">+ ${ppMoi ? "M'attribuer" : "Attribuer"}</button>`}</td>
-        <td class="r">${l.avenir ? "" : `<a class="sv-btn ${l.etat === "afaire" ? "pri" : ""}" style="padding:6px 12px;font-size:.8rem;text-decoration:none" href="${escapeHtmlSE(url)}">${l.etat === "afaire" ? "Créer la fiche" : "Ouvrir"}</a>`}</td>
+        <td class="r">${l.avenir ? `<a class="sv-btn ${npx && npx.nb ? "" : "pri"}" style="padding:6px 12px;font-size:.8rem;text-decoration:none" href="${escapeHtmlSE(url)}">${npx && npx.nb ? "Ouvrir" : "Coller la NDC"}</a>` : `<a class="sv-btn ${l.etat === "afaire" ? "pri" : ""}" style="padding:6px 12px;font-size:.8rem;text-decoration:none" href="${escapeHtmlSE(url)}">${l.etat === "afaire" ? "Créer la fiche" : "Ouvrir"}</a>`}</td>
       </tr>`;
     }).join("");
   }

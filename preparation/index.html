@@ -536,11 +536,30 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 .pf-pop .bas button { border: none; background: none; color: #2A5DBF; cursor: pointer; font: inherit; padding: 0; }
 .pf-pop .bas .ok { background: #1d1d1f; color: #fff; border-radius: 8px; padding: 5px 12px; font-weight: 700; }
 .pf-pop .chk { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: .82rem; }
+/* Activité du chantier + note de calcul pieux (20/11/2026) */
+.px-act { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; font-size: .84rem; color: var(--text-sub); }
+.px-act[hidden], #pxPage[hidden], #pxCarte[hidden], #pxZone[hidden], #pxResultat[hidden], #pxDepot[hidden], #pxModes[hidden], #pxResume[hidden], #pxCols[hidden], #pxAnnuler[hidden] { display: none; }
+.px-act #pxActBoutons { display: inline-flex; gap: 8px; }
+.px-act button { border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 7px 16px; font: inherit; font-size: .84rem; font-weight: 800; cursor: pointer; color: var(--text-main); letter-spacing: .02em; }
+.px-act button[data-act="Micropieux"], .px-act button[data-act="Battage"] { border-left: 4px solid #2F6FDB; }
+.px-act button[data-act="Pieux"] { border-left: 4px solid #C0392B; }
+.px-act button.on[data-act="Pieux"] { background: #C0392B; border-color: #C0392B; color: #fff; }
+.px-act button.on:not([data-act="Pieux"]) { background: #1d1d1f; border-color: #1d1d1f; color: #fff; }
+.px-act .s { font-size: .78rem; }
+.nf-rc .g .geo { background: #C0392B; } .nf-rc .g .fer { background: #7A5AC8; }
+.nf-rc .c .geo, .nf-rc td.geo { background: #FDF3F1; } .nf-rc .c .fer, .nf-rc td.fer { background: #F4F0FC; }
+.px-tbl th.gauche, .px-tbl td.fer { text-align: left; padding-left: 10px; }
+.px-tbl .cr { background: #C0392B; color: #fff; font-size: .66rem; font-weight: 800; border-radius: 4px; padding: 1px 6px; }
+.px-tbl .et { font-size: .66rem; font-weight: 800; color: #B86E00; background: #FFF3DC; border-radius: 4px; padding: 1px 5px; margin-left: 5px; }
+.px-tot { display: flex; gap: 22px; justify-content: flex-end; padding: 10px 14px; font-size: .84rem; border-top: 1px solid var(--border); }
+.cl-chips span.cr { border-color: #F3B8B0; background: #FDF1EF; color: #8E2E22; }
 </style>
 </head>
 <body>
 
 <div id="svPage">
+  <!-- Activité du chantier : micropieux / pieux (un écran par activité, 20/11/2026) -->
+  <div class="px-act" id="pxActivites" hidden><span>Activité du chantier :</span><span id="pxActBoutons"></span><span class="s" id="pxActNote"></span></div>
   <!-- 3 documents : fiche de préparation · plan d'accès · page de garde (17/11/2026) -->
   <div class="pr-og" id="prTabs">
     <button type="button" class="on" data-t="Fiche"><span class="nm">1</span>Fiche de préparation<span class="et" id="etFiche"></span></button>
@@ -646,6 +665,51 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
           <label id="dpPlanLigne"><input type="checkbox" id="dpPlan" checked> <b>Plan d'accès</b> <span>onglet 2</span></label>
           <div class="pe-dp-b"><button type="button" class="sv-btn" id="pgApercu">🔍 Aperçu</button><button type="button" class="sv-btn" id="pgImprimer">🖨️ Imprimer</button><button type="button" class="sv-btn pri" id="pgPdf">💾 Enregistrer</button></div>
           <span class="pe-dp-s" id="dpStatut">💾 Enregistrer : sur le serveur FTS et/ou dans le Drive (dossier du chantier), au choix.</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- PIEUX · note de calcul (maquette-ndc-pieux.html validée le 20/11/2026) -->
+  <div id="pxPage" hidden>
+    <p class="sv-status" id="pxStatus">Chargement de la note de calcul pieux…</p>
+    <section class="nf-carte" id="pxCarte" hidden>
+      <h3><span class="nf-n">1</span>La note de calcul pieux <small>onglet « TABLEAU RECAP. PIEUX » de l'Excel de la NDC · c'est cette liste qui alimente le N° Px du rapport journalier</small></h3>
+      <div class="nf-cc">
+        <div id="pxResume" hidden></div>
+        <div id="pxZone" hidden>
+          <label class="cl-depot" id="pxDepot">
+            <textarea id="pxTexte" aria-label="Coller le tableau de la NDC pieux" spellcheck="false"></textarea>
+            <span class="ic">📋</span>
+            <b>Colle ici le tableau de la NDC pieux</b>
+            <span class="t">Dans l'Excel de la NDC, onglet <strong>TABLEAU RECAP. PIEUX</strong> : sélectionne de la ligne « indice » (ou « N° pieu ») jusqu'au dernier pieu,<br><kbd>Ctrl</kbd> + <kbd>C</kbd>, puis clique ici et <kbd>Ctrl</kbd> + <kbd>V</kbd>.</span>
+          </label>
+          <div id="pxResultat" hidden>
+            <div class="cl-recu" id="pxRecu"></div>
+            <div class="cl-chips" id="pxBilan"></div>
+            <div class="cl-ap">
+              <div class="cl-ap-h"><b>Aperçu de ce qui sera repris</b> · <span id="pxNb"></span> · Φ converti en mm (0,52 m → 520) · charges et efforts non repris</div>
+              <div class="cl-zone"><table class="nf-rc cl-tbl px-tbl">
+                <colgroup><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:7%"><col style="width:40%"></colgroup>
+                <thead>
+                  <tr class="g"><th class="gen">PIEU</th><th class="geo d" colspan="5">GÉOMÉTRIE</th><th class="fer d">FERRAILLAGE</th></tr>
+                  <tr class="c"><th class="rep">Repère</th><th class="geo d">Φ (mm)</th><th class="geo">Niveau AS (NGF)</th><th class="geo">Long. forée (m)</th><th class="geo">Vol théo (m³)</th><th class="geo">CR</th><th class="fer d gauche">Cage</th></tr>
+                </thead>
+                <tbody id="pxApercu"></tbody>
+              </table></div>
+              <div class="px-tot" id="pxTot"></div>
+              <div class="cl-corr"><span id="pxFormat"></span> Une colonne mal lue ? <button type="button" class="pe-lien" id="pxCorriger">Corriger les colonnes ▾</button>
+                <div class="cl-cols" id="pxCols" hidden></div></div>
+            </div>
+            <div style="margin-top:14px" id="pxModes" hidden>
+              <div class="nf-choix">
+                <label class="pr-radio"><input type="radio" name="pxMode" value="remplacer" checked><span><b>Tout remplacer</b> <span class="pr-chip v">conseillé</span><small>La liste devient celle de cette NDC (les repères qui disparaissent sont montrés avant ; un pieu déjà foré n'est jamais effacé du suivi du chantier).</small></span></label>
+                <label class="pr-radio"><input type="radio" name="pxMode" value="ajouter"><span><b>Ajouter</b><small>Ce qui est déjà là reste ; un repère déjà présent est mis à jour.</small></span></label>
+              </div>
+            </div>
+            <p class="sv-mstatus" id="pxMsg"></p>
+            <div class="nf-bt"><button type="button" class="sv-btn" id="pxAnnuler">Annuler</button><button type="button" class="sv-btn noir" id="pxValider" disabled>Enregistrer</button></div>
+          </div>
         </div>
       </div>
     </section>
@@ -820,6 +884,7 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <script src="../js/parc-materiel.js"></script>
 <script src="../js/personnel.js"></script>
 <script src="../js/preparation.js"></script>
+<script src="../js/ndc-pieux.js"></script>
 <script src="../js/gmail.js"></script>
 <script src="../js/mail-envoi.js"></script>
 <script src="../lib/jspdf/jspdf.umd.min.js"></script>
@@ -1132,6 +1197,7 @@ document.addEventListener("DOMContentLoaded", () => {
           FTSPersonnel.charger({ rapide: true }).catch(() => {}),
         ]);
         meta = m || {};
+        pxMonter();
         FTSAuth.getUserInfo().then((i) => { if (i) { nomMoi = i.name || i.email || ""; if ($("tiroirEnvoi").classList.contains("on") && !msgTouche) afficherEnvoi(); } }).catch(() => {});
         pp = await FTSParc.chargerParametresPrepa().catch(() => FTSParc.parametresPrepa());
         prep = P.normaliser(enreg, meta);
@@ -3542,6 +3608,190 @@ document.addEventListener("DOMContentLoaded", () => {
     const b = $("pfApercu"); b.disabled = true;
     try { const n = P.prochainIndice(prep, estModifiee()); const blob = await genererPdf(n); ouvrirApercu(blob, P.nomPdf(code, n), pagesPdf); }
     catch (e) { erreur("Aperçu impossible", e.message); } finally { b.disabled = false; }
+  });
+
+  // ═══ PIEUX : note de calcul (maquette-ndc-pieux.html validée le 20/11/2026) ═══
+  const NX = FTSNdcPieux;
+  const px = { ndc: null, charge: false, collage: null, actif: false };
+  /** Activités du chantier (un chantier peut cumuler micropieux, battage et pieux) */
+  const techniques = () => FTSDrive.techniquesChantier(meta || {});
+  const aPieux = () => techniques().includes("Pieux");
+  const pieuxSeul = () => aPieux() && !techniques().some((t) => t === "Micropieux" || t === "Battage");
+  /** Barre « Activité du chantier » (seulement si le chantier a des pieux) */
+  function pxMonter() {
+    if (!aPieux()) { $("pxActivites").hidden = true; return; }
+    const autres = techniques().filter((t) => t !== "Pieux");
+    $("pxActBoutons").innerHTML = [...autres.slice(0, 1), "Pieux"].map((t) => `<button type="button" data-act="${escA(t)}">${esc(t === "Pieux" ? "PIEUX" : autres.map((x) => x.toUpperCase()).join(" / "))}</button>`).join("");
+    $("pxActNote").textContent = pieuxSeul() ? "" : "une note de calcul par activité";
+    $("pxActivites").hidden = false;
+    pxActiver(pieuxSeul() || location.hash === "#pieux");
+  }
+  function pxActiver(on) {
+    px.actif = on;
+    document.querySelectorAll("#pxActBoutons button").forEach((b) => b.classList.toggle("on", (b.dataset.act === "Pieux") === on));
+    $("pxPage").hidden = !on;
+    $("prTabs").style.display = on ? "none" : ""; $("prStatus").style.display = on ? "none" : "";
+    document.querySelectorAll("#svPage > .sv-tab").forEach((x) => { x.style.display = on ? "none" : ""; });
+    ["etatSave", "btnEnregistrer", "btnValider"].forEach((id) => { const el = $(id); if (el) el.style.display = on ? "none" : ""; });
+    if (on) pxCharger();
+  }
+  $("pxActBoutons").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-act]"); if (!b) return;
+    pxActiver(b.dataset.act === "Pieux");
+    history.replaceState(null, "", b.dataset.act === "Pieux" ? "#pieux" : location.pathname + location.search);
+  });
+  async function pxCharger() {
+    if (px.charge) return pxAfficher();
+    $("pxStatus").hidden = false; $("pxStatus").textContent = "Chargement de la note de calcul pieux…";
+    try {
+      px.ndc = await NX.lire(chantierId);
+      px.charge = true;
+      $("pxStatus").hidden = true;
+      pxAfficher();
+    } catch (e) {
+      $("pxStatus").textContent = `Note de calcul pieux illisible : ${e.message}`;
+    }
+  }
+  const pxV = (x, d = 2) => (x === "" || x == null ? '<span class="vide">—</span>' : esc(NX.fr(x, d)));
+  function pxLignes(pieux) {
+    const coul = NX.couleurs(pieux);
+    return pieux.map((p) => {
+      const etoile = /\*/.test(p.rep);
+      return `<tr><td class="rep">${esc(p.rep.replace(/\*/g, ""))}${etoile ? '<span class="et">*</span>' : ""}</td>
+        <td class="geo d"><span class="diam" style="background:${coul[p.phi] || "#fff"}">Ø ${esc(String(p.phi))}</span></td>
+        <td class="geo">${pxV(p.as)}</td><td class="geo">${pxV(p.long)}</td><td class="geo">${pxV(NX.volume(p.phi, p.long))}</td>
+        <td class="geo">${p.cr ? '<span class="cr">CR</span>' : '<span class="vide">—</span>'}</td>
+        <td class="fer d" title="${escA(p.fer)}">${p.fer ? esc(p.fer) : '<span class="vide">—</span>'}</td></tr>`;
+    }).join("");
+  }
+  function pxChips(pieux) {
+    const s = NX.resumer(pieux);
+    const c = s.diametres.map((x) => `<span><span class="pt" style="background:${x.couleur}"></span><b>${x.nb}</b> en Ø ${x.d}</span>`);
+    if (s.cr) c.push(`<span class="cr"><b>${s.cr}</b> en contrôle renforcé (CR)</span>`);
+    c.push(`<span>Longueur forée <b>${NX.fr(s.longueur, 1)} ml</b></span>`, `<span>Béton théorique <b>${NX.fr(s.volume, 1)} m³</b></span>`);
+    if (s.etoiles.length) c.push(`<span class="w"><b>${s.etoiles.length}</b> repère${s.etoiles.length > 1 ? "s" : ""} avec * (${esc(s.etoiles.join(", "))})</span>`);
+    return c;
+  }
+  function pxTotaux(pieux) {
+    const s = NX.resumer(pieux);
+    return `<span>${s.nb} pieu${s.nb > 1 ? "x" : ""}</span><span>Longueur forée : <b>${NX.fr(s.longueur, 2)} m</b></span><span>Béton théorique : <b>${NX.fr(s.volume, 1)} m³</b></span>`;
+  }
+  /** NDC enregistrée → résumé + tableau ; rien → zone de collage */
+  function pxAfficher() {
+    $("pxCarte").hidden = false;
+    const n = px.ndc && px.ndc.pieux.length;
+    if (!n) { pxOuvrirCollage(); return; }
+    const d = px.ndc;
+    const le = d.majLe ? new Date(d.majLe).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "";
+    $("pxResume").hidden = false;
+    $("pxResume").innerHTML = `<div class="cl-recu"><span class="ic">✅</span><div class="t"><b>NDC${d.indice ? ` indice ${esc(d.indice)}` : ""} enregistrée · ${n} pieu${n > 1 ? "x" : ""}</b><small>${[d.ddc ? `DDC ${esc(d.ddc)}` : "", le ? `enregistrée le ${esc(le)}${d.majPar ? ` par ${esc(d.majPar)}` : ""}` : ""].filter(Boolean).join(" · ")}</small></div><button type="button" class="sv-btn" data-px-coller>↺ Coller un nouvel indice</button></div>
+      <div class="cl-chips">${pxChips(d.pieux).join("")}</div>
+      <div class="cl-ap"><div class="cl-ap-h"><b>Liste des pieux</b> · ce que le chef voit dans le rapport journalier (N° Px, Ø, niveau AS, longueur, CR, ferraillage)</div>
+        <div class="cl-zone" style="max-height:520px"><table class="nf-rc cl-tbl px-tbl"><colgroup><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:7%"><col style="width:40%"></colgroup>
+        <thead><tr class="g"><th class="gen">PIEU</th><th class="geo d" colspan="5">GÉOMÉTRIE</th><th class="fer d">FERRAILLAGE</th></tr>
+        <tr class="c"><th class="rep">Repère</th><th class="geo d">Φ (mm)</th><th class="geo">Niveau AS (NGF)</th><th class="geo">Long. forée (m)</th><th class="geo">Vol théo (m³)</th><th class="geo">CR</th><th class="fer d gauche">Cage</th></tr></thead>
+        <tbody>${pxLignes(d.pieux)}</tbody></table></div>
+        <div class="px-tot">${pxTotaux(d.pieux)}</div></div>
+      ${d.note ? `<p class="nf-note">Note de la NDC : ${esc(d.note)}</p>` : ""}`;
+    $("pxZone").hidden = true;
+  }
+  $("pxResume").addEventListener("click", (ev) => { if (ev.target.closest("[data-px-coller]")) pxOuvrirCollage(); });
+  function pxOuvrirCollage() {
+    const deja = !!(px.ndc && px.ndc.pieux.length);
+    $("pxTexte").value = ""; px.collage = null;
+    $("pxCols").hidden = true;
+    document.querySelector('input[name="pxMode"][value="remplacer"]').checked = true;
+    $("pxAnnuler").hidden = !deja;
+    $("pxResume").hidden = true;
+    $("pxZone").hidden = false;
+    pxAnalyser();
+    setTimeout(() => $("pxTexte").focus(), 50);
+  }
+  $("pxAnnuler").addEventListener("click", () => { px.collage = null; $("pxTexte").value = ""; pxAfficher(); });
+  const pxModeChoisi = () => (px.ndc && px.ndc.pieux.length ? document.querySelector('input[name="pxMode"]:checked').value : "remplacer");
+  function pxAnalyser() {
+    const txt = $("pxTexte").value;
+    if (!txt.trim()) {
+      px.collage = null;
+      $("pxDepot").hidden = false; $("pxResultat").hidden = true; $("pxValider").disabled = true;
+      return;
+    }
+    if (!px.collage || px.collage.texte !== txt) px.collage = { texte: txt, ...NX.analyserCollage(txt) };
+    const c = px.collage, res = NX.lirePieux(c.lignes, c.colonnes);
+    c.res = res;
+    $("pxDepot").hidden = true; $("pxResultat").hidden = false;
+    const nb = res.pieux.length, inf = c.infos || {};
+    const existants = (px.ndc && px.ndc.pieux) || [];
+    const f = NX.fusionner(existants, res.pieux, pxModeChoisi());
+    const compte = inf.nbPx === undefined ? "" : inf.nbPx === nb ? `la NDC annonce ${inf.nbPx} pieux : le compte est bon` : `⚠️ la NDC annonce ${inf.nbPx} pieux, ${nb} lus : vérifie qu'il n'en manque pas`;
+    const alerte = !nb || (inf.nbPx !== undefined && inf.nbPx !== nb);
+    $("pxRecu").className = "cl-recu" + (alerte ? " w" : "");
+    $("pxRecu").innerHTML = nb
+      ? `<span class="ic">${alerte ? "⚠️" : "✅"}</span><div class="t"><b>NDC${inf.indice ? ` indice ${esc(inf.indice)}` : ""} reconnue · ${nb} pieu${nb > 1 ? "x" : ""}</b><small>${[inf.ddc ? `DDC ${esc(inf.ddc)}` : "", esc(compte)].filter(Boolean).join(" · ")}</small></div><button type="button" class="pe-lien" data-px-recoller>↺ Recoller</button>`
+      : `<span class="ic">⚠️</span><div class="t"><b>Aucun pieu reconnu</b><small>Vérifie que le tableau copié contient bien les repères, les Φ et les longueurs forées, ou corrige les colonnes ci-dessous.</small></div><button type="button" class="pe-lien" data-px-recoller>↺ Recoller</button>`;
+    const chips = nb ? pxChips(res.pieux) : [];
+    if (existants.length) {
+      if (f.nouveaux.length) chips.push(`<span class="ok">${f.nouveaux.length} nouveau${f.nouveaux.length > 1 ? "x" : ""}${f.nouveaux.length <= 4 ? " : " + esc(f.nouveaux.join(", ")) : ""}</span>`);
+      if (f.misAJour.length) chips.push(`<span class="w">${f.misAJour.length} modifié${f.misAJour.length > 1 ? "s" : ""}${f.misAJour.length <= 4 ? " : " + esc(f.misAJour.join(", ")) : ""}</span>`);
+      if (f.retires.length) chips.push(`<span class="r">${f.retires.length} retiré${f.retires.length > 1 ? "s" : ""}${f.retires.length <= 4 ? " : " + esc(f.retires.join(", ")) : ""}</span>`);
+      if (!f.nouveaux.length && !f.misAJour.length && !f.retires.length) chips.push(`<span class="ok">aucun changement</span>`);
+    } else if (nb) chips.push(`<span class="ok">${nb} nouveau${nb > 1 ? "x" : ""}</span>`);
+    if (res.ignorees) chips.push(`<span class="w">${res.ignorees} ligne${res.ignorees > 1 ? "s" : ""} sans Φ ou sans longueur ignorée${res.ignorees > 1 ? "s" : ""}</span>`);
+    $("pxBilan").innerHTML = chips.join("");
+    $("pxNb").textContent = `${nb} pieu${nb > 1 ? "x" : ""}`;
+    $("pxApercu").innerHTML = nb ? pxLignes(res.pieux) : `<tr><td colspan="7" style="text-align:left;padding:14px;color:var(--text-sub)">Rien à montrer : aucun pieu reconnu.</td></tr>`;
+    $("pxTot").innerHTML = nb ? pxTotaux(res.pieux) : "";
+    $("pxFormat").textContent = c.entete ? "Colonnes reconnues d'après l'entête de la NDC (format TABLEAU RECAP. PIEUX)." : "Pas d'entête : ordre des colonnes du TABLEAU RECAP. PIEUX utilisé.";
+    if (!nb) $("pxCols").hidden = false;
+    const opts = (k) => `<option value="">— ignorée —</option>` + NX.CHAMPS.map((x) => `<option value="${x.k}" ${x.k === k ? "selected" : ""}>${x.lib}</option>`).join("");
+    const lettre = (i) => (i < 26 ? String.fromCharCode(65 + i) : "A" + String.fromCharCode(65 + i - 26));
+    const exemple = (col) => { const l = c.lignes.find((x) => String(x[col] || "").trim()); return l ? String(l[col]).trim() : ""; };
+    $("pxCols").innerHTML = c.colonnes.map((k, col) => `<div class="cl-col${k ? "" : " ign"}"><div class="l">Colonne <b>${lettre(col)}</b> · ex. ${esc(exemple(col).slice(0, 18)) || "vide"}</div><select data-col="${col}">${opts(k)}</select></div>`).join("");
+    $("pxModes").hidden = !existants.length;
+    $("pxMsg").textContent = "";
+    $("pxValider").disabled = !nb;
+    $("pxValider").textContent = nb ? `Enregistrer ${nb === 1 ? "ce pieu" : `ces ${nb} pieux`}` : "Enregistrer";
+  }
+  $("pxTexte").addEventListener("input", () => { px.collage = null; pxAnalyser(); });
+  $("pxCols").addEventListener("change", (ev) => {
+    const s = ev.target.closest("[data-col]"); if (!s || !px.collage) return;
+    const k = s.value, col = Number(s.dataset.col);
+    px.collage.colonnes = px.collage.colonnes.map((x, j) => (j === col ? k : x === k && k ? "" : x));
+    pxAnalyser();
+  });
+  $("pxCorriger").addEventListener("click", () => { $("pxCols").hidden = !$("pxCols").hidden; });
+  $("pxRecu").addEventListener("click", (ev) => {
+    if (!ev.target.closest("[data-px-recoller]")) return;
+    px.collage = null; $("pxTexte").value = ""; pxAnalyser(); $("pxTexte").focus();
+  });
+  document.querySelectorAll('input[name="pxMode"]').forEach((r) => r.addEventListener("change", pxAnalyser));
+  $("pxValider").addEventListener("click", async () => {
+    const c = px.collage;
+    if (!c || !c.res || !c.res.pieux.length) return;
+    const mode = pxModeChoisi();
+    const avant = px.ndc || NX.nouvelle();
+    const f = NX.fusionner(avant.pieux, c.res.pieux, mode);
+    if (f.retires.length && !(await confirmer("Tout remplacer ?", `Ces repères ne sont plus dans la NDC collée et vont sortir de la liste :<div class="warn" style="text-align:left"><b>${esc(f.retires.slice(0, 20).join(", "))}${f.retires.length > 20 ? "…" : ""}</b></div>Les pieux déjà forés restent dans le suivi du chantier.`, "Tout remplacer", "pri", "📋"))) return;
+    const inf = c.infos || {};
+    const ndc = { ...avant, pieux: f.pieux, majPar: nomMoi || "" };
+    if (inf.indice) ndc.indice = inf.indice;
+    if (inf.ddc) ndc.ddc = inf.ddc;
+    if (inf.date) ndc.date = inf.date;
+    if (inf.nbPx !== undefined) ndc.nbAnnonce = inf.nbPx;
+    if (c.res.note) ndc.note = c.res.note;
+    ndc.historique = [...(avant.historique || []), { indice: ndc.indice || "", le: new Date().toISOString(), par: nomMoi || "", nb: f.pieux.length, nouveaux: f.nouveaux.length, modifies: f.misAJour.length, retires: f.retires.length }];
+    const b = $("pxValider"); b.disabled = true; $("pxMsg").textContent = "Enregistrement…"; $("pxMsg").className = "sv-mstatus";
+    try {
+      const r = await NX.enregistrer(chantierId, ndc);
+      px.ndc = r.data;
+      if (r.meta) meta = r.meta;
+      px.collage = null; $("pxTexte").value = "";
+      FTSShell.toast(`NDC pieux enregistrée : ${r.data.pieux.length} pieux`);
+      pxAfficher();
+    } catch (e) {
+      $("pxMsg").textContent = `Enregistrement impossible : ${e.message}`; $("pxMsg").className = "sv-mstatus err";
+      b.disabled = false;
+    }
   });
 
   if (location.hash === "#envoi") setTimeout(() => { if (pret) valider(); }, 1500);

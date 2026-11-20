@@ -134,7 +134,7 @@ const FTSBoiteEnvoi = (() => {
       if (aucuneEtape && (!item.controles.pieux || !item.controles.existant)) {
         const conflits = [];
         const racine = await FTSDrive.findChantierFolder(item.code);
-        if (!item.controles.pieux && racine && window.FTSSheets && item.suivi.numerosPieux.length) {
+        if (!item.controles.pieux && racine && window.FTSSheets && (item.suivi.numerosPieux || []).length) {
           const doublons = await FTSSheets.verifierPieuxDejaRealises(racine.id, racine.name, item.suivi.numerosPieux, item.suivi.date, item.atelier);
           doublons.forEach((c) => conflits.push(`Pieu n°${c.numero} déjà déclaré le ${c.date}${c.atelier ? ` par l'atelier ${c.atelier}` : ""}`));
         }
@@ -176,6 +176,7 @@ const FTSBoiteEnvoi = (() => {
               nbPieux: item.suivi.nbPieux, longueurTotale: item.suivi.longueurTotale, numerosPieux: item.suivi.numerosPieux,
               nomChef: item.nomChef, atelier: item.atelier,
               horaires: item.suivi.horaires, trajets: item.suivi.trajets, pannes: item.suivi.pannes, arrets: item.suivi.arrets,
+              activite: item.suivi.activite || "MICROPIEUX", pieux: item.suivi.pieux,
             });
           }
         } catch (e) {

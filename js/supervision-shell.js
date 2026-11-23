@@ -143,7 +143,8 @@ const FTSShell = (() => {
     document.body.prepend(sidebar);
 
     // Voyant du serveur FTS (pages qui chargent serveur-fts.js, ordinateur uniquement)
-    if ((typeof FTSServeur !== "undefined")) FTSServeur.monterVoyant(main.querySelector(".sv-actions"));
+    // voyantServeur:false → pas de voyant (ex. Détail chantier : seulement dans le bandeau « à déposer »)
+    if ((typeof FTSServeur !== "undefined") && opts.voyantServeur !== false) FTSServeur.monterVoyant(main.querySelector(".sv-actions"));
 
     document.getElementById("menuPlusBtn").addEventListener("click", () => document.body.classList.toggle("menu-ouvert"));
     backdrop.addEventListener("click", () => document.body.classList.remove("menu-ouvert"));

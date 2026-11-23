@@ -230,6 +230,9 @@ html { font-size: 16px; }
 .sv-top .sv-crumb { font-size: 0.78rem; color: var(--text-sub); }
 .sv-top .sv-crumb a { color: var(--text-sub); text-decoration: none; }
 .sv-top .sv-crumb a:hover { text-decoration: underline; }
+/* Premier lien du fil = bouton retour bien visible */
+.sv-top .sv-crumb a:first-child { display: inline-flex; align-items: center; gap: 4px; background: #F4F5F7; border: 1px solid var(--border); border-radius: 8px; padding: 3px 10px; margin: 0 0 5px; font-weight: 700; font-size: 0.8rem; color: var(--text-main); }
+.sv-top .sv-crumb a:first-child:hover { background: #E9EBEF; text-decoration: none; }
 .sv-top h1 .code { color: var(--text-sub); font-weight: 700; font-size: 0.92rem; margin-right: 8px; }
 .sv-top h1 .sv-badge, .sv-top h1 .sv-st { vertical-align: 3px; margin-left: 6px; }
 .sv-top .sv-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

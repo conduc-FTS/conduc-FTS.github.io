@@ -248,6 +248,13 @@ tr.pp-libre { background: #FFFCF0; }
 .sv-last small { display: block; color: var(--text-sub); font-size: 0.72rem; }
 .sv-last.warn { color: #A15C00; font-weight: 700; }
 .sv-chef { font-size: 0.86rem; }
+.sv-chef b { font-weight: 700; }
+.sv-chef small, .sv-ctx small { display: block; font-size: 0.74rem; color: var(--text-sub); margin-top: 2px; line-height: 1.3; }
+.sv-ctx { font-size: 0.84rem; white-space: nowrap; }
+.sv-ctx .non { color: #C0392B; font-weight: 600; }
+.c-nom .sv-badges { margin-top: 4px; }
+#chantiersTbody td.c-nom { min-width: 230px; }
+#chantiersTbody td.c-chef { min-width: 170px; }
 .sv-act { white-space: nowrap; text-align: right; }
 .sv-ab { border: 1px solid var(--border); background: #fff; border-radius: 8px; width: 34px; height: 34px; display: inline-grid; place-items: center; font-size: 0.95rem; margin-left: 4px; text-decoration: none; cursor: pointer; }
 .sv-ab:hover { background: var(--bg); }
@@ -329,7 +336,8 @@ tr.pp-libre { background: #FFFCF0; }
   .sv-table tbody tr { padding: 12px 14px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
   .sv-table tbody tr:last-child { border-bottom: none; }
   .sv-table td { padding: 0; border: none; }
-  .sv-table td.c-type, .sv-table td.c-chef, .sv-table td.c-act { display: none; }
+  #chantiersTbody td.c-nom, #chantiersTbody td.c-chef { min-width: 0; }
+  .sv-table td.c-type, .sv-table td.c-chef, .sv-table td.c-ctx, .sv-table td.c-act { display: none; }
   .sv-table td.c-st { text-align: right; }
   .sv-table td.c-last { grid-column: 1 / -1; font-size: 0.78rem; color: var(--text-sub); }
   .sv-table td.c-last small { display: inline; margin-left: 4px; }
@@ -445,10 +453,10 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
     <span class="sv-sp"></span>
     <label class="sv-search" id="searchBox">🔍<input type="text" id="rechercheChantier" placeholder="Rechercher un chantier, un chef…"></label>
     <label class="pp-moi" id="ppMoiBox" hidden title="Retenu sur cet ordinateur">👤 <select id="ppMoi"><option value="">Je suis… (choisir)</option></select></label>
-    <span id="srvVoyantZone"></span>
+    <span id="srvVoyantZone" style="display:none"></span>
     <span class="sv-sync" id="syncTop"><span class="dot"></span><span class="txt"></span></span>
     <button type="button" class="sv-btn" id="refreshVueEnsembleBtn" title="Recharger depuis Google">🔄</button>
-    <button type="button" class="sv-btn pri" id="nouveauChantierBtn">+ Nouveau chantier</button>
+    <button type="button" class="sv-btn pri" id="nouveauChantierBtn" style="display:none">+ Nouveau chantier</button>
   </header>
 
   <div class="sv-content">
@@ -481,11 +489,11 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
       <table class="sv-table">
         <thead><tr>
           <th data-sort="nom">Chantier <span class="ar">↕</span></th>
-          <th>Type</th>
+          <th data-sort="ctx" title="Conducteur de travaux">Ctx <span class="ar">↕</span></th>
+          <th data-sort="chef" title="Chef du dernier rapport, puis les personnes présentes ce jour-là">Chef <span class="ar">↕</span></th>
           <th>Foreuse</th>
           <th data-sort="avancement">Avancement <span class="ar">↕</span></th>
           <th data-sort="delai">Délai <span class="ar">↕</span></th>
-          <th data-sort="chef">Chef <span class="ar">↕</span></th>
           <th data-sort="dernier">Dernier rapport <span class="ar">↕</span></th>
           <th></th>
         </tr></thead>
@@ -925,6 +933,9 @@ document.addEventListener("DOMContentLoaded", () => {
     $("pageTitle").textContent = TITRES_VUES[id] || "Supervision";
     $("mobileTitle").textContent = id === "se-view-overview" ? "Supervision" : (TITRES_VUES[id] || "Supervision");
     $("searchBox").style.display = id === "se-view-overview" ? "" : "none"; // n'occupe plus de place sur les autres vues
+    // « + Nouveau chantier » : seulement dans Préparation (23/11/2026). Le voyant serveur : seulement là où un fichier part sur le serveur.
+    $("nouveauChantierBtn").style.display = id === "se-view-preparation" ? "" : "none";
+    $("srvVoyantZone").style.display = ["se-view-preparation", "se-view-resultats", "se-view-ouverture"].includes(id) ? "" : "none";
     if (id === "se-view-overview") afficherVueEnsemble();
     if (id === "se-view-archives") chargerArchives();
     if (id === "se-view-preparation") chargerPreparation();
@@ -1105,6 +1116,31 @@ document.addEventListener("DOMContentLoaded", () => {
   const fmtCourt = (d) => d ? `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}` : "";
   const nombre = (v) => parseFloat(String(v == null ? "" : v).replace(",", ".")) || 0;
 
+  /**
+   * Personnes du rapport d'un jour, hors chef : FTS avec leur poste
+   * (« SASHA DAVAL (second) »), intérimaires comptés à part.
+   * @returns {{noms:string[], interim:number}}
+   */
+  function equipeDuJour(personnel, date, chef) {
+    const k = (x) => (window.FTSPersonnel ? FTSPersonnel.cle(x) : String(x || "").trim().toUpperCase());
+    const vus = new Set([k(chef)]), noms = [];
+    let interim = 0;
+    (personnel || []).filter((r) => date && r[0] === date && r[1]).forEach((r) => {
+      const cle = k(r[1]);
+      if (vus.has(cle)) return; vus.add(cle);
+      if (/int[ée]rim/i.test(r[2] || "")) { interim++; return; }
+      const f = window.FTSPersonnel && FTSPersonnel.parNom(r[1]);
+      const poste = f && f.poste && !/CHEF/.test(f.poste) ? ` (${f.poste.toLowerCase()})` : "";
+      noms.push(String(r[1]).trim().toUpperCase() + poste);
+    });
+    return { noms, interim };
+  }
+  /** « CLÉMENT MALECOT » → « C. MALECOT » (colonne Ctx étroite) */
+  function nomCourt(n) {
+    const m = String(n || "").trim().split(/\s+/);
+    return m.length > 1 ? `${m[0].charAt(0)}. ${m.slice(1).join(" ")}` : (m[0] || "");
+  }
+
   // Transforme les lignes brutes des Sheets en une ligne de tableau par chantier
   function construireLignes(d) {
     const lundi = lundiDeLaSemaine(new Date());
@@ -1123,11 +1159,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const termine = meta.statutChantier === "Termine";
 
       // Dernier rapport (date la plus récente, Production ou Matériel) + chef de ce jour-là
-      let dernier = null, chef = "";
+      let dernier = null, chef = "", dateChef = "";
       s.production.forEach((r) => {
         const x = FTSSheets.parseDateFR(r[0]);
-        if (x && (!dernier || x >= dernier)) { dernier = x; if (r[4]) chef = r[4]; }
+        if (x && (!dernier || x >= dernier)) { dernier = x; if (r[4]) { chef = r[4]; dateChef = r[0]; } }
       });
+      const equipe = equipeDuJour(s.personnel, dateChef, chef);
       s.materiel.forEach((r) => { const x = FTSSheets.parseDateFR(r[0]); if (x && (!dernier || x > dernier)) dernier = x; });
       const ecartJours = dernier ? Math.round((aujourdhui - jourSeul(dernier)) / 86400000) : null;
 
@@ -1157,10 +1194,20 @@ document.addEventListener("DOMContentLoaded", () => {
         mpx: compteMpx ? (resume.totalMicropieux || 0) : null, prevuMpx,
         pieuxPrevus: meta.pieuxPrevus || null,
         jours, duree, enRetard: !termine && !!(duree && jours && jours > duree),
-        chef, dernier, ecartJours,
+        chef, equipe, chefPrevu: (meta.preparation && meta.preparation.chef) || "", ctx: meta.conducteur || "",
+        dernier, ecartJours,
         mpxSemaine, heuresSemaine, personnesSemaine: persoSemaine.map((r) => (r[1] || "").trim().toUpperCase()).filter(Boolean),
       };
     });
+  }
+
+  /** Chef du dernier rapport en gras, puis les autres personnes de ce jour-là */
+  function celluleChef(c) {
+    if (!c.chef) return c.chefPrevu ? `—<small>pas encore de rapport · prévu : ${escapeHtmlSE(c.chefPrevu)}</small>` : "—";
+    const e = c.equipe || { noms: [], interim: 0 };
+    const autres = e.noms.map(escapeHtmlSE);
+    if (e.interim) autres.push(`${e.interim} intérimaire${e.interim > 1 ? "s" : ""}`);
+    return `<b>${escapeHtmlSE(c.chef)}</b>${autres.length ? `<small>+ ${autres.join(", ")}</small>` : ""}`;
   }
 
   function lignesFiltrees(toutes) {
@@ -1169,7 +1216,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return toutes.filter((c) => {
       if (c.termine && !avecTermines) return false;
       if (!FAMILLES[filtreFamille](c.tech)) return false;
-      if (q && !`${c.code} ${c.nom} ${c.chef}`.toLowerCase().includes(q)) return false;
+      if (q && !`${c.code} ${c.nom} ${c.chef} ${c.ctx} ${c.equipe ? c.equipe.noms.join(" ") : ""}`.toLowerCase().includes(q)) return false;
       return true;
     });
   }
@@ -1264,7 +1311,8 @@ document.addEventListener("DOMContentLoaded", () => {
       nom: (c) => c.nomComplet,
       avancement: (c) => (c.prevuMpx ? (c.mpx || 0) / c.prevuMpx : -1),
       delai: (c) => (c.duree && c.jours ? c.jours / c.duree : -1),
-      chef: (c) => c.chef || "~",
+      chef: (c) => c.chef || c.chefPrevu || "~",
+      ctx: (c) => c.ctx || "~",
       dernier: (c) => (c.dernier ? -c.dernier.getTime() : Infinity),
     };
     const cle = cles[triColonne] || cles.nom;
@@ -1289,12 +1337,12 @@ document.addEventListener("DOMContentLoaded", () => {
         : `<span class="sv-st"><i></i>—</span>`;
       const tagFin = c.termine ? `<span class="sv-tag">✓ TERMINÉ${c.dateFin ? " " + escapeHtmlSE(c.dateFin) : ""}</span>` : "";
       return `<tr class="${c.enRetard ? "late" : ""}${c.termine ? " done" : ""}" data-id="${escapeHtmlSE(c.id)}" data-name="${escapeHtmlSE(c.nomComplet)}">
-        <td class="c-nom"><span class="sv-code">${escapeHtmlSE(c.code)}</span><span class="sv-nom">${escapeHtmlSE(c.nom)}</span>${tagFin}</td>
-        <td class="c-type"><div class="sv-badges">${badges}</div></td>
+        <td class="c-nom"><span class="sv-code">${escapeHtmlSE(c.code)}</span><span class="sv-nom">${escapeHtmlSE(c.nom)}</span>${tagFin}<div class="sv-badges">${badges}</div></td>
+        <td class="c-ctx sv-ctx" title="${escapeHtmlSE(c.ctx || "")}">${c.ctx ? escapeHtmlSE(nomCourt(c.ctx)) : `<span class="non">à attribuer</span>`}</td>
+        <td class="c-chef sv-chef">${celluleChef(c)}</td>
         <td class="c-st">${statut}<span class="sv-mach">${escapeHtmlSE(c.machine || "—")}</span></td>
         <td class="c-mp">${celluleAvancement(c)}</td>
         <td class="c-j">${celluleDelai(c)}</td>
-        <td class="c-chef sv-chef">${escapeHtmlSE(c.chef || "—")}</td>
         ${celluleDernier(c)}
         <td class="c-act sv-act"><a class="sv-ab" title="Rapports et détail" href="../detail-chantier/index.html?id=${encodeURIComponent(c.id)}&name=${encodeURIComponent(c.nomComplet)}">📄</a><a class="sv-ab sv-drive" title="Ouvrir le dossier Drive" target="_blank" rel="noopener" href="https://drive.google.com/drive/folders/${encodeURIComponent(c.id)}">📁</a></td>
       </tr>`;

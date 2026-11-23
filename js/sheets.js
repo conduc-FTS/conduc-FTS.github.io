@@ -604,16 +604,26 @@ const FTSSheets = (() => {
       : [];
 
     // Les foreuses sont les seules machines qui comptent vraiment pour
-    // la vignette (le statut d'une pelle ou d'un groupe électrogène est
-    // moins parlant). On reconnaît les modèles courants par mots-clés ;
-    // si aucun ne correspond, on retombe sur la première ligne du jour.
-    const MOTS_CLES_FOREUSE = ["FUTURO", "MA12", "MA 12", "COMACCHIO", "BERETTA", "T41", "T46", "MC6", "MC8", "MC15", "PH15", "PH 15", "CASAGRANDE", "SOILMEC", "IMT", "DCH", "EGT"];
+    // la vignette. Une machine est une foreuse si le Parc matériel la range
+    // en « FOREUSES MICROPIEUX » ou « PIEUX (PTC) » (23/11/2026 : avant, une
+    // liste de mots-clés prenait aussi la MA12 / PH15, qui sont la centrale
+    // d'injection). Machine absente du parc (location, ancien nom) : mots-clés
+    // des modèles de foreuses seulement. Pas de foreuse ce jour-là : rien.
+    const CATEGORIES_FOREUSE = ["FOREUSES MICROPIEUX", "PIEUX (PTC)"];
+    const MOTS_CLES_FOREUSE = ["FUTURO", "COMACCHIO", "COMMACCHIO", "GEO 205", "BERETTA", "T41", "T46", "MC6", "MC8", "MC15", "CASAGRANDE", "SOILMEC", "IMT", "DCH", "EGT", "MD1500", "TESCAR", "MECBO", "LLAMADA", "P105"];
+    const PARC = (typeof window !== "undefined" && window.FTSParc) || null;
     const estForeuse = (nomMachine) => {
-      const n = (nomMachine || "").toUpperCase();
-      return MOTS_CLES_FOREUSE.some((mot) => n.includes(mot));
+      const n = String(nomMachine || "").trim();
+      if (!n) return false;
+      if (PARC) {
+        let m = PARC.parNom(n) || PARC.parNumero(n);
+        if (!m && PARC.resoudreAncienNom) m = PARC.resoudreAncienNom(n, "")[0] || null;
+        if (m) return CATEGORIES_FOREUSE.includes(m.categorie);
+      }
+      const u = n.toUpperCase();
+      return MOTS_CLES_FOREUSE.some((mot) => u.includes(mot));
     };
-    const ligneForeuse = lignesDuJour.find((r) => estForeuse(r[1]));
-    const premiereLigne = ligneForeuse || lignesDuJour[0] || null;
+    const premiereLigne = lignesDuJour.find((r) => estForeuse(r[1])) || null;
 
     const totalMicropieux = production.reduce((sum, r) => sum + (Number(r[1]) || 0), 0);
 

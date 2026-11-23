@@ -14,6 +14,11 @@ if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw_dashbo
 <link rel="stylesheet" href="../css/supervision.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
+.dc-plus { position: relative; display: inline-block; }
+.dc-plus-menu { position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 24px rgba(0,0,0,.12); min-width: 220px; padding: 6px; z-index: 40; display: flex; flex-direction: column; }
+.dc-plus-menu[hidden] { display: none; }
+.dc-plus-menu a { padding: 8px 10px; border-radius: 7px; font-weight: 600; font-size: .86rem; color: var(--text-main); text-decoration: none; white-space: nowrap; }
+.dc-plus-menu a:hover { background: var(--bg); }
 .srv-band { display: flex; align-items: center; gap: 12px; background: #FFF8EA; border: 1px solid #F1D9A6; border-radius: 10px; padding: 10px 14px; font-size: .84rem; margin-bottom: 14px; }
 .srv-band[hidden] { display: none; }
 .srv-band .t { flex: 1; min-width: 0; } .srv-band small { display: block; color: var(--text-sub); font-size: .76rem; overflow-wrap: anywhere; }
@@ -217,15 +222,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   FTSShell.monter({
     actif: "se-view-overview",
-    crumb: `<a href="../supervision-encadrement/index.html">← Vue d'ensemble</a> &nbsp;›&nbsp; ${esc(code)}`,
+    crumb: `<a href="../supervision-encadrement/index.html">← Vue d'ensemble</a>`,
+    voyantServeur: false, // le serveur n'apparaît que dans le bandeau « à déposer »
     titre: `<span class="code">${esc(code)}</span>${esc(nom)}<span id="titreBadges"></span>`,
     titreMobile: esc(nom),
     sousTitreMobile: `<span id="mSous">${esc(code)}</span>`,
     retour: "../supervision-encadrement/index.html",
-    actions: `<a class="sv-btn" id="driveBtn" href="https://drive.google.com/drive/folders/${encodeURIComponent(chantierId || "")}" target="_blank" rel="noopener" style="text-decoration:none">📁 Dossier Drive</a>
-      <a class="sv-btn" href="../preparation/index.html?id=${encodeURIComponent(chantierId || "")}&name=${encodeURIComponent(chantierName)}" style="text-decoration:none">📋 Fiche de préparation</a>
-      <button type="button" class="sv-btn" id="modifierInfosBtn">✏️ Modifier les infos</button>
-      <span id="statutActions"></span>`,
+    actions: `<button type="button" class="sv-btn" id="modifierInfosBtn">✏️ Modifier les infos</button>
+      <span id="statutActions"></span>
+      <span class="dc-plus"><button type="button" class="sv-btn" id="plusBtn" aria-label="Autres actions" aria-expanded="false">⋯</button>
+        <span class="dc-plus-menu" id="plusMenu" hidden>
+          <a href="../preparation/index.html?id=${encodeURIComponent(chantierId || "")}&name=${encodeURIComponent(chantierName)}">📋 Fiche de préparation</a>
+          <a id="driveBtn" href="https://drive.google.com/drive/folders/${encodeURIComponent(chantierId || "")}" target="_blank" rel="noopener">📁 Dossier Drive</a>
+        </span></span>`,
     menuMobile: [
       { label: "📁 Ouvrir le dossier Drive", action: () => window.open(`https://drive.google.com/drive/folders/${encodeURIComponent(chantierId || "")}`, "_blank") },
       { label: "📋 Fiche de préparation", action: () => { window.location.href = `../preparation/index.html?id=${encodeURIComponent(chantierId || "")}&name=${encodeURIComponent(chantierName)}`; } },
@@ -233,6 +242,16 @@ document.addEventListener("DOMContentLoaded", () => {
     ],
     onSession: (c) => { if (c) charger(); else if (!donnees) $("dcStatus").textContent = "Connecte-toi pour afficher le chantier."; },
   });
+
+  // Menu « ⋯ » : Fiche de préparation, Dossier Drive
+  (() => {
+    const b = $("plusBtn"), mn = $("plusMenu");
+    if (!b || !mn) return;
+    const fermer = () => { mn.hidden = true; b.setAttribute("aria-expanded", "false"); };
+    b.addEventListener("click", (e) => { e.stopPropagation(); mn.hidden = !mn.hidden; b.setAttribute("aria-expanded", String(!mn.hidden)); });
+    document.addEventListener("click", (e) => { if (!mn.contains(e.target)) fermer(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") fermer(); });
+  })();
 
   // ─── Chargement ────────────────────────────────────────────────
   async function charger() {
@@ -439,6 +458,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (b) b.addEventListener("click", async () => {
       b.disabled = true; b.textContent = "Dépôt…";
       try {
+        // Serveur pas (ou mal) relié sur ce PC : on le relie d'abord, ici (plus de voyant en haut de cette page)
+        const st = await FTSServeur.etat();
+        if (st === "non-relie" || st === "mal-relie") {
+          const l = await FTSServeur.relierGuide();
+          if (!l.ok) { if (l.avert) FTSShell.toast("⚠️ " + l.avert, 7000); return; }
+        }
         const r = await FTSServeur.dossierChantier(code);
         if (!r.ok) { FTSShell.toast("⚠️ " + r.message, 6000); return; }
         const res = await FTSServeur.traiterAttente(chantierId, r.dossier);
@@ -578,11 +603,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const parPers = {};
     c.suivi.personnel.forEach((r) => { if (!r[1]) return; const k = cleNom(r[1]); (parPers[k] = parPers[k] || { nom: r[1], type: r[2], dates: new Set() }).dates.add(r[0]); });
     const chefs = [...new Set(c.prod.map((r) => r[4]).filter(Boolean))];
-    const stables = Object.values(parPers).filter((p) => p.type !== "Intérim" && p.dates.size >= Math.ceil(c.jours * 0.8));
     const joursInterim = new Set(c.suivi.personnel.filter((r) => r[2] === "Intérim").map((r) => r[0])).size;
     if (Object.keys(parPers).length) {
-      const noms = stables.slice(0, 3).map((p) => { const f = window.FTSPersonnel && FTSPersonnel.parNom(p.nom); return esc(p.nom) + (f && f.poste && f.poste !== "CHEF DE CHANTIER" ? ` (${esc(f.poste.toLowerCase())})` : ""); });
-      const txt = chefs.length > 1 ? `<b>${chefs.length} chefs se sont succédé</b> (${chefs.map(esc).join(", ")}).` : `<b>Équipe ${stables.length >= 2 ? "stable" : "variable"} :</b> ${noms.length ? noms.join(" + ") + " presque tous les jours" : "peu de personnes présentes tous les jours"}.`;
+      // Chef du dernier rapport + les personnes FTS présentes ce jour-là (23/11/2026 : sans « stable / presque tous les jours »)
+      let dDate = null, dJour = "", dChef = "";
+      c.prod.forEach((r) => { const x = parseFR(r[0]); if (x && r[4] && (!dDate || x >= dDate)) { dDate = x; dJour = r[0]; dChef = r[4]; } });
+      const vus = new Set([cleNom(dChef)]), noms = [];
+      c.suivi.personnel.filter((r) => r[0] === dJour && r[1] && r[2] !== "Intérim").forEach((r) => {
+        const k = cleNom(r[1]); if (vus.has(k)) return; vus.add(k);
+        const f = window.FTSPersonnel && FTSPersonnel.parNom(r[1]);
+        noms.push(esc(String(r[1]).trim().toUpperCase()) + (f && f.poste && !/CHEF/.test(f.poste) ? ` (${esc(f.poste.toLowerCase())})` : ""));
+      });
+      const avant = chefs.filter((x) => cleNom(x) !== cleNom(dChef));
+      const txt = dChef ? `<b>Chef :</b> ${esc(dChef)}${noms.length ? " + " + noms.join(" + ") : ""}.${avant.length ? ` Avant : ${avant.map(esc).join(", ")}.` : ""}`
+        : `<b>Chef :</b> pas encore indiqué dans les rapports.`;
       pt("b", "👷", `${txt}${joursInterim ? ` Intérim ${joursInterim} jour${joursInterim > 1 ? "s" : ""} sur ${c.jours}.` : ""}`);
     }
     $("dcAnalyse").innerHTML = pts.join("");

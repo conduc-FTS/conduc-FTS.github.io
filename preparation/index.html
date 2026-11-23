@@ -1202,6 +1202,9 @@ document.addEventListener("DOMContentLoaded", () => {
         pp = await FTSParc.chargerParametresPrepa().catch(() => FTSParc.parametresPrepa());
         prep = P.normaliser(enreg, meta);
         prep.plan = FTSPlanAcces.normaliser(prep.plan);
+        // Le conducteur attribué au chantier (liste Préparation, directrice travaux) fait foi :
+        // une fiche déjà commencée le reprend aussi (23/11/2026). Changé ici, il remonte sur le chantier à l'enregistrement.
+        if (enreg && meta.conducteur && prep.infos && prep.infos.conducteur !== meta.conducteur) prep.infos.conducteur = meta.conducteur;
         if (!prep.plan.gps && meta.gps) prep.plan.gps = String(meta.gps);
         if (!enreg) {
           const adr = String(meta.adresse || "");

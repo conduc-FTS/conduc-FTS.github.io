@@ -129,6 +129,9 @@ html { font-size: 16px; }
 .pp-tech.Micropieux { background: #E8F0FE; color: #2A5DBF; } .pp-tech.Pieux { background: #F3E8FF; color: #7030A0; } .pp-tech.Battage { background: #E6F6EC; color: #1D6E3E; }
 .pp-attr { border: 1px dashed #c9ccd2; border-radius: 8px; background: #fff; padding: 4px 9px; font-size: .78rem; color: var(--text-sub); cursor: pointer; font-family: inherit; }
 .pp-attr:hover { border-color: #E8B923; color: var(--text-main); }
+.pp-ctx { border: 1px solid var(--border); border-radius: 8px; background: #fff; padding: 4px 6px; font-size: .8rem; font-family: inherit; color: var(--text-main); max-width: 190px; cursor: pointer; }
+.pp-ctx.vide { border: 1px dashed #E8B923; background: #FFF8E1; font-weight: 700; color: #8A5A00; }
+.pp-nonattr { font-size: .78rem; font-weight: 700; color: #8A5A00; }
 tr.pp-libre { background: #FFFCF0; }
 .pp-avenir { font-size: .76rem; color: var(--text-sub); font-style: italic; }
 .pp-et.envoyee { background: #EAF6EE; color: #1D6E3E; } .pp-et.modifiee { background: #EAF1FE; color: #2A5DBF; }
@@ -1389,6 +1392,25 @@ document.addEventListener("DOMContentLoaded", () => {
     sel.closest(".pp-moi").classList.toggle("vide", !ppMoi);
     sel.options[0].textContent = "Je suis… (choisir)";
   }
+  // Attribution des chantiers (23/11/2026) : en général la directrice travaux (Marielle Buchon),
+  // mais toute personne qui a accès à la Préparation peut le faire (l'accès au module est
+  // déjà contrôlé par l'écran Accès). Changeable aussi dans la fiche de préparation.
+  function peutAttribuer() { return true; }
+  /** Personnes à qui on peut attribuer un chantier : conducteurs + directrice / directeur travaux */
+  function listeConducteurs() {
+    try { return [...new Set(FTSPersonnel.encadrement().filter((p) => /CONDUCTEUR|DIRECT\w* TRAVAUX/.test(`${p.poste || ""} ${p.fonctionEnc || ""}`.toUpperCase())).map(FTSPersonnel.nomComplet))]; }
+    catch (e) { return []; }
+  }
+  /** Case « Conducteur » de la liste Préparation */
+  function celluleConducteur(l, cond) {
+    if (!peutAttribuer()) return cond ? `<span style="color:var(--text-sub)">${escapeHtmlSE(cond)}</span>` : `<span class="pp-nonattr">Non attribué</span>`;
+    const noms = listeConducteurs();
+    if (cond && !noms.some((n) => clePersonne(n) === clePersonne(cond))) noms.unshift(cond);
+    return `<select class="pp-ctx${cond ? "" : " vide"}" data-ctx="${escapeHtmlSE(l.id)}" aria-label="Conducteur de travaux">
+      <option value="">${cond ? "— retirer —" : "Non attribué ▾"}</option>
+      ${noms.map((n) => `<option ${clePersonne(n) === clePersonne(cond) ? "selected" : ""}>${escapeHtmlSE(n)}</option>`).join("")}</select>`;
+  }
+
   /** Conducteur d'un chantier : celui attribué au chantier, sinon celui de la fiche */
   const conducteurDe = (l) => (l.meta && l.meta.conducteur) || (l.r && l.r.conducteur) || "";
   const ETATS_PREPA = { afaire: "À faire", encours: "En cours", envoyee: "Envoyée", modifiee: "Modifiée après envoi" };
@@ -1465,7 +1487,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const voirNon = nNon ? `<button type="button" class="sv-btn" data-voir="nonattr">Voir ${nNon > 1 ? `les ${nNon} non attribués` : "le non attribué"} →</button>` : "";
       empty.classList.add("pp-vide");
       empty.innerHTML = ppVue === "miens" && !ppMoi ? `<b>Qui es-tu ?</b>Choisis ton nom en haut de la page (👤) pour voir tes chantiers.`
-        : ppVue === "miens" && !toutes.length ? `<b>Aucun chantier à ton nom pour l'instant</b>${nNon ? `Va dans « Non attribués » et clique « + M'attribuer » sur tes chantiers.` : "Les chantiers créés apparaîtront ici dès qu'ils te seront attribués."}${voirNon ? `<div>${voirNon}</div>` : ""}`
+        : ppVue === "miens" && !toutes.length ? `<b>Aucun chantier à ton nom pour l'instant</b>${nNon ? `${nNon} chantier${nNon > 1 ? "s attendent" : " attend"} d'être attribué${nNon > 1 ? "s" : ""} (onglet « Non attribués »).` : "Les chantiers apparaîtront ici dès qu'ils te seront attribués."}${voirNon ? `<div>${voirNon}</div>` : ""}`
         : `<b>Aucun chantier ne correspond à ce filtre</b>Change l'état ou la technique, ou efface la recherche.`;
     }
     const fmtD = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
@@ -1483,7 +1505,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <td class="r">${npx && npx.nb ? npx.nb : r && r.nbPieux ? r.nbPieux : "—"}</td>
         <td>${l.avenir ? (npx && npx.nb ? `<span class="pp-et encours">NDC pieux${npx.indice ? " ind " + escapeHtmlSE(npx.indice) : ""}</span>` : '<span class="pp-et afaire">NDC pieux à coller</span>') : `<span class="pp-et ${l.etat}">${ETATS_PREPA[l.etat] || l.etat}</span>${l.note ? `<span class="pp-note">${escapeHtmlSE(l.note)}</span>` : ""}`}</td>
         <td style="white-space:nowrap">${envoi}</td>
-        <td>${cond ? `<span style="color:var(--text-sub)">${escapeHtmlSE(cond)}</span>` : `<button type="button" class="pp-attr" data-attr="${escapeHtmlSE(l.id)}">+ ${ppMoi ? "M'attribuer" : "Attribuer"}</button>`}</td>
+        <td>${celluleConducteur(l, cond)}</td>
         <td class="r">${l.avenir ? `<a class="sv-btn ${npx && npx.nb ? "" : "pri"}" style="padding:6px 12px;font-size:.8rem;text-decoration:none" href="${escapeHtmlSE(url)}">${npx && npx.nb ? "Ouvrir" : "Coller la NDC"}</a>` : `<a class="sv-btn ${l.etat === "afaire" ? "pri" : ""}" style="padding:6px 12px;font-size:.8rem;text-decoration:none" href="${escapeHtmlSE(url)}">${l.etat === "afaire" ? "Créer la fiche" : "Ouvrir"}</a>`}</td>
       </tr>`;
     }).join("");
@@ -1515,25 +1537,30 @@ document.addEventListener("DOMContentLoaded", () => {
     b.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1d1d1f;color:#fff;border-radius:12px;padding:11px 16px;font-weight:600;font-size:.9rem;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:9999";
     document.body.appendChild(b); setTimeout(() => b.remove(), 3200);
   }
-  /** Attribue un chantier au conducteur choisi dans « Je suis » (enregistré sur le chantier) */
-  async function attribuer(id, btn) {
-    if (!ppMoi) { $("ppMoi").focus(); bulle("Choisis d'abord ton nom dans « Je suis »"); return; }
-    btn.disabled = true; btn.textContent = "…";
+  /** Attribue un chantier à un conducteur (enregistré sur le chantier ; vide = non attribué) */
+  async function attribuer(id, nom, sel) {
+    sel.disabled = true;
     try {
       const meta = await FTSDrive.getMetadonneesChantier(id);
-      await FTSDrive.setMetadonneesChantier(id, { ...meta, conducteur: ppMoi });
+      const m = { ...meta, conducteur: nom };
+      if (!nom) delete m.conducteur;
+      await FTSDrive.setMetadonneesChantier(id, m);
       const c = donnees && donnees.chantiers.find((x) => x.id === id);
-      if (c) { c.meta = { ...(c.meta || {}), conducteur: ppMoi }; ecrireCacheLocal(donnees); }
-      bulle(`✅ Chantier attribué à ${ppMoi}`);
+      if (c) { c.meta = { ...(c.meta || {}), conducteur: nom }; if (!nom) delete c.meta.conducteur; ecrireCacheLocal(donnees); }
+      bulle(nom ? `✅ Chantier attribué à ${nom}` : "Chantier remis en « Non attribué »");
       afficherPreparation();
     } catch (e) {
-      btn.disabled = false; btn.textContent = "+ M'attribuer";
+      sel.disabled = false;
       bulle("❌ " + e.message);
+      afficherPreparation();
     }
   }
+  $("ppTbody").addEventListener("change", (e) => {
+    const sel = e.target.closest("select[data-ctx]");
+    if (sel) attribuer(sel.dataset.ctx, sel.value, sel);
+  });
   $("ppTbody").addEventListener("click", (e) => {
-    const at = e.target.closest("[data-attr]");
-    if (at) { attribuer(at.dataset.attr, at); return; }
+    if (e.target.closest("select[data-ctx]")) return; // le choix du conducteur n'ouvre pas la fiche
     if (e.target.closest("a")) return;
     const tr = e.target.closest("tr[data-url]");
     if (tr && tr.dataset.url) window.location.href = tr.dataset.url;

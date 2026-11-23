@@ -3331,14 +3331,20 @@ document.addEventListener("DOMContentLoaded", () => {
       const st = await FTSServeur.etat();
       if (tour !== srvTour) return;
       if (st === "non-relie") { cls = "w"; chip = "att"; html = ligne("Serveur FTS pas relié sur ce PC", "Les PDF seront mis en attente de dépôt.", relier); }
+      else if (st === "mal-relie") { cls = "ko"; chip = "att"; html = ligne("Serveur relié au dossier d'un seul chantier", `Il faut relier « ${esc(FTSServeur.DOSSIER_ATTENDU)} », le dossier qui contient tous les chantiers. En attendant, les PDF sont mis en attente de dépôt.`, relier); }
       else if (st === "a-autoriser") { cls = "ok"; chip = "ok"; html = ligne("Serveur FTS relié", "Le navigateur demandera « Autoriser » au moment de l'envoi (une fois par session). Rien n'est jamais remplacé ni supprimé."); }
       else {
         let t;
         try { t = await FTSServeur.trouverChantier(code); } catch (e) { t = { etat: "erreur" }; }
         if (tour !== srvTour) return;
-        if (t.etat === "ok") { cls = "ok"; chip = "ok"; html = ligne("Serveur FTS relié", "") + `<div class="srv-path">${esc(FTSServeur.DOSSIER_ATTENDU)} › <b>${esc(t.nom)}</b> › ${SRV_CHEMIN.map(esc).join(" › ")}</div>`; }
+        if (t.etat === "ok") {
+          cls = "ok"; chip = "ok";
+          const changer = `<button type="button" class="sv-btn" id="srvChoisirMain" style="padding:3px 9px;font-size:.72rem">📁 ${t.manuel ? "Changer" : "Autre dossier"}</button>`
+            + (t.manuel ? ` <button type="button" class="sv-btn" id="srvOublierMain" style="padding:3px 9px;font-size:.72rem">Recherche automatique</button>` : "");
+          html = ligne("Serveur FTS relié", "") + `<div class="srv-path">${esc(t.zone || "")} › <b>${esc(t.nom)}</b> › ${SRV_CHEMIN.map(esc).join(" › ")}</div><div>${changer}</div>`;
+        }
         else if (t.etat === "plusieurs") { cls = "w"; chip = "ok"; html = ligne(`${t.choix.length} dossiers commencent par « ${esc(code)} »`, "On te demandera lequel au moment de l'envoi."); }
-        else if (t.etat === "introuvable") { cls = "ko"; chip = "att"; html = ligne(`Aucun dossier « ${esc(code)} » sur le serveur`, "Il a peut-être été déplacé ou pas encore créé (l'appli ne crée jamais de dossier chantier). Les PDF seront mis en attente de dépôt."); }
+        else if (t.etat === "introuvable") { cls = "ko"; chip = "att"; html = ligne(`Aucun dossier « ${esc(code)} » dans 7-1 ni 7-6`, "Il a peut-être été déplacé ou pas encore créé (l'appli ne crée jamais de dossier chantier). S'il est ailleurs, choisis-le à la main ; sinon les PDF seront mis en attente de dépôt.", `<button type="button" class="sv-btn" id="srvChoisirMain" style="padding:5px 10px;font-size:.76rem">📁 Choisir le dossier</button>`); }
         else { cls = "w"; chip = "att"; html = ligne("Serveur FTS non accessible depuis ce PC", "Pas de VPN ? Les PDF seront mis en attente de dépôt."); }
       }
     }
@@ -3346,7 +3352,15 @@ document.addEventListener("DOMContentLoaded", () => {
     majPartent();
     bloc.className = "pj2-srv " + cls; det.innerHTML = html;
     const rel = $("srvRelierEnvoi");
-    if (rel) rel.addEventListener("click", async () => { try { const r = await FTSServeur.relier(); if (r && r.avert) erreur("Serveur FTS", r.avert); } catch (e) { erreur("Serveur non relié", e.message); } afficherServeur(true); });
+    if (rel) rel.addEventListener("click", async () => { try { const r = await FTSServeur.relierGuide(); if (r && r.avert) erreur("Serveur FTS", r.avert); } catch (e) { erreur("Serveur non relié", e.message); } afficherServeur(true); });
+    const main = $("srvChoisirMain");
+    if (main) main.addEventListener("click", async () => {
+      const r = await FTSServeur.choisirDossierChantier(code);
+      if (r.ok) FTSShell.toast(`📁 Dossier retenu pour ${code} sur ce PC : ${r.nom}`); else if (r.avert) erreur("Dossier du chantier", r.avert);
+      afficherServeur(false);
+    });
+    const oub = $("srvOublierMain");
+    if (oub) oub.addEventListener("click", async () => { await FTSServeur.oublierDossierChantier(code); afficherServeur(false); });
     // File d'attente du chantier
     if (rechargerAttente || srvAttente === null) {
       try { srvAttente = (typeof FTSServeur !== "undefined") && chantierId ? await FTSServeur.lireAttente(chantierId) : []; } catch (e) { srvAttente = []; }

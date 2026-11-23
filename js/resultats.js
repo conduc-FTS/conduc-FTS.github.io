@@ -819,7 +819,7 @@ const FTSResultats = (() => {
     let startIn = "documents";
     try {
       if (window.FTSServeur && (await FTSServeur.etat()) === "relie") {
-        const d = await FTSServeur.dossierChantier(f.code);
+        const d = await FTSServeur.dossierChantier(f.code, { silencieux: true });
         if (d && d.ok && d.dossier) startIn = d.dossier;
       }
     } catch (e) { /* serveur non joignable : dossier Documents */ }

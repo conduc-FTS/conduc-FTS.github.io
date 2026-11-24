@@ -421,13 +421,12 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
     <button type="button" class="se-nav-btn active" data-view="se-view-overview"><span class="ic">📊</span>Vue d'ensemble</button>
     <button type="button" class="se-nav-btn" data-view="se-view-stats"><span class="ic">📈</span>Statistiques</button>
     <div class="sv-grp">CHANTIERS</div>
+    <!-- OUVERTURE CHANTIER (js/ouverture-chantier.js) : seule porte d'entrée d'un nouveau chantier (24/11/2026) -->
+    <button type="button" class="se-nav-btn" data-view="se-view-ouverture"><span class="ic">📝</span>Ouverture de chantier</button>
     <button type="button" class="se-nav-btn" data-view="se-view-preparation"><span class="ic">📋</span>Préparation<span class="sv-pill" id="navPrepaPill" hidden></span></button>
     <button type="button" class="se-nav-btn" data-view="se-view-resultats"><span class="ic">💶</span>Résultats<span class="sv-pill" id="navResultatsPill" hidden></span></button>
     <button type="button" class="se-nav-btn" data-view="se-view-archives"><span class="ic">🗄️</span>Archives</button>
     <button type="button" class="se-nav-btn" data-view="se-view-documents"><span class="ic">📁</span>Documents</button>
-    <!-- OUVERTURE CHANTIER (js/ouverture-chantier.js) : entrée de menu -->
-    <div class="sv-grp">AFFAIRES</div>
-    <button type="button" class="se-nav-btn" data-view="se-view-ouverture"><span class="ic">📝</span>Ouverture de chantier</button>
     <div class="sv-grp">POINTAGES</div>
     <a href="../recap-hebdo/index.html?type=materiel"><span class="ic">🔧</span>Matériel</a>
     <a href="../recap-hebdo/index.html?type=personnel"><span class="ic">👷</span>Personnel</a>
@@ -459,7 +458,6 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
     <span id="srvVoyantZone" style="display:none"></span>
     <span class="sv-sync" id="syncTop"><span class="dot"></span><span class="txt"></span></span>
     <button type="button" class="sv-btn" id="refreshVueEnsembleBtn" title="Recharger depuis Google">🔄</button>
-    <button type="button" class="sv-btn pri" id="nouveauChantierBtn" style="display:none">+ Nouveau chantier</button>
   </header>
 
   <div class="sv-content">
@@ -831,7 +829,6 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
 </div>
 </div><!-- /sv-main -->
 
-<button type="button" class="sv-fab" id="nouveauChantierFab" aria-label="Nouveau chantier">+</button>
 <nav class="sv-tabbar">
   <button type="button" class="tab-btn on" data-view="se-view-overview"><span>📊</span>Accueil</button>
   <a href="../recap-hebdo/index.html?type=materiel"><span>🔧</span>Matériel</a>
@@ -840,34 +837,7 @@ button.am-c:hover{box-shadow:0 0 0 3px rgba(253,202,1,.35)}.am-c.on{background:#
   <button type="button" id="menuPlusBtn"><span>☰</span>Plus</button>
 </nav>
 
-<!-- ─── FENÊTRE NOUVEAU CHANTIER ───────────────────────────── -->
-<div class="sv-ov" id="chantierModal">
-  <form class="sv-modal" id="chantierForm" autocomplete="off">
-    <div class="sv-mh"><h3>Nouveau chantier</h3><button type="button" class="sv-x" id="chantierModalClose" aria-label="Fermer">✕</button></div>
-    <div class="sv-mb">
-      <div class="sv-f full"><label>Technique(s) — coche tout ce qui sera réalisé</label>
-        <div class="sv-techs">
-          <label><input type="checkbox" name="tech" value="Micropieux" checked>🔩 Micropieux</label>
-          <label><input type="checkbox" name="tech" value="Pieux">🏛️ Pieux</label>
-          <label><input type="checkbox" name="tech" value="Battage">🔨 Battage</label>
-        </div>
-      </div>
-      <div class="sv-f"><label for="numAffaire">N° affaire</label><input type="text" id="numAffaire" placeholder="ex : 26FTS012" required></div>
-      <div class="sv-f"><label for="nomChantier">Nom du chantier</label><input type="text" id="nomChantier" placeholder="ex : CAP8000 AUCHAN LAC" required></div>
-      <div class="sv-f"><label for="adresseChantier">Adresse / commune <i>(optionnel)</i></label><input type="text" id="adresseChantier" placeholder="ex : 12 RUE THIAC, BORDEAUX"></div>
-      <div class="sv-f"><label for="gpsChantier">GPS <i>(optionnel, si pas d'adresse précise)</i></label><input type="text" id="gpsChantier" placeholder="ex : 44.833328, -0.577580"></div>
-      <div class="sv-sep">PRÉVISIONS <i>(optionnel, modifiable plus tard)</i></div>
-      <div class="sv-f" data-tech="Micropieux"><label for="nbMicropieuxPrevus">Micropieux prévus</label><input type="number" id="nbMicropieuxPrevus" placeholder="ex : 25" min="0"></div>
-      <div class="sv-f" data-tech="Pieux" hidden><label for="nbPieuxPrevus">Pieux prévus</label><input type="number" id="nbPieuxPrevus" placeholder="ex : 12" min="0"></div>
-      <div class="sv-f" data-tech="Battage" hidden><label for="nbBattagePrevus">Battage prévus</label><input type="number" id="nbBattagePrevus" placeholder="ex : 40" min="0"></div>
-      <div class="sv-f"><label for="dureeChantier">Durée (jours)</label><input type="number" id="dureeChantier" placeholder="ex : 15" min="0"></div>
-      <div class="sv-f"><label for="montantVendu">Montant vendu (€)</label><input type="number" id="montantVendu" placeholder="ex : 45000" min="0" step="0.01"></div>
-      <div class="sv-hint">Crée le dossier Drive (PLAN, NDC, SECURITE + ACCUEIL SECURITE, RAPPORT JOURNALIER, DICT, SONDAGE). Le chantier apparaît ensuite dans le sélecteur « Chantier actif » de la tablette.</div>
-      <p class="sv-mstatus" id="chantierStatus"></p>
-    </div>
-    <div class="sv-mf"><button type="button" class="sv-btn" id="chantierModalCancel">Annuler</button><button type="submit" class="sv-btn pri" id="chantierSubmit">Créer le chantier</button></div>
-  </form>
-</div>
+<!-- Fenêtre « Nouveau chantier » supprimée le 24/11/2026 : un chantier se crée uniquement par l'Ouverture de chantier. -->
 
 <script src="../js/auth.js"></script>
 <script src="../js/drive.js"></script>
@@ -936,8 +906,7 @@ document.addEventListener("DOMContentLoaded", () => {
     $("pageTitle").textContent = TITRES_VUES[id] || "Supervision";
     $("mobileTitle").textContent = id === "se-view-overview" ? "Supervision" : (TITRES_VUES[id] || "Supervision");
     $("searchBox").style.display = id === "se-view-overview" ? "" : "none"; // n'occupe plus de place sur les autres vues
-    // « + Nouveau chantier » : seulement dans Préparation (23/11/2026). Le voyant serveur : seulement là où un fichier part sur le serveur.
-    $("nouveauChantierBtn").style.display = id === "se-view-preparation" ? "" : "none";
+    // Voyant serveur : seulement là où un fichier part sur le serveur (23/11/2026).
     $("srvVoyantZone").style.display = ["se-view-preparation", "se-view-resultats", "se-view-ouverture"].includes(id) ? "" : "none";
     if (id === "se-view-overview") afficherVueEnsemble();
     if (id === "se-view-archives") chargerArchives();
@@ -1598,80 +1567,6 @@ document.addEventListener("DOMContentLoaded", () => {
       afficherVueEnsemble();
     });
   });
-
-  // ─── Fenêtre Nouveau chantier ────────────────────────────────────
-  const modal = $("chantierModal");
-  const chantierForm = $("chantierForm");
-  const chantierStatus = $("chantierStatus");
-  const techsCochees = () => [...chantierForm.querySelectorAll("input[name=tech]:checked")].map((i) => i.value);
-
-  function ouvrirCreation() {
-    chantierStatus.textContent = ""; chantierStatus.className = "sv-mstatus";
-    modal.classList.add("open");
-    setTimeout(() => $("numAffaire").focus(), 50);
-  }
-  function fermerCreation() { modal.classList.remove("open"); }
-  function majChampsPrevus() {
-    const t = techsCochees();
-    chantierForm.querySelectorAll(".sv-f[data-tech]").forEach((f) => { f.hidden = !t.includes(f.dataset.tech); });
-  }
-  $("nouveauChantierBtn").addEventListener("click", ouvrirCreation);
-  $("nouveauChantierFab").addEventListener("click", ouvrirCreation);
-  $("chantierModalClose").addEventListener("click", fermerCreation);
-  $("chantierModalCancel").addEventListener("click", fermerCreation);
-  modal.addEventListener("click", (e) => { if (e.target === modal) fermerCreation(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && modal.classList.contains("open")) fermerCreation(); });
-  chantierForm.querySelectorAll("input[name=tech]").forEach((i) => i.addEventListener("change", majChampsPrevus));
-
-  ["numAffaire", "nomChantier", "adresseChantier"].forEach((id) => {
-    const el = $(id);
-    el.addEventListener("input", () => {
-      const pos = el.selectionStart;
-      el.value = el.value.toUpperCase();
-      el.setSelectionRange(pos, pos);
-    });
-  });
-
-  chantierForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const techniques = techsCochees();
-    const val = (id) => $(id).value.trim();
-    const setStatus = (txt, cls) => { chantierStatus.textContent = txt; chantierStatus.className = "sv-mstatus" + (cls ? " " + cls : ""); };
-
-    if (techniques.length === 0) { setStatus("Coche au moins une technique.", "err"); return; }
-    if (!window.FTSAuth || !FTSAuth.isSignedIn()) { setStatus("Session Google expirée : clique sur « Reprendre la session » puis recommence.", "err"); return; }
-    if (!window.FTSDrive) { setStatus("Erreur : module Drive non chargé.", "err"); return; }
-
-    // typeChantier reste renseigné pour les pages qui ne lisent qu'un type
-    // (détail chantier, historique) : la technique principale.
-    const typeChantier = techniques.includes("Micropieux") ? "Micropieux" : techniques.includes("Battage") ? "Battage" : "Pieux";
-    const submitBtn = $("chantierSubmit");
-    submitBtn.disabled = true;
-    setStatus("Création du dossier Drive en cours…");
-    try {
-      const result = await FTSDrive.creerArborescenceChantier({
-        numAffaire: val("numAffaire"), nom: val("nomChantier"), typeChantier, techniques,
-        adresse: val("adresseChantier"), gps: val("gpsChantier"),
-        micropieuxPrevus: techniques.includes("Micropieux") ? val("nbMicropieuxPrevus") : "",
-        pieuxPrevus: techniques.includes("Pieux") ? val("nbPieuxPrevus") : "",
-        battagePrevus: techniques.includes("Battage") ? val("nbBattagePrevus") : "",
-        dureeChantier: val("dureeChantier"), montantVendu: val("montantVendu"),
-      });
-      setStatus(result.reused
-        ? `Le dossier « ${result.chantierName} » existait déjà : sous-dossiers vérifiés et prévisions mises à jour.`
-        : `Chantier « ${result.chantierName} » créé sur Drive.`, "ok");
-      chantierForm.reset();
-      majChampsPrevus();
-      chargerVueEnsemble(true);
-      setTimeout(fermerCreation, 1800);
-    } catch (err) {
-      console.error("Erreur création chantier :", err);
-      setStatus(`Erreur : ${err.message}`, "err");
-    } finally {
-      submitBtn.disabled = false;
-    }
-  });
-
 
   let cacheArchives = null;
   let archivesChargeesA = 0;

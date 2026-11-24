@@ -24,13 +24,12 @@ const FTSShell = (() => {
     { id: "se-view-overview", ic: "📊", label: "Vue d'ensemble", href: SUP },
     { id: "se-view-stats", ic: "📈", label: "Statistiques", href: SUP + "#se-view-stats" },
     { grp: "CHANTIERS" },
+    // OUVERTURE CHANTIER (js/ouverture-chantier.js) : seule porte d'entrée d'un nouveau chantier (24/11/2026)
+    { id: "se-view-ouverture", ic: "📝", label: "Ouverture de chantier", href: SUP + "#se-view-ouverture" },
     { id: "se-view-preparation", ic: "📋", label: "Préparation", href: SUP + "#se-view-preparation", pastille: "fts_prepa_a_faire" },
     { id: "se-view-resultats", ic: "💶", label: "Résultats", href: SUP + "#se-view-resultats" },
     { id: "se-view-archives", ic: "🗄️", label: "Archives", href: SUP + "#se-view-archives" },
     { id: "se-view-documents", ic: "📁", label: "Documents", href: SUP + "#se-view-documents" },
-    // OUVERTURE CHANTIER (js/ouverture-chantier.js)
-    { grp: "AFFAIRES" },
-    { id: "se-view-ouverture", ic: "📝", label: "Ouverture de chantier", href: SUP + "#se-view-ouverture" },
     { grp: "POINTAGES" },
     { id: "materiel", ic: "🔧", label: "Matériel", href: "../recap-hebdo/index.html?type=materiel" },
     { id: "personnel", ic: "👷", label: "Personnel", href: "../recap-hebdo/index.html?type=personnel" },

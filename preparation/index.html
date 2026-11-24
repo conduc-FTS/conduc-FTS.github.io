@@ -1224,7 +1224,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (pv.deblais != null) prep.remarques.boues = pv.deblais ? "OUI" : "NON";
             if (pv.essai) { prep.remarques.essaiOui = true; prep.remarques.essaiNb = Math.max(1, Number(pv.essaiNb) || 1); prep.remarques.essais = P.texteEssais(prep.remarques); }
             if (ov.realisation && ov.realisation.mode === "date" && ov.realisation.valeur) { prep.infos.dateConnue = true; prep.infos.date = ov.realisation.valeur; }
-            const notes = [ov.realisation && ov.realisation.mode === "semaine" ? `Réalisation prévue : ${ov.realisation.texte}` : "", ov.contraintes && ov.contraintes.hauteur ? `Hauteur limitée${ov.contraintes.hauteurVal ? " : " + ov.contraintes.hauteurVal : ""}` : "", ov.contraintes && ov.contraintes.acces ? "Accès difficile" : "", ov.infos || ""].filter(Boolean);
+            const notes = [ov.realisation && (ov.realisation.mode === "semaine" || ov.realisation.precision) ? `Réalisation prévue : ${ov.realisation.texte}` : "", ov.contraintes && ov.contraintes.hauteur ? `Hauteur limitée${ov.contraintes.hauteurVal ? " : " + ov.contraintes.hauteurVal : ""}` : "", ov.contraintes && ov.contraintes.acces ? "Accès difficile" : "", ov.infos || ""].filter(Boolean);
             if (notes.length && !prep.remarques.divers) prep.remarques.divers = notes.join(" · ");
           }
         }

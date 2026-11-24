@@ -36,12 +36,13 @@ const FTSModules = (() => {
   const TOUS = MODULES.map((m) => m.id);
   const SAUF = (...ex) => TOUS.filter((m) => !ex.includes(m));
   // Modules par défaut de chaque poste d'encadrement (validés le 07/11/2026 ;
-  // Président, BE et assistante : proposition, à ajuster au lot 2)
+  // Président, BE et assistante : proposition, à ajuster au lot 2).
+  // 24/11/2026 : l'Ouverture de chantier devient la seule façon de créer un chantier → ouverte aux conducteurs et directeurs travaux.
   const DEFAUTS = {
-    "CONDUCTEUR DE TRAVAUX PRINCIPAL": SAUF("ouverture"),
-    "CONDUCTEUR DE TRAVAUX": SAUF("ouverture"),
-    "DIRECTRICE TRAVAUX": SAUF("ouverture"),
-    "DIRECTEUR TRAVAUX": SAUF("ouverture"),
+    "CONDUCTEUR DE TRAVAUX PRINCIPAL": TOUS,
+    "CONDUCTEUR DE TRAVAUX": TOUS,
+    "DIRECTRICE TRAVAUX": TOUS,
+    "DIRECTEUR TRAVAUX": TOUS,
     "CHARGÉ D'AFFAIRES": ["overview", "stats", "ouverture"],
     "CHARGÉE D'AFFAIRES": ["overview", "stats", "ouverture"],
     "DIRECTEUR COMMERCIAL": ["overview", "stats", "ouverture"],
@@ -56,9 +57,6 @@ const FTSModules = (() => {
     "ASSISTANTE D'EXPLOITATION": ["overview", "documents", "pointMat", "pointPers", "personnel"],
   };
   const DEFAUT_INCONNU = ["overview", "stats"];
-  // Qui peut créer un chantier (bouton « + Nouveau chantier ») : les conducteurs et la direction.
-  // Les chargés d'affaires passeront par « Ouverture de chantier ».
-  const CREENT_CHANTIER = ["CONDUCTEUR DE TRAVAUX PRINCIPAL", "CONDUCTEUR DE TRAVAUX", "DIRECTRICE TRAVAUX", "DIRECTEUR TRAVAUX", "PRÉSIDENT", "PRÉSIDENT DIRECTEUR GÉNÉRAL"];
   const CACHE = "fts_modules_v1";
 
   // ─── Réglages faits par conduc.fts (écran Accès › Modules) ─────────
@@ -220,9 +218,6 @@ const FTSModules = (() => {
       const m = moduleDuLien(el);
       if (m) el.hidden = !autoriseLien(m, e);
     });
-    // Création de chantier réservée aux conducteurs et à la direction
-    const creer = e.statut === "proprio" || (e.statut === "encadrement" && CREENT_CHANTIER.includes(e.poste));
-    ["nouveauChantierBtn", "nouveauChantierFab"].forEach((id) => { const b = document.getElementById(id); if (b) b.hidden = !creer; });
     // Titres de groupe sans entrée visible
     document.querySelectorAll(".sv-nav .sv-grp").forEach((g) => {
       let n = g.nextElementSibling, vis = false;

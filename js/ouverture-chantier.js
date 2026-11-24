@@ -99,7 +99,9 @@ const FTSOuverture = (() => {
 .ov-f{min-width:0}.ov-f label{font-size:.86rem;font-weight:700;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px}
 .ov-g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 16px;align-items:start}.ov-g4 .two{grid-column:span 2}.ov-g4 .full{grid-column:1/-1}
 @media(max-width:1100px){.ov-g4{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.ov-f input,.ov-f select{height:40px}.ov-f .ov-chips{min-height:40px;align-items:center}
+.ov-f input,.ov-f select{height:40px}
+.ov-req{border:2px solid #FDCA01 !important;background:#FFFBEA !important}.ov-req.vide{background:#FFF1B8 !important}
+.ov-chips.ov-req{border-radius:10px;padding:4px 6px}.ov-f .ov-chips{min-height:40px;align-items:center}
 .ov-st{font-size:.7rem;font-weight:800;color:var(--text-sub);letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #eee;padding-bottom:5px;margin:6px 0 10px}.ov-st .ov-tot{text-transform:none;letter-spacing:0}
 .ov-it{display:grid;grid-template-columns:190px minmax(0,1.3fr) minmax(0,1fr) 150px minmax(0,1.1fr);gap:8px 10px;align-items:center}
 .ov-it .h{font-size:.84rem;font-weight:700;color:var(--text-main)}.ov-it .r{font-size:.86rem;font-weight:700;display:flex;align-items:center;gap:6px;min-height:40px}.ov-it .r i{color:#C0392B;font-style:normal}
@@ -210,7 +212,7 @@ const FTSOuverture = (() => {
 
   // ─── Formulaire ────────────────────────────────────────────────────
   const sw = (k, titre, sous, extra = "") => `<div class="ov-tg ${f[k] ? "" : "off"}"><button type="button" class="ov-sw ${f[k] ? "on" : ""}" data-sw="${k}" aria-pressed="${f[k]}"></button><div><b>${titre}</b><small>${sous}</small></div>${extra}</div>`;
-  const champ = (k, lib, o = {}) => `<div class="ov-f ${o.cls || ""}"><label title="${esc(String(lib).replace(/<[^>]+>/g, ""))}">${lib}${o.req ? " <i>*</i>" : ""}</label><input data-k="${k}" value="${esc(f[k])}" autocomplete="off" ${o.type ? `type="${o.type}"` : ""} placeholder="${esc(o.ph || "")}">${o.aide ? `<div class="ov-aide ${o.aideCls || ""}" id="ov_aide_${k}">${o.aide}</div>` : ""}</div>`;
+  const champ = (k, lib, o = {}) => `<div class="ov-f ${o.cls || ""}"><label title="${esc(String(lib).replace(/<[^>]+>/g, ""))}">${lib}${o.req ? " <i>*</i>" : ""}</label><input data-k="${k}" value="${esc(f[k])}" autocomplete="off" ${o.req ? `class="ov-req${String(f[k] || "").trim() ? "" : " vide"}"` : ""} ${o.type ? `type="${o.type}"` : ""} placeholder="${esc(o.ph || "")}">${o.aide ? `<div class="ov-aide ${o.aideCls || ""}" id="ov_aide_${k}">${o.aide}</div>` : ""}</div>`;
   const choix = (k, lib, valeurs) => `<div class="ov-f"><label>${lib}</label><div class="ov-chips petit">${valeurs.map((v) => `<button type="button" class="ov-chip ${String(f[k]) === String(v[0]) ? "on" : ""}" data-ch="${k}" data-v="${esc(v[0])}">${esc(v[1])}</button>`).join("")}</div></div>`;
   const liste = (k, lib, noms, vide) => {
     const l = noms.slice(); if (f[k] && !l.includes(f[k])) l.unshift(f[k]);
@@ -224,7 +226,7 @@ const FTSOuverture = (() => {
       const c = f.inter[k];
       const tete = `<div class="r">${lib}${req ? " <i>*</i>" : ""}${k === "geo" ? `<label class="g4"><input type="checkbox" data-g4 ${c.g4 ? "checked" : ""}> G4</label>` : ""}</div>`;
       if (k === "contact" && c.idem) return tete + `<div class="idem"><label class="ov-mail" style="font-weight:600"><input type="checkbox" data-idem checked> idem client</label></div>`;
-      return tete + ["soc", "nom", "tel", "mail"].map((ch) => `<input data-it="${k}.${ch}" value="${esc(c[ch])}" ${ch === "tel" ? 'inputmode="tel"' : ""} autocomplete="off" name="ov-${k}-${ch}-${Date.now() % 100000}" placeholder="${k === "contact" && ch === "soc" ? "décocher « idem client » pour remplir" : ""}">`).join("")
+      return tete + ["soc", "nom", "tel", "mail"].map((ch) => `<input data-it="${k}.${ch}" value="${esc(c[ch])}" ${req && ch === "soc" ? `class="ov-req${String(c[ch] || "").trim() ? "" : " vide"}"` : ""} ${ch === "tel" ? 'inputmode="tel"' : ""} autocomplete="off" name="ov-${k}-${ch}-${Date.now() % 100000}" placeholder="${k === "contact" && ch === "soc" ? "décocher « idem client » pour remplir" : ""}">`).join("")
         + (k === "contact" ? "" : "");
     };
     return `<div class="ov-it"><span></span><span class="h">Société</span><span class="h">Interlocuteur</span><span class="h">Téléphone</span><span class="h">E-mail</span>
@@ -237,13 +239,13 @@ const FTSOuverture = (() => {
     const tot = techsDe(f).map((t) => `${nbDe(f, t)} ${libNb(t)}`).join(" + ");
     return `<div class="ov-st">Techniques</div>
       <div class="ov-g4" style="margin-bottom:12px">
-        <div class="ov-f two"><label>Technique(s) <i>*</i> · plusieurs possibles pour un chantier mixte</label><div class="ov-chips">${TECHS.map((t) => `<button type="button" class="ov-chip ${f.techs.includes(t) ? "on" : ""}" data-tech="${t}">${t}</button>`).join("")}</div></div>
+        <div class="ov-f two"><label>Technique(s) <i>*</i> · plusieurs possibles pour un chantier mixte</label><div class="ov-chips ov-req${f.techs.length ? "" : " vide"}">${TECHS.map((t) => `<button type="button" class="ov-chip ${f.techs.includes(t) ? "on" : ""}" data-tech="${t}">${t}</button>`).join("")}</div></div>
         ${champ("typeTech", "Type", { cls: "two", ph: "ex. MICROPIEU TYPE III IGU" })}
       </div>
       <div class="ov-st">Quantités prévues au devis <span class="ov-tot" id="ov_tot">${tot ? "· total : " + esc(tot) : ""}</span></div>
       <table class="ov-tt"><thead><tr>${multi ? "<th>Technique</th>" : ""}<th>Nombre <i style="color:#C0392B;font-style:normal">*</i></th><th>Ø forage (mm)</th><th>Longueur max (m)</th><th>Armature</th><th class="x"></th></tr></thead><tbody>
         ${f.lignes.map((l, i) => `<tr>${multi ? `<td><select data-l="${i}.tech">${techsDe(f).map((t) => `<option ${l.tech === t ? "selected" : ""}>${t}</option>`).join("")}</select></td>` : ""}
-          <td><input autocomplete="off" data-l="${i}.nb" value="${esc(l.nb)}" inputmode="numeric" placeholder="ex. 6"></td><td><input data-l="${i}.diam" value="${esc(l.diam)}" inputmode="numeric"></td>
+          <td><input autocomplete="off" class="ov-req${String(l.nb || "").trim() ? "" : " vide"}" data-l="${i}.nb" value="${esc(l.nb)}" inputmode="numeric" placeholder="ex. 6"></td><td><input data-l="${i}.diam" value="${esc(l.diam)}" inputmode="numeric"></td>
           <td><input data-l="${i}.long" value="${esc(l.long)}" inputmode="decimal" placeholder="ex. 14,50"></td><td><input data-l="${i}.arm" value="${esc(l.arm)}" placeholder="ex. 88,9"></td>
           <td class="x">${f.lignes.length > 1 ? `<button type="button" data-suppr="${i}" title="Supprimer la ligne">✕</button>` : ""}</td></tr>`).join("")}
       </tbody></table>
@@ -364,6 +366,7 @@ const FTSOuverture = (() => {
   }
 
   function majProgres() {
+    racine.querySelectorAll("input.ov-req").forEach((el) => el.classList.toggle("vide", !el.value.trim()));
     const m = manque(), vc = verifCode();
     const p = $("prog"); if (p) { p.textContent = m.length ? "il manque : " + m.join(", ") : "complet ✓"; p.style.color = m.length ? "#C0392B" : ""; }
     const b = $("bar"); if (b) b.style.width = Math.round(100 * (6 - m.length) / 6) + "%";

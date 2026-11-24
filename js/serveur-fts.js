@@ -103,9 +103,15 @@ const FTSServeur = (() => {
    */
   async function zonesDe(r) {
     const trouvees = [];
-    for await (const [nom, e] of r.entries()) if (e.kind === "directory" && cleZone(nom)) trouvees.push({ nom, dossier: e, rang: ZONES.indexOf(cleZone(nom)) });
+    for await (const [nom, e] of r.entries()) {
+      if (e.kind !== "directory" || !cleZone(nom)) continue;
+      // 7-6 - CHANTIERS PIEUX range ses chantiers un cran plus bas, dans « 01-Chantiers en cours » (24/11/2026)
+      let dossier = e, libelle = nom;
+      for await (const [n2, e2] of e.entries()) if (e2.kind === "directory" && /^\d{1,2}CHANTIERSENCOURS/.test(norm(n2))) { dossier = e2; libelle = `${nom} › ${n2}`; break; }
+      trouvees.push({ nom: libelle, dossier, rang: ZONES.indexOf(cleZone(nom)), cle: cleZone(nom).cle });
+    }
     if (trouvees.length) return trouvees.sort((a, b) => a.rang - b.rang);
-    return [{ nom: r.name, dossier: r }];
+    return [{ nom: r.name, dossier: r, cle: (cleZone(r.name) || {}).cle || "" }];
   }
   async function nomRacine() { const h = await lireHandle("racine"); return h ? h.name : ""; }
 
@@ -246,6 +252,77 @@ const FTSServeur = (() => {
     try { return await existe(dir, nomFichier); } catch (e) { throw traduire(e); }
   }
 
+  // ─── Création du dossier chantier depuis la trame (Ouverture, 24/11/2026) ───
+  // Trame micropieux : « xx FTS xx trame » dans 7-1 ; trame pieux : « 00 FTS 000 Arborescence
+  // chantiers pieux… » dans 7-6 › 01-Chantiers en cours. Copiée telle quelle (les modifications
+  // de la trame suivent toutes seules), sauf la fiche d'affaire acquise Excel (remplacée par le PDF).
+  const estTrame = (nom) => /^(xx|00)\s*FTS\s*(xx|0+)\b/i.test(String(nom || "").trim());
+  const PREFIXE_TRAME = /^(xx|\d{2})\s*FTS\s*(x{2,3}|0{3})\b\s*/i;
+  const espacerCode = (code) => String(code || "").toUpperCase().replace(/\s+/g, "").replace(/^(\d{2})FTS(\d+)$/, "$1 FTS $2");
+  /** « 26 FTS 343 CLINIQUE HONORE » : code avec espaces + nom, SANS ACCENTS (règle FTS, 24/11/2026), sans caractères interdits par Windows */
+  const sansAccents = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/Œ/g, "OE").replace(/œ/g, "oe").replace(/Æ/g, "AE").replace(/æ/g, "ae");
+  function nomDossierServeur(code, nom) {
+    return `${espacerCode(code)} ${sansAccents(nom).replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim()}`.trim().replace(/[. ]+$/, "");
+  }
+  /** Zone de rangement : "71" (micropieux, battage) ou "76" (pieux) */
+  const zoneParCle = async (r, z) => (await zonesDe(r)).find((x) => x.cle === (z === "76" ? "76CHANTIERS" : "71CHANTIERS")) || null;
+  async function copierDossier(src, dst, code, compte) {
+    for await (const [nom, e] of src.entries()) {
+      if (e.kind === "directory") {
+        const d = await dst.getDirectoryHandle(nom, { create: true }); compte.dossiers++;
+        await copierDossier(e, d, code, compte);
+      } else {
+        if (/FICHE\s*(D.)?\s*AFFAIRE\s*ACQUISE/i.test(nom)) continue; // remplacée par la fiche PDF de l'appli
+        if (/\.lnk$/i.test(nom) || /- Raccourci$/i.test(nom)) continue; // raccourcis Windows de la trame (pointent vers un autre chantier)
+        const cible = nom.replace(PREFIXE_TRAME, espacerCode(code) + " ");
+        if (await existe(dst, cible)) continue;
+        const fh = await dst.getFileHandle(cible, { create: true });
+        const w = await fh.createWritable();
+        await w.write(await e.getFile()); await w.close(); compte.fichiers++;
+      }
+    }
+  }
+  /**
+   * Crée le dossier du chantier sur le serveur en copiant la trame de la zone.
+   * Le dossier relié doit être autorisé (appeler autoriser() sur un clic avant).
+   * Dossier déjà présent pour ce code (7-1 ou 7-6) : rien n'est copié, il est renvoyé.
+   * @param {{code:string, nomDossier:string, zone:"71"|"76"}} o
+   * @returns {Promise<{ok:true, existait:boolean, dossier, nom:string, chemin:string, dossiers:number, fichiers:number}>}
+   */
+  async function creerDossierChantier({ code, nomDossier, zone }) {
+    const r = await racineAutorisee();
+    if (!r) throw new Error("Serveur FTS pas relié ou pas autorisé sur ce PC.");
+    try {
+      const t = await trouverChantier(code, r);
+      if (t.etat === "ok") return { ok: true, existait: true, dossier: t.dossier, nom: t.nom, chemin: `${t.zone || ""} › ${t.nom}`, dossiers: 0, fichiers: 0 };
+      if (t.etat === "plusieurs") throw new Error(`Plusieurs dossiers « ${code} » existent déjà sur le serveur : rien n'a été créé.`);
+      const z = await zoneParCle(r, zone);
+      if (!z) throw new Error(`Dossier ${zone === "76" ? "7-6 - CHANTIERS PIEUX" : "7-1 - CHANTIERS EN COURS"} introuvable : relie « ${DOSSIER_ATTENDU} » sur ce PC.`);
+      let trame = null;
+      for await (const [nom, e] of z.dossier.entries()) if (e.kind === "directory" && estTrame(nom)) { trame = e; break; }
+      if (!trame) throw new Error(`Trame introuvable dans ${z.nom} (dossier « xx FTS xx trame » ou « 00 FTS 000 … »).`);
+      const dossier = await z.dossier.getDirectoryHandle(nomDossier, { create: true });
+      const compte = { dossiers: 0, fichiers: 0 };
+      await copierDossier(trame, dossier, code, compte);
+      return { ok: true, existait: false, dossier, nom: nomDossier, chemin: `${z.nom} › ${nomDossier}`, ...compte };
+    } catch (e) { throw e && e.name && e.name !== "Error" ? traduire(e) : e; }
+  }
+  /**
+   * Sous-dossier du devis dans le dossier chantier : « 1 - Marché › 1.3 Devis marché » (trame
+   * micropieux) ; sinon le sous-dossier « devis » du dossier marché (« 01 - Marché »…), sinon le
+   * dossier marché lui-même, sinon la racine du chantier. Aucun dossier n'est inventé.
+   */
+  async function cheminDevis(dossierChantier) {
+    try {
+      for await (const [n1, e1] of dossierChantier.entries()) {
+        if (e1.kind !== "directory" || !/^0?1MARCHE/.test(norm(n1))) continue;
+        for await (const [n2, e2] of e1.entries()) if (e2.kind === "directory" && /DEVIS/.test(norm(n2))) return [n1, n2];
+        return [n1];
+      }
+    } catch (e) {}
+    return [];
+  }
+
   // ─── File d'attente (infos du chantier dans le Drive) ───────────
   /** @returns {Promise<Array<{nom, chemin:string[], driveId, le, origine}>>} */
   async function lireAttente(chantierId) {
@@ -283,7 +360,8 @@ const FTSServeur = (() => {
     for (const it of liste) {
       try {
         const blob = await FTSDrive.downloadFileBlob(it.driveId);
-        const [r] = await deposer(dossierChantier, it.chemin, [{ nom: it.nom, blob }]);
+        const chemin = it.chemin[0] === "@devis" ? await cheminDevis(dossierChantier) : it.chemin;
+        const [r] = await deposer(dossierChantier, chemin, [{ nom: it.nom, blob }]);
         if (r.statut === "erreur") { erreurs.push({ nom: it.nom, erreur: r.erreur }); continue; }
         if (r.statut === "depose") deposes++; else deja++;
         faits.push(it);
@@ -495,6 +573,7 @@ const FTSServeur = (() => {
     DOSSIER_ATTENDU, CHEMIN_ATTENDU, disponible, etat, relier, relierGuide, autoriser, racineAutorisee, trouverChantier, retenirChoix,
     choisirDossierChantier, oublierDossierChantier,
     dossierChantier, deposer, existeDans, lireAttente, ajouterAttente, retirerAttente, traiterAttente,
+    creerDossierChantier, cheminDevis, nomDossierServeur, espacerCode, sansAccents,
     monterVoyant, codeDepuisNom, correspond, norm,
   };
 })();

@@ -47,7 +47,7 @@ const FTSOuverture = (() => {
       realMode: "adefinir", realVal: "", precision: "", duree: "", dateNdc: "",
       plan: "", sol: "", devisNo: "", devisLe: "",
       montant: "", dateFact: "", acompte: false, acomptePct: "",
-      infos: "", prevenir: false, destinataires: "",
+      infos: "", prevenir: false, destinataires: "", srvZone: "",
     };
   }
 
@@ -112,6 +112,10 @@ const FTSOuverture = (() => {
 .ov-tot{font-weight:800;color:#1D6E3E;font-size:.86rem}
 .ov-calc{height:40px;display:flex;align-items:center;border:1px dashed #d6d9de;border-radius:9px;padding:0 11px;color:var(--text-sub);font-size:.88rem;background:#FAFBFC}
 .ov-mail{display:flex;align-items:center;gap:10px;font-weight:700;font-size:.9rem;cursor:pointer}.ov-mail input{width:18px;height:18px;accent-color:#1d1d1f}
+.ov-srv{background:#fff;border-radius:14px;padding:14px 18px;margin-top:4px;border:1px solid #e5e7eb}.ov-srv.ok{border-color:#BFE3CB}.ov-srv.w{border-color:#F1D9A6;background:#FFFBEB}
+.ov-srv h4{margin:0 0 8px;font-size:.95rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ov-srv h4 small{font-size:.76rem;font-weight:700}
+.ov-srv .path{font-family:Consolas,monospace;font-size:.8rem;background:#F4F5F7;border-radius:8px;padding:7px 10px;margin:8px 0 4px;word-break:break-all}
+.ov-srv .aide{font-size:.78rem;color:var(--text-sub)}
 .pp-nouveau{display:inline-block;margin-top:3px;font-size:.66rem;font-weight:800;color:#2457C5;background:#E8F0FE;border-radius:6px;padding:1px 6px}`;
     document.head.appendChild(st);
   }
@@ -158,6 +162,12 @@ const FTSOuverture = (() => {
     catch (e) { return []; }
   }
   const CONDUCTEURS = /CONDUCTEUR|DIRECT\w* TRAVAUX/;
+  // Serveur FTS : 7-1 (micropieux, battage) ou 7-6 (pieux seuls), modifiable pour un chantier mixte
+  const SRV = () => typeof FTSServeur !== "undefined";
+  const zoneDe = (x) => x.srvZone || (techsDe(x).length === 1 && techsDe(x)[0] === "Pieux" ? "76" : "71");
+  const LIB_ZONE = { "71": "7-1 · Chantiers en cours", "76": "7-6 · Chantiers pieux" };
+  const nomSrv = (x) => (SRV() ? FTSServeur.nomDossierServeur(codeNorm(x.code) || "XX FTS XXX", (x.nom || "").trim() || "NOM DU CHANTIER") : "");
+  let srvEtat = "";
   const texteNombres = (x) => techsDe(x).map((t) => `${nbDe(x, t)} ${libNb(t)}`).join(" + ");
   const nombre = (v) => Number(String(v || "").replace(/\s/g, "").replace(",", ".").replace(/[^\d.]/g, "")) || 0;
   const codeNorm = (s) => String(s || "").trim().toUpperCase().replace(/\s+/g, "");
@@ -250,6 +260,31 @@ const FTSOuverture = (() => {
       </div>`;
   }
 
+  /** Carte « Serveur FTS » : où le dossier chantier sera créé sur le serveur */
+  function carteServeur() {
+    if (!SRV()) return "";
+    const z = zoneDe(f);
+    const chips = `<div class="ov-chips petit" style="margin:2px 0 4px">${["71", "76"].map((k) => `<button type="button" class="ov-chip ${z === k ? "on" : ""}" data-zone="${k}">${LIB_ZONE[k]}</button>`).join("")}</div>
+      <div class="aide">choisi tout seul d'après la technique (pieux seuls → 7-6), modifiable pour un chantier mixte</div>`;
+    const chemin = `<div class="path">P:\\…\\7 - TRAVAUX\\${z === "76" ? "7-6 - CHANTIERS PIEUX\\01-Chantiers en cours" : "7-1 - CHANTIERS EN COURS"}\\<b id="ov_srvnom">${esc(nomSrv(f))}</b></div>
+      <div class="aide">copie de la trame · fiche d'affaire acquise PDF à la racine (à la place du fichier Excel) · devis signé dans 1 - Marché › 1.3 Devis marché</div>`;
+    if (srvEtat === "relie") return `<h4>🗄️ Serveur FTS <small style="color:#1D6E3E">● relié</small></h4><div class="ov-f" style="margin:0"><label>Rangé dans</label>${chips}</div>${chemin}`;
+    const pourquoi = srvEtat === "a-autoriser" ? ["autorisation à redonner pour cette session", `<button type="button" class="sv-btn" id="ov_srvaut">🗄️ Autoriser</button>`]
+      : srvEtat === "indisponible" ? ["pas accessible depuis ce navigateur (Chrome ou Edge sur un PC du bureau)", ""]
+      : srvEtat ? ["pas relié sur ce PC", `<button type="button" class="sv-btn" id="ov_srvrel">🗄️ Relier le serveur</button>`] : ["vérification…", ""];
+    return `<h4>🗄️ Serveur FTS <small style="color:#8A5A00">● ${pourquoi[0]}</small>${pourquoi[1]}</h4>
+      <div class="ov-f" style="margin:0"><label>Rangé dans</label>${chips}</div>${chemin}
+      <div class="aide" style="color:#8A5A00;font-weight:600;margin-top:6px">Si le serveur n'est pas accessible au moment d'ouvrir : le chantier est quand même ouvert (Drive, fiche, mail) et le dossier serveur passe en attente, avec un bandeau sur le chantier jusqu'à sa création depuis un PC du bureau.</div>`;
+  }
+  function majCarteServeur() {
+    const c = $("srv"); if (!c) return;
+    c.className = "ov-srv " + (srvEtat === "relie" ? "ok" : srvEtat ? "w" : "");
+    c.innerHTML = carteServeur();
+    racine.querySelectorAll("[data-zone]").forEach((b) => (b.onclick = () => { f.srvZone = b.dataset.zone; majCarteServeur(); }));
+    const a = $("srvaut"); if (a) a.onclick = async () => { await FTSServeur.autoriser(); srvEtat = await FTSServeur.etat(); majCarteServeur(); };
+    const rl = $("srvrel"); if (rl) rl.onclick = async () => { try { const r = await FTSServeur.relierGuide(); if (r && r.avert) alert(r.avert); } catch (e) { alert(e.message); } srvEtat = await FTSServeur.etat(); majCarteServeur(); };
+  }
+
   function rendreForm() {
     const vc = verifCode();
     const m = manque();
@@ -310,6 +345,7 @@ const FTSOuverture = (() => {
         <div class="ov-f"><label>Informations pour le conducteur</label><textarea data-k="infos" rows="4" placeholder="Ce que le conducteur doit savoir">${esc(f.infos)}</textarea></div>
         <div class="ov-f" style="margin-top:12px"><label>Devis signé (PDF, facultatif · rangé avec la fiche d'affaire acquise, jamais visible des chefs)</label>
           <label class="ov-drop ${devis ? "ok" : ""}" style="white-space:normal">${devis ? "✅ " + esc(devis.name) + " · clique pour changer" : "📎 Clique pour joindre le devis signé"}<input type="file" accept="application/pdf" id="ov_devis" hidden></label></div>`)}
+      <div class="ov-srv" id="ov_srv">${carteServeur()}</div>
       <div class="ov-foot">
         <label class="ov-mail"><input type="checkbox" id="ov_prevenir" ${f.prevenir ? "checked" : ""}> ✉️ Prévenir par mail</label>
         ${f.prevenir ? `<div class="ov-f" style="flex:1;min-width:280px;margin:0"><input data-k="destinataires" value="${esc(f.destinataires)}" placeholder="adresses séparées par ;"></div>` : `<span style="flex:1;color:var(--text-sub);font-size:.84rem">aucun mail ne partira</span>`}
@@ -335,6 +371,7 @@ const FTSOuverture = (() => {
     const o = $("ouvrir"); if (o) o.style.opacity = m.length ? .5 : 1;
     const t = $("tot"); if (t) { const tot = techsDe(f).map((x) => `${nbDe(f, x)} ${libNb(x)}`).join(" + "); t.textContent = tot ? "· total : " + tot : ""; }
     const fi = $("fin"); if (fi) fi.textContent = dateFin(f) || "calculée si date + durée";
+    const sn = $("srvnom"); if (sn) sn.textContent = nomSrv(f);
     if (f.realMode === "semaine") { const s = semaine(f.realVal), r = $("aide_real"); if (r) r.textContent = s ? s.texte.replace(/^semaine \d+ /, "") : "numéro de semaine entre 1 et 53"; }
   }
 
@@ -374,6 +411,7 @@ const FTSOuverture = (() => {
     }));
     $("realsel").onchange = () => { f.realMode = $("realsel").value; f.realVal = ""; rendre(); };
     $("prevenir").onchange = () => { f.prevenir = $("prevenir").checked; rendre(); };
+    if (SRV()) { majCarteServeur(); FTSServeur.etat().then((e) => { srvEtat = e; majCarteServeur(); }).catch(() => {}); }
     $("devis").onchange = () => { devis = $("devis").files[0] || null; rendre(); };
     $("ouvrir").onclick = ouvrir;
   }
@@ -540,6 +578,32 @@ const FTSOuverture = (() => {
       };
       if (x.conducteur) meta.conducteur = x.conducteur; // attribution directe (sinon « Non attribué » dans Préparation)
       await FTSDrive.setMetadonneesChantier(r.chantierId, meta);
+      // Serveur FTS : dossier du chantier créé depuis la trame + fiche et devis déposés ; sinon en attente
+      if (SRV()) {
+        etape("Dossier sur le serveur FTS…");
+        const zone = zoneDe(x), nomDossier = FTSServeur.nomDossierServeur(x.code, x.nom), cs = FTSServeur.espacerCode(x.code);
+        const docs = [{ nom: `${cs} FICHE AFFAIRE ACQUISE.pdf`, chemin: [], driveId: fFiche.id, blob: pdf }];
+        if (fDevis) docs.push({ nom: `${cs} Devis signe.pdf`, chemin: ["@devis"], driveId: fDevis.id, blob: devis });
+        let srvFait = null;
+        if ((await FTSServeur.etat().catch(() => "")) === "relie") {
+          try {
+            const c = await FTSServeur.creerDossierChantier({ code: x.code, nomDossier, zone });
+            const dDevis = await FTSServeur.cheminDevis(c.dossier);
+            const res = [...await FTSServeur.deposer(c.dossier, [], docs.filter((d) => !d.chemin.length)), ...await FTSServeur.deposer(c.dossier, dDevis, docs.filter((d) => d.chemin.length))];
+            const ko = res.filter((z) => z.statut === "erreur");
+            if (ko.length) throw new Error(ko[0].erreur);
+            srvFait = c;
+            faits.push(c.existait ? `Dossier serveur déjà présent (${c.chemin}) : rien n'a été copié, fiche${fDevis ? " et devis" : ""} déposé${fDevis ? "s" : "e"}`
+              : `Dossier serveur créé : ${c.chemin} (trame copiée : ${c.dossiers} dossiers, ${c.fichiers} fichier${c.fichiers > 1 ? "s" : ""} ; fiche${fDevis ? " et devis" : ""} déposé${fDevis ? "s" : "e"})`);
+          } catch (e) { faits.push("⚠️ Dossier serveur non créé : " + e.message); }
+        }
+        if (!srvFait) {
+          const m2 = await FTSDrive.getMetadonneesChantier(r.chantierId);
+          await FTSDrive.setMetadonneesChantier(r.chantierId, { ...m2, serveurCreation: { zone, nom: nomDossier, le: new Date().toISOString() } });
+          await FTSServeur.ajouterAttente(r.chantierId, docs.map(({ blob, ...d }) => ({ ...d, origine: "ouverture" })));
+          faits.push("⏳ Dossier serveur en attente : à créer depuis un PC du bureau (bandeau sur le chantier)");
+        }
+      }
       // Mail
       const objet = `Nouveau chantier signé - ${x.code} ${x.nom}`;
       const liens = { fiche: fFiche.webViewLink || "", devis: fDevis ? fDevis.webViewLink || "" : "" };

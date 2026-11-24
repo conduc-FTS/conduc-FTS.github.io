@@ -122,7 +122,7 @@ const FTSAuth = (() => {
   let renouvellementEnCours = false;
   let renouvellementTimer = null;
   let verificationPeriodiqueDemarree = false;
-  let silencieuxTentePour = 0;   // expiresAt du token pour lequel on a déjà tenté
+  let silencieuxTentePour = "";  // access_token pour lequel on a déjà tenté un renouvellement auto
   let clicArme = false;
   let derniereDemande = 0;
 
@@ -140,8 +140,29 @@ const FTSAuth = (() => {
     return o;
   }
 
-  function lancerDemande(prompt) {
+  // Fenêtres Google ouvertes toutes seules (sans clic) : au plus une toutes
+  // les 2 min, toutes fenêtres de l'appli confondues (Supervision installée
+  // + onglets ouverts partagent le même compteur via localStorage).
+  // Évite l'effet "fenêtre qui s'ouvre et se ferme toutes les 5 secondes".
+  const AUTO_KEY = "fts_auth_derniere_auto";
+  const DELAI_MIN_AUTO = 2 * 60 * 1000;
+
+  function autoAutorisee() {
+    let derniere = 0;
+    try { derniere = Number(localStorage.getItem(AUTO_KEY)) || 0; } catch (e) {}
+    return Date.now() - derniere > DELAI_MIN_AUTO;
+  }
+
+  function noterAuto() {
+    try { localStorage.setItem(AUTO_KEY, String(Date.now())); } catch (e) {}
+  }
+
+  function lancerDemande(prompt, automatique) {
     if (!tokenClient || renouvellementEnCours) return false;
+    if (automatique) {
+      if (!autoAutorisee()) return false;
+      noterAuto();
+    }
     renouvellementEnCours = true;
     derniereDemande = Date.now();
     // Sécurité : si Google ne répond jamais (fenêtre bloquée sans erreur),
@@ -158,7 +179,7 @@ const FTSAuth = (() => {
   }
 
   function tenterRenouvellementSilencieux() {
-    lancerDemande("none");
+    lancerDemande("none", true);
   }
 
   // Le navigateur bloque souvent la fenêtre Google quand elle s'ouvre
@@ -191,15 +212,21 @@ const FTSAuth = (() => {
       // Vraiment expiré : on bascule en "déconnecté" (la page affiche alors
       // son bouton de reconnexion) et on tente quand même en silence.
       if (accessToken) { accessToken = null; notifyChange(); }
-      if (silencieuxTentePour !== stored.expiresAt) {
-        silencieuxTentePour = stored.expiresAt;
+      // Une tentative de plus une fois le jeton vraiment mort : Google ne
+      // peut plus renvoyer le même, il en donnera un neuf.
+      if (silencieuxTentePour !== stored.access_token + "|expire") {
+        silencieuxTentePour = stored.access_token + "|expire";
         tenterRenouvellementSilencieux();
       }
       armerRenouvellementAuClic();
     } else if (reste < MARGE_RENOUVELLEMENT) {
       // Encore valable : on garde l'accès actuel pendant le renouvellement.
-      if (silencieuxTentePour !== stored.expiresAt) {
-        silencieuxTentePour = stored.expiresAt;
+      // Repère = le jeton lui-même (et non sa date de fin) : Google renvoie
+      // parfois LE MÊME jeton, encore valable quelques minutes. Sa date de
+      // fin recalculée change à chaque fois, ce qui relançait une fenêtre
+      // en boucle jusqu'à l'expiration réelle.
+      if (silencieuxTentePour !== stored.access_token) {
+        silencieuxTentePour = stored.access_token;
         tenterRenouvellementSilencieux();
       }
       armerRenouvellementAuClic();
@@ -280,7 +307,7 @@ const FTSAuth = (() => {
     // la renouveler silencieusement plutôt que d'attendre un clic manuel,
     // et le premier clic dans l'appli fera la reconnexion si besoin.
     if (brutAvantExpiration && !accessToken) {
-      silencieuxTentePour = brutAvantExpiration.expiresAt || 0;
+      silencieuxTentePour = (brutAvantExpiration.access_token || "") + "|expire";
       tenterRenouvellementSilencieux();
       armerRenouvellementAuClic();
     } else {

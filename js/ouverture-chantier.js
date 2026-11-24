@@ -210,7 +210,7 @@ const FTSOuverture = (() => {
 
   // ─── Formulaire ────────────────────────────────────────────────────
   const sw = (k, titre, sous, extra = "") => `<div class="ov-tg ${f[k] ? "" : "off"}"><button type="button" class="ov-sw ${f[k] ? "on" : ""}" data-sw="${k}" aria-pressed="${f[k]}"></button><div><b>${titre}</b><small>${sous}</small></div>${extra}</div>`;
-  const champ = (k, lib, o = {}) => `<div class="ov-f ${o.cls || ""}"><label title="${esc(String(lib).replace(/<[^>]+>/g, ""))}">${lib}${o.req ? " <i>*</i>" : ""}</label><input data-k="${k}" value="${esc(f[k])}" ${o.type ? `type="${o.type}"` : ""} placeholder="${esc(o.ph || "")}">${o.aide ? `<div class="ov-aide ${o.aideCls || ""}" id="ov_aide_${k}">${o.aide}</div>` : ""}</div>`;
+  const champ = (k, lib, o = {}) => `<div class="ov-f ${o.cls || ""}"><label title="${esc(String(lib).replace(/<[^>]+>/g, ""))}">${lib}${o.req ? " <i>*</i>" : ""}</label><input data-k="${k}" value="${esc(f[k])}" autocomplete="off" ${o.type ? `type="${o.type}"` : ""} placeholder="${esc(o.ph || "")}">${o.aide ? `<div class="ov-aide ${o.aideCls || ""}" id="ov_aide_${k}">${o.aide}</div>` : ""}</div>`;
   const choix = (k, lib, valeurs) => `<div class="ov-f"><label>${lib}</label><div class="ov-chips petit">${valeurs.map((v) => `<button type="button" class="ov-chip ${String(f[k]) === String(v[0]) ? "on" : ""}" data-ch="${k}" data-v="${esc(v[0])}">${esc(v[1])}</button>`).join("")}</div></div>`;
   const liste = (k, lib, noms, vide) => {
     const l = noms.slice(); if (f[k] && !l.includes(f[k])) l.unshift(f[k]);
@@ -224,7 +224,7 @@ const FTSOuverture = (() => {
       const c = f.inter[k];
       const tete = `<div class="r">${lib}${req ? " <i>*</i>" : ""}${k === "geo" ? `<label class="g4"><input type="checkbox" data-g4 ${c.g4 ? "checked" : ""}> G4</label>` : ""}</div>`;
       if (k === "contact" && c.idem) return tete + `<div class="idem"><label class="ov-mail" style="font-weight:600"><input type="checkbox" data-idem checked> idem client</label></div>`;
-      return tete + ["soc", "nom", "tel", "mail"].map((ch) => `<input data-it="${k}.${ch}" value="${esc(c[ch])}" ${ch === "tel" ? 'inputmode="tel"' : ch === "mail" ? 'type="email"' : ""} placeholder="${k === "contact" && ch === "soc" ? "décocher « idem client » pour remplir" : ""}">`).join("")
+      return tete + ["soc", "nom", "tel", "mail"].map((ch) => `<input data-it="${k}.${ch}" value="${esc(c[ch])}" ${ch === "tel" ? 'inputmode="tel"' : ""} autocomplete="off" name="ov-${k}-${ch}-${Date.now() % 100000}" placeholder="${k === "contact" && ch === "soc" ? "décocher « idem client » pour remplir" : ""}">`).join("")
         + (k === "contact" ? "" : "");
     };
     return `<div class="ov-it"><span></span><span class="h">Société</span><span class="h">Interlocuteur</span><span class="h">Téléphone</span><span class="h">E-mail</span>
@@ -243,7 +243,7 @@ const FTSOuverture = (() => {
       <div class="ov-st">Quantités prévues au devis <span class="ov-tot" id="ov_tot">${tot ? "· total : " + esc(tot) : ""}</span></div>
       <table class="ov-tt"><thead><tr>${multi ? "<th>Technique</th>" : ""}<th>Nombre <i style="color:#C0392B;font-style:normal">*</i></th><th>Ø forage (mm)</th><th>Longueur max (m)</th><th>Armature</th><th class="x"></th></tr></thead><tbody>
         ${f.lignes.map((l, i) => `<tr>${multi ? `<td><select data-l="${i}.tech">${techsDe(f).map((t) => `<option ${l.tech === t ? "selected" : ""}>${t}</option>`).join("")}</select></td>` : ""}
-          <td><input data-l="${i}.nb" value="${esc(l.nb)}" inputmode="numeric" placeholder="ex. 6"></td><td><input data-l="${i}.diam" value="${esc(l.diam)}" inputmode="numeric"></td>
+          <td><input autocomplete="off" data-l="${i}.nb" value="${esc(l.nb)}" inputmode="numeric" placeholder="ex. 6"></td><td><input data-l="${i}.diam" value="${esc(l.diam)}" inputmode="numeric"></td>
           <td><input data-l="${i}.long" value="${esc(l.long)}" inputmode="decimal" placeholder="ex. 14,50"></td><td><input data-l="${i}.arm" value="${esc(l.arm)}" placeholder="ex. 88,9"></td>
           <td class="x">${f.lignes.length > 1 ? `<button type="button" data-suppr="${i}" title="Supprimer la ligne">✕</button>` : ""}</td></tr>`).join("")}
       </tbody></table>
@@ -386,7 +386,11 @@ const FTSOuverture = (() => {
     racine.querySelectorAll("[data-it]").forEach((el) => el.addEventListener("input", () => {
       const [k, ch] = el.dataset.it.split(".");
       if (ch === "soc") { const p = el.selectionStart; el.value = el.value.toUpperCase(); el.setSelectionRange(p, p); }
-      f.inter[k][ch] = el.value; majProgres();
+      f.inter[k][ch] = el.value;
+      // Signale une adresse e-mail tapée (ou collée par le navigateur) ailleurs que dans la colonne E-mail
+      const faux = (ch === "mail" && el.value && !/@/.test(el.value)) || (ch !== "mail" && /@/.test(el.value));
+      el.style.borderColor = faux ? "#C0392B" : ""; el.title = faux ? (ch === "mail" ? "Adresse e-mail incomplète" : "Une adresse e-mail va dans la colonne E-mail") : "";
+      majProgres();
     }));
     racine.querySelectorAll("[data-l]").forEach((el) => el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => {
       const [i, ch] = el.dataset.l.split("."); f.lignes[Number(i)][ch] = el.value; majProgres();
@@ -641,11 +645,19 @@ const FTSOuverture = (() => {
       ${m.dest.length ? `<pre><b>Objet : ${esc(m.objet)}</b>\n\n${esc(m.corps)}</pre>` : ""}
       <div class="ov-act"><button type="button" class="sv-btn pri" id="ov_imprimer">🖨️ Imprimer la fiche d'affaire acquise</button>
         ${m.dest.length && m.mode === "outlook" ? '<button type="button" class="sv-btn" id="ov_rouvrir">📧 Rouvrir le mail</button>' : ""}
+        ${m.dest.length ? '<button type="button" class="sv-btn" id="ov_copier" title="Si le mail ne s\'ouvre pas dans le bon Outlook : copie, puis colle dans un nouveau message">📋 Copier le mail</button>' : ""}
         <button type="button" class="sv-btn" id="ov_nouvelle">📝 Nouvelle ouverture</button></div></div>`;
   }
   function brancherResultat() {
     $("imprimer").onclick = () => { const u = URL.createObjectURL(dernier.pdf); const w = window.open(u, "_blank"); if (!w) location.href = u; };
     const ro = $("rouvrir"); if (ro) ro.onclick = ouvrirOutlook;
+    // Secours : destinataires, objet et texte copiés pour les coller dans un nouveau message
+    const cp = $("copier"); if (cp) cp.onclick = async () => {
+      const m = dernier.mail, t = `À : ${m.dest.join(" ; ")}\nObjet : ${m.objet}\n\n${m.corps}`;
+      try { await navigator.clipboard.writeText(t); cp.textContent = "✅ Copié : colle-le dans un nouveau message"; }
+      catch (e) { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); cp.textContent = "✅ Copié"; }
+      setTimeout(() => { cp.textContent = "📋 Copier le mail"; }, 4000);
+    };
     $("nouvelle").onclick = () => { dernier = null; f = vierge(); f.destinataires = destinatairesDefaut(); devis = null; codesExistants = null; chargerCodes().then(majProgres); rendre(); };
   }
 

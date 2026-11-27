@@ -17,7 +17,10 @@
  *    l'appareil ;
  *  - tout est modifiable (quantités, prix, même les lignes remplies par
  *    l'appli) ; un prix différent du tarif est signalé « modifié » ;
- *  - provisions soutènement modifiables, ou « ne s'applique pas » (0 %) ;
+ *  - provisions soutènement modifiables (s'il n'y en a pas, on efface le chiffre) ;
+ *  - (27/11/2026) personnel : une ligne par personne (nom, poste, jours, GD) ;
+ *    la fiche n'affiche que les lignes qui ont une quantité, « + Ajouter »
+ *    sous chaque section pour en mettre une autre ; plus de tubes 2 m / 5 m ;
  *  - PDF : logo FTS, seules les lignes renseignées, sous-total en bas de
  *    chaque groupe, pas d'annexe ; enregistré où l'on veut (fenêtre
  *    « Enregistrer sous »), nom « CODE NOM RESULTAT CHANTIER.pdf ».
@@ -64,7 +67,11 @@ const FTSResultats = (() => {
     ["88,9 × 6,5", ["1", "1,5", "1,5+P", "2", "3", "3+P"]], ["114 × 7", ["1", "1,5", "2", "3", "3+P"]],
     ["127 × 9,19", ["1,5", "2", "3", "3+P"]], ["139 × 10,5", ["1", "1,5", "3", "3+P"]], ["152,4 × 10", ["3"]],
     ["177,8 × 10", ["1"]], ["177,8 × 10,5", ["1,5", "2", "3"]]]
-    .flatMap(([d, ls]) => ls.map((l) => ({ k: "tb_" + (d + "_" + l).replace(/[^0-9a-zA-Z+]/g, "").replace(/\+/g, "P"), lib: `Tube Ø ${d}`, l: l + " m" })));
+    .flatMap(([d, ls]) => ls.map((l) => ({ k: "tb_" + (d + "_" + l).replace(/[^0-9a-zA-Z+]/g, "").replace(/\+/g, "P"), lib: `Tube Ø ${d}`, l: l + " m", retire: l === "2" || l === "5" })));
+  // Tubes de 2 m et 5 m abandonnés (Clément, 27/11/2026) : plus proposés ni tarifés,
+  // mais une ancienne fiche qui en contient les garde dans son total (affichés « n'existe plus »).
+  const TUBES_RETIRES = TUBES.filter((x) => x.retire);
+  TUBES.splice(0, TUBES.length, ...TUBES.filter((x) => !x.retire));
   const PROFILES = [["HEB 120", 26.7], ["HEB 140", 33.7], ["HEB 160", 42.6], ["HEB 180", 51.2], ["HEB 200", 61.3], ["HEB 220", 71.5],
     ["HEB 240", 83.2], ["HEB 260", 93], ["HEB 280", 103], ["HEB 300", 117], ["HEB 320", 127], ["HEB 340", 135], ["HEB 360", 142],
     ["HEB 380", 155], ["HEB 400", 171], ["HEA 200", 42.3], ["HEA 220", 50.5], ["HEA 240", 60.3], ["HEA 260", 68.2], ["HEA 280", 76.4],
@@ -270,23 +277,29 @@ const FTSResultats = (() => {
     const joursProd = dates.length;
     const nbMpx = prod.reduce((t, r) => t + num(r[1]), 0);
     const ml = prod.reduce((t, r) => t + num(r[2]), 0);
-    // Personnel : jours-hommes par poste, grands déplacements
-    const pers = {};
+    // Personnel : une ligne par personne (jours de présence, grands déplacements)
+    const gens = new Map();
     const inconnus = new Set();
     (s.personnel || []).filter((r) => parseFR(r[0]) && String(r[1] || "").trim()).forEach((r) => {
-      const nom = String(r[1]).trim();
-      const interim = /INTERIM/.test(sansAccent(r[2]));
-      const fiche = !interim && window.FTSPersonnel ? FTSPersonnel.parNom(nom) : null;
-      let k = fiche ? POSTE_LIGNE[String(fiche.poste || "").toUpperCase()] : null;
-      if (!k) { k = "manoeuvre"; if (!interim) inconnus.add(nom); }
-      pers[k] = pers[k] || { jours: new Set(), j: 0, gd: 0 };
-      const cle = String(r[0]).trim() + "|" + sansAccent(nom);
-      if (pers[k].jours.has(cle)) return; // même personne, même jour : une seule fois
-      pers[k].jours.add(cle);
-      pers[k].j += 1;
-      if (String(r[3] || "").trim()) pers[k].gd += 1;
+      const nom = String(r[1]).trim().replace(/\s+/g, " ");
+      const cleNom = sansAccent(nom);
+      let g = gens.get(cleNom);
+      if (!g) {
+        const interim = /INTERIM/.test(sansAccent(r[2]));
+        const fiche = !interim && window.FTSPersonnel ? FTSPersonnel.parNom(nom) : null;
+        let k = fiche ? POSTE_LIGNE[String(fiche.poste || "").toUpperCase()] : null;
+        if (!k) { k = "manoeuvre"; if (!interim) inconnus.add(nom); }
+        g = { nom, k, interim, jours: new Set(), gd: 0 };
+        gens.set(cleNom, g);
+      }
+      const jour = String(r[0]).trim();
+      if (g.jours.has(jour)) return; // même personne, même jour : une seule fois
+      g.jours.add(jour);
+      if (String(r[3] || "").trim()) g.gd += 1;
     });
-    GROUPES[0].lignes.forEach(([k]) => { L[k] = { nb: 1, j: pers[k] ? pers[k].j : "", pu: p(k), gd: pers[k] && pers[k].gd ? pers[k].gd : "" }; });
+    const ordre = (k) => GROUPES[0].lignes.findIndex((l) => l[0] === k);
+    const P = [...gens.values()].sort((a, b) => ordre(a.k) - ordre(b.k) || a.nom.localeCompare(b.nom, "fr"))
+      .map((g) => ({ nom: g.nom, k: g.k, j: g.jours.size, gd: g.gd || "", pu: p(g.k), ...(g.interim ? { interim: true } : {}) }));
     if (inconnus.size) avert.push(`Absents de Personnel FTS, comptés en manœuvre : ${[...inconnus].join(", ")}.`);
     // Matériel : jours-machine par ligne (MA12 + PH15 le même jour = un seul ensemble)
     const jm = {}, nonReconnus = {};
@@ -328,17 +341,46 @@ const FTSResultats = (() => {
         entete: { conducteur: meta.conducteur || "", semaines: sem ? (sem[0] === sem[1] ? `semaine ${sem[0]}` : `semaines ${sem[0]} à ${sem[1]}`) : "", montant: facturationVendue(meta) },
         prod: { nb: nbMpx, lm: nbMpx ? Math.round((ml / nbMpx) * 100) / 100 : "", jours: joursProd },
         facturation: facturationVendue(meta),
-        fg: pu._fg === "" || pu._fg == null ? "" : pu._fg, prov: pu._prov === "" || pu._prov == null ? "" : pu._prov, provNA: false,
+        fg: pu._fg === "" || pu._fg == null ? "" : pu._fg, prov: pu._prov === "" || pu._prov == null ? "" : pu._prov,
         gd: pu._gd === "" || pu._gd == null ? "" : pu._gd,
         tarifsDu: tarifs ? `${tarifs.annee || ""}${tarifs.majLe ? ` (mis à jour le ${tarifs.majLe})` : ""}`.trim() : "",
-        L, A,
+        L, A, P,
       },
       avert,
     };
   }
 
+  /**
+   * Remet une fiche enregistrée au format actuel, sans changer son résultat :
+   *  - ancien personnel par poste (nb × jours) → une ligne par poste dans P,
+   *    sans nom (« Reprendre les pointages » refait une ligne par personne) ;
+   *  - « ne s'applique pas » coché → provisions à 0 % ;
+   *  - tubes 2 m / 5 m saisis : gardés, signalés.
+   */
+  function normaliser(f) {
+    const avert = [];
+    f.L = f.L || {}; f.A = f.A || {};
+    if (!Array.isArray(f.P)) {
+      f.P = [];
+      GROUPES[0].lignes.forEach(([k]) => {
+        const x = f.L[k];
+        if (!x) return;
+        const nb = num(x.nb) || 1;
+        if (num(x.j) || num(x.gd)) f.P.push({ nom: "", k, j: nb * num(x.j), gd: num(x.gd) ? nb * num(x.gd) : "", pu: x.pu === undefined ? "" : x.pu, ancien: true });
+        delete f.L[k];
+      });
+      if (f.P.length && f.etat !== "cloture") avert.push("Fiche commencée avant le détail par personne : clique sur « Reprendre les pointages » pour avoir une ligne par personne (les prix ne bougent pas).");
+    }
+    if ("provNA" in f) { if (f.provNA) f.prov = 0; delete f.provNA; }
+    const vieux = TUBES_RETIRES.filter((x) => qteAnnexe(f, x));
+    if (vieux.length) avert.push(`Tubes de 2 m ou 5 m saisis sur cette fiche (plus utilisés) : ${vieux.map((x) => `${x.lib} · ${x.l}`).join(", ")}. Ils restent comptés ; mets la quantité à 0 s'ils sont en trop.`);
+    return avert;
+  }
+
   // ─── Calculs ─────────────────────────────────────────────────
+  const totalPers = (f, x) => num(x.j) * num(x.pu) + num(x.gd) * num(f.gd);
   function totalLigne(f, g, k) {
+    if (g.t === "p") return 0; // personnel : voir totalPers (une ligne par personne)
     const x = f.L[k] || {};
     if (g.t === "p") return num(x.nb) * (num(x.j) * num(x.pu) + num(x.gd) * num(f.gd));
     if (g.t === "j") return num(x.nb) * num(x.j) * num(x.pu);
@@ -347,14 +389,25 @@ const FTSResultats = (() => {
     return num(x.q) * num(x.pu);
   }
   const totalAnnexeLigne = (f, x) => { const a = f.A[x.k] || {}; return x.pml !== undefined ? num(a.long) * num(a.nb) * num(a.pml) * num(a.pu) : num(a.q) * num(a.pu); };
-  const totalAnnexe = (f, a) => ANNEXES[a].reduce((t, x) => t + totalAnnexeLigne(f, x), 0);
+  const listeTotale = (a) => (a === "tubes" ? TUBES.concat(TUBES_RETIRES) : ANNEXES[a]);
+  const totalAnnexe = (f, a) => listeTotale(a).reduce((t, x) => t + totalAnnexeLigne(f, x), 0);
+  /** Une quantité est saisie (même sans prix) : la ligne est affichée. */
+  const qteAnnexe = (f, x) => { const a = f.A[x.k] || {}; return x.pml !== undefined ? num(a.long) * num(a.nb) : num(a.q); };
+  function aQuantite(f, g, k) {
+    const x = f.L[k] || {};
+    const u = (g.lignes.find((l) => l[0] === k) || [])[2];
+    if (u === "a") return listeTotale(k).some((y) => qteAnnexe(f, y));
+    if (g.t === "q") return !!num(x.q);
+    return !!(num(x.nb) * num(x.j));
+  }
+  const persVisible = (x) => !!(num(x.j) || num(x.gd));
   function calculer(f) {
     const g = {};
-    GROUPES.forEach((gr) => { g[gr.id] = gr.lignes.reduce((t, [k]) => t + totalLigne(f, gr, k), 0); });
+    GROUPES.forEach((gr) => { g[gr.id] = gr.t === "p" ? (f.P || []).reduce((t, x) => t + totalPers(f, x), 0) : gr.lignes.reduce((t, [k]) => t + totalLigne(f, gr, k), 0); });
     const dep = Object.values(g).reduce((a, b) => a + b, 0);
     const fact = num(f.facturation);
     const fg = (num(f.fg) / 100) * fact;
-    const prov = f.provNA ? 0 : (num(f.prov) / 100) * fact;
+    const prov = (num(f.prov) / 100) * fact;
     return { g, dep, fact, fg, prov, res: fact - dep - fg - prov };
   }
   const ligneRemplie = (f, g, k) => Math.abs(totalLigne(f, g, k)) > 0.004;
@@ -371,7 +424,8 @@ const FTSResultats = (() => {
       racine.dataset.ecoute = "1";
       racine.addEventListener("click", clic);
       racine.addEventListener("input", saisie);
-      racine.addEventListener("change", (e) => { if (e.target.matches("[data-provna]")) saisie(e); });
+      racine.addEventListener("change", (e) => { if (e.target.matches("[data-ajout]")) ajouterLigne(e.target.value); });
+      racine.addEventListener("focusin", (e) => { if (e.target.matches(".rs-poste")) e.target.dataset.avant = e.target.value; });
     }
     vue = "liste";
     charger();
@@ -450,22 +504,29 @@ const FTSResultats = (() => {
     racine.innerHTML = `<div class="rs-chargement">Chargement de la fiche ${esc(code(c.name))}…</div>`;
     try {
       const r = resultats.get(id);
+      affiches.clear(); persVues.clear(); annexesOuvertes.clear();
       if (r && r.data) { fiche = r.data; }
       else {
         const s = (await FTSSheets.chargerDonneesSupervision([{ id: c.id, name: c.name }]))[0] || {};
         const p = preRemplir(c, s, (tarifs && tarifs.pu) || {});
         fiche = p.fiche; avertissements = p.avert;
       }
+      avertissements = avertissements.concat(normaliser(fiche));
       rendreFiche();
     } catch (e) { console.error(e); racine.innerHTML = `<div class="sv-banner">❌ ${esc(e.message)} <span class="sv-sp"></span><button type="button" class="sv-btn" data-a="liste">← Retour</button></div>`; }
   }
 
   async function reprendrePointages() {
     const c = chantiers.find((x) => x.id === fiche.chantierId);
-    if (!c || !confirm("Reprendre les jours du personnel et du matériel, le GNR, les consommables, le fourgon et la production depuis les pointages ?\n\nLes prix, les fournitures, les divers et les transports ne bougent pas.")) return;
+    if (!c || !confirm("Reprendre les jours du personnel et du matériel, le GNR, les consommables, le fourgon et la production depuis les pointages ?\n\nLe personnel est refait avec une ligne par personne (le poste et le prix déjà choisis pour une personne sont gardés). Les fournitures, les divers et les transports ne bougent pas.")) return;
     const s = (await FTSSheets.chargerDonneesSupervision([{ id: c.id, name: c.name }]))[0] || {};
     const p = preRemplir(c, s, (tarifs && tarifs.pu) || {});
-    GROUPES.slice(0, 3).forEach((g) => g.lignes.forEach(([k]) => { fiche.L[k] = { ...fiche.L[k], nb: p.fiche.L[k].nb, j: p.fiche.L[k].j, ...(g.t === "p" ? { gd: p.fiche.L[k].gd } : {}) }; }));
+    GROUPES.slice(1, 3).forEach((g) => g.lignes.forEach(([k]) => { fiche.L[k] = { ...fiche.L[k], nb: p.fiche.L[k].nb, j: p.fiche.L[k].j }; }));
+    const avant = new Map((fiche.P || []).filter((x) => x.nom).map((x) => [sansAccent(x.nom), x]));
+    const nouveaux = p.fiche.P.map((x) => { const a = avant.get(sansAccent(x.nom)); return a ? { ...x, k: a.k, pu: a.pu } : x; });
+    const ajoutes = (fiche.P || []).filter((x) => x.ajout && x.nom && !nouveaux.some((y) => sansAccent(y.nom) === sansAccent(x.nom)));
+    fiche.P = nouveaux.concat(ajoutes);
+    persVues.clear();
     fiche.L.gnr = { ...fiche.L.gnr, q: p.fiche.L.gnr.q };
     fiche.prod = p.fiche.prod;
     fiche.entete.semaines = p.fiche.entete.semaines;
@@ -478,34 +539,72 @@ const FTSResultats = (() => {
     const t = tarifs && tarifs.pu ? tarifs.pu[k] : "";
     return t !== "" && t != null && pu !== "" && pu != null && Math.abs(num(pu) - num(t)) > 0.0001 ? `<span class="rs-mod" data-mod="${k}">modifié · tarif ${esc(fmt(t))}</span>` : `<span class="rs-mod" data-mod="${k}"></span>`;
   }
+  // Lignes affichées en plus de celles qui ont une quantité : ajoutées avec
+  // « + Ajouter » ou modifiées pendant que la fiche est ouverte (une ligne
+  // qu'on vide reste donc visible jusqu'à la prochaine ouverture).
+  const affiches = new Set(), persVues = new Set();
+  const ligneVisible = (g, k) => aQuantite(fiche, g, k) || affiches.has(k);
+  const menuAjout = (choix, texte = "+ Ajouter…") => (!choix.length || fiche.etat === "cloture" ? "" :
+    `<select class="rs-ajout" data-ajout><option value="">${esc(texte)}</option>${choix.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select>`);
+
+  function htmlPersonnel(g) {
+    const clos = fiche.etat === "cloture";
+    let h = `<tr class="sep"><td colspan="6">${esc(g.lib.toUpperCase())} <span class="rs-b rs-auto">auto</span> <span class="rs-src">${esc(g.auto)} · une ligne par personne</span></td></tr>`;
+    (fiche.P || []).forEach((x, i) => {
+      if (!persVisible(x) && !persVues.has(i)) return;
+      const poste = `<select class="rs-poste" data-p="P.${i}.k"${clos ? " disabled" : ""}>${g.lignes.map(([k, lib]) => `<option value="${k}"${k === x.k ? " selected" : ""}>${esc(lib)}</option>`).join("")}</select>`;
+      const nom = x.ajout || x.ancien
+        ? `<input class="rs-txt rs-nom" data-p="P.${i}.nom" value="${esc(x.nom || "")}" placeholder="${x.ancien ? "nom ?" : "Nom Prénom"}"${clos ? " disabled" : ""}>`
+        : `<b class="rs-nomb">${esc(x.nom)}</b>${x.interim ? ' <span class="rs-src">intérim</span>' : ""}`;
+      h += `<tr data-pi="${i}"><td>${nom} ${poste}</td><td></td><td class="r">${inp(`P.${i}.j`, x.j, x.ajout ? "" : "a")}</td><td class="r">${inp(`P.${i}.pu`, x.pu, x.ajout ? "" : "a")}${marquePers(i, x)}</td><td class="r">${inp(`P.${i}.gd`, x.gd, x.ajout ? "" : "a")}</td><td class="r" data-tp="${i}"></td></tr>`;
+    });
+    if (!clos) h += `<tr class="rs-add"><td colspan="6"><button type="button" class="rs-ajout" data-a="ajoutPers">+ Ajouter une personne</button> <span class="rs-src">pour quelqu'un oublié dans les pointages</span></td></tr>`;
+    h += `<tr class="stot"><td colspan="5" data-k="persst">Sous-total personnel</td><td class="r" data-st="${g.id}"></td></tr>`;
+    return h;
+  }
+
   function htmlGroupe(g) {
+    if (g.t === "p") return htmlPersonnel(g);
     const auto = g.auto ? `<span class="rs-b rs-auto">auto</span> <span class="rs-src">${esc(g.auto)}</span>` : '<span class="rs-b rs-man">à saisir</span>';
     let h = `<tr class="sep"><td colspan="6">${esc(g.lib.toUpperCase())} ${auto}</td></tr>`;
+    const caches = [];
     g.lignes.forEach(([k, lib, u]) => {
+      if (!ligneVisible(g, k)) { caches.push([k, lib]); return; }
       const x = fiche.L[k] || {};
       const cl = `${g.auto ? "" : "loc"} ${ligneRemplie(fiche, g, k) ? "" : "vide"}`;
-      if (g.t === "p") h += `<tr class="${cl}" data-l="${k}"><td>${esc(lib)}</td><td class="r">${inp(`L.${k}.nb`, x.nb, "a")}</td><td class="r">${inp(`L.${k}.j`, x.j, "a")}</td><td class="r">${inp(`L.${k}.pu`, x.pu, "a")}${marqueModif(k, x.pu)}</td><td class="r">${inp(`L.${k}.gd`, x.gd, "a")}</td><td class="r" data-t="${k}"></td></tr>`;
-      else if (g.t === "j") h += `<tr class="${cl}" data-l="${k}"><td>${esc(lib)}</td><td class="r">${inp(`L.${k}.nb`, x.nb, g.auto ? "a" : "")}</td><td class="r">${inp(`L.${k}.j`, x.j, g.auto ? "a" : "")}</td><td class="r">${inp(`L.${k}.pu`, x.pu, g.auto ? "a" : "")}${marqueModif(k, x.pu)}</td><td></td><td class="r" data-t="${k}"></td></tr>`;
+      if (g.t === "j") h += `<tr class="${cl}" data-l="${k}"><td>${esc(lib)}</td><td class="r">${inp(`L.${k}.nb`, x.nb, g.auto ? "a" : "")}</td><td class="r">${inp(`L.${k}.j`, x.j, g.auto ? "a" : "")}</td><td class="r">${inp(`L.${k}.pu`, x.pu, g.auto ? "a" : "")}${marqueModif(k, x.pu)}</td><td></td><td class="r" data-t="${k}"></td></tr>`;
       else if (u === "a") h += `<tr class="loc ${cl}" data-l="${k}"><td>${esc(lib)}</td><td class="r" colspan="4"><button type="button" class="sv-btn mini" data-annexe="${k}">Détail ${annexesOuvertes.has(k) ? "▴" : "▾"}</button></td><td class="r" data-t="${k}"></td></tr>${htmlAnnexe(k)}`;
       else h += `<tr class="${k === "gnr" ? "" : "loc"} ${cl}" data-l="${k}"><td>${esc(lib)}</td><td class="r rs-u">${esc(u)}</td><td class="r">${inp(`L.${k}.q`, x.q, k === "gnr" ? "a" : "")}</td><td class="r">${inp(`L.${k}.pu`, x.pu, k === "gnr" ? "a" : "", "P.U.")}${marqueModif(k, x.pu)}</td><td></td><td class="r" data-t="${k}"></td></tr>`;
     });
+    const menu = menuAjout(caches);
+    if (menu) h += `<tr class="rs-add"><td colspan="6">${menu}${g.lignes.some(([k]) => ligneVisible(g, k)) ? "" : ' <span class="rs-src">rien de saisi</span>'}</td></tr>`;
     h += `<tr class="stot"><td colspan="5">Sous-total ${esc(g.lib.toLowerCase())}</td><td class="r" data-st="${g.id}"></td></tr>`;
     return h;
+  }
+  function marquePers(i, x) {
+    const t = tarifs && tarifs.pu ? tarifs.pu[x.k] : "";
+    const modif = t !== "" && t != null && x.pu !== "" && x.pu != null && Math.abs(num(x.pu) - num(t)) > 0.0001;
+    return `<span class="rs-mod" data-mod="P${i}">${modif ? `modifié · tarif ${esc(fmt(t))}` : ""}</span>`;
   }
   const annexesOuvertes = new Set();
   function htmlAnnexe(a) {
     if (!annexesOuvertes.has(a)) return "";
-    const liste = ANNEXES[a];
     const prof = a === "profiles";
     const tete = prof ? "<th>Profilé</th><th class=\"r\">Long. (m)</th><th class=\"r\">Nb barres</th><th class=\"r\">kg / ml</th><th class=\"r\">P.U. (€/kg)</th><th class=\"r\">Total</th>"
       : `<th>Article</th><th class="r">${a === "tubes" ? "Longueur" : ""}</th><th class="r">Quantité${a === "gewi" ? " (ml)" : ""}</th><th class="r">P.U.</th><th class="r">Total</th>`;
+    const visible = (x) => qteAnnexe(fiche, x) || affiches.has(x.k);
+    const liste = ANNEXES[a].filter(visible).concat(a === "tubes" ? TUBES_RETIRES.filter((x) => qteAnnexe(fiche, x)) : []);
+    const nom = (x) => (x.libre ? "Autre profilé" : x.lib) + (x.l ? " · " + x.l : "");
+    const caches = ANNEXES[a].filter((x) => !visible(x)).map((x) => [x.k, nom(x)]);
     const lignes = liste.map((x) => {
       const v = fiche.A[x.k] || {};
       const vide = totalAnnexeLigne(fiche, x) ? "" : "vide";
-      if (prof) return `<tr class="${vide}"><td>${x.libre ? `<input class="rs-lib" data-p="A.${x.k}.lib" value="${esc(v.lib || "")}" placeholder="autre profilé"${fiche.etat === "cloture" ? " disabled" : ""}>` : esc(x.lib)}</td><td class="r">${inp(`A.${x.k}.long`, v.long)}</td><td class="r">${inp(`A.${x.k}.nb`, v.nb)}</td><td class="r">${inp(`A.${x.k}.pml`, v.pml)}</td><td class="r">${inp(`A.${x.k}.pu`, v.pu)}${marqueModif(x.k, v.pu)}</td><td class="r" data-ta="${x.k}"></td></tr>`;
-      return `<tr class="${vide}"><td>${esc(x.lib)}</td><td class="r">${esc(x.l || "")}</td><td class="r">${inp(`A.${x.k}.q`, v.q)}</td><td class="r">${inp(`A.${x.k}.pu`, v.pu)}${marqueModif(x.k, v.pu)}</td><td class="r" data-ta="${x.k}"></td></tr>`;
+      if (prof) return `<tr class="${vide}" data-ak="${x.k}"><td>${x.libre ? `<input class="rs-lib" data-p="A.${x.k}.lib" value="${esc(v.lib || "")}" placeholder="autre profilé"${fiche.etat === "cloture" ? " disabled" : ""}>` : esc(x.lib)}</td><td class="r">${inp(`A.${x.k}.long`, v.long)}</td><td class="r">${inp(`A.${x.k}.nb`, v.nb)}</td><td class="r">${inp(`A.${x.k}.pml`, v.pml)}</td><td class="r">${inp(`A.${x.k}.pu`, v.pu)}${marqueModif(x.k, v.pu)}</td><td class="r" data-ta="${x.k}"></td></tr>`;
+      return `<tr class="${vide}" data-ak="${x.k}"><td>${esc(x.lib)}${x.retire ? ' <span class="rs-retire">n\'existe plus</span>' : ""}</td><td class="r">${esc(x.l || "")}</td><td class="r">${inp(`A.${x.k}.q`, v.q)}</td><td class="r">${inp(`A.${x.k}.pu`, v.pu)}${marqueModif(x.k, v.pu)}</td><td class="r" data-ta="${x.k}"></td></tr>`;
     }).join("");
-    return `<tr class="annexe"><td colspan="6"><table class="sv-tbl sub"><thead><tr>${tete}</tr></thead><tbody>${lignes}</tbody></table></td></tr>`;
+    const menu = menuAjout(caches, a === "tubes" ? "+ Ajouter un tube…" : "+ Ajouter…");
+    const pied = menu ? `<tr class="rs-add"><td colspan="${prof ? 6 : 5}">${menu}</td></tr>` : "";
+    return `<tr class="annexe"><td colspan="6"><table class="sv-tbl sub"><thead><tr>${tete}</tr></thead><tbody>${lignes}${pied}</tbody></table></td></tr>`;
   }
 
   function rendreFiche() {
@@ -526,7 +625,7 @@ const FTSResultats = (() => {
         <div class="sv-kpi rs-kres"><div class="ico">✅</div><div><div class="l">Résultat net</div><div class="v" data-k="res"></div><div class="s" data-k="marge"></div></div></div>
       </div>
       <div class="dt-grid rs-grid"><div class="dt-col">
-        <section class="sv-card"><div class="sv-ch"><h2>Dépenses</h2><span class="s">toutes les lignes de l'Excel · tout est modifiable · grisé = vide, absent du PDF</span></div>
+        <section class="sv-card"><div class="sv-ch"><h2>Dépenses</h2><span class="s">seules les lignes avec une quantité sont affichées · « + Ajouter » pour en mettre une autre · grisé = sans prix, absent du PDF</span></div>
           <div class="se-table-scroll"><table class="sv-tbl rs-dep"><thead><tr><th>Désignation</th><th class="r">Nb / unité</th><th class="r">Jours / qté</th><th class="r">P.U.</th><th class="r">Gd dép.</th><th class="r">Total HT</th></tr></thead>
           <tbody>${GROUPES.map(htmlGroupe).join("")}<tr class="tot"><td colspan="5">Total des dépenses</td><td class="r" data-k="dep2"></td></tr></tbody></table></div></section>
       </div><div class="dt-col">
@@ -538,7 +637,7 @@ const FTSResultats = (() => {
             <tr><td>Facturation <span class="rs-src">(montant total marché)</span></td><td class="r">${inp("facturation", f.facturation, "a rs-big")} €</td></tr>
             <tr><td>− Total des dépenses</td><td class="r" data-k="dep3"></td></tr>
             <tr><td>− F.G. assurance ${inp("fg", f.fg, "pc", "%")} %</td><td class="r" data-k="fgv"></td></tr>
-            <tr><td>− Provisions soutènement ${inp("prov", f.prov, "pc", "%")} % <label class="rs-na"><input type="checkbox" data-provna${f.provNA ? " checked" : ""}${clos ? " disabled" : ""}> ne s'applique pas</label></td><td class="r" data-k="provv"></td></tr>
+            <tr><td>− Provisions soutènement ${inp("prov", f.prov, "pc", "%")} % <span class="rs-src">vide = pas de provision</span></td><td class="r" data-k="provv"></td></tr>
             <tr><td>Grand déplacement (forfait par nuit) ${inp("gd", f.gd, "pc", "€")} €</td><td></td></tr>
             <tr class="res"><td data-k="resl">Résultat net</td><td class="r" data-k="res2"></td></tr></tbody></table>
           <div class="rs-actions">
@@ -555,8 +654,17 @@ const FTSResultats = (() => {
   function recalculer() {
     const f = fiche, c = calculer(f);
     const set = (sel, txt) => racine.querySelectorAll(sel).forEach((e) => (e.textContent = txt));
+    (f.P || []).forEach((x, i) => {
+      const t = totalPers(f, x);
+      set(`[data-tp="${i}"]`, t ? fmt(t) : "0");
+      const tr = racine.querySelector(`tr[data-pi="${i}"]`);
+      if (tr) tr.classList.toggle("vide", Math.abs(t) < 0.005);
+    });
+    const pv = (f.P || []).filter(persVisible);
+    const nbPers = pv.filter((x) => !x.ancien).length; // une ligne d'ancienne fiche = un poste, pas une personne
+    set('[data-k="persst"]', `Sous-total personnel${pv.length ? ` ·${nbPers ? ` ${nbPers} personne${nbPers > 1 ? "s" : ""} ·` : ""} ${fmt(pv.reduce((t, x) => t + num(x.j), 0))} jours` : ""}`);
     GROUPES.forEach((g) => {
-      g.lignes.forEach(([k]) => {
+      if (g.t !== "p") g.lignes.forEach(([k]) => {
         const t = totalLigne(f, g, k);
         set(`[data-t="${k}"]`, t ? fmt(t) : "0");
         const tr = racine.querySelector(`tr[data-l="${k}"]`);
@@ -564,7 +672,7 @@ const FTSResultats = (() => {
       });
       set(`[data-st="${g.id}"]`, eur(c.g[g.id]));
     });
-    Object.values(ANNEXES).forEach((liste) => liste.forEach((x) => {
+    Object.values(ANNEXES).concat([TUBES_RETIRES]).forEach((liste) => liste.forEach((x) => {
       const cell = racine.querySelector(`[data-ta="${x.k}"]`);
       if (!cell) return;
       const t = totalAnnexeLigne(f, x);
@@ -574,7 +682,7 @@ const FTSResultats = (() => {
     set('[data-k="fact"]', eur(c.fact));
     set('[data-k="dep"]', eur(c.dep)); set('[data-k="dep2"]', eur(c.dep)); set('[data-k="dep3"]', eur(c.dep));
     set('[data-k="fgp"]', eur(c.fg + c.prov));
-    set('[data-k="fgps"]', `${fmt(f.fg)} % + provisions ${f.provNA ? "0" : fmt(f.prov)} %`);
+    set('[data-k="fgps"]', `${fmt(f.fg)} % + provisions ${fmt(f.prov)} %`);
     set('[data-k="fgv"]', eur(c.fg)); set('[data-k="provv"]', eur(c.prov));
     set('[data-k="res"]', eur(c.res)); set('[data-k="res2"]', eur(c.res));
     const marge = c.fact ? `${fmt((c.res / c.fact) * 100, 1)} % de la facturation` : "facturation à renseigner";
@@ -585,13 +693,25 @@ const FTSResultats = (() => {
     const nbp = num(f.prod.nb), j = num(f.prod.jours), lm = num(f.prod.lm);
     set('[data-k="cad"]', j ? `${fmt(nbp / j, 1)} u/j · ${fmt((nbp * lm) / j, 1)} ml/j` : "—");
     const na = racine.querySelector('[data-p="prov"]');
-    if (na) na.disabled = !!f.provNA || f.etat === "cloture";
+    if (na) na.disabled = f.etat === "cloture";
+  }
+
+  /** « + Ajouter » : affiche une ligne cachée (ou un article d'annexe) et met le curseur dedans. */
+  function ajouterLigne(k) {
+    if (!k || !fiche || fiche.etat === "cloture") return;
+    affiches.add(k);
+    if (ANNEXES[k]) annexesOuvertes.add(k);
+    const annexe = Object.entries(ANNEXES).find(([, l]) => l.some((x) => x.k === k));
+    if (annexe) { affiches.add(annexe[0]); annexesOuvertes.add(annexe[0]); }
+    const y = window.scrollY; rendreFiche(); window.scrollTo(0, y);
+    const tr = racine.querySelector(`tr[data-l="${k}"], tr[data-ak="${k}"]`);
+    const champ = tr && tr.querySelector("input:not([disabled])");
+    if (champ) champ.focus();
   }
 
   function saisie(e) {
     if (vue !== "fiche" || !fiche || fiche.etat === "cloture") return;
     const t = e.target;
-    if (t.matches("[data-provna]")) { fiche.provNA = t.checked; recalculer(); planifierSauvegarde(); return; }
     const p = t.dataset.p;
     if (!p) return;
     const parts = p.split(".");
@@ -599,8 +719,31 @@ const FTSResultats = (() => {
     for (let i = 0; i < parts.length - 1; i++) { o[parts[i]] = o[parts[i]] || {}; o = o[parts[i]]; }
     const dernier = parts[parts.length - 1];
     const brut = t.value.trim();
-    o[dernier] = t.classList.contains("rs-txt") || t.classList.contains("rs-lib") ? brut : brut === "" ? "" : num(brut);
-    if (dernier === "pu") {
+    o[dernier] = t.classList.contains("rs-txt") || t.classList.contains("rs-lib") || t.classList.contains("rs-poste") ? brut : brut === "" ? "" : num(brut);
+    if (parts[0] === "L" || parts[0] === "A") affiches.add(parts[1]);
+    if (parts[0] === "P") {
+      const i = +parts[1], x = fiche.P[i];
+      persVues.add(i);
+      if (dernier === "k") {
+        // Changement de poste : le prix suit le tarif du nouveau poste, sauf prix modifié à la main
+        const ancien = t.dataset.avant || "";
+        const tAncien = tarifs && tarifs.pu ? tarifs.pu[ancien] : "";
+        if (x.pu === "" || x.pu == null || (tAncien !== "" && tAncien != null && Math.abs(num(x.pu) - num(tAncien)) < 0.0001)) {
+          const tn = tarifs && tarifs.pu ? tarifs.pu[x.k] : "";
+          x.pu = tn === "" || tn == null ? "" : tn;
+        }
+        const y = window.scrollY; rendreFiche(); window.scrollTo(0, y);
+        planifierSauvegarde();
+        return;
+      }
+      if (dernier === "pu") {
+        const m = racine.querySelector(`[data-mod="P${i}"]`);
+        const ref = tarifs && tarifs.pu ? tarifs.pu[x.k] : "";
+        const modif = ref !== "" && ref != null && brut !== "" && Math.abs(num(brut) - num(ref)) > 0.0001;
+        if (m) m.textContent = modif ? `modifié · tarif ${fmt(ref)}` : "";
+        t.toggleAttribute("data-m", modif);
+      }
+    } else if (dernier === "pu") {
       const k = parts[1];
       const m = racine.querySelector(`[data-mod="${k}"]`);
       if (m) { const ref = tarifs && tarifs.pu ? tarifs.pu[k] : ""; m.textContent = ref !== "" && ref != null && brut !== "" && Math.abs(num(brut) - num(ref)) > 0.0001 ? `modifié · tarif ${fmt(ref)}` : ""; }
@@ -647,6 +790,17 @@ const FTSResultats = (() => {
     }
     if (!fiche) return;
     if (a === "pointages") { reprendrePointages().catch((err) => alert(err.message)); return; }
+    if (a === "ajoutPers") {
+      if (fiche.etat === "cloture") return;
+      const tn = tarifs && tarifs.pu ? tarifs.pu.manoeuvre : "";
+      fiche.P = fiche.P || [];
+      fiche.P.push({ nom: "", k: "manoeuvre", j: "", gd: "", pu: tn === "" || tn == null ? "" : tn, ajout: true });
+      persVues.add(fiche.P.length - 1);
+      const y = window.scrollY; rendreFiche(); window.scrollTo(0, y);
+      const champ = racine.querySelector(`[data-p="P.${fiche.P.length - 1}.nom"]`);
+      if (champ) champ.focus();
+      return;
+    }
     if (a === "cloturer") {
       if (!confirm("Clôturer ce résultat ?\n\nLa fiche passe dans « Faits » et n'est plus modifiable (tu pourras la rouvrir).")) return;
       fiche.etat = "cloture"; fiche.clotureLe = auj(); fiche.cloturePar = moi();
@@ -725,9 +879,10 @@ const FTSResultats = (() => {
   }
   /** Lignes imprimées d'un groupe : seulement les lignes renseignées. */
   function lignesPdf(f, g) {
+    if (g.t === "p") return (f.P || []).filter((x) => Math.abs(totalPers(f, x)) > 0.004)
+      .map((x) => [`${libLigne(x.k)}${x.nom ? " · " + x.nom : ""}`, `${fmt(x.j)} j${num(x.gd) ? ` + ${fmt(x.gd)} GD` : ""}`, fmt(x.pu), fmt(totalPers(f, x))]);
     return g.lignes.filter(([k]) => ligneRemplie(f, g, k)).map(([k, lib, u]) => {
       const x = f.L[k] || {};
-      if (g.t === "p") return [lib, `${fmt(num(x.nb) > 1 ? num(x.nb) * num(x.j) : x.j)} j${num(x.gd) ? ` + ${fmt(x.gd)} GD` : ""}${num(x.nb) > 1 ? ` (${fmt(x.nb)} pers.)` : ""}`, fmt(x.pu), fmt(totalLigne(f, g, k))];
       if (g.t === "j") return [lib, `${fmt(num(x.nb) * num(x.j))} j${num(x.nb) > 1 ? ` (${fmt(x.nb)} × ${fmt(x.j)})` : ""}`, fmt(x.pu), fmt(totalLigne(f, g, k))];
       if (u === "a") return [lib, "forfait", "", fmt(totalLigne(f, g, k))];
       return [lib, `${fmt(x.q)} ${u}`, fmt(x.pu), fmt(totalLigne(f, g, k))];
@@ -795,7 +950,7 @@ const FTSResultats = (() => {
     doc.setDrawColor(34); doc.setLineWidth(0.5); doc.line(X0, y - 4, X1, y - 4);
     ligneTab(["Total des dépenses", "", "", eur(c.dep)], { gras: true, trait: true });
     ligneTab([`F.G. assurance ${fmt(f.fg)} %`, "", "", eur(c.fg)], { trait: true });
-    ligneTab([`Provisions soutènement ${f.provNA ? "(ne s'applique pas)" : fmt(f.prov) + " %"}`, "", "", eur(c.prov)], { trait: true });
+    ligneTab([`Provisions soutènement ${fmt(f.prov)} %`, "", "", eur(c.prov)], { trait: true });
     ligneTab(["Facturation", "", "", eur(c.fact)], { trait: true });
     ligneTab([`Résultat net${c.fact ? " · " + fmt((c.res / c.fact) * 100, 1) + " %" : ""}`, "", "", eur(c.res)], { gras: true, taille: 11, h: 7.5, fond: c.res < 0 ? [253, 236, 234] : [234, 246, 238] });
     pied();

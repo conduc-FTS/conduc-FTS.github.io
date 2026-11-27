@@ -83,7 +83,14 @@
 .rs-dep .sv-tbl.sub td { font-size: 0.8rem; padding: 4px 12px; }
 .rs-calc td { font-size: 0.88rem; }
 .rs-calc tr.res td { font-weight: 800; font-size: 1rem; background: #EAF6EE; color: #1E8E4E; border-top: 2px solid #3FAE63; }
-.rs-na { font-size: 0.74rem; color: var(--text-sub); margin-left: 8px; white-space: nowrap; }
+.rs-dep tr.rs-add td { border-bottom: 0; padding-top: 6px; padding-bottom: 10px; }
+.rs .rs-ajout { font: inherit; font-size: 0.78rem; color: #374151; background: #fff; border: 1.5px dashed #9CA3AF; border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+.rs .rs-ajout:hover { border-color: #111; background: #FFFBEA; }
+.rs select.rs-ajout { padding: 3px 6px; max-width: 320px; }
+.rs .rs-poste { font: inherit; font-size: 0.76rem; border: 1px solid var(--border); border-radius: 6px; padding: 2px 4px; margin-left: 6px; background: #fff; color: var(--text-main); }
+.rs .rs-nomb { font-weight: 700; }
+.rs .rs-dep input.rs-nom { width: 150px; text-align: left; }
+.rs-retire { font-size: 0.66rem; color: #C77700; font-weight: 700; margin-left: 4px; }
 .rs-prod { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 14px 18px; }
 .rs-prod > * { border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px; font-size: 0.86rem; }
 .rs-prod small { display: block; font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-sub); font-weight: 700; margin-bottom: 3px; }
